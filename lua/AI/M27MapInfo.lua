@@ -582,7 +582,7 @@ function FixSegmentPathingGroup(sPathing, tLocation, iCorrectPathingGroup)
         --if sPathing == M27UnitInfo.refPathingTypeLand and tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ] == tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeAmphibious][iSegmentX][iSegmentZ] then bUpdateAmphibiousWithSameGroup = true end
         tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ] = iCorrectPathingGroup
         --if bUpdateAmphibiousWithSameGroup then tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeAmphibious][iSegmentX][iSegmentZ] = iCorrectPathingGroup end
-        tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(tLocation)] = tLocation
+        tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(tLocation)] = {tLocation[1], tLocation[2], tLocation[3]}
         if M27Utilities.IsTableEmpty(tSegmentBySegmentGroup[sPathing][iOldPathingGroup]) == false then
             for iEntry, tSegments in tSegmentBySegmentGroup[sPathing][iOldPathingGroup] do
                 --table.insert into this is tSegmentBySegmentGroup[sPathing][iPathingGroup], {iSegmentX, iSegmentZ}

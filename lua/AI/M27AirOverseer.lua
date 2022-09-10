@@ -2511,6 +2511,30 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
         end
     end
 
+    --Get details of recently seen cruisers so AirAA can abort:
+    local iRecentlySeenCruiserSearchRange = 100
+    local tAllRecentlySeenCruisers = {}
+    --Add any pond AA recently seen but not currently visible to this
+    if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy untis by pond empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]))) end
+    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]) == false then
+        for iPond, tEnemyUnits in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond] do
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering iPond='..iPond..'; is table of enemy units empty for this='..tostring(M27Utilities.IsTableEmpty(tEnemyUnits))) end
+            if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                local tEnemyT2PlusNavalAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiserCarrier, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPond])
+                if bDebugMessages == true then LOG(sFunctionRef..': Is table of cruisers and carriers empty='..tostring(M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA))) end
+                if M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA) == false then
+                    for iUnit, oUnit in tEnemyT2PlusNavalAA do
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Is valid='..tostring(M27UnitInfo.IsUnitValid(oUnit))..'; Is last known position empty='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]))..'; Can see unit='..tostring(M27Utilities.CanSeeUnit(aiBrain, oUnit, true))) end
+                        if M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]) == false and not(M27Utilities.CanSeeUnit(aiBrain, oUnit, true)) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': About to add naval unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to AA threats') end
+                            table.insert( tAllRecentlySeenCruisers, oUnit)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
     aiBrain[reftLowFuelAir] = {}
     iCurUnitsWithLowFuel = 0
     aiBrain[refiPreviousAvailableBombers] = 0
@@ -2817,9 +2841,18 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                                                                         break
                                                                                     end
                                                                                 end
-                                                                            elseif bDebugMessages == true then
-                                                                                LOG(sFunctionRef .. ': No nearby enemy AA so will continue to attack')
                                                                             end
+                                                                            if not(bClearAirAATargets) and M27Utilities.IsTableEmpty(tAllRecentlySeenCruisers) == false then
+                                                                                for iCruiser, oCruiser in tAllRecentlySeenCruisers do
+                                                                                    if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oCruiser:GetPosition()) <= iRecentlySeenCruiserSearchRange then
+                                                                                        bClearAirAATargets = true
+                                                                                        bReturnToRallyPoint = true
+                                                                                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy cruiser recently detected nearby='..oCruiser.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCruiser)..'; Dist away='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oCruiser:GetPosition())) end
+                                                                                        break
+                                                                                    end
+                                                                                end
+                                                                            end
+                                                                            if bDebugMessages == true then LOG(sFunctionRef..': Finished checking for nearby AA. bClearAirAATargets='..tostring(bClearAirAATargets)..'; bReturnToRallyPoint='..tostring(bReturnToRallyPoint)) end
                                                                         end
                                                                     else
                                                                         if bDebugMessages == true then
@@ -4812,6 +4845,30 @@ function AirBomberManager(aiBrain)
         local iCurActualDistance
         local bAvoidCruisers = false
         local tEnemyCruisers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryCruiserCarrier, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxPossibleRange, 'Enemy')
+        local tAllRecentlySeenCruisers = {}
+        --Include recently seen cruisers in this
+        --Add any pond AA recently seen but not currently visible to this
+        if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy untis by pond empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]))) end
+        if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]) == false then
+            for iPond, tEnemyUnits in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond] do
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering iPond='..iPond..'; is table of enemy units empty for this='..tostring(M27Utilities.IsTableEmpty(tEnemyUnits))) end
+                if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                    local tEnemyT2PlusNavalAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiserCarrier, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPond])
+                    if bDebugMessages == true then LOG(sFunctionRef..': Is table of cruisers and carriers empty='..tostring(M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA))) end
+                    if M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA) == false then
+                        for iUnit, oUnit in tEnemyT2PlusNavalAA do
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Is valid='..tostring(M27UnitInfo.IsUnitValid(oUnit))..'; Is last known position empty='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]))..'; Can see unit='..tostring(M27Utilities.CanSeeUnit(aiBrain, oUnit, true))) end
+                            if M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]) == false and not(M27Utilities.CanSeeUnit(aiBrain, oUnit, true)) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': About to add naval unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to AA threats') end
+                                table.insert( tAllRecentlySeenCruisers, oUnit)
+                                table.insert(tEnemyCruisers, oUnit)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
         if M27Utilities.IsTableEmpty(tEnemyCruisers) == false then
             aiBrain[refbEnemyHasHadCruisersOrT3AA] = true
             for iUnit, oUnit in tEnemyCruisers do
@@ -4890,6 +4947,11 @@ function AirBomberManager(aiBrain)
         local iBasePathingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
 
         local tAllEnemyAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiMaxScoutRadius], 'Enemy')
+        if M27Utilities.IsTableEmpty(tAllRecentlySeenCruisers) == false then
+            for iUnit, oUnit in tAllRecentlySeenCruisers do
+                table.insert(tAllEnemyAA, oUnit)
+            end
+        end
         local tEnemyAAAndCruisers = nil
         local tEnemySAMsAndCruisers = nil
 
@@ -4904,8 +4966,15 @@ function AirBomberManager(aiBrain)
                         M27Chat.SendMessage(aiBrain, 'LotsOfAA', 'That\'s a lot of anti-air commander.  Think it\'ll be enough to calm the fear?', 0, 10000)
                     end
                 end
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': Size of tEnemyAAAndCruisers='..table.getn(tEnemyAAAndCruisers)..'; will list out each unit in here')
+                    for iUnit, oUnit in tEnemyAAAndCruisers do
+                        LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                    end
+                end
             end
         end
+
 
         for iTechLevel = 1, 4 do
 
@@ -5062,6 +5131,13 @@ function AirBomberManager(aiBrain)
 
                                 --Dont want to avoid T3 MAA since T1 bombers do ok against them
                                 local tAAForT1BombersToAvoid = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH2 + M27UnitInfo.refCategoryStructureAA + M27UnitInfo.refCategoryCruiserCarrier, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxPossibleRange, 'Enemy')
+                                --Add unseen cruisers
+                                if M27Utilities.IsTableEmpty(tAllRecentlySeenCruisers) == false then
+                                    for iCruiser, oCruiser in tAllRecentlySeenCruisers do
+                                        table.insert(tAAForT1BombersToAvoid, oCruiser)
+                                    end
+                                end
+
                                 if M27Utilities.IsTableEmpty(tAAForT1BombersToAvoid) == false then
                                     tT1AreasToAvoidSubtables = {}
                                     local tNearbyLandCombat
@@ -5723,9 +5799,9 @@ function AirBomberManager(aiBrain)
                         local iFriendlySearchRange = iAOE * 1.5
 
 
-                        --Is the enemy ACU vulnerable and we are in assassination mode? If so then target this
+                        --Is the enemy ACU vulnerable and we are in assassination mode and it's either the last ACU or full share isnt on? If so then target this
                         iCurPriority = 1
-                        if ScenarioInfo.Options.Victory == "demoralization" and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()) <= 10 and (not (M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU])) or not (M27MapInfo.IsUnderwater({ aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[1], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[2] + 18, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[3] }, false))) then
+                        if ScenarioInfo.Options.Victory == "demoralization" and not(aiBrain[M27Overseer.refiActiveEnemyBrains] > 1 and ScenarioInfo.Options.Share == 'FullShare') and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()) <= 10 and (not (M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU])) or not (M27MapInfo.IsUnderwater({ aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[1], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[2] + 18, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[3] }, false))) then
                             tNearbyFriendlies = aiBrain:GetUnitsAroundPoint(iNearbyFriendlyCategories, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition(), iFriendlySearchRange, 'Ally')
                             if M27Utilities.IsTableEmpty(tNearbyFriendlies) then
                                 iEnemyAANearTarget = IsTargetCoveredByAA(aiBrain[M27Overseer.refoLastNearestACU], tEnemyAAAndCruisers, 3, tStartPoint, true)
@@ -5871,14 +5947,18 @@ function AirBomberManager(aiBrain)
                                             if bDebugMessages == true then
                                                 LOG(sFunctionRef .. ': Considering oUnit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; Distance to startpoint=' .. M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tStartPoint) .. '; iEnemyAANearTarget=' .. IsTargetCoveredByAA(oUnit, tEnemySAMs, 3, tStartPoint, true) .. '; Is shielded=' .. tostring(M27Logic.IsTargetUnderShield(aiBrain, oUnit, 0, false, false, true)))
                                             end
-                                            if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tStartPoint) >= 120 then
-                                                tNearbyFriendlies = aiBrain:GetUnitsAroundPoint(iNearbyFriendlyCategories, oUnit:GetPosition(), iFriendlySearchRange, 'Ally')
-                                                if M27Utilities.IsTableEmpty(tNearbyFriendlies) then
-                                                    iEnemyAANearTarget = IsTargetCoveredByAA(oUnit, tEnemySAMs, 3, tStartPoint, true)
 
-                                                    if iEnemyAANearTarget <= iMaxUnshieldedSAM then
-                                                        if iEnemyAANearTarget <= iMaxShieldedSAM or not (M27Logic.IsTargetUnderShield(aiBrain, oUnit, 0, false, false, true)) then
-                                                            AddUnitToShortlist(oUnit, iTechLevel)
+                                            --Is the unit visible (since we have included recently seen units in here)?
+                                            if M27Utilities.CanSeeUnit(aiBrain, oUnit, true) then
+                                                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tStartPoint) >= 120 then
+                                                    tNearbyFriendlies = aiBrain:GetUnitsAroundPoint(iNearbyFriendlyCategories, oUnit:GetPosition(), iFriendlySearchRange, 'Ally')
+                                                    if M27Utilities.IsTableEmpty(tNearbyFriendlies) then
+                                                        iEnemyAANearTarget = IsTargetCoveredByAA(oUnit, tEnemySAMs, 3, tStartPoint, true)
+
+                                                        if iEnemyAANearTarget <= iMaxUnshieldedSAM then
+                                                            if iEnemyAANearTarget <= iMaxShieldedSAM or not (M27Logic.IsTargetUnderShield(aiBrain, oUnit, 0, false, false, true)) then
+                                                                AddUnitToShortlist(oUnit, iTechLevel)
+                                                            end
                                                         end
                                                     end
                                                 end
@@ -6390,17 +6470,20 @@ function AirBomberManager(aiBrain)
                                     --Target enemy AA within 60% of our base, regardless of if shielded or protected by AA
                                     local iMaxDist = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.6
                                     for iUnit, oUnit in tEnemyAAAndCruisers do
-                                        if (oUnit[refiStrikeDamageAssigned] or 0) <= 1000 and oUnit:GetFractionComplete() >= 0.5 then
-                                            if not (M27UnitInfo.IsUnitUnderwater(oUnit)) then
-                                                --Is the unit within 60% of our base?
-                                                iCurModDistance = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition())
-                                                if iCurModDistance <= iMaxDist then
+                                        --Make sure we can see this (since we include recently seen but not visible cruisers)
+                                        if M27Utilities.CanSeeUnit(aiBrain, oUnit, true) then
+                                            if (oUnit[refiStrikeDamageAssigned] or 0) <= 1000 and oUnit:GetFractionComplete() >= 0.5 then
+                                                if not (M27UnitInfo.IsUnitUnderwater(oUnit)) then
+                                                    --Is the unit within 60% of our base?
+                                                    iCurModDistance = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition())
+                                                    if iCurModDistance <= iMaxDist then
 
-                                                    iCurStrikeDamage = GetMaxStrikeDamageWanted(oUnit)
-                                                    iTableIndex = math.min(5, math.ceil(iCurStrikeDamage / 10000))
-                                                    table.insert(tTargetsByMaxHealth[iTableIndex], oUnit)
-                                                    table.insert(tTargetStrikeDamageByMaxHealth[iTableIndex], iCurStrikeDamage)
-                                                    iPossibleTargets = iPossibleTargets + 1
+                                                        iCurStrikeDamage = GetMaxStrikeDamageWanted(oUnit)
+                                                        iTableIndex = math.min(5, math.ceil(iCurStrikeDamage / 10000))
+                                                        table.insert(tTargetsByMaxHealth[iTableIndex], oUnit)
+                                                        table.insert(tTargetStrikeDamageByMaxHealth[iTableIndex], iCurStrikeDamage)
+                                                        iPossibleTargets = iPossibleTargets + 1
+                                                    end
                                                 end
                                             end
                                         end
@@ -6832,6 +6915,31 @@ function AirAAManager(aiBrain)
             end
 
 
+            --Record enemy unseen cruisers/carriers that have had sight of recently
+            local iRecentlySeenCruiserSearchRange = 100
+            local tAllRecentlySeenCruisers = {}
+            --Add any pond AA recently seen but not currently visible to this
+            if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy untis by pond empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]))) end
+            if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]) == false then
+                for iPond, tEnemyUnits in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond] do
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering iPond='..iPond..'; is table of enemy units empty for this='..tostring(M27Utilities.IsTableEmpty(tEnemyUnits))) end
+                    if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                        local tEnemyT2PlusNavalAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiserCarrier, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPond])
+                        if bDebugMessages == true then LOG(sFunctionRef..': Is table of cruisers and carriers empty='..tostring(M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA))) end
+                        if M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA) == false then
+                            for iUnit, oUnit in tEnemyT2PlusNavalAA do
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Is valid='..tostring(M27UnitInfo.IsUnitValid(oUnit))..'; Is last known position empty='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]))..'; Can see unit='..tostring(M27Utilities.CanSeeUnit(aiBrain, oUnit, true))) end
+                                if M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]) == false and not(M27Utilities.CanSeeUnit(aiBrain, oUnit, true)) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': About to add naval unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to AA threats') end
+                                    table.insert( tAllRecentlySeenCruisers, oUnit)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+
+
 
             --Create a table with all air threats and their distance
             for iUnit, oUnit in tEnemyAirUnits do
@@ -6948,6 +7056,9 @@ function AirAAManager(aiBrain)
                                         if not (oUnit:IsUnitState('Attached')) then
                                             --Check if ground AA near the target
                                             tEnemyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, tUnitCurPosition, iEnemyGroundAASearchRange, 'Enemy')
+
+
+
                                             if M27Utilities.IsTableEmpty(tEnemyGroundAA) == true then
                                                 bShouldAttackThreat = true
                                             else
@@ -6984,6 +7095,19 @@ function AirAAManager(aiBrain)
                                                         end
                                                     end
                                                 end
+                                            end
+                                            if bShouldAttackThreat then
+                                                --Is there a nearby cruiser or carrier? If so then abort
+                                                if M27Utilities.IsTableEmpty(tAllRecentlySeenCruisers) == false then
+                                                    for iCruiser, oCruiser in tAllRecentlySeenCruisers do
+                                                        if M27Utilities.GetDistanceBetweenPositions(tUnitCurPosition, oCruiser:GetPosition()) <= iRecentlySeenCruiserSearchRange then
+                                                            bShouldAttackThreat = false
+                                                            if bDebugMessages == true then LOG(sFunctionRef..': Enemy cruiser recently detected nearby='..oCruiser.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCruiser)..'; Dist away='..M27Utilities.GetDistanceBetweenPositions(tUnitCurPosition, oCruiser:GetPosition())) end
+                                                            break
+                                                        end
+                                                    end
+                                                end
+
                                             end
                                         end
                                     end
@@ -8193,6 +8317,32 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
         iImmediateCombatRange = 17 --Given czar's speed, this is a reasonable approximation
     end
     local iSAMSearchRange = 60 + iCombatRangeToUse + 6
+    local iRecentlySeenCruiserSearchRange = 100
+    local tRecentlySeenCruisersToAdd = {} --table of cruisers/carriers that we dont have visiblitliy of but have seen recently so we know to avoid an area
+    --Add any pond AA recently seen but not currently visible to this
+    if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy untis by pond empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]))) end
+    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]) == false then
+        for iPond, tEnemyUnits in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond] do
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering iPond='..iPond..'; is table of enemy units empty for this='..tostring(M27Utilities.IsTableEmpty(tEnemyUnits))) end
+            if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                local tEnemyT2PlusNavalAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiserCarrier, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPond])
+                if bDebugMessages == true then LOG(sFunctionRef..': Is table of cruisers and carriers empty='..tostring(M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA))) end
+                if M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA) == false then
+                    for iUnit, oUnit in tEnemyT2PlusNavalAA do
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Is valid='..tostring(M27UnitInfo.IsUnitValid(oUnit))..'; Is last known position empty='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]))..'; Can see unit='..tostring(M27Utilities.CanSeeUnit(aiBrain, oUnit, true))) end
+                        if M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]) == false and not(M27Utilities.CanSeeUnit(aiBrain, oUnit, true)) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Distance to last known position='..M27Utilities.GetDistanceBetweenPositions(tCurPosition, oUnit[M27UnitInfo.reftLastKnownPosition])..'; Distance to actual position='..M27Utilities.GetDistanceBetweenPositions(tCurPosition, oUnit:GetPosition())) end
+                            if M27Utilities.GetDistanceBetweenPositions(tCurPosition, oUnit[M27UnitInfo.reftLastKnownPosition]) <= iRecentlySeenCruiserSearchRange and M27Utilities.GetDistanceBetweenPositions(tCurPosition, oUnit:GetPosition()) <= iRecentlySeenCruiserSearchRange then
+                                if bDebugMessages == true then LOG(sFunctionRef..': About to add naval unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to AA threats') end
+                                table.insert( tRecentlySeenCruisersToAdd, oUnit)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
 
     local reftLastLocationTarget = 'M27AirLastLocationTarget'
     local refoLastUnitTarget = 'M27AirLastUnitTarget'
@@ -8306,7 +8456,17 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             if iTimeToKillTarget <= 150 then
                 local iTimeUntilWeDie
 
+                local iEnemyAASearchRange = 100
                 local tEnemyAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA + M27UnitInfo.refCategoryGroundAA, tCurPosition, 100, 'Enemy')
+                --Add any pond AA recently seen but not currently visible to this
+                if M27Utilities.IsTableEmpty(tRecentlySeenCruisersToAdd) == false then
+                    for iUnit, oUnit in tRecentlySeenCruisersToAdd do
+                        table.insert(tEnemyAA, oUnit)
+                    end
+                end
+
+
+
                 local iEstimatedEnemyAADPS = 0
                 local iEstimatedMassDPSFactor = 0.4
                 local iEnemyAAMass = 0
@@ -8452,7 +8612,13 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             end
             if bStillRun and iTimeSinceFirstRan >= 15 and (bIsCzar or iTimeSinceFirstRan >= 25) then
                 --Does the enemy not have any SAMs (or other T3 ground AA) within range of us?
-                local tNearbyEnemySAMs = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, tCurPosition, iSAMSearchRange + 10, 'Enemy')
+                local tNearbyEnemySAMs = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3 + M27UnitInfo.refCategoryCruiserCarrier, tCurPosition, iSAMSearchRange + 10, 'Enemy')
+                if M27Utilities.IsTableEmpty(tRecentlySeenCruisersToAdd) == false then
+                    for iUnit, oUnit in tRecentlySeenCruisersToAdd do
+                        table.insert(tNearbyEnemySAMs, oUnit)
+                    end
+                end
+
                 if M27Utilities.IsTableEmpty(tNearbyEnemySAMs) then
                     local tNearbyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryNavalSurface - categories.TECH1, tCurPosition, iCombatRangeToUse, 'Enemy')
                     if M27Utilities.IsTableEmpty(tNearbyUnits) then
@@ -8522,6 +8688,11 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 LOG(sFunctionRef .. ': No immediate targets so will consider units nearby')
             end
             local tNearbySAM = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, tCurPosition, iSAMSearchRange, 'Enemy')
+            if M27Utilities.IsTableEmpty(tRecentlySeenCruisersToAdd) == false then
+                for iUnit, oUnit in tRecentlySeenCruisersToAdd do
+                    table.insert(tNearbySAM, oUnit)
+                end
+            end
             iSAMThreshold = 6
             if iNearbyFriendlyAirExperimental > 0 then
                 iSAMThreshold = iSAMThreshold * (1 + iNearbyFriendlyAirExperimental)

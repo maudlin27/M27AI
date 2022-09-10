@@ -752,6 +752,11 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                                 ForkThread(M27Team.RecordUnseenPD, oUnitCausingDamage, self)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Have recrded unseen PD') end
                             end
+
+                            --Unseen naval units - record if they have dealt us damage
+                            if not(oUnitCausingDamage[M27UnitInfo.reftLastKnownPosition]) and EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitCausingDamage.UnitId) then
+                                M27Navy.UpdateUnitPond(oUnitCausingDamage, aiBrain.M27Team, IsEnemy(aiBrain:GetArmyIndex(), oUnitCausingDamage:GetAIBrain():GetArmyIndex()))
+                            end
                         end
                         --General logic for shields so are very responsive with micro
                         if self.MyShield and self.MyShield.GetHealth and self.MyShield:GetHealth() < 100 and EntityCategoryContains((M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryPersonalShield) * categories.MOBILE, self) then
@@ -949,7 +954,7 @@ function OnMissileBuilt(self, weapon)
                     elseif EntityCategoryContains(M27UnitInfo.refCategoryTML, self.UnitId) then sActionRef = M27EngineerOverseer.refActionAssistTML
                     elseif EntityCategoryContains(M27UnitInfo.refCategorySMD, self.UnitId) then sActionRef = M27EngineerOverseer.refActionAssistSMD
                     end
-                    if sActionRef then
+                    if sActionRef and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][sActionRef]) == false then
                         for iRef, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][sActionRef] do
                             oEngineer = tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]
                             --if oEngineer:IsUnitState('Building') or oEngineer:IsUnitState('Repairing') then bDebugMessages = true M27Utilities.ErrorHandler('Clearing an engineer whose unit state is building or repairing') end
@@ -1344,14 +1349,23 @@ function OnConstructed(oEngineer, oJustBuilt)
         elseif M27Config.M27ShowEnemyUnitNames then
             oJustBuilt:SetCustomName(oJustBuilt.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oJustBuilt))
         end
+
+
         --Engineer callbacks
-        if oEngineer:GetAIBrain().M27AI and not (oEngineer.Dead) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer:GetUnitId()) then
-            local sFunctionRef = 'OnConstructed'
-            local bDebugMessages = false
-            if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-            ForkThread(M27EngineerOverseer.ReassignEngineers, oEngineer:GetAIBrain(), true, { oEngineer })
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        if oEngineer:GetAIBrain().M27AI and not (oEngineer.Dead) then
+            if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer:GetUnitId()) then
+                local sFunctionRef = 'OnConstructed'
+                local bDebugMessages = false
+                if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                ForkThread(M27EngineerOverseer.ReassignEngineers, oEngineer:GetAIBrain(), true, { oEngineer })
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            elseif EntityCategoryContains(categories.COMMAND, oEngineer.UnitId) then
+                local bDebugMessages = false
+                local sFunctionRef = 'OnConstructed'
+                if bDebugMessages == true then LOG(sFunctionRef..': About to run ACU logic update out of cycle as it has just finished construction') end
+                ForkThread(M27PlatoonUtilities.RunPlatoonSingleCycle, oEngineer.PlatoonHandle)
+            end
         end
     end
 end
@@ -1485,6 +1499,20 @@ function OnTransportUnload(oUnit, oTransport, bone)
                 end
             end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        end
+    end
+end
+
+function OnDetectedBy(oUnitDetected, iBrainIndex)
+    --Appears to be called when iBrainIndex detects oUnitDetected
+
+    --For now used to make sure we have up to date naval info
+    if M27Utilities.bM27AIInGame then
+        local aiBrain = ArmyBrains[iBrainIndex]
+        --LOG('OnDetectedBy: UnitID='..oUnitDetected.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitDetected)..'; tAllAIBrainsByArmyIndex[iBrainIndex] name='..M27Overseer.tAllAIBrainsByArmyIndex[iBrainIndex].Nickname..'; ArmyBrains nickname='..ArmyBrains[iBrainIndex].Nickname..'; Does entity contain navy='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitDetected.UnitId))..'; aiBrain.M27AI='..tostring((aiBrain.M27AI or false)))
+        if aiBrain.M27AI and not(oUnitDetected[M27UnitInfo.reftLastKnownPosition]) and M27UnitInfo.IsUnitValid(oUnitDetected) and EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitDetected.UnitId) and aiBrain.M27Team then
+            --LOG('OnDetectedBy: aiBrain='..aiBrain.Nickname..' has just detected unit '..oUnitDetected.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitDetected))
+            M27Navy.UpdateUnitPond(oUnitDetected, aiBrain.M27Team, IsEnemy(iBrainIndex, oUnitDetected:GetAIBrain():GetArmyIndex()))
         end
     end
 end

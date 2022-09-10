@@ -38,6 +38,7 @@ refoClosestEnemyNavalUnitByPond = 'NavalM27ClosestEnemy' --[x] is the pond ref
 refoClosestFriendlyUnitToEnemyByPond = 'NavalM27ClosestFriendlyToEnemy' --[x] is the pond ref
 refoPrimaryNavalFactoryByPond = 'NavalM27PrimaryNavalFactory' --[x] is the pond ref
 refiTimeOfLastPrimaryNavalUpdateByPond = 'NavalM27TimeOfLastNavalUpdate' --[x] is the pond ref
+refiTimeOfLastNavalUnitCheckByPond = 'NavalM27TimeOfLastNavalUnitCheck' --[x] is the pond ref
 reftBackupBaseLocationByPond = 'NavalM27BackupBase' --[x] is pond ref; will return the last naval factory location (used e.g. if want to manage navy after naval fac destroyed)
 refbHaveNavalShortfall = 'NavalM27Shortfall' --[x] is pond ref
 refiTimeOfLastEnemyNavalBaseUpdateByPond = 'NavalM27TimeOfLastEnemyNavalBase' --[x] is the pond ref
@@ -45,6 +46,7 @@ refoPrimaryEnemyNavalUnitByPond = 'NavalM27PrimaryEnemyNavalUnit' --[x] - enemy 
 reftEnemyBaseLocationByPond = 'NavalM27NavalLocation'
 refiLastBombardmentSearchRangeByPond = 'NavalM27LastBombardmentSearchRange'
 refbLastBombardmentSearchRangeSuccessByPond = 'NavalM27LastBombardmentSuccess'
+refiEnemyNavalThreatByPond = 'NavalM27NavalThreatByPond'
 
 reftTimeOfTransportLastLocationAttempt = 'M27TeamTimeOfLastTransportAttempt' --against tTeamData[aiBrain.M27Team], returns a table with [x] being the string location ref, and the value being the game time in seconds that we last tried to land a transport there
 tScoutAssignedToMexLocation = 'M27ScoutsAssignedByMex' --tTeamData[aiBrain.M27Team][this]: returns a table, with key [sLocationRef], that returns a scout object, e.g. [X1Z1] = oScout; only returns scout unit if one has been assigned to that location; used to track scouts assigned by mex
@@ -116,7 +118,7 @@ function UpdateTeamDataForEnemyUnits(aiBrain)
         --Refresh table of unseen PD
         if M27Utilities.IsTableEmpty(tTeamData[aiBrain.M27Team][reftUnseenPD]) == false then
             for iUnit, oUnit in tTeamData[aiBrain.M27Team][reftUnseenPD] do
-                if M27UnitInfo.IsUnitValid(oUnit) then
+                if not(M27UnitInfo.IsUnitValid(oUnit)) then
                     tTeamData[aiBrain.M27Team][reftUnseenPD][iUnit] = nil
                 elseif M27Utilities.CanSeeUnit(aiBrain, oUnit, true) then
                     tTeamData[aiBrain.M27Team][reftUnseenPD][iUnit] = nil
@@ -143,9 +145,10 @@ function UpdateTeamDataForEnemyUnits(aiBrain)
 
         --Record enemy naval units
         local tEnemyNavy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllAmphibiousAndNavy, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 10000, 'Enemy')
+        tTeamData[aiBrain.M27Team][refiTimeOfLastNavalUnitCheckByPond] = GetGameTimeSeconds()
         if M27Utilities.IsTableEmpty(tEnemyNavy) == false then
-            local iCurPond
-            local sPathing = M27UnitInfo.refPathingTypeNavy
+            --local iCurPond
+            --local sPathing = M27UnitInfo.refPathingTypeNavy
             for iUnit, oUnit in tEnemyNavy do
                 M27Navy.UpdateUnitPond(oUnit, aiBrain.M27Team, true)
             end
@@ -674,6 +677,7 @@ function TeamInitialisation(iTeamRef)
     tTeamData[iTeamRef][refiDestroyedNavalFactoriesByPond] = {}
     tTeamData[iTeamRef][refoPrimaryNavalFactoryByPond] = {}
     tTeamData[iTeamRef][refiTimeOfLastPrimaryNavalUpdateByPond] = {}
+    tTeamData[iTeamRef][refiTimeOfLastNavalUnitCheckByPond] = {}
     tTeamData[iTeamRef][reftBackupBaseLocationByPond] = {}
     tTeamData[iTeamRef][refoClosestEnemyNavalUnitByPond] = {}
     tTeamData[iTeamRef][refoClosestFriendlyUnitToEnemyByPond] = {}
@@ -683,6 +687,7 @@ function TeamInitialisation(iTeamRef)
     tTeamData[iTeamRef][reftEnemyBaseLocationByPond] = {}
     tTeamData[iTeamRef][refiLastBombardmentSearchRangeByPond] = {}
     tTeamData[iTeamRef][refbLastBombardmentSearchRangeSuccessByPond] = {}
+    tTeamData[iTeamRef][refiEnemyNavalThreatByPond] = {}
 
 
 

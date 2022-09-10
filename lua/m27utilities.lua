@@ -13,6 +13,7 @@ refProfilerEnd = 1
 bGlobalDebugOverride = false
 bM27AIInGame = false
 tErrorCountByMessage = {} --WHenever we have an error, then the error message is a key that gets included in this table
+refiHumansInGame = -1 --Used to determine if some debug functionality like drawing circles is disabled; set to -1 initially so know if it has been run or not before
 
 
 
@@ -220,34 +221,37 @@ function DrawCircleAroundPoint(tLocation, iColour, iDisplayCount, iCircleSize)
     local sFunctionRef = 'DrawCircleAroundPoint'
     local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
 
-    if iCircleSize == nil then iCircleSize = 2 end
-    if iDisplayCount == nil then iDisplayCount = 500
-    elseif iDisplayCount <= 0 then iDisplayCount = 1
-    elseif iDisplayCount >= 10000 then iDisplayCount = 10000
-    end
+    if refiHumansInGame <= 1 or M27Config.M27AllowDebugWithMultipleHumans then
 
-    local sColour
-    if iColour == nil then sColour = 'c00000FF' --dark blue
-    elseif iColour == 1 then sColour = 'c00000FF' --dark blue
-    elseif iColour == 2 then sColour = 'ffFF4040' --Red
-    elseif iColour == 3 then sColour = 'c0000000' --Black (can be hard to see on some maps)
-    elseif iColour == 4 then sColour = 'fff4a460' --Gold
-    elseif iColour == 5 then sColour = 'ff27408b' --Light Blue
-    elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan (might actually be white as well?)
-    elseif iColour == 7 then sColour = 'ffffffff' --white
-    else sColour = 'ffFF6060' --Orangy pink
-    end
+        if iCircleSize == nil then iCircleSize = 2 end
+        if iDisplayCount == nil then iDisplayCount = 500
+        elseif iDisplayCount <= 0 then iDisplayCount = 1
+        elseif iDisplayCount >= 10000 then iDisplayCount = 10000
+        end
 
-    local iMaxDrawCount = iDisplayCount
-    local iCurDrawCount = 0
-    if bDebugMessages == true then LOG('About to draw circle at table location ='..repru(tLocation)) end
-    while true do
-        bFirstLocation = true
-        DrawCircle(tLocation, iCircleSize, sColour)
-        iCurDrawCount = iCurDrawCount + 1
-        if iCurDrawCount > iMaxDrawCount then return end
-        if bDebugMessages == true then LOG(sFunctionRef..': Will wait 2 ticks then refresh the drawing') end
-        coroutine.yield(2) --Any more and circles will flash instead of being constant
+        local sColour
+        if iColour == nil then sColour = 'c00000FF' --dark blue
+        elseif iColour == 1 then sColour = 'c00000FF' --dark blue
+        elseif iColour == 2 then sColour = 'ffFF4040' --Red
+        elseif iColour == 3 then sColour = 'c0000000' --Black (can be hard to see on some maps)
+        elseif iColour == 4 then sColour = 'fff4a460' --Gold
+        elseif iColour == 5 then sColour = 'ff27408b' --Light Blue
+        elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan (might actually be white as well?)
+        elseif iColour == 7 then sColour = 'ffffffff' --white
+        else sColour = 'ffFF6060' --Orangy pink
+        end
+
+        local iMaxDrawCount = iDisplayCount
+        local iCurDrawCount = 0
+        if bDebugMessages == true then LOG('About to draw circle at table location ='..repru(tLocation)) end
+        while true do
+            bFirstLocation = true
+            DrawCircle(tLocation, iCircleSize, sColour)
+            iCurDrawCount = iCurDrawCount + 1
+            if iCurDrawCount > iMaxDrawCount then return end
+            if bDebugMessages == true then LOG(sFunctionRef..': Will wait 2 ticks then refresh the drawing') end
+            coroutine.yield(2) --Any more and circles will flash instead of being constant
+        end
     end
 end
 
@@ -262,50 +266,52 @@ function OldDrawTableOfLocations(tableLocations, relativeStart, iColour, iDispla
     -- iDisplayCount - No. of times to cycle through drawing; limit of 500 (10s) for performance reasons
     --bSingleLocation - true if tableLocations is just 1 position
     local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
-    if iCircleSize == nil then iCircleSize = 2 end
-    if iDisplayCount == nil then iDisplayCount = 500
-    elseif iDisplayCount <= 0 then iDisplayCount = 1
-    elseif iDisplayCount >= 10000 then iDisplayCount = 10000
-    end
-    if bSingleLocation == nil then bSingleLocation = false end
-    local sColour
-    if iColour == nil then sColour = 'c00000FF' --dark blue
-    elseif iColour == 1 then sColour = 'c00000FF' --dark blue
-    elseif iColour == 2 then sColour = 'ffFF4040' --Red
-    elseif iColour == 3 then sColour = 'c0000000' --Black (can be hard to see on some maps)
-    elseif iColour == 4 then sColour = 'fff4a460' --Gold
-    elseif iColour == 5 then sColour = 'ff27408b' --Light Blue
-    elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan (might actually be white as well?)
-    elseif iColour == 7 then sColour = 'ffffffff' --white
-    else sColour = 'ffFF6060' --Orangy pink
-    end
-
-
-    if relativeStart == nil then relativeStart = {0,0,0} end
-    local iMaxDrawCount = iDisplayCount
-    local iCurDrawCount = 0
-    if bDebugMessages == true then LOG('About to draw circle at table locations ='..repru(tableLocations)) end
-    local bFirstLocation = true
-    local tPrevLocation = {}
-    local iCount = 0
-    while true do
-        bFirstLocation = true
-        iCount = iCount + 1 if iCount > 10000 then ErrorHandler('Infinite loop') break end
-        if bSingleLocation then DrawCircle(tableLocations, iCircleSize, sColour)
-        else
-            for i, tCurLocation in ipairs(tableLocations) do
-                DrawCircle(tCurLocation, iCircleSize, sColour)
-                if bFirstLocation == true then
-                    bFirstLocation = false
-                else
-                    DrawLine(tPrevLocation, tCurLocation, sColour)
-                end
-                tPrevLocation = tCurLocation
-            end
+    if refiHumansInGame <= 1 or M27Config.M27AllowDebugWithMultipleHumans then
+        if iCircleSize == nil then iCircleSize = 2 end
+        if iDisplayCount == nil then iDisplayCount = 500
+        elseif iDisplayCount <= 0 then iDisplayCount = 1
+        elseif iDisplayCount >= 10000 then iDisplayCount = 10000
         end
-        iCurDrawCount = iCurDrawCount + 1
-        if iCurDrawCount > iMaxDrawCount then return end
-        coroutine.yield(2) --Any more and circles will flash instead of being constant
+        if bSingleLocation == nil then bSingleLocation = false end
+        local sColour
+        if iColour == nil then sColour = 'c00000FF' --dark blue
+        elseif iColour == 1 then sColour = 'c00000FF' --dark blue
+        elseif iColour == 2 then sColour = 'ffFF4040' --Red
+        elseif iColour == 3 then sColour = 'c0000000' --Black (can be hard to see on some maps)
+        elseif iColour == 4 then sColour = 'fff4a460' --Gold
+        elseif iColour == 5 then sColour = 'ff27408b' --Light Blue
+        elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan (might actually be white as well?)
+        elseif iColour == 7 then sColour = 'ffffffff' --white
+        else sColour = 'ffFF6060' --Orangy pink
+        end
+
+
+        if relativeStart == nil then relativeStart = {0,0,0} end
+        local iMaxDrawCount = iDisplayCount
+        local iCurDrawCount = 0
+        if bDebugMessages == true then LOG('About to draw circle at table locations ='..repru(tableLocations)) end
+        local bFirstLocation = true
+        local tPrevLocation = {}
+        local iCount = 0
+        while true do
+            bFirstLocation = true
+            iCount = iCount + 1 if iCount > 10000 then ErrorHandler('Infinite loop') break end
+            if bSingleLocation then DrawCircle(tableLocations, iCircleSize, sColour)
+            else
+                for i, tCurLocation in ipairs(tableLocations) do
+                    DrawCircle(tCurLocation, iCircleSize, sColour)
+                    if bFirstLocation == true then
+                        bFirstLocation = false
+                    else
+                        DrawLine(tPrevLocation, tCurLocation, sColour)
+                    end
+                    tPrevLocation = tCurLocation
+                end
+            end
+            iCurDrawCount = iCurDrawCount + 1
+            if iCurDrawCount > iMaxDrawCount then return end
+            coroutine.yield(2) --Any more and circles will flash instead of being constant
+        end
     end
 end
 
@@ -323,62 +329,65 @@ function DrawRectBase(rRect, iColour, iDisplayCount)
     local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DrawRectBase'
     if bDebugMessages == true then LOG(sFunctionRef..': rRect='..repru(rRect)) end
-    local sColour
-    if iColour == nil then sColour = 'c00000FF' --dark blue
-    elseif iColour == 1 then sColour = 'c00000FF' --dark blue
-    elseif iColour == 2 then sColour = 'ffFF4040' --Red
-    elseif iColour == 3 then sColour = 'c0000000' --Black (can be hard to see on some maps)
-    elseif iColour == 4 then sColour = 'fff4a460' --Gold
-    elseif iColour == 5 then sColour = 'ff27408b' --Light Blue
-    elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan (might actually be white as well?)
-    elseif iColour == 7 then sColour = 'ffffffff' --white
-    else sColour = 'ffFF6060' --Orangy pink
-    end
+
+    if refiHumansInGame <= 1 or M27Config.M27AllowDebugWithMultipleHumans then
+        local sColour
+        if iColour == nil then sColour = 'c00000FF' --dark blue
+        elseif iColour == 1 then sColour = 'c00000FF' --dark blue
+        elseif iColour == 2 then sColour = 'ffFF4040' --Red
+        elseif iColour == 3 then sColour = 'c0000000' --Black (can be hard to see on some maps)
+        elseif iColour == 4 then sColour = 'fff4a460' --Gold
+        elseif iColour == 5 then sColour = 'ff27408b' --Light Blue
+        elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan (might actually be white as well?)
+        elseif iColour == 7 then sColour = 'ffffffff' --white
+        else sColour = 'ffFF6060' --Orangy pink
+        end
 
 
-    if iDisplayCount == nil then iDisplayCount = 500
-    elseif iDisplayCount <= 0 then iDisplayCount = 1
-    elseif iDisplayCount >= 10000 then iDisplayCount = 10000 end
-    local tPos1, tPos2
-    local iValPos2ToUse
-    local tCurPos, tLastPos
-    local tAllX = {}
-    local tAllZ = {}
-    local iCurX, iCurZ
-    local iRectKey = 0
+        if iDisplayCount == nil then iDisplayCount = 500
+        elseif iDisplayCount <= 0 then iDisplayCount = 1
+        elseif iDisplayCount >= 10000 then iDisplayCount = 10000 end
+        local tPos1, tPos2
+        local iValPos2ToUse
+        local tCurPos, tLastPos
+        local tAllX = {}
+        local tAllZ = {}
+        local iCurX, iCurZ
+        local iRectKey = 0
 
-    --[[for sRectKey, iRectVal in rRect do
-        tAllX[iRectKey] = iRectVal
-        else tAllZ[iRectKey - 2] = iRectVal end
-    end--]]
+        --[[for sRectKey, iRectVal in rRect do
+            tAllX[iRectKey] = iRectVal
+            else tAllZ[iRectKey - 2] = iRectVal end
+        end--]]
 
-    --if bDebugMessages == true then LOG(sFunctionRef..'tAllX='..repru(tAllX)..'; tAllZ='..repru(tAllZ)..'; Rectx0='..rRect['x0']) end
-    local iCurDrawCount = 0
+        --if bDebugMessages == true then LOG(sFunctionRef..'tAllX='..repru(tAllX)..'; tAllZ='..repru(tAllZ)..'; Rectx0='..rRect['x0']) end
+        local iCurDrawCount = 0
 
-    local iCount = 0
-    while true do
-        iCount = iCount + 1 if iCount > 10000 then ErrorHandler('Infinite loop') break end
-        for iValX = 1, 2 do
-            for iValZ = 1, 2 do
-                if iValX == 1 then
-                    iCurX = rRect['x0']
-                    if iValZ == 1 then iCurZ = rRect['y0'] else iCurZ = rRect['y1'] end
-                else
-                    iCurX = rRect['x1']
-                    if iValZ == 1 then iCurZ = rRect['y1'] else iCurZ = rRect['y0'] end
-                end
+        local iCount = 0
+        while true do
+            iCount = iCount + 1 if iCount > 10000 then ErrorHandler('Infinite loop') break end
+            for iValX = 1, 2 do
+                for iValZ = 1, 2 do
+                    if iValX == 1 then
+                        iCurX = rRect['x0']
+                        if iValZ == 1 then iCurZ = rRect['y0'] else iCurZ = rRect['y1'] end
+                    else
+                        iCurX = rRect['x1']
+                        if iValZ == 1 then iCurZ = rRect['y1'] else iCurZ = rRect['y0'] end
+                    end
 
-                tLastPos = tCurPos
-                tCurPos = {iCurX, GetTerrainHeight(iCurX, iCurZ), iCurZ}
-                if tLastPos then
-                    if bDebugMessages == true then LOG(sFunctionRef..': tLastPos='..repru(tLastPos)..'; tCurPos='..repru(tCurPos)) end
-                    DrawLine(tLastPos, tCurPos, sColour)
+                    tLastPos = tCurPos
+                    tCurPos = {iCurX, GetTerrainHeight(iCurX, iCurZ), iCurZ}
+                    if tLastPos then
+                        if bDebugMessages == true then LOG(sFunctionRef..': tLastPos='..repru(tLastPos)..'; tCurPos='..repru(tCurPos)) end
+                        DrawLine(tLastPos, tCurPos, sColour)
+                    end
                 end
             end
+            iCurDrawCount = iCurDrawCount + 1
+            if iCurDrawCount > iDisplayCount then return end
+            coroutine.yield(2) --Any more and lines will flash instead of being constant
         end
-        iCurDrawCount = iCurDrawCount + 1
-        if iCurDrawCount > iDisplayCount then return end
-        coroutine.yield(2) --Any more and lines will flash instead of being constant
     end
 end
 
@@ -413,33 +422,36 @@ function DrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, bS
     local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DrawLocations'
 
-    local tTableOfLocations
-    if not(bCopyTable) then
-        if bSingleLocation then tTableOfLocations = {tableLocations}
+    if refiHumansInGame <= 1 or M27Config.M27AllowDebugWithMultipleHumans then
+
+        local tTableOfLocations
+        if not(bCopyTable) then
+            if bSingleLocation then tTableOfLocations = {tableLocations}
+            else
+                tTableOfLocations = tableLocations
+            end
         else
-            tTableOfLocations = tableLocations
+
+            tTableOfLocations = {}
+            local iCount = 0
+            for iEntry, tEntry in tableLocations do
+                iCount = iCount + 1
+                tTableOfLocations[iCount] = {}
+                tTableOfLocations[iCount] = {tEntry[1], tEntry[2], tEntry[3]}
+            end
+            if bSingleLocation then tTableOfLocations = {tTableOfLocations} end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished hard copy of table, iCount='..iCount) end
         end
-    else
 
-        tTableOfLocations = {}
-        local iCount = 0
-        for iEntry, tEntry in tableLocations do
-            iCount = iCount + 1
-            tTableOfLocations[iCount] = {}
-            tTableOfLocations[iCount] = {tEntry[1], tEntry[2], tEntry[3]}
+
+        if bDebugMessages == true then
+            LOG(sFunctionRef..': About to fork threat, bCopyTable='..tostring(bCopyTable)..'; tTableOfLocations='..repru(tTableOfLocations)..'; bSingleLocation='..tostring(bSingleLocation))
         end
-        if bSingleLocation then tTableOfLocations = {tTableOfLocations} end
-        if bDebugMessages == true then LOG(sFunctionRef..': Finished hard copy of table, iCount='..iCount) end
-    end
-
-
-    if bDebugMessages == true then
-        LOG(sFunctionRef..': About to fork threat, bCopyTable='..tostring(bCopyTable)..'; tTableOfLocations='..repru(tTableOfLocations)..'; bSingleLocation='..tostring(bSingleLocation))
-    end
-    if IsTableEmpty(tTableOfLocations) then ErrorHandler('Trying to draw an empty table')
-    else
-        --SteppingStoneForDrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
-        ForkThread(SteppingStoneForDrawLocations, tTableOfLocations, relativeStart, iColour, iDisplayCount, iCircleSize)--]]
+        if IsTableEmpty(tTableOfLocations) then ErrorHandler('Trying to draw an empty table')
+        else
+            --SteppingStoneForDrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
+            ForkThread(SteppingStoneForDrawLocations, tTableOfLocations, relativeStart, iColour, iDisplayCount, iCircleSize)--]]
+        end
     end
 
 end
@@ -618,6 +630,32 @@ function GetAngleDifference(iAngle1, iAngle2)
     --returns the absolute difference between two angles.  Assumes angles are 0-360
     return 180 - math.abs(math.abs(iAngle1 - iAngle2) - 180)
 end
+
+function GetDistanceToBuildingEdgeTowardsEngineer(tEngineerPosition, tBuildingPosition, iBuildingSquareRadius)
+    --Assumes building is a square, which simplifies the maths; might be a better way of doing this but couldn't figure it out so took the easy option
+    local iAngleToEngi = GetAngleFromAToB(tBuildingPosition, tEngineerPosition)
+    local iTheta
+    if iAngleToEngi <= 45 then
+        iTheta = iAngleToEngi
+    elseif iAngleToEngi <= 90 then
+        iTheta = 90 - iAngleToEngi
+    elseif iAngleToEngi <= 135 then
+        iTheta = iAngleToEngi - 90
+    elseif iAngleToEngi <= 180 then
+        iTheta = 180 - iAngleToEngi
+    elseif iAngleToEngi <= 225 then
+        iTheta = iAngleToEngi - 180
+    elseif iAngleToEngi <= 270 then
+        iTheta = 270 - iAngleToEngi
+    elseif iAngleToEngi <= 315 then
+        iTheta = iAngleToEngi - 270
+    else
+        iTheta = 360 - iAngleToEngi
+    end
+
+    return iBuildingSquareRadius / math.cos(ConvertAngleToRadians(iTheta))
+end
+
 function ConvertAngleToRadians(iAngle)
     return iAngle * math.pi / 180
 end
@@ -631,16 +669,34 @@ end
 
 function GetAngleFromAToB(tLocA, tLocB)
     --Returns an angle 0 = north, 90 = east, etc. based on direction of tLocB from tLocA
-    local iTheta = math.atan(math.abs(tLocA[3] - tLocB[3]) / math.abs(tLocA[1] - tLocB[1])) * 180 / math.pi
-    if tLocB[1] > tLocA[1] then
-        if tLocB[3] > tLocA[3] then
-            return 90 + iTheta
-        else return 90 - iTheta
+    local iTheta
+    if tLocA[1] == tLocB[1] then
+        --Will get infinite if try and use this; is [3] the same?
+        if tLocA[3] > tLocB[3] then --going south
+            iTheta = 180
+        else
+            --Either LocA == locB (so want 0) or going north (which is 0)
+            iTheta = 0
+        end
+    elseif tLocA[3] == tLocB[3] then
+        --Have dif in X values but not Z values, so moving in straight line east or west:
+        if tLocA[1] < tLocB[1] then --Moving east
+            iTheta = 90
+        else --must be moving west
+            iTheta = 270
         end
     else
-        if tLocB[3] > tLocA[3] then
-            return 270 - iTheta
-        else return 270 + iTheta
+        iTheta = math.atan(math.abs(tLocA[3] - tLocB[3]) / math.abs(tLocA[1] - tLocB[1])) * 180 / math.pi
+        if tLocB[1] > tLocA[1] then
+            if tLocB[3] > tLocA[3] then
+                return 90 + iTheta
+            else return 90 - iTheta
+            end
+        else
+            if tLocB[3] > tLocA[3] then
+                return 270 - iTheta
+            else return 270 + iTheta
+            end
         end
     end
     return iTheta
