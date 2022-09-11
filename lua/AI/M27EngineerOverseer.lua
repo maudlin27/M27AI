@@ -4932,13 +4932,13 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
                         --If enemy has T3 navy then want at least 1 novax
                         if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalFactory * categories.TECH3, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), 1500, 'Enemy')) == false then
                             if iPond > 0 then
-                                iNovaxTargetValue = iNovaxTargetValue + math.max(10000, M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond]) --(effectively double-counts, as want navy to be an extra priority)
+                                iNovaxTargetValue = iNovaxTargetValue + math.max(10000, (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] or 0)) --(effectively double-counts, as want navy to be an extra priority)
                             else
                                 iNovaxTargetValue = iNovaxTargetValue + 10000
                             end
                         elseif iPond > 0 then
                             --Incrase by naval threat value of assigned pond
-                            iNovaxTargetValue = iNovaxTargetValue + M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond]
+                            iNovaxTargetValue = iNovaxTargetValue + (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] or 0)
                         end
 
                         if iNovaxTargetValue < iValueWanted then
@@ -5065,7 +5065,7 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
                         if not(iCategoryRef) then
                             --Still consider air experimental if we dont have much of an air shortfall and enemy has navy
                             if aiBrain[M27AirOverseer.refbHaveAirControl] or aiBrain[M27AirOverseer.refiOurMassInAirAA] >= aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] * iAirRatioWanted or aiBrain[M27AirOverseer.refiAirAAWanted] <= 10 then
-                                if M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] >= 8000 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL) == 0 then
+                                if (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] or 0) >= 8000 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL) == 0 then
                                     iCategoryRef = refiExperimentalAir
                                 end
                             end
@@ -11798,16 +11798,16 @@ end--]]
 
                                 --Increase engineers assisting if enemy has significant naval threat
                                 local iPond = M27Navy.GetPondToFocusOn(aiBrain)
-                                if M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] <= math.min(350, math.max(225, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.6)) then
+                                if (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] or 0) >= math.min(350, math.max(225, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.6)) then
 
-                                    if M27Team.tTeamData[aiBrain.M27Team][M27Team.refbHaveNavalShortfall][iPond] or M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] >= 6000 then
+                                    if M27Team.tTeamData[aiBrain.M27Team][M27Team.refbHaveNavalShortfall][iPond] or (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] or 0) >= 6000 then
                                         local iNavalFactor = 1
                                         local oPrimaryNavalFactory = M27Navy.GetPrimaryNavalFactory(aiBrain, iPond)
                                         if M27UnitInfo.IsUnitValid(oPrimaryNavalFactory) and oPrimaryNavalFactory:GetAIBrain() == aiBrain then iNavalFactor = 0.4 end --dont get as much air units as want to invest in navy instead
                                         if bHaveLowMass then
-                                            iMaxEngisWanted = math.min(30, math.max(iMaxEngisWanted, iNavalFactor * M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] / 750))
+                                            iMaxEngisWanted = math.min(30, math.max(iMaxEngisWanted, iNavalFactor * (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] or 0) / 750))
                                         else
-                                            iMaxEngisWanted = math.min(40, math.max(iMaxEngisWanted, iNavalFactor * M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] / 500))
+                                            iMaxEngisWanted = math.min(40, math.max(iMaxEngisWanted, iNavalFactor * (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] or 0) / 500))
                                         end
                                     end
                                 end
