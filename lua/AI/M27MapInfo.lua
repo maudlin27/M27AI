@@ -642,6 +642,7 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
     local sFunctionRef = 'RecheckPathingOfLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if M27UnitInfo.IsUnitValid(oPathingUnit) and EntityCategoryContains(categories.MOBILE, oPathingUnit.UnitId) then --Hard crash of game if do :CanPathTo on a structure, which could happen given structures use some of the platoon logic e.g. for mobile shield assistance then
+        local iEstimatedPathingTime = 0
 
         --Ignore the check if we have had too many slowdowns for this unit, or this brain
         local aiBrain = oPathingUnit:GetAIBrain()
@@ -711,6 +712,7 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
 
                 local bCanPathToTarget = oPathingUnit:CanPathTo(tTargetLocation)
                 local bCanPathToBase = oPathingUnit:CanPathTo(tKnownCorrectPoint)
+                iEstimatedPathingTime = iEstimatedPathingTime + 0.05
                 local bExpectedToPathToTarget = false
                 if iUnitPathingGroup == iTargetPathingGroup then bExpectedToPathToTarget = true end
                 local bExpectedToPathToBase = false
@@ -744,11 +746,13 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
                         if not(iUnitPathingGroup == iBasePathingGroup) then
                             bHaveChangedPathing = true
                             if bDebugMessages == true then LOG(sFunctionRef..': Can path to base but we didnt think we could, will change unit pathing group to '..iBasePathingGroup) end
+                            iEstimatedPathingTime = iEstimatedPathingTime + 0.05
                             FixSegmentPathingGroup(sPathing, oPathingUnit:GetPosition(), iBasePathingGroup)
                             RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iBasePathingGroup, oPathingUnit:GetPosition(), 4)
 
                             if not(bTargetIsBase) and bCanPathToTarget and not(iTargetPathingGroup == iBasePathingGroup) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': target location cna path to base but we didnt think it could, will change target pathing group to '..iBasePathingGroup) end
+                                iEstimatedPathingTime = iEstimatedPathingTime + 0.05
                                 FixSegmentPathingGroup(sPathing, tTargetLocation, iBasePathingGroup)
                                 --Check an area around the target (if its not really far away)
                                 RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iBasePathingGroup, tTargetLocation, math.min(6, math.floor(250 / M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tTargetLocation))))
@@ -759,6 +763,7 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
                                 if not(bExpectedToPathToTarget) then
                                     --can path to target but didnt think we could
                                     if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we cant path to the target') end
+                                    iEstimatedPathingTime = iEstimatedPathingTime + 0.05
                                     FixSegmentPathingGroup(sPathing, tTargetLocation, iBasePathingGroup)
                                     RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iBasePathingGroup, tTargetLocation, math.min(6, math.floor(250 / M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tTargetLocation))))
                                 end
@@ -771,10 +776,12 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
                             bHaveChangedPathing = true
                             local iNewPathingGroup = table.getn(tSegmentBySegmentGroup[sPathing]) + 1
                             if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we can path to base, will set engineer position group to '..iNewPathingGroup) end
+                            iEstimatedPathingTime = iEstimatedPathingTime + 0.05
                             FixSegmentPathingGroup(sPathing, oPathingUnit:GetPosition(), iNewPathingGroup)
                             --Is there also an issue with the target?
                             if not(bTargetIsBase) and bCanPathToTarget and iTargetPathingGroup == iBasePathingGroup then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think the target can path to base, will set target location group to '..iNewPathingGroup) end
+                                iEstimatedPathingTime = iEstimatedPathingTime + 0.05
                                 FixSegmentPathingGroup(sPathing, tTargetLocation, iNewPathingGroup)
                             end
                         else
@@ -787,6 +794,7 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
                                         --Can path to target but werent expecting to be able to; Will assume our units pathing group is correct and will update target pathing group to be the engineers pathing group
                                         bHaveChangedPathing = true
                                         if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we cant path to target, will set target location pathing group to '..iUnitPathingGroup) end
+                                        iEstimatedPathingTime = iEstimatedPathingTime + 0.05
                                         FixSegmentPathingGroup(sPathing, tTargetLocation, iUnitPathingGroup)
                                     end
                                 else
@@ -794,6 +802,7 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
                                         --Cant path to target but thought we could; increase the targets pathing group
                                         bHaveChangedPathing = true
                                         if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we can path to target, will set target location pathing group to '..(table.getn(tSegmentBySegmentGroup[sPathing]) + 1)) end
+                                        iEstimatedPathingTime = iEstimatedPathingTime + 0.05
                                         FixSegmentPathingGroup(sPathing, tTargetLocation, table.getn(tSegmentBySegmentGroup[sPathing]) + 1)
                                     else
                                         --Dont have enough informatino to say antyhing more, since we cant path to base, or to the target, and we're correctly expecting to not path to either of them
@@ -815,6 +824,7 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
                             iGroupAlreadyChecked = iAmphibiousOrigGroupOfPathingUnit
                             for iMex, tMex in tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit][subrefPlateauMexes] do
                                 if bDebugMessages == true then LOG(sFunctionRef..': Checking for tMex='..repru(tMex)..'; with mex pathing group='..GetSegmentGroupOfLocation(sPathing, tMex)..'; iAmphibiousOrigGroupOfPathingUnit='..iAmphibiousOrigGroupOfPathingUnit) end
+                                iEstimatedPathingTime = iEstimatedPathingTime + 0.05
                                 if RecheckPathingOfLocation(sPathing, oPathingUnit, tMex, tOptionalComparisonKnownCorrectPoint, true) or not(GetSegmentGroupOfLocation(sPathing, tMex) == iAmphibiousOrigGroupOfPathingUnit) then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Pathing was dif for iMex='..iMex..'; tMex='..repru(tMex)..' or the mex shouldnt be assigned to this plateau') end
                                     bChangedAnyMex = true
@@ -845,11 +855,11 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
                 end
             end
 
-            oPathingUnit[M27UnitInfo.refiPathingCheckTime] = (oPathingUnit[M27UnitInfo.refiPathingCheckTime] or 0) + (GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime)
-            aiBrain[M27UnitInfo.refiPathingCheckTime] = (aiBrain[M27UnitInfo.refiPathingCheckTime] or 0) + (GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime)
+            oPathingUnit[M27UnitInfo.refiPathingCheckTime] = (oPathingUnit[M27UnitInfo.refiPathingCheckTime] or 0) + iEstimatedPathingTime
+            aiBrain[M27UnitInfo.refiPathingCheckTime] = (aiBrain[M27UnitInfo.refiPathingCheckTime] or 0) + iEstimatedPathingTime
             aiBrain[M27UnitInfo.refiPathingCheckCount] = (aiBrain[M27UnitInfo.refiPathingCheckCount] or 0) + 1
-            if (GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime) > 0.3 then bDebugMessages = true end --Retain for audit trail - to show significant pathing related freezes we have had
-            if bDebugMessages == true then LOG(sFunctionRef..': GameTime='..GetGameTimeSeconds()..'; bHaveChangedPathing='..tostring(bHaveChangedPathing)..'; Time taken='..(GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime)..'; Brain count='..aiBrain[M27UnitInfo.refiPathingCheckCount]..'; Brain total time='..aiBrain[M27UnitInfo.refiPathingCheckTime]) end
+            if iEstimatedPathingTime > 0.3 then bDebugMessages = true end --Retain for audit trail - to show significant pathing related freezes we have had
+            if bDebugMessages == true then LOG(sFunctionRef..': GameTime='..GetGameTimeSeconds()..'; bHaveChangedPathing='..tostring(bHaveChangedPathing)..'; Estimated time taken for this cycle='..iEstimatedPathingTime..'; Brain count='..aiBrain[M27UnitInfo.refiPathingCheckCount]..'; Brain total time='..aiBrain[M27UnitInfo.refiPathingCheckTime]) end
             if bDebugMessages == true and bHaveChangedPathing then M27Utilities.ErrorHandler('Have changed pathing', true) end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return bHaveChangedPathing
