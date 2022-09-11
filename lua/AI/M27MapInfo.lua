@@ -845,10 +845,10 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
                 end
             end
 
-            oPathingUnit[M27UnitInfo.refiPathingCheckTime] = (oPathingUnit[M27UnitInfo.refiPathingCheckTime] or 0) + (GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime)
-            aiBrain[M27UnitInfo.refiPathingCheckTime] = (aiBrain[M27UnitInfo.refiPathingCheckTime] or 0) + (GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime)
+            oPathingUnit[M27UnitInfo.refiPathingCheckTime] = 0 --(oPathingUnit[M27UnitInfo.refiPathingCheckTime] or 0) + (GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime)
+            aiBrain[M27UnitInfo.refiPathingCheckTime] = 0 --(aiBrain[M27UnitInfo.refiPathingCheckTime] or 0) + (GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime)
             aiBrain[M27UnitInfo.refiPathingCheckCount] = (aiBrain[M27UnitInfo.refiPathingCheckCount] or 0) + 1
-            if (GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime) > 0.3 then bDebugMessages = true end --Retain for audit trail - to show significant pathing related freezes we have had
+            if 0 > 0.3 then bDebugMessages = true end --Retain for audit trail - to show significant pathing related freezes we have had
             if bDebugMessages == true then LOG(sFunctionRef..': GameTime='..GetGameTimeSeconds()..'; bHaveChangedPathing='..tostring(bHaveChangedPathing)..'; Time taken='..(GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime)..'; Brain count='..aiBrain[M27UnitInfo.refiPathingCheckCount]..'; Brain total time='..aiBrain[M27UnitInfo.refiPathingCheckTime]) end
             if bDebugMessages == true and bHaveChangedPathing then M27Utilities.ErrorHandler('Have changed pathing', true) end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
