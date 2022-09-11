@@ -187,13 +187,14 @@ function GetUnitReclaimTargets(aiBrain)
             if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
                 for iBrain, oBrain in aiBrain[M27Overseer.toAllyBrains] do
                     if not(oBrain == aiBrain) then
-                        --Is it an M27 brain with <=75 energy and <2 T2/<1 T3?
+                        --Is it an M27 brain with <=75 energy and no T2 PGen?
                         if oBrain.M27AI then
-                            if oBrain[refiEnergyGrossBaseIncome] <= 75 then
+                            if oBrain[refiEnergyGrossBaseIncome] <= 75 and oBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Power + M27UnitInfo.refCategoryT3Power) == 0 then
                                 oTeammateWantingPower = oBrain
                                 break
                             end
-                        elseif oBrain:GetEconomyIncome('ENERGY') <= 75 then
+                        --Only give to non-M27 teammate in exceptional circumstances (i.e. where they're power stalling and have low gross energy)
+                        elseif oBrain:GetEconomyIncome('ENERGY') <= 75 and oBrain:GetEconomyStoredRatio('ENERGY') <= 0.1 then
                             oTeammateWantingPower = oBrain
                             break
                         end
