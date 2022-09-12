@@ -6622,7 +6622,10 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             if aiBrain[refbEnemyTMLSightedBefore] == false then
                 aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
                 aiBrain[refbEnemyTMLSightedBefore] = true
-                M27Chat.SendMessage(aiBrain, 'TML sighted', 'They have TML, get TMD', 0, 90, true)
+            end
+            if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryTML, aiBrain[reftEnemyTML])) == false then
+                --SendMessage(aiBrain, sMessageType, sMessage, iOptionalDelayBeforeSending, iOptionalTimeBetweenMessageType, bOnlySendToTeam)
+                M27Chat.SendMessage(aiBrain, 'TML sighted', 'They have TML, get TMD', 0, 100000, true)
             end
         else
             --No TML - remove the flag that we need TMD from units

@@ -223,6 +223,7 @@ refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categori
 refCategoryMissileNavy = categories.NAVAL * categories.SILO + categories.BATTLESHIP * categories.INDIRECTFIRE - categories.BATTLESHIP * categories.SERAPHIM --i.e. UEF+Sera cruisers, and nukesubs
 refCategorySubmarine = categories.NAVAL * categories.SUBMERSIBLE * categories.ANTINAVY
 refCategoryCooper = categories.NAVAL * categories.ANTINAVY * categories.TECH2 - categories.SUBMERSIBLE - categories.DESTROYER
+refCategoryShieldBoat = categories.NAVAL * categories.SHIELD + categories.HOVER * categories.SHIELD --Includes mobile land shields that can hover
 
 
 --Multi-category:

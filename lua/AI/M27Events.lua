@@ -543,6 +543,17 @@ function OnUnitDeath(oUnit)
                             end
                         end
 
+                        --Naval shield tracking
+                        if M27Utilities.IsTableEmpty(oUnit[M27Navy.reftoAssignedShields]) == false then
+                            for iShield, oShield in oUnit[M27Navy.reftoAssignedShields] do
+                                if M27UnitInfo.IsUnitValid(oShield) then M27Navy.RemoveShieldAssignment(oShield) end
+                            end
+                        end
+                        if oUnit[M27Navy.refoSupportTarget] then
+                            M27Navy.RemoveShieldAssignment(oUnit)
+                        end
+
+
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     elseif EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then
                         OnMexDeath(oUnit)

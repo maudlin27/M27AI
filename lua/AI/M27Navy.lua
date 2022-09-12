@@ -27,6 +27,9 @@ refbEnemyNavyPreventingBuildingNavy = 'M27PondEnemyNavyNearBuildLocation' --agai
 refiAssignedPond = 'M27PondAssigned' --set against a unit to reflect the pond it is in; set to 0 if not in a pond
 reftiTeamRefsUpdatedFor = 'M27UpdatedTeamRefs' --Reflects M27 team ref numbers that have recorded the unit against a pond
 refbTempIsUnderwater = 'M27IsUnderwater' --Temporary for units - set when analysing naval threats only, so can refer to it later in code
+refbRechargeShield = 'M27NavyRechargeShield' --against unit, true if want to recharge shield
+reftoAssignedShields = 'M27NavyAssignedShields' --against unit, table of all shields assigned to support this unit
+refoSupportTarget = 'M27NavySupportTarget' --against unit, the unit that it is supporting (e.g. for a shield this would be the unit it is shielding)
 
 --TeamData variables (references are to tTeamData[aiBrain.M27Team] - see M27Team
 
@@ -49,6 +52,8 @@ subrefMexDFUnblockedLocation = 'PondMexDFLocation' --i.e. the closest location w
 subrefMexIndirectDistance = 'PondMexIndirectDistance'
 subrefMexIndirectUnblockedLocation = 'PondMexIndirectLocation' --i.e. the closest location we found where an indirect unit should be able to hit the mex
 subrefBuildLocationByStartPosition = 'PondBuildLocationByStart' --Subtable, key is start position number, which stores the build location for that start position (will only record for M27 brain start
+
+
 
 function CheckForPondNearNavalUnit(oUnit)
     --Looks at area around unit to see if in a recognised pond, if so then updates pathing of all points in the area.  Returns the revised pond (or 0 if no revised one found)
@@ -722,9 +727,9 @@ function AddUnitToPond(oUnit, iCurPond, iM27TeamUpdatingFor, bIsEnemy)
 end
 
 function UpdateUnitPond(oUnit, iM27TeamUpdatingFor, bIsEnemy, iPondRefOverride)
-    --Check the unit's pond
+    --Check the unit's pond; ignore this for non-M27 friendly units
     --LOG('UpdateUnitPond: Called for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
-    if not(oUnit[refiAssignedPond]) or not(EntityCategoryContains(M27UnitInfo.refCategoryPondFixedCategory, oUnit.UnitId)) or bIsEnemy then --and not(oUnit[reftiTeamRefsUpdatedFor][iM27TeamUpdatingFor])) then
+    if (bIsEnemy or oUnit:GetAIBrain().M27AI) and not(oUnit[refiAssignedPond]) or not(EntityCategoryContains(M27UnitInfo.refCategoryPondFixedCategory, oUnit.UnitId)) or bIsEnemy then --and not(oUnit[reftiTeamRefsUpdatedFor][iM27TeamUpdatingFor])) then
         local iCurPond = iPondRefOverride or M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oUnit:GetPosition())
         --LOG('iCurPond pre adj='..(iCurPond or 'nil'))
         --if tPondDetails[iCurPond] then LOG('Pond size='..(tPondDetails[iCurPond][subrefPondSize] or 'nil')) end
@@ -1253,6 +1258,45 @@ function TellUnitToAttackTarget(oUnit, oTarget, sOrderDesc)
     end
 end
 
+function RemoveShieldAssignment(oShield)
+    local oUnitToSupport = oShield[refoSupportTarget]
+    if M27UnitInfo.IsUnitValid(oUnitToSupport) and M27Utilities.IsTableEmpty(oUnitToSupport[reftoAssignedShields]) == false then
+        for iSupportingShield, oSupportingShield in oUnitToSupport[reftoAssignedShields] do
+            if oSupportingShield == oShield then
+                table.remove(oUnitToSupport[reftoAssignedShields], oShield)
+                break
+            end
+        end
+    end
+    oShield[refoSupportTarget] = nil
+end
+
+function AddShieldAssignment(oUnitToSupport, oClosestShield, tOurBase)
+    --Assignes closest shield to support oUnitToSupport and gets it to move there, by reference to our base
+    if M27UnitInfo.IsUnitValid(oUnitToSupport) then --Redundancy
+        --Are we already assigned a support target that is different? If so then remove cur assignment
+        if oClosestShield[refoSupportTarget] then
+            if not(oClosestShield[refoSupportTarget] == oUnitToSupport) then
+                RemoveShieldAssignment(oClosestShield)
+            end
+        end
+        oClosestShield[refoSupportTarget] = oUnitToSupport
+        if not(oUnitToSupport[reftoAssignedShields]) then oUnitToSupport[reftoAssignedShields] = {} end
+        table.insert(oUnitToSupport[reftoAssignedShields], oClosestShield)
+
+        --Move the shield so it covers the unit if it doesnt already
+        local iShieldRadius = oClosestShield:GetBlueprint().Defense.Shield.ShieldSize * 0.5
+        local iTargetSpeed = oUnitToSupport:GetBlueprint()
+        --local iDistToTarget = M27Utilities.GetDistanceBetweenPositions(oClosestShield:GetPosition(), oUnitToSupport:GetPosition())
+        local iDistFromTarget = math.max(1, iShieldRadius - iTargetSpeed * 1.5)
+
+        local tMoveTarget = M27Utilities.MoveInDirection(oUnitToSupport:GetPosition(), M27Utilities.GetAngleFromAToB(oUnitToSupport:GetPosition(), tOurBase), iDistFromTarget, true, false)
+        MoveUnitTowardsTarget(oClosestShield, tMoveTarget, false, 'SCover')
+    else
+        M27Utilities.ErrorHandler('Passed invalid unit to support for shield assignment')
+    end
+end
+
 
 
 function ManageTeamNavy(aiBrain, iTeam, iPond)
@@ -1314,6 +1358,9 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
             end
             iFriendlyDistToEnemy = iClosestDistance
         end
+        M27Team.tTeamData[iTeam][M27Team.refiFriendlyNavalThreatByPond][iPond] = M27Logic.GetCombatThreatRating(aiBrain, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond], false, nil, nil, false, false, false, false, true, false, false)
+    else
+        M27Team.tTeamData[iTeam][M27Team.refiFriendlyNavalThreatByPond][iPond] = 0
     end
     M27Team.tTeamData[iTeam][M27Team.refoClosestFriendlyUnitToEnemyByPond][iPond] = oClosestFriendlyUnitToEnemyBase
     if bDebugMessages == true then LOG(sFunctionRef..': About to update list of enemy units in pond nad calculate closest enemy unit. Is the table empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond]))) end
@@ -1408,7 +1455,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     local iSupportNavyCategory = M27UnitInfo.refCategoryMobileNavalSurface - categories.DIRECTFIRE - categories.INDIRECTFIRE - categories.ANTINAVY --e.g. aircraft carriers without any attack and shield boats
 
 
-
+    local bAllOutSubAttack = false
     if M27UnitInfo.IsUnitValid(oClosestEnemyUnit) and M27UnitInfo.IsUnitValid(oClosestFriendlyUnitToEnemyBase) then
         --Record friendly and enemy units of relevance, then decide what action we want to take at a global level
 
@@ -1424,6 +1471,8 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
         local refiEnemyThreatAntiNavy = 4
 
         local tiRangesUsed = {} --all ranges used by us or enemy
+
+
 
 
         function GetUnitTypes(oUnit)
@@ -1625,7 +1674,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
 
             --Do we win in both theatres, and have significanlty more threat?
             local bAllOutAttack = false
-            local bAllOutSubAttack = false --Set to true if we arent doing an all out at tack, but think our subs can still do an all out attack
+            --bAllOutSubAttack = false --Recorded above; Set to true if we arent doing an all out at tack, but think our subs can still do an all out attack
             local bAttackNearbyEnemies = false --If dont have enough to beat every naval unit between us and enemy base, but do have enough to take on the nearest enemies, then will use this
             local bIgnoreEnemySubs = false
             local bConsolidateForces = false --used to determine unit task description for now (to help with debugging)
@@ -1635,6 +1684,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                 local iFactorCap = 3 - math.min(1.7, iOurSurfaceThreat / 1000)
                 iMinSurfaceFactorWanted = math.min(iMinSurfaceFactorWanted, iFactorCap)
             end
+
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Considering if we want an all out attack. iMinSurfaceFactorWanted=' .. iMinSurfaceFactorWanted .. '; iOurSurfaceThreat=' .. iOurSurfaceThreat .. '; iEnemySurfaceThreat=' .. iEnemySurfaceThreat .. '; iEnemySurfaceThreat*factor=' .. iEnemySurfaceThreat * iMinSurfaceFactorWanted..'; Size of tFriendliesNearFront='..table.getn(tFriendliesNearFront))
                 if iOurAntiNavyThreat > 0 then
@@ -2390,13 +2440,147 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
 
             local tSupportDestination = M27Utilities.MoveInDirection(oClosestFriendlyUnitToEnemyBase:GetPosition(), M27Utilities.GetAngleFromAToB(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase), iDistToTravel, true, false)
             if bDebugMessages == true then LOG(sFunctionRef..': Will send all support units to '..repru(tSupportDestination)..'; this was based on closest friendly unit to enemy base '..oClosestFriendlyUnitToEnemyBase.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestFriendlyUnitToEnemyBase)..'; which is at position'..repru(oClosestFriendlyUnitToEnemyBase:GetPosition())..' and tOurBase='..repru(tOurBase)..'; Angle between these='..M27Utilities.GetAngleFromAToB(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase)) end
+            local iCurShieldHealth, iMaxShieldHealth
+            local iShieldPercent
+            local tShieldsToAssign = {}
+
             for iUnit, oUnit in tSupportUnits do
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Sending move command to oUnit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' to ' .. repru(tSupportDestination))
+                if EntityCategoryContains(M27UnitInfo.refCategoryShieldBoat, oUnit.UnitId) then
+                    --Check if want to be recharging shield
+                    iCurShieldHealth, iMaxShieldHealth = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
+                    iShieldPercent = iCurShieldHealth / iMaxShieldHealth
+                    if oUnit[refbRechargeShield] then
+                        if iShieldPercent >= 0.75 then oUnit[refbRechargeShield] = true end
+                    else
+                        if iShieldPercent <= 0.2 then
+                            oUnit[refbRechargeShield] = true
+                            RemoveShieldAssignment(oUnit)
+                        end
+                    end
+
+                    --Determine action based on if we want to recharge shield
+                    if iMaxShieldHealth == 0 then --Redundancy
+                        MoveUnitTowardsTarget(oUnit, tSupportDestination, false, 'GSupport')
+                    else
+                        if oUnit[refbRechargeShield] then
+                            MoveUnitTowardsTarget(oUnit, tOurBase, false, 'SRecharge')
+                        else
+                            --Want to assist a unit
+                            table.insert(tShieldsToAssign, oUnit)
+                        end
+                    end
+                else
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Sending move command to oUnit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' to ' .. repru(tSupportDestination))
+                    end
+                    MoveUnitTowardsTarget(oUnit, tSupportDestination, false, 'GSupport')
                 end
-                MoveUnitTowardsTarget(oUnit, tSupportDestination, false, 'GSupport')
+            end
+
+
+            ---->>>>SHIELD BOATS<<<<----
+            --Assign shield units - decide on priority list, and then get the closest shield unit to this
+            if M27Utilities.IsTableEmpty(tShieldsToAssign) == false then
+                local tUnitsToShieldByPriority = {}
+                local iCurPriority = 1
+                local iSurfaceCombatCategory = M27UnitInfo.refCategoryNavalSurface * categories.DIRECTFIRE + M27UnitInfo.refCategoryNavalSurface * categories.INDIRECTFIRE + M27UnitInfo.refCategoryNavalSurface * categories.ANTINAVY
+                local oClosestSurface1, oClosestSurface2, oClosestSurface3
+                local iClosestSurface1 = 100000
+                local iClosestSurface2 = 100000
+                local iClosestSurface3 = 100000
+
+                local iCurDist
+
+                function AddUnitToPriorityList(oUnit)
+                    table.insert(tUnitsToShieldByPriority, oUnit)
+                    iCurPriority = iCurPriority + 1
+                end
+
+
+                local tSurfaceCombat = EntityCategoryFilterDown(iSurfaceCombatCategory, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
+                if M27Utilities.IsTableEmpty(tSurfaceCombat) == false then
+                    for iUnit, oUnit in tSurfaceCombat do
+                        iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tOurBase)
+                        if iCurDist < iClosestSurface3 then
+                            if iCurDist < iClosestSurface2 then
+                                if iCurDist < iClosestSurface1 then
+                                    oClosestSurface3 = oClosestSurface2
+                                    iClosestSurface3 = iClosestSurface2
+                                    oClosestSurface2 = oClosestSurface1
+                                    iClosestSurface2 = iClosestSurface1
+                                    oClosestSurface1 = oUnit
+                                    iClosestSurface1 = iCurDist
+                                else
+                                    --Closet than 2 not 1
+                                    oClosestSurface3 = oClosestSurface2
+                                    iClosestSurface3 = iClosestSurface2
+                                    oClosestSurface2 = oUnit
+                                    iClosestSurface2 = iCurDist
+                                end
+                            else
+                                oClosestSurface3 = oUnit
+                                iClosestSurface3 = iCurDist
+                            end
+                        end
+                    end
+                end
+                if oClosestSurface1 then AddUnitToPriorityList(oClosestSurface1) end
+                local oClosestCruiser1, oClosestCruiser2
+                local iClosestCruiser1 = 100000
+                local iClosestCruiser2 = 100000
+                local tCruisers = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiser, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
+                if M27Utilities.IsTableEmpty(tCruisers) == false then
+                    for iUnit, oUnit in tCruisers do
+                        iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tOurBase)
+                        if iCurDist < iClosestCruiser2 then
+                            if iCurDist < iClosestCruiser1 then
+                                oClosestCruiser2 = oClosestCruiser1
+                                iClosestCruiser2 = iClosestCruiser1
+                                oClosestCruiser1 = oUnit
+                                iClosestCruiser1 = iCurDist
+                            else
+                                oClosestCruiser2 = oUnit
+                                iClosestCruiser2 = iCurDist
+                            end
+                        end
+                    end
+                end
+                if oClosestCruiser1 then AddUnitToPriorityList(oClosestCruiser1) end
+
+                if not(bAllOutSubAttack) and not(EntityCategoryContains(M27UnitInfo.refCategoryCruiser + iSurfaceCombatCategory,oClosestFriendlyUnitToEnemyBase.UnitId)) then
+                    AddUnitToPriorityList(oClosestFriendlyUnitToEnemyBase)
+                end
+                if oClosestSurface2 then AddUnitToPriorityList(oClosestSurface2) end
+                if oClosestSurface3 then AddUnitToPriorityList(oClosestSurface3) end
+                if oClosestCruiser2 then AddUnitToPriorityList(oClosestCruiser2) end
+
+
+                --Find the nearest shield to each priority unit to shield
+                local oClosestShield
+                for iUnit, oUnit in tUnitsToShieldByPriority do
+                    oClosestShield = M27Utilities.GetNearestUnit(tShieldsToAssign, oUnit:GetPosition())
+                    AddShieldAssignment(oUnit, oClosestShield, tOurBase)
+                    table.remove(tShieldsToAssign, oClosestShield)
+                    if M27Utilities.IsTableEmpty(tShieldsToAssign) then break end
+                end
+                --Assign any spare shields to the closest friendly unit to the front
+                if M27Utilities.IsTableEmpty(tShieldsToAssign) == false then
+                    local oRemainingUnitPriority = oClosestFriendlyUnitToEnemyBase
+                    if bAllOutSubAttack and EntityCategoryContains(categories.SUBMERSIBLE + categories.AMPHIBIOUS - categories.HOVER, oClosestFriendlyUnitToEnemyBase.UnitId) then
+                        local tSurfaceUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAllAmphibiousAndNavy - categories.SUBMIERSIBLE, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
+                        if M27Utilities.IsTableEmpty(tSurfaceUnits) == false then
+                            oRemainingUnitPriority = M27Utilities.GetNearestUnit(tSurfaceUnits, tEnemyBase)
+                        else
+                            M27Utilities.ErrorHandler('Dont have any surface units but should at least have the shields that are considering')
+                        end
+                    end
+                    for iShield, oClosestShield in tShieldsToAssign do
+                        AddShieldAssignment(oRemainingUnitPriority, oClosestShield, tOurBase)
+                    end
+                end
             end
         end
+
     end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -2480,4 +2664,43 @@ function GetPondToFocusOn(aiBrain)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iPondWanted
+end
+
+function GetShieldBoatsWanted(aiBrain, oFactory)
+    --Returns the number wanted ignoring tech and power limitations, i.e. based solely on naval composition
+    --oFactory can also just be a unit (e.g. the shield unit itself)
+    local iPond = oFactory[refiAssignedPond] or GetPondToFocusOn(aiBrain)
+
+    function GetExistingCruisers()
+        local iExistingCruisers = 0
+        if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][iPond]) == false then
+            local tExistingCruisers = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiser, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][iPond])
+            if M27Utilities.IsTableEmpty(tExistingCruisers) == false then
+                iExistingCruisers = table.getn(tExistingCruisers)
+            end
+        end
+        return iExistingCruisers
+    end
+
+
+    local iShieldBoatsWanted = 0
+    if EntityCategoryContains(categories.UEF, oFactory.UnitId) then
+        --1 for every 3.5k surface threat, provided have at least 1.5k threat
+        if M27Team.tTeamData[aiBrain.M27Team][M27Team.refiFriendlyNavalThreatByPond][iPond] >= 1750 then
+            iShieldBoatsWanted = math.min(5, math.max(1, M27Team.tTeamData[aiBrain.M27Team][M27Team.refiFriendlyNavalThreatByPond][iPond] / 3500))
+        end
+    elseif EntityCategoryContains(categories.AEON, oFactory.UnitId) then
+        if M27Team.tTeamData[aiBrain.M27Team][M27Team.refiFriendlyNavalThreatByPond][iPond] >= 1200 then
+            iShieldBoatsWanted = math.min(5, math.max(1, M27Team.tTeamData[aiBrain.M27Team][M27Team.refiFriendlyNavalThreatByPond][iPond] / 1500))
+            local iExistingCruisers = GetExistingCruisers()
+            if iExistingCruisers > 0 then iShieldBoatsWanted = iShieldBoatsWanted + math.min(3, iExistingCruisers) end
+        end
+    elseif EntityCategoryContains(categories.SERAPHIM, oFactory.UnitId) then
+        if M27Team.tTeamData[aiBrain.M27Team][M27Team.refiFriendlyNavalThreatByPond][iPond] >= 2000 then
+            iShieldBoatsWanted = math.min(3, math.max(1, M27Team.tTeamData[aiBrain.M27Team][M27Team.refiFriendlyNavalThreatByPond][iPond] / 2500))
+            local iExistingCruisers = GetExistingCruisers()
+            if iExistingCruisers > 0 then iShieldBoatsWanted = iShieldBoatsWanted + math.min(2, iExistingCruisers) end
+        end
+    end
+    return iShieldBoatsWanted
 end
