@@ -4239,36 +4239,49 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
 
             if not(bMexHydroOrStorage) then
                 if iCatToBuildBy or oUnitToBuildBy then
-                    local oPossibleBuildingsToBuildBy
+                    local toPossibleBuildingsToBuildBy
                     local iBuildingCount = 0
                     local tPossibleTargets = {}
                     local tBuildingPosition
 
                     if iCatToBuildBy then
-                        sBlueprintBuildBy = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCatToBuildBy, oEngineer)--, false, false)
+                        --sBlueprintBuildBy = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCatToBuildBy, oEngineer)--, false, false)
 
-                        oPossibleBuildingsToBuildBy = aiBrain:GetUnitsAroundPoint(iCatToBuildBy, tTargetLocation, iMaxAreaToSearch, 'Ally')
+                        toPossibleBuildingsToBuildBy = aiBrain:GetUnitsAroundPoint(iCatToBuildBy, tTargetLocation, iMaxAreaToSearch, 'Ally')
+                        local iCurDist
+                        local iClosestDist = 100000
                         --ACU specific - cant build by hydro, but might have nearby hydro
-                        if bDebugMessages == true then LOG(sFunctionRef..': Engineer position='..repru(oEngineer:GetPosition())..'; tTargetLocation='..repru(tTargetLocation)..'; iMaxAreaToSearch='..iMaxAreaToSearch..'; is oPossibleBuildingsToBuildBy empty='..tostring(M27Utilities.IsTableEmpty(oPossibleBuildingsToBuildBy))) end
-                        if not(sBlueprintBuildBy) and M27Utilities.IsTableEmpty(oPossibleBuildingsToBuildBy) == false then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Engineer position='..repru(oEngineer:GetPosition())..'; tTargetLocation='..repru(tTargetLocation)..'; iMaxAreaToSearch='..iMaxAreaToSearch..'; is toPossibleBuildingsToBuildBy empty='..tostring(M27Utilities.IsTableEmpty(toPossibleBuildingsToBuildBy))) end
+                        if M27Utilities.IsTableEmpty(toPossibleBuildingsToBuildBy) == false then
                             --Try to build by the closest unit of the category wanted
-                            local oClosestBuilding = M27Utilities.GetNearestUnit(oPossibleBuildingsToBuildBy, oEngineer:GetPosition())
-                            sBlueprintBuildBy = oClosestBuilding.UnitId
-                            if bDebugMessages == true then LOG(sFunctionRef..': Will update sBlueprintBuildBy to be the closest building for adjacency='..oClosestBuilding.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestBuilding)) end
+                            local oClosestBuilding
+                            for iUnit, oUnit in  toPossibleBuildingsToBuildBy do
+                                if oUnit:GetAIBrain() == aiBrain then
+                                    iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oEngineer:GetPosition())
+                                    if iCurDist < iClosestDist then
+                                        oClosestBuilding = oUnit
+                                        iClosestDist = iCurDist
+                                    end
+                                end
+                            end
+                            if oClosestBuilding then
+                                sBlueprintBuildBy = oClosestBuilding.UnitId
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will update sBlueprintBuildBy to be the closest building for adjacency='..oClosestBuilding.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestBuilding)) end
+                            end
                         end
 
 
                     elseif oUnitToBuildBy then
                         sBlueprintBuildBy = oUnitToBuildBy.UnitId
-                        oPossibleBuildingsToBuildBy = {oUnitToBuildBy}
+                        toPossibleBuildingsToBuildBy = {oUnitToBuildBy}
                     else M27Utilities.ErrorHandler('Missing code')
                     end
 
 
-                    if M27Utilities.IsTableEmpty(oPossibleBuildingsToBuildBy) == false then
+                    if M27Utilities.IsTableEmpty(toPossibleBuildingsToBuildBy) == false then
                         if bDebugMessages == true then LOG(sFunctionRef..': Have possible buildings to build by, so will consider best location') end
-                        for iBuilding, oBuilding in oPossibleBuildingsToBuildBy do
-                            if not(oBuilding.Dead) and oBuilding.GetPosition then
+                        for iBuilding, oBuilding in toPossibleBuildingsToBuildBy do
+                            if not(oBuilding.Dead) and oBuilding.GetPosition and oBuilding:GetAIBrain() == aiBrain then
                                 tBuildingPosition = oBuilding:GetPosition()
                                 if M27Utilities.GetDistanceBetweenPositions(tBuildingPosition, tTargetLocation) <= iMaxAreaToSearch then
                                     --Check we're not building by a mex
@@ -4283,6 +4296,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                             end
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': Found iBuildingCount='..iBuildingCount..' to build by') end
+                        if iBuildingCount == 0 then bFindRandomLocation = not(bNeverBuildRandom) end
                     else
                         if bDebugMessages == true then
                             LOG(sFunctionRef..': Cant find any buildings for adjacency, getting random location to build unless we want to build by a mex/hydro and have an unbuilt one nearby')
@@ -4295,13 +4309,16 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                         end
                         bFindRandomLocation = not(bNeverBuildRandom)
                     end
+
                     --Also check for unbuilt buildings if dealing with a mex or hydro, unless are building a shield
                     local tResourceLocations
                     if not(EntityCategoryContains(categories.SHIELD, sBlueprintToBuild)) then
-                        if EntityCategoryContains(M27UnitInfo.refCategoryMex, sBlueprintBuildBy) then
-                            tResourceLocations = M27MapInfo.GetResourcesNearTargetLocation(tTargetLocation, 30, true)
-                        elseif EntityCategoryContains(M27UnitInfo.refCategoryHydro, sBlueprintBuildBy) or EntityCategoryContains(M27UnitInfo.refCategoryT2Power, sBlueprintBuildBy) then --Dont want to make this all power, because the adjacency code requires a building size, and only works for a single building size; i.e. if try and get adjacency for t1 power and include hydro locations, then it will think it needs to build within the hydro for adjacency
-                            tResourceLocations = M27MapInfo.GetResourcesNearTargetLocation(tTargetLocation, 30, false)
+                        if sBlueprintBuildBy then
+                            if EntityCategoryContains(M27UnitInfo.refCategoryMex, sBlueprintBuildBy) then
+                                tResourceLocations = M27MapInfo.GetResourcesNearTargetLocation(tTargetLocation, 30, true)
+                            elseif EntityCategoryContains(M27UnitInfo.refCategoryHydro, sBlueprintBuildBy) or EntityCategoryContains(M27UnitInfo.refCategoryT2Power, sBlueprintBuildBy) then --Dont want to make this all power, because the adjacency code requires a building size, and only works for a single building size; i.e. if try and get adjacency for t1 power and include hydro locations, then it will think it needs to build within the hydro for adjacency
+                                tResourceLocations = M27MapInfo.GetResourcesNearTargetLocation(tTargetLocation, 30, false)
+                            end
                         end
                     end
                     if M27Utilities.IsTableEmpty(tResourceLocations) == false then
