@@ -1021,15 +1021,17 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         elseif iCurrentConditionToTry == 22 then --Mobile shields for navy
                                             if iFactoryTechLevel >= 2 and EntityCategoryContains(categories.AEON + categories.SERAPHIM * categories.TECH2, oFactory.UnitId) then
-                                                local iShieldBoatsWanted = M27Navy.GetShieldBoatsWanted(aiBrain, oFactory)
-                                                local iExistingShieldBoats = 0
-                                                local tExistingShieldBoats = EntityCategoryFilterDown(M27UnitInfo.refCategoryShieldBoat, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
-                                                if M27Utilities.IsTableEmpty(tExistingShieldBoats) == false then
-                                                    iExistingShieldBoats = table.getn(tExistingShieldBoats)
-                                                end
-                                                if iShieldBoatsWanted < iExistingShieldBoats then
-                                                    iCategoryToBuild = M27UnitInfo.refCategoryShieldBoat
-                                                    iTotalWanted = math.min(iTotalWanted, iShieldBoatsWanted - iExistingShieldBoats)
+                                                if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false then
+                                                    local iShieldBoatsWanted = M27Navy.GetShieldBoatsWanted(aiBrain, oFactory)
+                                                    local iExistingShieldBoats = 0
+                                                    local tExistingShieldBoats = EntityCategoryFilterDown(M27UnitInfo.refCategoryShieldBoat, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                                                    if M27Utilities.IsTableEmpty(tExistingShieldBoats) == false then
+                                                        iExistingShieldBoats = table.getn(tExistingShieldBoats)
+                                                    end
+                                                    if iShieldBoatsWanted < iExistingShieldBoats then
+                                                        iCategoryToBuild = M27UnitInfo.refCategoryShieldBoat
+                                                        iTotalWanted = math.min(iTotalWanted, iShieldBoatsWanted - iExistingShieldBoats)
+                                                    end
                                                 end
                                             end
                                         elseif iCurrentConditionToTry == 23 then --T3 mobile artillery if are turtling and havent tried building any and enemy has significant mobile threat

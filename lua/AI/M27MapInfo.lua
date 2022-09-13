@@ -188,7 +188,8 @@ function DetermineMaxTerrainHeightDif()
     ['Flooded Strip Mine'] = 0.24, --middle island should be pathable by amphibious; ast 0.235 it isnt, at 0.24 it is
     ['Adaptive Point of Reason'] = 0.26,
     ['Hyperion'] = 0.215, --0.213 results in apparant plateau with 2 mexes (that is actually pathable) being treated as a plateau incorrectly
-    ['adaptive millennium'] = 0.16 --Default and 0.15 results in top right and bottom left being thought to be plateaus when theyre not, 0.17 shows them as pathable
+    ['adaptive millennium'] = 0.16, --Default and 0.15 results in top right and bottom left being thought to be plateaus when theyre not, 0.17 shows them as pathable
+    ['Pelagial v2'] = 0.18, --Fails to detect northern island as pathable at 0.17, succeeds at 0.18
     }
     local sMapName = ScenarioInfo.name
     iMaxHeightDif = (tMapHeightOverride[sMapName] or iMaxHeightDif)
