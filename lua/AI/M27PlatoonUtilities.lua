@@ -12120,6 +12120,7 @@ function ProcessPlatoonAction(oPlatoon)
                         oPlatoon[refiLastOrderType] = refiOrderIssueMove
                     end
                 elseif oPlatoon[refiCurrentAction] == refActionBuildFactory then
+                    bDebugMessages = true
                     --if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..': BuildLandFac') end
                     if GetPlatoonUnitsOrUnitCount(oPlatoon, reftBuilders, true, true) > 0 then
                         local tBuilders = GetPlatoonUnitsOrUnitCount(oPlatoon, reftBuilders, false, true)
@@ -12208,6 +12209,7 @@ function ProcessPlatoonAction(oPlatoon)
                             end
                             --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCatToBuildBy, tAlternativePositionToLookFrom, bLookForPartCompleteBuildings, bLookForQueuedBuildings, oUnitToBuildBy, bNeverBuildRandom, iOptionalCategoryForStructureToBuild)
                             oPlatoon[reftLastBuildLocation] = M27EngineerOverseer.BuildStructureAtLocation(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, nil, bLookForNearbyBuildings, bLookForNearbyBuildings, nil, nil, M27UnitInfo.refCategoryEngineer)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Just told ACU to try and build factory with iMaxAreaToSearch='..iMaxAreaToSearch..'; oPlatoon[reftLastBuildLocation]='..repru(oPlatoon[reftLastBuildLocation])) end
                             if not(M27Utilities.IsTableEmpty(oPlatoon[reftLastBuildLocation])) then
                                 oPlatoon[refiLastOrderType] = refiOrderIssueBuild
                                 --Update engineer trackers so they can assist us, and clear existing trackers so we dont ahve engineers assisting us when theyre not meant to

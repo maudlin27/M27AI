@@ -4152,7 +4152,7 @@ function SetWhetherCanPathToEnemy(aiBrain)
         local sPathing = M27UnitInfo.refPathingTypeLand
         local iOurBaseGroup = GetSegmentGroupOfLocation(sPathing, tOurBase)
         local iEnemyBaseGroup = GetSegmentGroupOfLocation(sPathing, tEnemyStartPosition)
-        if iOurBaseGroup == iEnemyBaseGroup then aiBrain[refbCanPathToEnemyBaseWithLand] = true
+        if iOurBaseGroup == iEnemyBaseGroup and not(IsUnderwater({tOurBase[1], GetTerrainHeight(tOurBase[1], tOurBase[3]), tOurBase[3]})) then aiBrain[refbCanPathToEnemyBaseWithLand] = true
         else aiBrain[refbCanPathToEnemyBaseWithLand] = false end
         sPathing = M27UnitInfo.refPathingTypeAmphibious
         iOurBaseGroup = GetSegmentGroupOfLocation(sPathing, tOurBase)
