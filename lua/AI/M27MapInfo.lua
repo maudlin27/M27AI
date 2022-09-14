@@ -654,7 +654,7 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
             --Do nothing, dont want to risk constant slowdowns which can happen on larger maps if a unit manages to break out of a plateau
             if not(oPathingUnit['M27UnitMapPathingCheckAbort']) then
                 oPathingUnit['M27UnitMapPathingCheckAbort'] = true
-                M27Utilities.ErrorHandler('Wont do any more pathing checks for unit '..oPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)..' as want to avoid major slowdowns. Total time spent on this unit='..(oPathingUnit[M27UnitInfo.refiPathingCheckTime] or 0)..'; Total time spent on this brain='..(aiBrain[M27UnitInfo.refiPathingCheckTime] or 0), true)
+                M27Utilities.ErrorHandler('Wont do any more pathing checks for unit being considered as want to avoid major slowdowns', true)
             end
         else
 
@@ -2509,11 +2509,13 @@ function RecordMexesInPathingGroupFilteredByEnemyDistance(aiBrain, sPathing, iPa
         aiBrain[reftMexesInPathingGroupFilteredByDistanceToEnemy][sPathing][iPathingGroup][iMinDistanceFromEnemy][iMaxDistanceFromEnemy] = {}
         local iValidMexCount = 0
         local tEnemyStartPosition = GetPrimaryEnemyBaseLocation(aiBrain)
-        for iMex, tMexLocation in tMexByPathingAndGrouping[sPathing][iPathingGroup] do
-            iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyStartPosition, tMexLocation)
-            if iCurDistanceToEnemy >= iMinDistanceFromEnemy and iCurDistanceToEnemy <= iMaxDistanceFromEnemy then
-                iValidMexCount = iValidMexCount + 1
-                aiBrain[reftMexesInPathingGroupFilteredByDistanceToEnemy][sPathing][iPathingGroup][iMinDistanceFromEnemy][iMaxDistanceFromEnemy][iValidMexCount] = tMexLocation
+        if M27Utilities.IsTableEmpty(tMexByPathingAndGrouping[sPathing][iPathingGroup]) == false then
+            for iMex, tMexLocation in tMexByPathingAndGrouping[sPathing][iPathingGroup] do
+                iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyStartPosition, tMexLocation)
+                if iCurDistanceToEnemy >= iMinDistanceFromEnemy and iCurDistanceToEnemy <= iMaxDistanceFromEnemy then
+                    iValidMexCount = iValidMexCount + 1
+                    aiBrain[reftMexesInPathingGroupFilteredByDistanceToEnemy][sPathing][iPathingGroup][iMinDistanceFromEnemy][iMaxDistanceFromEnemy][iValidMexCount] = tMexLocation
+                end
             end
         end
     end

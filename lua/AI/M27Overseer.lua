@@ -6565,7 +6565,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                             M27Chat.SendMessage(aiBrain, sCategoryDesc, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 0, 1000, true)
                                         end
                                     end
-
+                                elseif sCategoryDesc == 'Land experimental' then
+                                    M27Chat.SendMessage(aiBrain, sCategoryDesc, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 0, 1000, true)
                                 else
                                     M27Chat.SendMessage(aiBrain, sCategoryDesc, 'Enemy '..sCategoryDesc..' detected', 0, 1000, true)
                                 end

@@ -2389,7 +2389,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 1380 and aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 950 then bDebugMessages = true end
-    --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refiPlatoonMaxRange] >= 60 then bDebugMessages = true end
+    if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
@@ -4274,8 +4274,9 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                         local bInRangeOfT2PlusPD = false
                                         local bNearbyT2PlusPD
                                         local oNearestPD
+                                        local tEnemyT2PlusPD
                                         if oPlatoon[refiEnemyStructuresInRange] > 0 then
-                                            local tEnemyT2PlusPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryT2PlusPD, oPlatoon[reftEnemyStructuresInRange])
+                                            tEnemyT2PlusPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryT2PlusPD, oPlatoon[reftEnemyStructuresInRange])
                                             if M27Utilities.IsTableEmpty(tEnemyT2PlusPD) == false then
                                                 bNearbyT2PlusPD = true
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Have T2 PD within the enemy structures in range, will see if we have nearby T1 indirect fire units for calculating our range, and then attack if we are almost within range') end
@@ -4352,11 +4353,37 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                             local iEnemyMobileThreatRating = 0
 
                                             if oPlatoon[refiEnemiesInRange] > 0 then
-                                                iEnemyMobileThreatRating = M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemiesInRange], true, nil)
+                                                iEnemyMobileThreatRating = M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemiesInRange], false, nil) --Will have had visibility to be in enemiesinrange
                                                 iEnemyThreatRating = iEnemyMobileThreatRating
                                             end
-                                            if oPlatoon[refiEnemyStructuresInRange] > 0 then iEnemyThreatRating = iEnemyThreatRating + M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemyStructuresInRange], true) end
-                                            if (not(bNearbyT2PlusPD) and iOurThreatRating * 0.95 >= iEnemyThreatRating) or (bNearbyT2PlusPD and iOurThreatRating * 0.7 >= iEnemyThreatRating) then
+                                            if oPlatoon[refiEnemyStructuresInRange] > 0 then
+
+                                                local iEnemyStructureThreat = M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemyStructuresInRange], false) --WIll have had visibility already to get to this point so can set to false
+                                                --Adjust for shields and ignore T1 PD in certain cases (main focus is to stop experimentals running from a shielded base that has minimal threat in it)
+                                                if iEnemyStructureThreat >= 2000 and oPlatoon[refiPlatoonMaxRange] >= 30 and oPlatoon[refiPlatoonMassValue] >= 2000 then
+                                                    local tEnemyShields = EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedShield, oPlatoon[reftEnemyStructuresInRange])
+                                                    local iMaxShieldThreat = 0
+                                                    local iShieldThreatToUse = 0
+                                                    if M27Utilities.IsTableEmpty(tEnemyShields) == false then
+                                                        iMaxShieldThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyShields, false)
+                                                    end
+                                                    local iT2PDThreat = 0
+                                                    if M27Utilities.IsTableEmpty(tEnemyT2PlusPD) == false then
+                                                        iT2PDThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyT2PlusPD, false)
+                                                    end
+                                                    if iMaxShieldThreat > 0 then
+                                                        --Cap shield threat based on enemy non-shield threat
+                                                        iShieldThreatToUse = math.min(iMaxShieldThreat, 7500, math.max(500, (iT2PDThreat + iEnemyMobileThreatRating)))
+                                                    end
+
+                                                    --Revise structure threat based on above
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': iEnemyStructureThreat pre adjust='..iEnemyStructureThreat..'; iT2PDThreat='..iT2PDThreat..'; iMaxShieldThreat='..iMaxShieldThreat..'; iShieldThreatToUse='..iShieldThreatToUse..'; iEnemyMobileThreatRating='..iEnemyMobileThreatRating) end
+                                                    iEnemyStructureThreat = math.max(0, (iEnemyStructureThreat - iT2PDThreat - iMaxShieldThreat) * 0.2) + iT2PDThreat + iShieldThreatToUse
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Structure threat post adjust='..iEnemyStructureThreat) end
+                                                end
+                                                iEnemyThreatRating = iEnemyThreatRating + iEnemyStructureThreat
+                                            end
+                                            if ((not(bNearbyT2PlusPD) or sPlatoonName == 'M27GroundExperimental') and iOurThreatRating * 0.95 >= iEnemyThreatRating) or (bNearbyT2PlusPD and iOurThreatRating * 0.7 >= iEnemyThreatRating) then
                                                 bWillWinAttack = true
                                                 if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': UpdateActionForNearbyEnemies - our threat is better than theirs; iEnemyThreatRating='..iEnemyThreatRating..'; iOurThreatRating='..iOurThreatRating) end
                                             elseif oPlatoon[refbACUInPlatoon] and iOurThreatRating >= 0.75 * iEnemyMobileThreatRating then
