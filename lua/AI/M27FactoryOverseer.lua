@@ -2197,7 +2197,6 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                             --=======NAVAL FACTORY------------------
                         elseif bIsNavalFactory then
-                            if aiBrain:GetArmyIndex() == 2 and iFactoryTechLevel >= 2 then bDebugMessages = true end
                             if oFactory == M27Navy.GetPrimaryNavalFactory(aiBrain, oFactory[M27Navy.refiAssignedPond]) then M27Team.tTeamData[aiBrain.M27Team][M27Team.refbHaveNavalShortfall][oFactory[M27Navy.refiAssignedPond]] = true end
                             iTotalWanted = 3 --As are looking at things on a team wide basis and this only checks on an aibrain basis will just try and build lots of the one category
                             if iCurrentConditionToTry == 1 then --Immediate threat to base

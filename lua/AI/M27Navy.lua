@@ -742,9 +742,11 @@ function UpdateUnitPond(oUnit, iM27TeamUpdatingFor, bIsEnemy, iPondRefOverride)
     local sFunctionRef = 'UpdateUnitPond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xes02051' and oUnit:GetAIBrain():GetArmyIndex() == 2 and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
+
     if (bIsEnemy or oUnit:GetAIBrain().M27AI) and not(oUnit[refiAssignedPond]) or not(EntityCategoryContains(M27UnitInfo.refCategoryPondFixedCategory, oUnit.UnitId)) or bIsEnemy then --and not(oUnit[reftiTeamRefsUpdatedFor][iM27TeamUpdatingFor])) then
         local iCurPond = iPondRefOverride or M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oUnit:GetPosition())
-        if bDebugMessages == true then LOG(sFunctionRef..': bIsEnemy='..tostring(bIsEnemy)..'; Updating for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iPondRefOverride='..(iPondRefOverride or 'nil')..'; iCurPond='..(iCurPond or 'nil')) end --LOG('iCurPond pre adj='..(iCurPond or 'nil'))
+        if bDebugMessages == true then LOG(sFunctionRef..': bIsEnemy='..tostring(bIsEnemy)..'; Updating for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iPondRefOverride='..(iPondRefOverride or 'nil')..'; iCurPond='..(iCurPond or 'nil')..'; oUnit[refiAssignedPond]='..(oUnit[refiAssignedPond] or 'nil')) end --LOG('iCurPond pre adj='..(iCurPond or 'nil'))
         --if tPondDetails[iCurPond] then LOG('Pond size='..(tPondDetails[iCurPond][subrefPondSize] or 'nil')) end
         if not(tPondDetails[iCurPond]) or (tPondDetails[iCurPond][subrefPondSize] or 0) <= iMinPondSize then
             --If have a naval unit that isnt amphibious then update pathing
@@ -1339,8 +1341,10 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     local sFunctionRef = 'ManageTeamNavy'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if GetGameTimeSeconds() >= 585 and GetGameTimeSeconds() <= 650 and M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategorySubmarine, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])) == false then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 840 and (aiBrain:GetArmyIndex() == 2 or aiBrain:GetArmyIndex() == 4) then bDebugMessages = true end
 
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for iTeam='..iTeam..'; Brain='..aiBrain.Nickname..'; Index='..aiBrain:GetArmyIndex()..'; GameTime='..GetGameTimeSeconds()) end
+
 
 
     local oClosestEnemyUnit
@@ -2609,7 +2613,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                             iClosestShieldDist = iCurDist
                         end
                     end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Will assign shield '..oClosestShield.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestShield)..' to priority unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iClosestShieldDist='..iClosestShieldDist) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Will assign shield '..oClosestShield.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestShield)..' with aiBrain index='..oClosestShield:GetAIBrain():GetArmyIndex()..' to priority unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iClosestShieldDist='..iClosestShieldDist) end
                     AddShieldAssignment(oUnit, oClosestShield, tOurBase)
                     table.remove(tShieldsToAssign, iClosestShieldRef)
                     if M27Utilities.IsTableEmpty(tShieldsToAssign) then break end
