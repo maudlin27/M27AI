@@ -1211,9 +1211,7 @@ function GetClosestPlatoonOrUnitWantingMobileShield(aiBrain, tStartPosition, oSh
                         M27Navy.UpdateUnitPond(oShield, aiBrain.M27Team, false, iPond)
                         --Assign to naval platoon if not already in it
                         if not(oShield.PlatoonHandle == aiBrain[M27PlatoonTemplates.refoIdleNavy]) then AddIdleUnitsToPlatoon(aiBrain, { oShield }, aiBrain[M27PlatoonTemplates.refoIdleNavy]) end
-                        bDebugMessages = true
                         if bDebugMessages == true then LOG(sFunctionRef..': Have assigned mobile shield '..oShield.UnitId..M27UnitInfo.GetUnitLifetimeCount(oShield)..' to pond '..iPond) end
-                        bDebugMessages = false
                     end
                 end
             end

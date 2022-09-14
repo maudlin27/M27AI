@@ -6557,7 +6557,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                             if bConsiderChatWarning and M27Utilities.IsTableEmpty(tReferenceTable) then
                                 if sCategoryDesc == 'Experimental building' then
                                     if EntityCategoryContains(M27UnitInfo.refCategoryNovaxCentre, oUnit.UnitId) then
-                                        M27Chat.SendMessage(aiBrain, sCategoryDesc, 'Enemy Novax detected', 0, 1000, true)
+                                        M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy Novax detected', 0, 1000, true)
                                     else
                                         if oUnit:GetFractionComplete() <= 0.2 and oUnit:GetAIBrain():GetCurrentUnits(M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryRASSACU + M27UnitInfo.refCategoryParagon) <= 20 then
                                             M27Chat.SendMessage(aiBrain, sCategoryDesc, 'LOL theyre building a '..LOCF(oUnit:GetBlueprint().General.UnitName), 0, 1000, true)
@@ -6566,7 +6566,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                         end
                                     end
                                 elseif sCategoryDesc == 'Land experimental' then
-                                    M27Chat.SendMessage(aiBrain, sCategoryDesc, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 0, 1000, true)
+                                    M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 0, 1000, true)
                                 else
                                     M27Chat.SendMessage(aiBrain, sCategoryDesc, 'Enemy '..sCategoryDesc..' detected', 0, 1000, true)
                                 end
@@ -8123,7 +8123,6 @@ function ACUInitialisation(aiBrain)
     if bDebugMessages == true then LOG(sFunctionRef..': Have just send order to try and build structure at location for ACU; tInitialBuildLocation='..repru(tInitialBuildLocation)) end
     if M27Utilities.IsTableEmpty(tInitialBuildLocation) then
         M27Utilities.ErrorHandler('Couldnt find anywhere to build initial land factory, will search for a new base location')
-        bDebugMessages = true
         --Search for the nearest location where we can build a land factory and pick this as the new base
         local sBlueprint = 'ueb0101'
         local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
@@ -8790,6 +8789,7 @@ function CoordinateLandExperimentals(aiBrain)
         end
         if not (bHaveChokepoint) then
             local bCoordinateFatboys = false
+            --Only coordinate fatboys if enemy has a fatboy (otherwise we want to kite with 1 fatboy if enemy has experimental)
             if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, aiBrain[reftEnemyLandExperimentals])) == false then
                 bCoordinateFatboys = true
             end

@@ -98,8 +98,9 @@ rMapPlayableArea = 2 --{x1,z1, x2,z2} - Set at start of the game, use instead of
 iPathingIntervalSize = 0.5
 iLowHeightDifThreshold = 0.007 --Used to trigger check for max height dif in an area
 iHeightDifAreaSize = 0.2 --T1 engineer is 0.6 x 0.9, so this results in a 1x1 size box by searching +- iHeightDifAreaSize if this is set to 0.5; however given are using a 0.25 interval size dont want this to be too large or destroys the purpose of the interval size and makes the threshold unrealistic
-iMaxHeightDif = 0.115 --NOTE: Map specific code should be added below in DetermineMaxTerrainHeightDif (hardcoded table with overrides by map name); Max dif in height allowed if move iPathingIntervalSize blocks away from current position in a straight line along x or z; Testing across 3 maps (africa, astro crater battles, open palms) a value of viable range across the 3 maps is a value between 0.11-0.119
-local iChangeInHeightThreshold = 0.04 --Amount by which to change iMaxHeightDif if we have pathing inconsistencies
+iMaxHeightDif = 0.115 --NOTE: Map specific code should be added below in DetermineMaxTerrainHeightDif (hardcoded table with overrides by map name); Max dif in height allowed if move iPathingIntervalSize blocks away from current position in a straight line along x or z; Testing across 3 maps (africa, astro crater battles, open palms) a value of viable range across the 3 maps is a value between 0.11-0.119.  Open palms: 0.074: Incorrect (middle not shown as pathable); 0.075: Correct; 0.119: Correct; 0.12: Incorrect (side cliffs shown as pathable).  Africa: Africa: 0.109: Incorrect (ramps at top and bottom not shown as pathable); 0.11: Correct mostly (some water areas show as unpathable when I think they’re pathable); 0.119: Correct; 0.25: Correct* (I’m not sure on the pathability of some of the island sections)
+--Since then have had various maps where need a higher value to detect ramps - see below for manual overrides
+local iChangeInHeightThreshold = 0.08 --Amount by which to change iMaxHeightDif if we have pathing inconsistencies
 iMinWaterDepth = 1.5 --Ships cant move right up to shore, this is a guess at how much clearance is needed (testing on Africa, depth of 2 leads to some pathable areas being considered unpathable)
 iWaterPathingIntervalSize = 1
 tWaterAreaAroundTargetAdjustments = {} --Defined in map initialisation
@@ -190,6 +191,7 @@ function DetermineMaxTerrainHeightDif()
     ['Hyperion'] = 0.215, --0.213 results in apparant plateau with 2 mexes (that is actually pathable) being treated as a plateau incorrectly
     ['adaptive millennium'] = 0.16, --Default and 0.15 results in top right and bottom left being thought to be plateaus when theyre not, 0.17 shows them as pathable
     ['Pelagial v2'] = 0.18, --Fails to detect northern island as pathable at 0.17, succeeds at 0.18
+    ['Battle Swamp'] = 0.19, --Fails to detect some at 0.15, locates at 0.18 although small sections showing as impathable
     }
     local sMapName = ScenarioInfo.name
     iMaxHeightDif = (tMapHeightOverride[sMapName] or iMaxHeightDif)

@@ -655,8 +655,6 @@ function RemoveUnitFromAssignedPond(oUnit)
     local sFunctionRef = 'RemoveUnitFromAssignedPond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'ual03075' then bDebugMessages = true end
-
     if oUnit[refiAssignedPond] then --redundancy
         if bDebugMessages == true then LOG(sFunctionRef..': Considering unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
         if oUnit[reftiTeamRefsUpdatedFor] then
@@ -704,8 +702,6 @@ function AddUnitToPond(oUnit, iCurPond, iM27TeamUpdatingFor, bIsEnemy)
     local sFunctionRef = 'AddUnitToPond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'ual03075' then bDebugMessages = true end
-
     if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurPond='..iCurPond..'; iM27TeamUpdatingFor='..iM27TeamUpdatingFor..'; bIsEnemy='..tostring((bIsEnemy or false))..'; repr of oUnit[reftiTeamRefsUpdatedFor]='..repru(oUnit[reftiTeamRefsUpdatedFor])..'; oUnit[refiAssignedPond]='..(oUnit[refiAssignedPond] or 'nil')) end
 
     if not(oUnit[reftiTeamRefsUpdatedFor]) then
@@ -745,8 +741,6 @@ function UpdateUnitPond(oUnit, iM27TeamUpdatingFor, bIsEnemy, iPondRefOverride)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateUnitPond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-
-    if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'ual03075' then bDebugMessages = true end
 
     if (bIsEnemy or oUnit:GetAIBrain().M27AI) and not(oUnit[refiAssignedPond]) or not(EntityCategoryContains(M27UnitInfo.refCategoryPondFixedCategory, oUnit.UnitId)) or bIsEnemy then --and not(oUnit[reftiTeamRefsUpdatedFor][iM27TeamUpdatingFor])) then
         local iCurPond = iPondRefOverride or M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oUnit:GetPosition())
@@ -1299,7 +1293,7 @@ end
 
 function AddShieldAssignment(oUnitToSupport, oClosestShield, tOurBase)
     --Assignes closest shield to support oUnitToSupport and gets it to move there, by reference to our base
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AddShieldAssignment'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -2472,7 +2466,6 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
 
     ---->>>>Support units<<<<---
     --Move general support units towards front unit
-    bDebugMessages = true
     if oClosestFriendlyUnitToEnemyBase then
         local tSupportUnits = EntityCategoryFilterDown(iSupportNavyCategory, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
         if M27Utilities.IsTableEmpty(tSupportUnits) == false then
@@ -2525,7 +2518,6 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
             ---->>>>SHIELD BOATS<<<<----
             --Assign shield units - decide on priority list, and then get the closest shield unit to this
             if M27Utilities.IsTableEmpty(tShieldsToAssign) == false then
-                bDebugMessages = true
                 local tUnitsToShieldByPriority = {}
                 local iCurPriority = 1
                 local iSurfaceCombatCategory = M27UnitInfo.refCategoryNavalSurface * categories.DIRECTFIRE + M27UnitInfo.refCategoryNavalSurface * categories.INDIRECTFIRE + M27UnitInfo.refCategoryNavalSurface * categories.ANTINAVY
