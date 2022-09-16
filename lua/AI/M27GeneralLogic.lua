@@ -1978,9 +1978,9 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                         if not(bIndirectFireThreatOnly) then
                             if bAntiNavyOnly or bSubmersibleOnly then
                                 iMassMod = 0
-                                if (bSubmersibleOnly and (EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) or oBP.Physics.MotionType == 'RULEUMT_Amphibious')) or (bAntiNavyOnly and EntityCategoryContains(categories.ANTINAVY+categories.OVERLAYANTINAVY, oUnit.UnitId)) then
+                                if (bSubmersibleOnly and (EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) or oBP.Physics.MotionType == 'RULEUMT_Amphibious')) or (not(bSubmersibleOnly) and bAntiNavyOnly and EntityCategoryContains(categories.ANTINAVY+categories.OVERLAYANTINAVY, oUnit.UnitId)) then
                                     iMassMod = 0.25 --e.g. for overlayantinavy or submersibles with no attack
-                                    if EntityCategoryContains(categories.SUBMERSIBLE * categories.ANTINAVY, oUnit.UnitId) then
+                                    if EntityCategoryContains(categories.ANTINAVY, oUnit.UnitId) then
                                         iMassMod = 1
                                     elseif EntityCategoryContains(categories.LAND * categories.ANTINAVY, oUnit.UnitId) then
                                         iMassMod = 0.5 --brick, wagner etc
@@ -2059,7 +2059,10 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                             elseif EntityCategoryContains(M27UnitInfo.refCategoryLongRangeDFLand, oUnit.UnitId) then iMassMod = 0.5
                             end
                         end
-                        if EntityCategoryContains(M27UnitInfo.refCategoryStructure, oUnit.UnitId) then iMassMod = iMassMod * 2 end
+                        if EntityCategoryContains(M27UnitInfo.refCategoryStructure, oUnit.UnitId) then
+                            iMassMod = iMassMod * 2
+                            if bAntiNavyOnly then iMassMod = iMassMod * 1.1 end
+                        end
                         iMassCost = (oBP.Economy.BuildCostMass or 0)
                         if bDebugMessages == true then LOG(sFunctionRef..': iMassCost='..(iMassCost or 'nil')..'; iMassMod='..(iMassMod or 'nil')) end
                         iBaseThreat = iMassCost * iMassMod

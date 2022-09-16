@@ -2574,7 +2574,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             if bDebugMessages == true then
                                                 LOG(sFunctionRef .. ': iExistingBombardmentUnits=' .. (iExistingBombardmentUnits or 'nil') .. '; Pond value to us=' .. (aiBrain[M27Navy.reftiPondValueToUs][oFactory[M27Navy.refiAssignedPond]] or 'nil'))
                                             end
-                                            if iExistingBombardmentUnits == 0 or iExistingBombardmentUnits <= math.max(iFactoryTechLevel - 1, aiBrain[M27Navy.reftiPondValueToUs][oFactory[M27Navy.refiAssignedPond]] * 0.3) then
+                                            if iExistingBombardmentUnits == 0 or iExistingBombardmentUnits <= math.max(iFactoryTechLevel - 1, (aiBrain[M27Navy.reftiPondValueToUs][oFactory[M27Navy.refiAssignedPond]] or 0) * 0.3) then
                                                 iCategoryToBuild = iBombardmentCategory
                                             else
                                                 --Only set category to build to bombardment category if worth investing more in this pond (note that bombardment category may already be nil though)
@@ -2583,10 +2583,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 local iMexesInRange = 0
                                                 local tEnemyPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                                                 local tOurPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-                                                for iMex, tMexSubtable in M27Navy.tPondDetails[oFactory[M27Navy.refiAssignedPond]][M27Navy.subrefPondMexInfo] do
-                                                    if tMexSubtable[sMexDistanceSubref] <= iPotentialBombardmentRange then
-                                                        if M27Utilities.GetDistanceBetweenPositions(tMexSubtable[M27Navy.subrefMexLocation], tEnemyPosition) <= M27Utilities.GetDistanceBetweenPositions(tMexSubtable[M27Navy.subrefMexLocation], tOurPosition) then
-                                                            iMexesInRange = iMexesInRange + 1
+                                                if M27Utilities.IsTableEmpty(M27Navy.tPondDetails[oFactory[M27Navy.refiAssignedPond]][M27Navy.subrefPondMexInfo]) == false then
+                                                    for iMex, tMexSubtable in M27Navy.tPondDetails[oFactory[M27Navy.refiAssignedPond]][M27Navy.subrefPondMexInfo] do
+                                                        if tMexSubtable[sMexDistanceSubref] <= iPotentialBombardmentRange then
+                                                            if M27Utilities.GetDistanceBetweenPositions(tMexSubtable[M27Navy.subrefMexLocation], tEnemyPosition) <= M27Utilities.GetDistanceBetweenPositions(tMexSubtable[M27Navy.subrefMexLocation], tOurPosition) then
+                                                                iMexesInRange = iMexesInRange + 1
+                                                            end
                                                         end
                                                     end
                                                 end
