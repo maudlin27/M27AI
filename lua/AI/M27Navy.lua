@@ -1357,6 +1357,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
 
     local iFriendlyDistToEnemy
     local tOurBase
+
     local oPrimaryFactory = GetPrimaryNavalFactory(aiBrain, iPond)
     if oPrimaryFactory then tOurBase = oPrimaryFactory:GetPosition()
     else
@@ -1364,6 +1365,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     end
 
     local tEnemyBase = GetPrimaryEnemyPondBaseLocation(aiBrain, iPond)
+    local iAngleToEnemy = M27Utilities.GetAngleFromAToB(tOurBase, tEnemyBase)
 
 
     if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false then
@@ -2114,7 +2116,17 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                     else
 
                         --Retreat
-                        tGlobalNavalDestination = M27Utilities.MoveInDirection(tOurBase, M27Utilities.GetAngleFromAToB(tOurBase, tEnemyBase), 40, true, false)
+
+                        tGlobalNavalDestination = M27Utilities.MoveInDirection(tOurBase, iAngleToEnemy, 40, true, false)
+                        --If not in same pond then reduce dist to 5 and try in opposite direction
+                        if not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, tGlobalNavalDestination) == iPond) then
+                            for iAngleMod = 0, 315, 45 do
+                                tGlobalNavalDestination = M27Utilities.MoveInDirection(tOurBase, iAngleToEnemy + iAngleMod, 8, true, false)
+                                if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, tGlobalNavalDestination) == iPond then
+                                    break
+                                end
+                            end
+                        end
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Want to retreat, will run to base=' .. repru(tGlobalNavalDestination))
                         end
@@ -2127,6 +2139,14 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
 
             ---->>>>SUBMERSIBLES<<<----
             local tBaseRallyPoint = M27Utilities.MoveInDirection(tOurBase, M27Utilities.GetAngleFromAToB(tOurBase, tEnemyBase), 8, true, false)
+            if not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, tBaseRallyPoint) == iPond) then
+                for iAngleMod = 45, 315, 45 do
+                    tBaseRallyPoint = M27Utilities.MoveInDirection(tOurBase, iAngleToEnemy + iAngleMod, 8, true, false)
+                    if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, tGlobalNavalDestination) == iPond then
+                        break
+                    end
+                end
+            end
 
             local tOurSubmersibles = EntityCategoryFilterDown(M27UnitInfo.refCategorySubmarine, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
             if bDebugMessages == true then LOG(sFunctionRef..': About to send orders to any subs we have. bAllOutSubAttack='..tostring(bAllOutSubAttack)..'; Is table of our submersibles empty='..tostring(M27Utilities.IsTableEmpty(tOurSubmersibles))) end
