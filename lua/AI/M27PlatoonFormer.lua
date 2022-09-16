@@ -11,7 +11,9 @@ local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 local M27Navy = import('/mods/M27AI/lua/AI/M27Navy.lua')
+
 
 
 local reftoCombatUnitsWaitingForAssignment = 'M27CombatUnitsWaitingForAssignment'
@@ -1116,7 +1118,7 @@ function DoesPlatoonOrUnitWantAnotherMobileShield(oPlatoonOrUnit, iShieldMass, b
 end
 
 function GetClosestPlatoonOrUnitWantingMobileShield(aiBrain, tStartPosition, oShield)
-
+    --Returns then earest platoon or unit to help; if we want to help navy instead then returns the closest unit to the enemy pond and assigns the shield to the pond (so the navy logic will pick it up)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetClosestPlatoonOrUnitWantingMobileShield'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -1186,6 +1188,37 @@ function GetClosestPlatoonOrUnitWantingMobileShield(aiBrain, tStartPosition, oSh
             end
         end
     end
+
+    --Consider if naval unit is closer, and if so assign the shield to a pond instead
+    if EntityCategoryContains(M27UnitInfo.refCategoryShieldBoat, oShield.UnitId) then
+        local iPond = M27Navy.GetPondToFocusOn(aiBrain)
+        if M27UnitInfo.IsUnitValid(M27Team.tTeamData[aiBrain.M27Team][M27Team.refoClosestFriendlyUnitToEnemyByPond][iPond]) then
+            iCurDistanceToUs = M27Utilities.GetDistanceBetweenPositions(tStartPosition, M27Team.tTeamData[aiBrain.M27Team][M27Team.refoClosestFriendlyUnitToEnemyByPond][iPond]:GetPosition())
+            if iCurDistanceToUs < iClosestDistanceToUs then
+                --Do we want more shields for this pond?
+                local iNavalShieldsWanted = M27Navy.GetShieldBoatsWanted(aiBrain, oShield)
+                if iNavalShieldsWanted > 0 then
+                    local iExistingShieldBoats = 0
+                    local tExistingShieldBoats = EntityCategoryFilterDown(M27UnitInfo.refCategoryShieldBoat, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][iPond])
+
+                    if M27Utilities.IsTableEmpty(tExistingShieldBoats) == false then
+                        iExistingShieldBoats = table.getn(tExistingShieldBoats)
+                    end
+                    if iExistingShieldBoats < iNavalShieldsWanted then
+                        iClosestDistanceToUs = iCurDistanceToUs
+                        oClosestPlatoonOrUnit = M27Team.tTeamData[aiBrain.M27Team][M27Team.refoClosestFriendlyUnitToEnemyByPond][iPond]
+                        oShield[M27Navy.refiAssignedPond] = iPond
+                        M27Navy.UpdateUnitPond(oShield, aiBrain.M27Team, false, iPond)
+                        --Assign to naval platoon if not already in it
+                        if not(oShield.PlatoonHandle == aiBrain[M27PlatoonTemplates.refoIdleNavy]) then AddIdleUnitsToPlatoon(aiBrain, { oShield }, aiBrain[M27PlatoonTemplates.refoIdleNavy]) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have assigned mobile shield '..oShield.UnitId..M27UnitInfo.GetUnitLifetimeCount(oShield)..' to pond '..iPond) end
+                    end
+                end
+            end
+        end
+    end
+
+
     if bDebugMessages == true then
         if not(oClosestPlatoonOrUnit) then LOG('No platoons or units found that want shields')
         else
@@ -1302,6 +1335,7 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
     local iShieldMass
     local bNoMorePlatoonsToHelp = false
 
+
     while bHaveUnitsToAssign == true do
         iCurCount = iCurCount + 1
         if iCurCount > iMaxLoop then M27Utilities.ErrorHandler('Infinite loop or excessive mobile shields') break end
@@ -1309,9 +1343,12 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
             for iUnit, oUnit in tMobileShieldUnits do
                 if M27UnitInfo.IsUnitValid(oUnit) then
                     if bDebugMessages == true then LOG(sFunctionRef..': Considering shield oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
-                    --Are we already in a mobile shield platoon?
-                    if oUnit.PlatoonHandle and oUnit.PlatoonHandle.GetPlan and oUnit.PlatoonHandle:GetPlan() == 'M27MobileShield' then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Are already in a mobile shield platoon') end
+                    --Are we already in a mobile shield platoon or assigned to a naval pond?
+                    if oUnit[M27Navy.refiAssignedPond] then
+                        --Are we assigned to naval idle platoon? if not then assign
+                        if not(oUnit.PlatoonHandle == aiBrain[M27PlatoonTemplates.refoIdleNavy]) then AddIdleUnitsToPlatoon(aiBrain, { oUnit }, aiBrain[M27PlatoonTemplates.refoIdleNavy]) end
+                    elseif oUnit.PlatoonHandle and oUnit.PlatoonHandle.GetPlan and oUnit.PlatoonHandle:GetPlan() == 'M27MobileShield' then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Are already in a mobile shield platoon or assigned a pond. Assigned pond='..(oUnit[M27Navy.refiAssignedPond] or 'nil')) end
                         --Do nothing
                     else
                         oCurUnitToAssign = oUnit
@@ -1352,7 +1389,7 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
                     if bDebugMessages == true then LOG(sFunctionRef..': Want to retreat cur shield, so have created a new retreating shield platoon for it') end
                 end
             else
-                --Get the platoon or unit to help                                
+                --Get the platoon or unit to help
                 if bDebugMessages == true then LOG(sFunctionRef..': Look for platoon or high priority units that wants shield; bNoMorePlatoonsToHelp='..tostring(bNoMorePlatoonsToHelp)) end
 
                 iShieldMass = oCurUnitToAssign:GetBlueprint().Economy.BuildCostMass
@@ -1436,19 +1473,22 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
                         if oPlatoonOrUnitToHelp.GetPlan then sPlan = oPlatoonOrUnitToHelp:GetPlan() end
                         LOG(sFunctionRef..': oPlatoonOrUnitToHelp='..(sPlan or 'nil')..(oPlatoonOrUnitToHelp[M27PlatoonUtilities.refiPlatoonCount] or '0')..'; or is a unit with ID='..(oPlatoonOrUnitToHelp.UnitId or 'nil')..'; checking if already have a platoon that should add to')
                     end
-                    --Does the platoon already have a shield helper assigned?
-                    if oPlatoonOrUnitToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon] and aiBrain:PlatoonExists(oPlatoonOrUnitToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon]) then
-                        --Add to existing platoon
-                        aiBrain:AssignUnitsToPlatoon(oPlatoonOrUnitToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon], { oCurUnitToAssign }, 'Attack', 'GrowthFormation')
-                        M27PlatoonUtilities.RecordPlatoonUnitsByType(oPlatoonOrUnitToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon], false)
+                    --Did we assign the shield to a pond (done when getting nearest platoon/unit to help)?
+                    if not(oCurUnitToAssign[M27Navy.refiAssignedPond]) then
+                        --Does the platoon already have a shield helper assigned?
+                        if oPlatoonOrUnitToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon] and aiBrain:PlatoonExists(oPlatoonOrUnitToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon]) then
+                            --Add to existing platoon
+                            aiBrain:AssignUnitsToPlatoon(oPlatoonOrUnitToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon], { oCurUnitToAssign }, 'Attack', 'GrowthFormation')
+                            M27PlatoonUtilities.RecordPlatoonUnitsByType(oPlatoonOrUnitToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon], false)
 
-                        if bDebugMessages == true then LOG(sFunctionRef..': Added shield unit to existing platoon='..oPlatoonOrUnitToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon]:GetPlan()..oPlatoonOrUnitToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon][M27PlatoonUtilities.refiPlatoonCount]) end
-                    else
-                        --Create new platoon
-                        oShieldPlatoon = CreatePlatoon(aiBrain, 'M27MobileShield', {oCurUnitToAssign})
-                        oPlatoonOrUnitToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon] = oShieldPlatoon
-                        oShieldPlatoon[M27PlatoonUtilities.refoPlatoonOrUnitToEscort] = oPlatoonOrUnitToHelp
-                        if bDebugMessages == true then LOG(sFunctionRef..': Just created a new platoon for the mobile shield') end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Added shield unit to existing platoon='..oPlatoonOrUnitToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon]:GetPlan()..oPlatoonOrUnitToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon][M27PlatoonUtilities.refiPlatoonCount]) end
+                        else
+                            --Create new platoon
+                            oShieldPlatoon = CreatePlatoon(aiBrain, 'M27MobileShield', {oCurUnitToAssign})
+                            oPlatoonOrUnitToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon] = oShieldPlatoon
+                            oShieldPlatoon[M27PlatoonUtilities.refoPlatoonOrUnitToEscort] = oPlatoonOrUnitToHelp
+                            if bDebugMessages == true then LOG(sFunctionRef..': Just created a new platoon for the mobile shield') end
+                        end
                     end
                 end
             end

@@ -6557,7 +6557,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                             if bConsiderChatWarning and M27Utilities.IsTableEmpty(tReferenceTable) then
                                 if sCategoryDesc == 'Experimental building' then
                                     if EntityCategoryContains(M27UnitInfo.refCategoryNovaxCentre, oUnit.UnitId) then
-                                        M27Chat.SendMessage(aiBrain, sCategoryDesc, 'Enemy Novax detected', 0, 1000, true)
+                                        M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy Novax detected', 0, 1000, true)
                                     else
                                         if oUnit:GetFractionComplete() <= 0.2 and oUnit:GetAIBrain():GetCurrentUnits(M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryRASSACU + M27UnitInfo.refCategoryParagon) <= 20 then
                                             M27Chat.SendMessage(aiBrain, sCategoryDesc, 'LOL theyre building a '..LOCF(oUnit:GetBlueprint().General.UnitName), 0, 1000, true)
@@ -6565,7 +6565,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                             M27Chat.SendMessage(aiBrain, sCategoryDesc, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 0, 1000, true)
                                         end
                                     end
-
+                                elseif sCategoryDesc == 'Land experimental' then
+                                    M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 0, 1000, true)
                                 else
                                     M27Chat.SendMessage(aiBrain, sCategoryDesc, 'Enemy '..sCategoryDesc..' detected', 0, 1000, true)
                                 end
@@ -6622,7 +6623,10 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             if aiBrain[refbEnemyTMLSightedBefore] == false then
                 aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
                 aiBrain[refbEnemyTMLSightedBefore] = true
-                M27Chat.SendMessage(aiBrain, 'TML sighted', 'They have TML, get TMD', 0, 90, true)
+            end
+            if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryTML, aiBrain[reftEnemyTML])) == false then
+                --SendMessage(aiBrain, sMessageType, sMessage, iOptionalDelayBeforeSending, iOptionalTimeBetweenMessageType, bOnlySendToTeam)
+                M27Chat.SendMessage(aiBrain, 'TML sighted', 'They have TML, get TMD', 0, 100000, true)
             end
         else
             --No TML - remove the flag that we need TMD from units
@@ -8115,7 +8119,73 @@ function ACUInitialisation(aiBrain)
     local iMaxAreaToSearch = 14
     local iCategoryToBuildBy = M27UnitInfo.refCategoryT1Mex
     --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCatToBuildBy, tAlternativePositionToLookFrom, bLookForPartCompleteBuildings, bLookForQueuedBuildings, oUnitToBuildBy, bNeverBuildRandom, iOptionalCategoryForStructureToBuild)
-    M27EngineerOverseer.BuildStructureAtLocation(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, nil, false, false, nil, false, M27UnitInfo.refCategoryEngineer)
+    local tInitialBuildLocation = M27EngineerOverseer.BuildStructureAtLocation(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, nil, false, false, nil, false, M27UnitInfo.refCategoryEngineer)
+    if bDebugMessages == true then LOG(sFunctionRef..': Have just send order to try and build structure at location for ACU; tInitialBuildLocation='..repru(tInitialBuildLocation)) end
+    if M27Utilities.IsTableEmpty(tInitialBuildLocation) then
+        M27Utilities.ErrorHandler('Couldnt find anywhere to build initial land factory, will search for a new base location')
+        --Search for the nearest location where we can build a land factory and pick this as the new base
+        local sBlueprint = 'ueb0101'
+        local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        local iMinX = M27MapInfo.rMapPlayableArea[1]
+        local iMaxX = M27MapInfo.rMapPlayableArea[3]
+        local iMinZ = M27MapInfo.rMapPlayableArea[2]
+        local iMaxZ = M27MapInfo.rMapPlayableArea[4]
+        local tPossiblePosition
+        local tActualLocation
+        local bHaveBuildLocation = false
+        local sPathing = M27UnitInfo.refPathingTypeAmphibious
+        local iPathingGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        if bDebugMessages == true then LOG(sFunctionRef..': Will consider places near tStartPosition='..repru(tStartPosition)..' if they are withi nM27MapInfo.rMapPlayableArea='..repru(M27MapInfo.rMapPlayableArea)) end
+        for iMaxAdjust = 2, 250, 2 do
+            for iAdjustXValue = 0, iMaxAdjust, 2 do
+            --for iAdjustXValue = 2, iMaxAdjust, 2 do
+                for iXFactor = -1, 1, 2 do
+                    for iAdjustZValue = 0, iMaxAdjust, 2 do
+                        for iZFactor = -1, 1, 2 do
+                            if iAdjustXValue == iMaxAdjust or iAdjustZValue == iMaxAdjust then
+                                tPossiblePosition = {tStartPosition[1] + iAdjustXValue * iXFactor, 0, tStartPosition[3] + iAdjustZValue * iZFactor}
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will consider tPossiblePosition='..repru(tPossiblePosition)..' if it is within map bounds') end
+                                --Is this locaiton within map bounds?
+                                if tPossiblePosition[1] > iMinX and tPossiblePosition[3] > iMinZ and tPossiblePosition[1] < iMaxX and tPossiblePosition[3] < iMaxZ then
+                                    --Adjust the y value
+                                    tPossiblePosition[2] = GetTerrainHeight(tPossiblePosition[1], tPossiblePosition[3])
+                                    if bDebugMessages == true then LOG(sFunctionRef..': CanBuildStructure at tPossiblePosition='..tostring(aiBrain:CanBuildStructureAt(sBlueprint, tPossiblePosition))) end
+                                    if aiBrain:CanBuildStructureAt(sBlueprint, tPossiblePosition) then
+                                        --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCatToBuildBy, tAlternativePositionToLookFrom, bLookForPartCompleteBuildings, bLookForQueuedBuildings, oUnitToBuildBy, bNeverBuildRandom, iOptionalCategoryForStructureToBuild, bBuildCheapestStructure, iOptionalEngiActionRef)
+                                        if M27MapInfo.GetSegmentGroupOfLocation(sPathing, tPossiblePosition) == iPathingGroupWanted then
+
+                                            tActualLocation = M27EngineerOverseer.BuildStructureAtLocation(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, tPossiblePosition, false, false, nil, false, M27UnitInfo.refCategoryEngineer)
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Found location where we think can build a land factory, tPossiblePosition='..repru(tPossiblePosition)..'; sent order to try and build here, tActualLocation='..repru(tActualLocation)..'; iAdjustXValue'..iAdjustXValue..'; iAdjustZValue='..iAdjustZValue) end
+                                            if M27Utilities.IsTableEmpty(tActualLocation) == false then
+                                                bHaveBuildLocation = true
+                                                break
+                                            end
+                                        end
+                                    elseif bDebugMessages == true then
+                                        LOG(sFunctionRef..': Couldnt build structure here, will draw in red')
+                                        M27Utilities.DrawLocation(tPossiblePosition, nil, 2)
+                                    end
+                                end
+                            end
+                        end
+                        if bHaveBuildLocation then break end
+                    end
+                    if bHaveBuildLocation then break end
+                end
+                if bHaveBuildLocation then break end
+            end
+            if bHaveBuildLocation then break end
+        end
+
+        if bHaveBuildLocation then
+            --We couldn't bild at our original location so want to change our start position if it is far away
+            if bDebugMessages == true then LOG(sFunctionRef..': Will change our start position if it is far away from the location where we are building our land factory. Distance='..M27Utilities.GetDistanceBetweenPositions(tActualLocation, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
+            if M27Utilities.GetDistanceBetweenPositions(tActualLocation, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 50 then
+                if bDebugMessages == true then LOG(sFunctionRef..': About to change start position from '..repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..' to '..repru(tActualLocation)) end
+                M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber] = {tActualLocation[1], tActualLocation[2], tActualLocation[3]}
+            end
+        end
+    end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     while aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllHQFactories) == 0 do
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -8719,6 +8789,7 @@ function CoordinateLandExperimentals(aiBrain)
         end
         if not (bHaveChokepoint) then
             local bCoordinateFatboys = false
+            --Only coordinate fatboys if enemy has a fatboy (otherwise we want to kite with 1 fatboy if enemy has experimental)
             if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, aiBrain[reftEnemyLandExperimentals])) == false then
                 bCoordinateFatboys = true
             end
