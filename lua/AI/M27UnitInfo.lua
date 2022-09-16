@@ -720,7 +720,7 @@ function GetUnitIndirectRange(oUnit)
         local oBP = oUnit:GetBlueprint()
         if oBP.Weapon then
             for iCurWeapon, oCurWeapon in oBP.Weapon do
-                if oCurWeapon.WeaponCategory == 'Missile' or oCurWeapon.WeaponCategory == 'Artillery' or oCurWeapon.WeaponCategory == 'Indirect Fire' then
+                if (oCurWeapon.WeaponCategory == 'Missile' and not(oCurWeapon.DamageType == 'Nuke')) or oCurWeapon.WeaponCategory == 'Artillery' or oCurWeapon.WeaponCategory == 'Indirect Fire' then
                     if oCurWeapon.MaxRadius > iMaxRange then iMaxRange = oCurWeapon.MaxRadius end
                 end
             end
@@ -758,7 +758,7 @@ function GetNavalDirectAndSubRange(oUnit)
         local iMaxAntiNavyRange = 0
         if oBP.Weapon then
             for iCurWeapon, oCurWeapon in oBP.Weapon do
-                if oCurWeapon.RangeCategory == 'UWRC_DirectFire' then
+                if oCurWeapon.RangeCategory == 'UWRC_DirectFire' and not(oCurWeapon.DamageType == 'Nuke') then
                     iMaxDFRange = math.max(iMaxDFRange, oCurWeapon.MaxRadius)
                 elseif oCurWeapon.RangeCategory == 'UWRC_AntiNavy' then
                     iMaxAntiNavyRange = math.max(iMaxAntiNavyRange, oCurWeapon.MaxRadius)

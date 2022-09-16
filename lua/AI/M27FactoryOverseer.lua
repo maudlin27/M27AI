@@ -514,13 +514,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                         bUpgradeFactoryInstead = true
                     elseif oPrimaryFactory and EntityCategoryContains(categories.TECH1, oPrimaryFactory.UnitId) then
                         --Build subs
-                        iCategoryToBuild = M27UnitInfo.refCategorySubmarine
+                        iCategoryToBuild = M27UnitInfo.refCategorySubmarine - M27UnitInfo.refCategoryMissileNavy
                     end
                 else
                     if EntityCategoryContains(categories.UEF, oFactory.UnitId) then
                         iCategoryToBuild = M27UnitInfo.refCategoryCooper
                     elseif EntityCategoryContains(categories.CYBRAN, oFactory.UnitId) or (iFactoryTechLevel == 3 and EntityCategoryContains(categories.SERAPHIM, oFactory.UnitId)) then
-                        iCategoryToBuild = M27UnitInfo.refCategorySubmarine
+                        iCategoryToBuild = M27UnitInfo.refCategorySubmarine - M27UnitInfo.refCategoryMissileNavy
                     else
                         iCategoryToBuild = M27UnitInfo.refCategoryDestroyer
                     end
@@ -2211,7 +2211,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             if EntityCategoryContains(categories.UEF - categories.TECH1, oFactory.UnitId) then
                                                 iCategoryToBuild = M27UnitInfo.refCategoryCooper
                                             else
-                                                iCategoryToBuild = M27UnitInfo.refCategorySubmarine
+                                                iCategoryToBuild = M27UnitInfo.refCategorySubmarine - M27UnitInfo.refCategoryMissileNavy
                                             end
                                         end
                                     end
@@ -2308,7 +2308,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         if bDebugMessages == true then LOG(sFunctionRef..': LC of subs='..M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategorySubmarine)) end
                                         if M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategorySubmarine) <= 2 then
                                             if bDebugMessages == true then LOG(sFunctionRef..': Have 2 or less lifetime subs so will build another') end
-                                            iCategoryToBuild = M27UnitInfo.refCategorySubmarine
+                                            iCategoryToBuild = M27UnitInfo.refCategorySubmarine - M27UnitInfo.refCategoryMissileNavy
                                         end
                                     end
                                 end
