@@ -4313,9 +4313,19 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                     --Also check for unbuilt buildings if dealing with a mex or hydro, unless are building a shield
                     local tResourceLocations
                     if not(EntityCategoryContains(categories.SHIELD, sBlueprintToBuild)) then
+                        --land factory - say that we're looking for a mex even if cant find one
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to check if building early fac and cant find mex/hydro. Does cat to build by contain mex or hydro='..tostring(M27Utilities.DoesCategoryContainCategory(M27UnitInfo.refCategoryHydro + M27UnitInfo.refCategoryMex, iCatToBuildBy, false))..'; sBlueprintBuildBy='..(sBlueprintBuildBy or 'nil')..'; Does engi contain tech1 or ACU='..tostring(EntityCategoryContains(categories.TECH1 + categories.COMMAND, oEngineer.UnitId))..'; Does blueprint to build contain factory='..tostring(EntityCategoryContains(categories.FACTORY, sBlueprintToBuild))) end
+                        if iCatToBuildBy and not(sBlueprintBuildBy) and EntityCategoryContains(categories.TECH1 + categories.COMMAND, oEngineer.UnitId) and EntityCategoryContains(categories.FACTORY, sBlueprintToBuild) then
+                            if M27Utilities.DoesCategoryContainCategory(M27UnitInfo.refCategoryMex, iCatToBuildBy, false) then
+                                sBlueprintBuildBy = 'ueb1103'
+                            elseif M27Utilities.DoesCategoryContainCategory(M27UnitInfo.refCategoryHydro, iCatToBuildBy, false) then
+                                sBlueprintBuildBy = 'ueb1102'
+                            end
+                        end
                         if sBlueprintBuildBy then
                             if EntityCategoryContains(M27UnitInfo.refCategoryMex, sBlueprintBuildBy) then
-                                tResourceLocations = M27MapInfo.GetResourcesNearTargetLocation(tTargetLocation, 30, true)
+                                tResourceLocations = M27MapInfo.GetResourcesNearTargetLocation(tTargetLocation, 20, true)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will add any mexes within 20 of target location to be considered') end
                             elseif EntityCategoryContains(M27UnitInfo.refCategoryHydro, sBlueprintBuildBy) or EntityCategoryContains(M27UnitInfo.refCategoryT2Power, sBlueprintBuildBy) then --Dont want to make this all power, because the adjacency code requires a building size, and only works for a single building size; i.e. if try and get adjacency for t1 power and include hydro locations, then it will think it needs to build within the hydro for adjacency
                                 tResourceLocations = M27MapInfo.GetResourcesNearTargetLocation(tTargetLocation, 30, false)
                             end
@@ -4328,6 +4338,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': Will try and build by resource location (mex or hydro); iBuildingCount including these locations='..iBuildingCount..'; table of building locations='..repru(tPossibleTargets)) end
                     end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Is table of resource locations empty='..tostring(M27Utilities.IsTableEmpty(tResourceLocations))..'; iBuildingCount='..iBuildingCount) end
                     if iBuildingCount > 0 then
                         --GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNewBuildingBPID, bCheckValid, aiBrain, bReturnOnlyBestMatch, pBuilderPos, iMaxAreaToSearch, iBuilderRange, bIgnoreOutsideBuildArea, bBetterIfNoReclaim, bPreferCloseToEnemy, bPreferFarFromEnemy, bLookForQueuedBuildings)
                         if EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, sBlueprintToBuild) then
