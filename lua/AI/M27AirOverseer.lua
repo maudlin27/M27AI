@@ -4480,7 +4480,7 @@ function DetermineBomberDefenceRange(aiBrain)
         aiBrain[refiBomberDefenceModDistance] = math.min(130, math.max(60, 20 + aiBrain[M27Overseer.refiHighestMobileLandEnemyRange]))
         aiBrain[refiBomberDefenceCriticalThreatDistance] = math.max(50, aiBrain[refiBomberDefenceModDistance] - 20)
     else
-        aiBrain[refiBomberDefenceCriticalThreatDistance] = math.min(math.max(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.2, math.min(130, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35)))
+        aiBrain[refiBomberDefenceCriticalThreatDistance] = math.min(math.max(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.2, math.min(130, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35)), aiBrain[M27Overseer.refiMaxDefenceCoverageWanted])
 
         --aiBrain[refiBomberDefencePercentRange] = 0.25 --(Will decrease if in air domination mode)
         --Increase bomber defence range if enemy has a land experimental that is within 40% of the base, or we have high value buildings we want to protect (in which case base the % range on the % that would provide 120 range protection on high value buildings)
@@ -4508,65 +4508,14 @@ function DetermineBomberDefenceRange(aiBrain)
         end
         if aiBrain[refiBomberDefenceModDistance] < iMaxRange then
             --Consider friendly experimentals under construction, and completed high value structures
-            local tOurHighValueBuildings = aiBrain:GetListOfUnits(categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT2Power + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAirFactory, false, false)
-            if M27Utilities.IsTableEmpty(tOurHighValueBuildings) == false then
-                local iCurDistance
-                for iUnit, oUnit in tOurHighValueBuildings do
-                    if oUnit:GetFractionComplete() < 1 or EntityCategoryContains(categories.STRUCTURE + M27UnitInfo.refCategoryExperimentalArti, oUnit.UnitId) then
-                        iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                        aiBrain[refiBomberDefenceDistanceCap] = math.max(iCurDistance + 20, aiBrain[refiBomberDefenceDistanceCap])
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Considering unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' which is distance ' .. iCurDistance .. ' from our base, and mod distance=' .. M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false) .. '; aiBrain[refiBomberDefenceModDistance]=' .. aiBrain[refiBomberDefenceModDistance])
-                        end
-                        if iCurDistance > aiBrain[refiBomberDefenceModDistance] then
-                            iCurDistance = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false)
-                            if iCurDistance > aiBrain[refiBomberDefenceModDistance] then
-                                aiBrain[refiBomberDefenceModDistance] = iCurDistance
-                            end
 
-                        end
-                    end
-                end
-            end
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': aiBrain[refiBomberDefenceModDistance] after considering high value buildings=' .. aiBrain[refiBomberDefenceModDistance])
-            end
-            if aiBrain[refiBomberDefenceModDistance] < aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.45 then
-                local iCategoryToSearchFor
-                if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] < 3 then
-                    if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 100 then
-                        iCategoryToSearchFor = M27UnitInfo.refCategoryHydro + M27UnitInfo.refCategoryT1Mex
-                    else
-                        iCategoryToSearchFor = M27UnitInfo.refCategoryT1Mex
-                    end
-                elseif aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 100 then
-                    iCategoryToSearchFor = M27UnitInfo.refCategoryHydro
-                end
-                if iCategoryToSearchFor then
-                    tOurHighValueBuildings = aiBrain:GetListOfUnits(iCategoryToSearchFor, false, true)
-                    if M27Utilities.IsTableEmpty(tOurHighValueBuildings) == false then
-                        local iCurDistance
-                        for iUnit, oUnit in tOurHighValueBuildings do
-                            if oUnit:GetFractionComplete() < 1 or EntityCategoryContains(categories.STRUCTURE, oUnit.UnitId) then
-                                iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                if iCurDistance > aiBrain[refiBomberDefenceModDistance] then
-                                    iCurDistance = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false)
-                                    if iCurDistance > aiBrain[refiBomberDefenceModDistance] then
-                                        aiBrain[refiBomberDefenceModDistance] = iCurDistance
-                                    end
-                                end
-                            end
-                        end
-                    end
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': aiBrain[refiBomberDefenceModDistance] after considering hydros=' .. aiBrain[refiBomberDefenceModDistance])
-                    end
-                end
-            end
+            --Note: These limits get increased further below by 60, which should cover most units that can threaten them
+            aiBrain[refiBomberDefenceDistanceCap] = math.max(aiBrain[refiBomberDefenceDistanceCap], 20 + aiBrain[M27Overseer.refiFurthestValuableBuildingActualDist])
+            aiBrain[refiBomberDefenceModDistance] = aiBrain[M27Overseer.refiFurthestValuableBuildingModDist]
             aiBrain[refiBomberDefenceModDistance] = math.min(aiBrain[refiBomberDefenceModDistance], aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.45)
         end
 
-        aiBrain[refiBomberDefenceModDistance] = math.min(aiBrain[refiBomberDefenceModDistance] + 60, iMaxRange)
+        aiBrain[refiBomberDefenceModDistance] = math.min(aiBrain[refiBomberDefenceModDistance] + 60, iMaxRange, aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] + 10)
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': Have increased defence distance to ' .. aiBrain[refiBomberDefenceModDistance] .. '; iMaxRange=' .. iMaxRange .. '; will increase further if have lots of available bombers. aiBrain[refiPreviousAvailableBombers]=' .. aiBrain[refiPreviousAvailableBombers])
         end
@@ -4639,7 +4588,7 @@ function DetermineBomberDefenceRange(aiBrain)
                 end
 
                 if iClosestDist < aiBrain[refiBomberDefenceModDistance] then
-                    aiBrain[refiBomberDefenceModDistance] = math.max(iClosestDist - iRange, 75, math.min(150, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.2))
+                    aiBrain[refiBomberDefenceModDistance] = math.max(iClosestDist - iRange, 75, math.min(150, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.2, aiBrain[M27Overseer.refiMaxDefenceCoverageWanted]))
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': aiBrain[refiBomberDefenceModDistance] after updating for enemy shielded AA or SAM=' .. aiBrain[refiBomberDefenceModDistance])
                     end

@@ -2001,8 +2001,9 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                 tMassThresholds[4] = {795, -0.5}
             else
 
-                --If not upgrading anything and have t1 mexes near base then consider upgrading as high priority
+                --If not upgrading anything and have t1 mexes near base, or enemy is at t3 and we dont have all t3 mexes, then consider upgrading as high priority
                 local iAvailableT1MexesNearBase = 0
+                local iMexesNearStart = table.getn(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1])
                 local tNearbyT1Mexes = aiBrain:GetUnitsAroundPoint(refCategoryT1Mex, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 35, 'Ally')
                 for iMex, oMex in tNearbyT1Mexes do
                     if not(oMex:IsUnitState('Upgrading')) then iAvailableT1MexesNearBase = iAvailableT1MexesNearBase + 1 end
@@ -2011,9 +2012,9 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                 if iAvailableT1MexesNearBase > 0 and aiBrain[refiMexesUpgrading] <= 1 and M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) and (iLandFactoryCount + iAirFactoryCount >= 3 or GetGameTimeSeconds() >= 300 or aiBrain[refiMassGrossBaseIncome] >= 2) then
                     --Want to get a t2 mex upgrade so our mass income is always increasing
                     if aiBrain[refiMassGrossBaseIncome] >= 3 then
-                        tMassThresholds[1] = {0, -1}
-                        tMassThresholds[2] = {100, -1.5}
-                        tMassThresholds[3] = {250, -3}
+                        tMassThresholds[1] = {0, -2}
+                        tMassThresholds[2] = {100, -2.5}
+                        tMassThresholds[3] = {250, -3.5}
                         tMassThresholds[4] = {400, -6}
                     elseif aiBrain[refiMassGrossBaseIncome] >= 1.8 then
                         tMassThresholds[1] = { 0, -0.2}
@@ -2034,6 +2035,13 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                         tMassThresholds[7] = {400, -1}
                         tMassThresholds[8] = {600, -2}
                     end
+                --Upgrade if enemy at T3 and we have mexes near our base not at T3
+                elseif aiBrain[refiMexesUpgrading] <= 1 and iMexesNearStart < (aiBrain[refiMexesUpgrading] + 1 + iT3MexCount) and aiBrain[M27Overseer.refiEnemyHighestTechLevel] >= 3 and aiBrain[refiMassGrossBaseIncome] >= 3 and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU) and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill) then
+                    tMassThresholds[1] = {0, -2}
+                    tMassThresholds[2] = {100, -2.5}
+                    tMassThresholds[3] = {250, -3.5}
+                    tMassThresholds[4] = {400, -6}
+
 
                 elseif aiBrain[refiMassGrossBaseIncome] <= 7 then
 
