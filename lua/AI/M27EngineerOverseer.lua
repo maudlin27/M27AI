@@ -5888,7 +5888,7 @@ function IsValidTMLTarget(aiBrain, tStartPos, oTarget, tEnemyTMD)
 
     if bDebugMessages == true then LOG(sFunctionRef..': Considering whether oTarget '..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..' is a valid TML target.  Is TMD table empty='..tostring(M27Utilities.IsTableEmpty(tEnemyTMD))..'; target faction complete='..oTarget:GetFractionComplete()..'; TML shots fired at target='..(oTarget[refiTMLShotsFired] or 'nil')..'; Strike damage assigned='..(oTarget[M27AirOverseer.refiStrikeDamageAssigned] or 'nil')..'; Unit max health='..oTarget:GetMaxHealth()) end
 
-    if M27UnitInfo.IsUnitValid(oTarget) and oTarget:GetFractionComplete() >= 0.5 and ((oTarget[refiTMLShotsFired] or 0) == 0 or oTarget[refiTMLShotsFired] <= math.floor(oTarget:GetMaxHealth() / 6000)) and (oTarget[M27AirOverseer.refiStrikeDamageAssigned] or 0) == 0 then
+    if M27UnitInfo.IsUnitValid(oTarget) and oTarget:GetFractionComplete() >= 0.5 and not(M27UnitInfo.IsUnitUnderwater(oTarget)) and ((oTarget[refiTMLShotsFired] or 0) == 0 or oTarget[refiTMLShotsFired] <= math.floor(oTarget:GetMaxHealth() / 6000)) and (oTarget[M27AirOverseer.refiStrikeDamageAssigned] or 0) == 0 then
         local iDistStartToTarget = M27Utilities.GetDistanceBetweenPositions(tStartPos, oTarget:GetPosition())
         --local iMaxShieldHealth = math.max(0, 6000 - oTarget:GetHealth() * 1.1 - 100) --Decided not to do, since unclear whether the shield could still stop the missile if strong enough - recall when testing mobile shields they could block a missile and survive
         --IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead, bIgnoreMobileShields, bTreatPartCompleteAsComplete)
@@ -10543,21 +10543,35 @@ end--]]
                             if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) and not(aiBrain[M27Overseer.refbEnemyFiredNuke]) then iMaxEngisWanted = 2 end
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': Finsihed considering if want to build or assist SMD. iActionToAssign='..(iActionToAssign or 'nil')) end
-                    elseif iCurrentConditionToTry == 19 then --Emergency AA when non-air threat near our base and we have no AA
+                    elseif iCurrentConditionToTry == 19 then --Emergency AA when non-air threat near our base and we have no or little AA
                         if bDebugMessages == true then LOG(sFunctionRef..': Considering if we want to build static AA as an emergency; aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]..'; aiBrain[M27AirOverseer.refiOurMassInAirAA]='..aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; aiBrain[M27AirOverseer.refiOurMassInMAA]='..aiBrain[M27AirOverseer.refiOurMassInMAA]..'; iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable) end
                         if aiBrain[M27AirOverseer.refiAirAANeeded] > 0 and not(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftNearestEnemyAirThreat])) and M27Utilities.GetDistanceBetweenPositions(aiBrain[M27AirOverseer.reftNearestEnemyAirThreat], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(150, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5) then
                             --How much AA threat do we have
                             local tNearbyStructureAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructureAA, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 90, 'Ally')
                             local bBuildAA = false
+                            if bDebugMessages == true then LOG(sFunctionRef..': Is table of nearby AA empty='..tostring(M27Utilities.IsTableEmpty(tNearbyStructureAA))) end
                             if M27Utilities.IsTableEmpty(tNearbyStructureAA) then bBuildAA = true
                             else
-                                --Do we have AirAA for our current tech level?
-                                if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.ConvertTechLevelToCategory(iHighestFactoryOrEngineerTechAvailable), tNearbyStructureAA)) and M27Utilities.IsTableEmpty(ScenarioInfo.Options.RestrictedCategories) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Checking if have high enoguh engi tech level for AA level wanted. iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable..'; tiAvailableEngineersByTech='..repru(tiAvailableEngineersByTech)) end
+                                --Do we have AirAA for our current tech level and have an engineer of this level available?
+
+                                if tiAvailableEngineersByTech[iHighestFactoryOrEngineerTechAvailable] > 0 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.ConvertTechLevelToCategory(iHighestFactoryOrEngineerTechAvailable), tNearbyStructureAA)) and M27Utilities.IsTableEmpty(ScenarioInfo.Options.RestrictedCategories) then
                                     bBuildAA = true
                                 elseif not(aiBrain[M27AirOverseer.refbHaveAirControl]) and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) then
                                     local iStructureAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyStructureAA, false, false, true, false, false, nil, nil, nil, nil, nil)
                                     --Want structureAA threat to be at least equal to enemyAA threat
-                                    if iStructureAAThreat < aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] + aiBrain[M27AirOverseer.refiEnemyAirAAThreat] * 0.25 then
+                                    local iStructureFactor = 1
+                                    if iStructureAAThreat >= 900 then --just over 1 T2 arti or 3 t1 AA turrets
+                                        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
+                                            if bHaveLowMass then iStructureFactor = 1.5
+                                            else iStructureFactor = 1.25
+                                            end
+                                        elseif bHaveLowMass then iStructureFactor = 1.25 end
+                                        --Further increase factor if we already have 3 of the current air structure at our current tech level, if dealing with T2 or lower
+                                        if iHighestFactoryOrEngineerTechAvailable <= 2 and table.getn(tNearbyStructureAA) >= 3 then iStructureFactor = iStructureFactor + 0.5 end
+                                    end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iStructureAAThreat='..iStructureAAThreat..'; aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]..'; aiBrain[M27AirOverseer.refiEnemyAirAAThreat]='..aiBrain[M27AirOverseer.refiEnemyAirAAThreat]..'; iStructureFactor='..iStructureFactor) end
+                                    if iStructureAAThreat * iStructureFactor < aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] + aiBrain[M27AirOverseer.refiEnemyAirAAThreat] * 0.25 then
                                         bBuildAA = true
                                     end
                                 end
