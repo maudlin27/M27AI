@@ -224,7 +224,8 @@ refoLastNearestACU = 'M27OverseerLastACUObject'
 reftLastNearestACU = 'M27OverseerLastACUPosition' --Position of the last ACU we saw
 refiLastNearestACUDistance = 'M27OverseerLastNearestACUDistance'
 
-
+refiFurthestValuableBuildingModDist = 'M27OverseerFurthestValuableBuildingModDist' --against aiBrain, includes under construction (incl experimentals being built)
+refiFurthestValuableBuildingActualDist = 'M27OverseerFurthestValuableBuildingActualDist' --against aiBrain, includes under construction (incl experimentals being built)
 refbEnemyACUNearOurs = 'M27OverseerACUNearOurs'
 refoACUKillTarget = 'M27OverseerACUKillTarget'
 reftACUKillTarget = 'M27OverseerACUKillPosition'
@@ -6463,6 +6464,52 @@ function CheckUnitCap(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function UpdateFurthestBuildingDistances(aiBrain)
+    --Records the high value buildings we have furthest from our base, used to help decide on bomber and land defence ranges as well as potential eco decisions
+
+    local iHighValueCategories = categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT2Power + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAirFactory
+    if aiBrain[refiOurHighestFactoryTechLevel] < 3 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] <= 4 then
+        local iCategoryToSearchFor
+        if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] < 3 then
+            if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 100 then
+                iCategoryToSearchFor = M27UnitInfo.refCategoryHydro + M27UnitInfo.refCategoryT1Mex
+            else
+                iCategoryToSearchFor = M27UnitInfo.refCategoryT1Mex
+            end
+        elseif aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 100 then
+            iCategoryToSearchFor = M27UnitInfo.refCategoryHydro
+        end
+
+        if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] < 3 then
+            iHighValueCategories = iHighValueCategories + M27UnitInfo.refCategoryT1Mex
+        end
+        if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 100 then
+            iHighValueCategories = iHighValueCategories + M27UnitInfo.refCategoryHydro
+        end
+    end
+
+    local tOurHighValueBuildings = aiBrain:GetListOfUnits(iHighValueCategories, false, false)
+    local iMinRange = 50
+    aiBrain[refiFurthestValuableBuildingModDist] = iMinRange
+    aiBrain[refiFurthestValuableBuildingActualDist] = iMinRange
+    if M27Utilities.IsTableEmpty(tOurHighValueBuildings) == false then
+        --local iFurthestModDistance
+        --local iFurthestActualDistance
+        local iCurDistance
+        local iCurModDistance
+        for iUnit, oUnit in tOurHighValueBuildings do
+            if oUnit:GetFractionComplete() < 1 or EntityCategoryContains(categories.STRUCTURE + M27UnitInfo.refCategoryExperimentalArti, oUnit.UnitId) then --Dont include expeirmentals once constructed
+                iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                if iCurDistance > aiBrain[refiFurthestValuableBuildingModDist] then
+                    iCurModDistance = GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false)
+                    aiBrain[refiFurthestValuableBuildingModDist] = math.max(iCurModDistance, aiBrain[refiFurthestValuableBuildingModDist])
+                    aiBrain[refiFurthestValuableBuildingActualDist] = math.max(iCurDistance, aiBrain[refiFurthestValuableBuildingActualDist])
+                end
+            end
+        end
+    end
+end
+
 
 function StrategicOverseer(aiBrain, iCurCycleCount)
     --also features 'state of game' logs
@@ -6761,11 +6808,16 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
             ForkThread(CheckUnitCap, aiBrain)
 
+            --Record the furthest 'high value' building we have (used to adjust bomber and land defence ranges)
+            --Dont do via forked threat as rely on these numbers below
+            UpdateFurthestBuildingDistances(aiBrain)
 
 
 
 
-            --STATE OF GAME LOG BELOW------------------
+
+
+            --Info wanted for grand strategy
 
             --Check if we need to refresh our mass income
             local bTimeForLongRefresh = false
@@ -6847,6 +6899,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             --Want below variables for both the game state table and to decide whether to eco:
             local iMexesNearStart = table.getn(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1])
             local iT3Mexes = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex)
+            local iT2Mexes = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Mex)
             --=========DECIDE ON GRAND STRATEGY
             --Get details on how close friendly units are to enemy
             --(Want to run below regardless as we use the distance to base for other logic)
@@ -6877,6 +6930,84 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             end
             local iPrevStrategy = aiBrain[refiAIBrainCurrentStrategy]
             local bChokepointsAreProtected = M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)
+
+            --Consider whether to adopt temporary turtle mode (meaning we will temporarily eco):
+            local bTemporaryTurtleMode = false --If true then will try and eco even with nearby threats if think are behind on eco and have lots of PD/T2 arti and enemy has no big threats
+            local iTemporaryTurtleDefenceRange --Limit defence range based on this
+
+            --Only consider temporary turtle if we have a firebase, provided the firebase itself isnt too far from us (to avoid risk e.g. of inheriting ally base that contains firebase)
+            if bDebugMessages == true then LOG(sFunctionRef..': About to check if we should temporarily turtle. Is table of firebases empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]))..'; are there big threats='..tostring(aiBrain[refbAreBigThreats])..'; GameTime='..GetGameTimeSeconds()..'; Nearest threat from start mod='..aiBrain[refiModDistFromStartNearestThreat]..'; Mexes available for upgrade='..aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade]..'; Furthest valuable building mod dist='..aiBrain[refiFurthestValuableBuildingModDist]..'; Enemy best mobile range='..aiBrain[refiHighestMobileLandEnemyRange]..'; Is table of planned chokepoints empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart]))..'; Enemy highest tech level='..aiBrain[refiEnemyHighestTechLevel]) end
+            if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]) == false then
+                --Are we a non-chokepoint map, with enemies more than 80 from our base, and multiple mexes available to upgrade, and it's not the first 10m of the game (when we want to focus more on map control), and havent got to experimental stage of game yet?
+                if GetGameTimeSeconds() >= 600 and aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] >= 2 and aiBrain[refiModDistFromStartNearestThreat] >= 80 and not(bChokepointsAreProtected) and M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart]) then
+                    --If the enemy's closest unit had its best range, would it threaten our high value buildings?
+                    if aiBrain[refiHighestMobileLandEnemyRange] + aiBrain[refiModDistFromStartNearestThreat] > aiBrain[refiFurthestValuableBuildingModDist] and aiBrain[refiEnemyHighestTechLevel] >= 2 then
+                        --Does the enemy have any land experimentals that have been constructed? (dont need to worry about nuke launchers as we shouldnt be checking eco conditions/strategy to defend against them)
+                        local bEnemyHasActiveLandExperimental = false
+                        if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false then
+                            for iUnit, oUnit in aiBrain[reftEnemyLandExperimentals] do
+                                if oUnit:GetFractionComplete() >= 0.95 then
+                                    bEnemyHasActiveLandExperimental = true
+                                    break
+                                end
+                            end
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Does enemy have active land experimental='..tostring(bEnemyHasActiveLandExperimental)) end
+                        if not(bEnemyHasActiveLandExperimental) then
+                            --Are at least 3 of the mexes near our start position at the same level as the enemy's highest factory level?
+                            local iMexesOfDesiredTech = 0
+                            if aiBrain[refiEnemyHighestTechLevel] >= 3 then iMexesOfDesiredTech = iT3Mexes
+                            else iMexesOfDesiredTech = iT2Mexes + iT3Mexes
+                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': iMexesOfDesiredTech='..iMexesOfDesiredTech..'; iMexesNearStart='..iMexesNearStart) end
+                            if iMexesOfDesiredTech < math.min(4, iMexesNearStart - 1) then
+
+                                local iOverallDistanceCap = math.max(80, math.min(250, aiBrain[refiDistanceToNearestEnemyBase] * 0.4)) --Dont want to risk inheriting ally base containing firebase, and also dont want to assume firebase can cover valuable buildings the further we get from our base
+                                if bDebugMessages == true then LOG(sFunctionRef..': Furthest valuable building actual dist='..aiBrain[refiFurthestValuableBuildingActualDist]..'; Overall distance cap='..iOverallDistanceCap) end
+                                if aiBrain[refiFurthestValuableBuildingActualDist] <= iOverallDistanceCap then
+                                    --Does our furthest firebase range suggest it will cover our most valuable building?
+                                    local iFurthestFirebaseDist = 0
+                                    local iFurthestFirebaseRef
+                                    local iCurFirebaseDist
+                                    --reftFirebasePosition = 'M27EngineerFirebasePosition' --aiBrain, [x] is the firebase unique count, returns midpoint of the firebase based on average of all units within it
+                                    for iFirebaseRef, tFirebaseUnits in aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef] do
+                                        if M27Utilities.IsTableEmpty(tFirebaseUnits) == false then
+                                            iCurFirebaseDist = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27EngineerOverseer.reftFirebasePosition][iFirebaseRef], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                            if iCurFirebaseDist > iFurthestFirebaseDist and iCurFirebaseDist <= iOverallDistanceCap then
+                                                iFurthestFirebaseDist = iCurFirebaseDist
+                                                iFurthestFirebaseRef = iFirebaseRef
+                                            end
+                                        end
+                                    end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Finished checking if we have a firebase and if so which firebase is furthest from us. iFurthestFirebaseRef='..(iFurthestFirebaseRef or 'nil')..'; iFurthestFirebaseDist='..(iFurthestFirebaseDist or 'nil')) end
+                                    if iFurthestFirebaseRef and iFurthestFirebaseDist + 25 > aiBrain[refiFurthestValuableBuildingActualDist] then
+                                        --Does the enemy have units that will soon be able to attack our firebase?
+                                        local iNearestEnemyActualDist = M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLocationFromStartNearestThreat], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                        if bDebugMessages == true then LOG(sFunctionRef..': iNearestEnemyActualDist='..(iNearestEnemyActualDist)..'; iFurthestFirebaseDist='..iFurthestFirebaseDist..'; aiBrain[refiHighestMobileLandEnemyRange]='..aiBrain[refiHighestMobileLandEnemyRange]) end
+                                        if iFurthestFirebaseDist + aiBrain[refiHighestMobileLandEnemyRange] < iNearestEnemyActualDist then
+
+                                            --We have a firebase that should be able to cover the nearest building and isnt under current attack; now consider the enemy threat within 50 of the nearest enemy unit
+
+                                            local tNearbyEnemyMobileThreats = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat + M27UnitInfo.refCategoryIndirect, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iNearestEnemyActualDist + 50, 'Enemy')
+                                            local iNearbyEnemyThreat = M27Logic.GetCombatThreatRating(aiBrain, tNearbyEnemyMobileThreats, false, nil, nil, false)
+                                            local iFirebaseThreat = M27Logic.GetCombatThreatRating(aiBrain, aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef][iFurthestFirebaseRef], false, nil, nil, false)
+                                            if bDebugMessages == true then LOG(sFunctionRef..': iFirebaseThreat='..iFirebaseThreat..'; iNearbyEnemyThreat='..iNearbyEnemyThreat) end
+                                            if iFirebaseThreat > iNearbyEnemyThreat * 1.25 then
+                                                --Should have enough threat to deal with enemy
+                                                bTemporaryTurtleMode = true
+                                                iTemporaryTurtleDefenceRange = iFurthestFirebaseDist + 45
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Will adopt temporary turtle mode, wiht iTemporaryTurtleDefenceRange='..iTemporaryTurtleDefenceRange) end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+
+
             --Are we in ACU kill mode and want to stay in it (determined b y ACU manager)?
             if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill and not (aiBrain[refbStopACUKillStrategy]) then
                 --set as part of ACU manager
@@ -7112,13 +7243,18 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
 
                                         --Dont eco if enemy ACU near ours as likely will need backup, unless we are on a chokepoint map and our ACU hasnt taken any damage recently (or if it has, it's less than 5 per sec)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Start of logic for checking if should eco. aiBrain[refbEnemyACUNearOurs]='..tostring((aiBrain[refbEnemyACUNearOurs] or false))..'; bChokepointsAreProtected='..tostring((bChokepointsAreProtected or false))..'; Our ACU health='..M27Utilities.GetACU(aiBrain):GetHealth()..'; M27UnitInfo.GetUnitHealthPercent(oACU)='..M27UnitInfo.GetUnitHealthPercent(oACU)..'; ACU most recent recorded health='..((oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 2] or oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 3] or 0) + 50)..'; ACU health 11s ago='..oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11]..'; bAlliesAreCloserToEnemy='..tostring(bAlliesAreCloserToEnemy or false)..'; bTemporaryTurtleMode='..tostring(bTemporaryTurtleMode or false)) end
                                         if aiBrain[refbEnemyACUNearOurs] == false or (bChokepointsAreProtected and M27Utilities.GetACU(aiBrain):GetHealth() >= 7000 and (M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.8 or (oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 2] or oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 3] or 0) + 50 >= oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11]))  then
                                             if bChokepointsAreProtected then
                                                 bWantToEco = true
                                             elseif bAlliesAreCloserToEnemy then
                                                 bWantToEco = true
+                                            elseif bTemporaryTurtleMode then
+                                                bWantToEco = true
                                             else
-                                                if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 12000 then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Considering mex control and if have lots of mass to use. Mexes available for upgrade='..aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade]..'; Stored mass%='..aiBrain:GetEconomyStoredRatio('MASS')..'; Stored mass val='..aiBrain:GetEconomyStored('MASS')) end
+                                                if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStored('MASS') < 12000 then
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy threat. Percentage outstanding threat='..aiBrain[refiPercentageOutstandingThreat]..'; bBigEnemyThreat='..tostring(bBigEnemyThreat or false)..'; aiBrain[refiModDistFromStartNearestThreat]='..aiBrain[refiModDistFromStartNearestThreat]..'; aiBrain[refiDistanceToNearestEnemyBase]='..aiBrain[refiDistanceToNearestEnemyBase]..'; iMexesInPathingGroupWeHaveClaimed='..iMexesInPathingGroupWeHaveClaimed..'; iOurTeamsShareOfMexesOnMap='..iOurTeamsShareOfMexesOnMap..'; iDistanceToEnemyEcoThreshold='..iDistanceToEnemyEcoThreshold..'; iT3Mexes='..iT3Mexes..'; aiBrain[refiOurHighestFactoryTechLevel]='..aiBrain[refiOurHighestFactoryTechLevel]) end
                                                     if aiBrain[refiPercentageOutstandingThreat] > 0.55 and (bBigEnemyThreat == false or aiBrain[refiModDistFromStartNearestThreat] >= aiBrain[refiDistanceToNearestEnemyBase] * 0.5) and (iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 0.8 or aiBrain[refiDistanceToNearestEnemyBase] >= iDistanceToEnemyEcoThreshold) and not (iT3Mexes >= math.min(iMexesNearStart, 7) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
                                                         if bDebugMessages == true then
                                                             LOG(sFunctionRef .. ': No big enemy threats and good defence and mex coverage so will eco')
@@ -7126,7 +7262,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                                         bWantToEco = true
                                                     else
                                                         if bDebugMessages == true then
-                                                            LOG(sFunctionRef .. ': Dont want to eco based on initial tests: bBigEnemyThreat=' .. tostring(bBigEnemyThreat) .. '; %threat=' .. aiBrain[refiPercentageOutstandingThreat] .. '; UnclaimedMex%=' .. iAllMexesInPathingGroupWeHaventClaimed / iAllMexesInPathingGroup .. '; EnemyDist=' .. aiBrain[refiDistanceToNearestEnemyBase])
+                                                            LOG(sFunctionRef .. ': Dont want to eco based on initial tests. Still eco if havent increased mass income for a while unless nearby threat. aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; iMassAtLeast3mAgo='..iMassAtLeast3mAgo..'; aiBrain[refiPercentageOutstandingThreat]='..aiBrain[refiPercentageOutstandingThreat]..'; iLandCombatUnits='..iLandCombatUnits)
                                                         end
                                                         --Has our mass income not changed recently, but we dont appear to be losing significantly on the battlefield?
                                                         if iCurTime > 100 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo < 1 and aiBrain[refiPercentageOutstandingThreat] > 0.55 and iLandCombatUnits >= 30 then
@@ -7157,6 +7293,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                             end
                                         end
                                         --Eco even if enemy has big threats if we cant path to enemy base with amphibious and we have all mexes in our pathing group
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Might still eco if cant get to enemy with land and have control of our island or have protected chokepoints. aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; aiBrain[refiModDistFromStartNearestThreat]='..aiBrain[refiModDistFromStartNearestThreat]..'; bChokepointsAreProtected='..tostring(bChokepointsAreProtected or false)) end
                                         if not (aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]) and iAllMexesInPathingGroupWeHaventClaimed == 0 and aiBrain[refiModDistFromStartNearestThreat] >= aiBrain[refiDistanceToNearestEnemyBase] * 0.3 then
                                             if bDebugMessages == true then
                                                 LOG(sFunctionRef .. ': Want to eco as we cant reach enemy base except by air and we have all mexes in our pathing group')
@@ -7171,23 +7308,24 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                                 bWantToEco = true
                                             end
                                         end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Do we want to eco based on initial logic (will change this to false in a moment in certain cases)='..tostring(bWantToEco)) end
                                         if bWantToEco == true then
-                                            if not (bChokepointsAreProtected) and not(bAlliesAreCloserToEnemy) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
+                                            if not (bChokepointsAreProtected) and not(bAlliesAreCloserToEnemy) and not(bTemporaryTurtleMode) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
                                                 bWantToEco = false
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Chokepoints arent protected, can path to enemy base with land, and dont have friendly units on enemy side of map') end
                                                 --Dont eco if enemy has AA structure within our bomber emergency range, as will likely want ground units to push them out
-                                            elseif aiBrain[M27AirOverseer.refbBomberDefenceRestrictedByAA] and (not(bChokepointsAreProtected) or (aiBrain[refiModDistFromStartNearestThreat] <= aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance] and M27UnitInfo.IsUnitValid(aiBrain[refoNearestThreat]) and M27Utilities.GetDistanceBetweenPositions(aiBrain[refoNearestThreat]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.max(150, aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]))) then
+                                            elseif aiBrain[M27AirOverseer.refbBomberDefenceRestrictedByAA] and ((not(bChokepointsAreProtected) and not(bTemporaryTurtleMode)) or (aiBrain[refiModDistFromStartNearestThreat] <= aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance] and M27UnitInfo.IsUnitValid(aiBrain[refoNearestThreat]) and M27Utilities.GetDistanceBetweenPositions(aiBrain[refoNearestThreat]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.max(math.min(150, iTemporaryTurtleDefenceRange or 150), aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]))) then
                                                 bWantToEco = false
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Bomber defence restricted by AA so will stop ecoing. aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]='..aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]..'; Bomber def range='..aiBrain[M27AirOverseer.refiBomberDefenceModDistance]) end
                                                 --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
-                                            elseif M27UnitInfo.GetUnitHealthPercent(oACU) < 0.45 and (M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 125 or oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] > 0) then
+                                            elseif M27UnitInfo.GetUnitHealthPercent(oACU) < 0.45 and (M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 125 or (oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] > 0 and not(bTemporaryTurtleMode))) then
                                                 bWantToEco = false
                                                 if bDebugMessages == true then LOG(sFunctionRef..': ACU is low health and has nearby enemies so wont eco') end
                                                 --•	Don’t eco if our ACU is within 60 of the enemy base (on the expectation the game will be over soon if it is), unless the enemy has at least 4 T2 PD and 1 T2 Arti.
                                             elseif M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) <= 80 then
                                                 bWantToEco = false
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Our ACU is near enemy base') end
-                                            elseif not(bChokepointsAreProtected) and not(bAlliesAreCloserToEnemy) and aiBrain[refiTotalEnemyShortRangeThreat] >= 2500 and iMexesInPathingGroupWeHaveClaimed < iOurTeamsShareOfMexesOnMap * 1.3 and not(aiBrain[refbNeedIndirect]) then
+                                            elseif not(bChokepointsAreProtected) and not(bAlliesAreCloserToEnemy) and not(bTemporaryTurtleMode) and aiBrain[refiTotalEnemyShortRangeThreat] >= 2500 and iMexesInPathingGroupWeHaveClaimed < iOurTeamsShareOfMexesOnMap * 1.3 and not(aiBrain[refbNeedIndirect]) then
                                                 --Does the enemy have more mobile threat than us and our allies, and we have < 65% mex control, and have gained income recently
                                                 if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo >= 1 then
                                                     local iSearchRange = math.min(600, aiBrain[refiDistanceToNearestEnemyBase] + 60, aiBrain[M27AirOverseer.refiMaxScoutRadius])
@@ -7210,6 +7348,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                             end
                                         end
                                     end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Do we want to eco (end of decision)='..tostring(bWantToEco)) end
 
                                     if bWantToEco == true then
                                         aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = nil
@@ -7256,6 +7395,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             else
                 aiBrain[refiMaxDefenceCoverageWanted] = 0.9
             end
+            --Reduce defence coverage if are temporarily turtling
+            if bTemporaryTurtleMode then aiBrain[refiMaxDefenceCoverageWanted] = math.min(aiBrain[refiMaxDefenceCoverageWanted], (iTemporaryTurtleDefenceRange or aiBrain[refiMaxDefenceCoverageWanted])) end
 
 
             --Reduce air scouting threshold for enemy base if likely to be considering whether to build a nuke or not
@@ -7289,6 +7430,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
 
             --TestCustom(aiBrain)
+
+            --STATE OF GAME LOG BELOW------------------
 
 
 

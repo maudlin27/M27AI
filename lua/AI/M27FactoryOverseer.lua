@@ -109,7 +109,11 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
 
     if bDebugMessages == true then LOG(sFunctionRef..': reftBlueprintPriorityOverride='..repru(aiBrain[reftBlueprintPriorityOverride])) end
     if not(oFactory.CanBuild) then
-        M27Utilities.ErrorHandler('Factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..' doesnt have .canbuild')
+        if oFactory.UnitId then
+            M27Utilities.ErrorHandler('Factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..' doesnt have .canbuild')
+        else
+            M27Utilities.ErrorHandler('Factory has no UnitId and doesnt have .CanBuild')
+        end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return nil
     else
