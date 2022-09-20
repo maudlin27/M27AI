@@ -108,6 +108,11 @@ refbAreBigThreats = 'M27OverseerAreBigThreats'
 refbEnemyFiredNuke = 'M27OverseerEnemyFiredNuke' --against aiBrain, true if an enemy has fired a nuke
 refbDefendAgainstArti = 'M27OverseerDefendAgainstArti' --set to true if have activated logic to defend against enemy arti or novax
 refbCloakedEnemyACU = 'M27OverseerCloakedACU'
+
+refoNearestRangeAdjustedLandExperimental = 'M27OverseerNearestLandExperiObject' --against aiBrain, distance less unit's range
+refiNearestRangeAdjustedLandExperimental = 'M27OverseerNearestLandExperiDistance' --against aibrain, nearest based on distance less range (i.e. distance until it is in range of our startp osition)
+
+
 --Total threat values e.g. used for firebase chokepoints
 refiTotalEnemyLongRangeThreat = 'M27OverseerLongRangeThreat' --against aiBrain, returns the mass value, even if under construction
 refiTotalEnemyShortRangeThreat = 'M27OverseerShortRangeThreat' --as above
@@ -6713,19 +6718,56 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             aiBrain[refbAreBigThreats] = true
         end
 
-        --Coordinate friendly experimentals if enemy has land experimentals
+        --Coordinate friendly experimentals if enemy has land experimentals, and record nearest enemy land experimental
+        bDebugMessages = true
+        if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy land experimentals empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]))) end
         if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false then
             local bEnemyHasLandExperimental = false
+            local iClosestExperimentalDistLessRange = 10000
+            local iCurDist
+            local iCurRange
+            local oClosestExperimental
+
+
             for iUnit, oUnit in aiBrain[reftEnemyLandExperimentals] do
-                if oUnit:GetFractionComplete() >= 0.9 then
-                    bEnemyHasLandExperimental = true
-                    break
+                if M27UnitInfo.IsUnitValid(oUnit) then
+                    if oUnit:GetFractionComplete() >= 0.9 then
+                        bDebugMessages = true
+                        bEnemyHasLandExperimental = true
+                        iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                        iCurRange = M27UnitInfo.GetUnitMaxGroundRange(oUnit)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurDist='..(iCurDist or 'nil')..'; iCurRange='..(iCurRange or 'nil')) end
+                        if iCurDist - iCurRange < iClosestExperimentalDistLessRange then
+                            iClosestExperimentalDistLessRange = iCurDist - iCurRange
+                            oClosestExperimental = oUnit
+                        end
+                    end
                 end
             end
             if bEnemyHasLandExperimental then
                 ForkThread(CoordinateLandExperimentals, aiBrain)
+                aiBrain[refoNearestRangeAdjustedLandExperimental] = oClosestExperimental
+                aiBrain[refiNearestRangeAdjustedLandExperimental] = iClosestExperimentalDistLessRange
+                if bDebugMessages == true then LOG(sFunctionRef..': Enemy has land experimental, oClosestExperimental='..oClosestExperimental.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestExperimental)..'; iClosestExperimentalDistLessRange='..iClosestExperimentalDistLessRange..'; Is unit valid='..tostring(M27UnitInfo.IsUnitValid(aiBrain[refoNearestRangeAdjustedLandExperimental])))
+                    if aiBrain[refoNearestRangeAdjustedLandExperimental] then LOG(sFunctionRef..': aiBrain[refoNearestRangeAdjustedLandExperimental].UnitId='..(aiBrain[refoNearestRangeAdjustedLandExperimental].UnitId or 'nil')) end
+                end
+            else
+                --Clear if unit is no longer valid (otherwise want to retain so we know the threat is there)
+                if not(M27UnitInfo.IsUnitValid(aiBrain[refoNearestRangeAdjustedLandExperimental])) then
+                    aiBrain[refoNearestRangeAdjustedLandExperimental] = nil
+                    aiBrain[refiNearestRangeAdjustedLandExperimental] = nil
+                    if bDebugMessages == true then LOG(sFunctionRef..': Clearing values for nearest land experimental') end
+                end
+            end
+        else
+            if not(M27UnitInfo.IsUnitValid(aiBrain[refoNearestRangeAdjustedLandExperimental])) then
+                aiBrain[refoNearestRangeAdjustedLandExperimental] = nil
+                aiBrain[refiNearestRangeAdjustedLandExperimental] = nil
+                if bDebugMessages == true then LOG(sFunctionRef..': Clearing values for nearest land experimental') end
             end
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': Finished recording nearest land experimental, is unit valid='..tostring(M27UnitInfo.IsUnitValid(aiBrain[refoNearestRangeAdjustedLandExperimental]))) end
+        bDebugMessages = false
         --Coordinate novax
         if M27Utilities.IsTableEmpty(aiBrain[reftEnemyArtiAndExpStructure]) == false then
             local bEnemyHasAlmostCompleteArti = false
@@ -9106,7 +9148,9 @@ end
 
 function TestCustom(aiBrain)
     local sFunctionRef = 'TestCustom'
-    LOG('Table with table key will get printed to give reference')
+
+
+    --[[LOG('Table with table key will get printed to give reference')
     local tTempTable = {1,2,3}
     local tTableWithTable = {}
     tTableWithTable[tTempTable] = 1
@@ -9161,7 +9205,7 @@ function TestCustom(aiBrain)
         --ACU unit
         reprsl(M27Utilities.GetACU(aiBrain)[reftPotentialFlankingUnits])
 
-    end
+    end--]]
 
     --Spawn monkeylord for enemy at certain point in game
     --[[if aiBrain:GetArmyIndex() == 4 then

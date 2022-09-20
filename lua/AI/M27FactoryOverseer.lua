@@ -1680,7 +1680,33 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             iTotalWanted = 1
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 6 then
+                                elseif iCurrentConditionToTry == 6 then --Enemy land experimental - build up bombers to deal with it
+                                    if M27Conditions.HaveApproachingLandExperimentalThreat(aiBrain) then
+                                        iTotalWanted = 5
+                                        --Is the experimental underwater?
+                                        if M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoNearestRangeAdjustedLandExperimental]) and aiBrain[M27Overseer.refiNearestRangeAdjustedLandExperimental] >= 100 then
+                                            if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTorpBombers]) == false and table.getn(aiBrain[M27AirOverseer.reftAvailableTorpBombers]) >= 30 then
+                                                --Have enough torp bombers, get some t1 bombers for if it makes it to land
+                                                if iCurT1Bombers < 40 then
+                                                    iCategoryToBuild = M27UnitInfo.refCategoryBomber * categories.TECH1
+                                                end
+                                            else
+                                                iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
+                                            end
+                                        else
+                                            --Get t1 bombers if dont have many already, or T3 bombers otherwise
+                                            if iCurT1Bombers <= 80 then
+                                                iCategoryToBuild = M27UnitInfo.refCategoryBomber * categories.TECH1
+                                            else
+                                                --Get strats if we have fewer than 3
+                                                if iFactoryTechLevel >= 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber * categories.TECH3) <= 2 then
+                                                    iCategoryToBuild = M27UnitInfo.refCategoryBomber
+                                                    iTotalWanted = 1
+                                                end
+                                            end
+                                        end
+                                    end
+                                elseif iCurrentConditionToTry == 7 then
                                     --1-off air scout and air bomber at start of game as top-priority; torp bombers are a top priority if ACU is underwater or torp bombers are needed
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': About to see if in our lifetime we ahve built 0 scouts, bombers, or spy planes. iFactoryTechLevel=' .. iFactoryTechLevel .. '; bomber lifetimecount=' .. M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryBomber * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)))
@@ -1739,7 +1765,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             iCategoryToBuild = refCategoryBomber
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 7 then
+                                elseif iCurrentConditionToTry == 8 then
                                     --Initial engis
                                     if M27Conditions.LifetimeBuildCountLessThan(aiBrain, refCategoryEngineer, aiBrain[refiInitialEngineersWanted] + 1) == true then
                                         if bDebugMessages == true then
@@ -1748,7 +1774,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         iCategoryToBuild = refCategoryEngineer
                                         iTotalWanted = 1
                                     end
-                                elseif iCurrentConditionToTry == 8 then
+                                elseif iCurrentConditionToTry == 9 then
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': Emergyency air AA check; aiBrain[M27AirOverseer.refiAirAANeeded]=' .. aiBrain[M27AirOverseer.refiAirAANeeded] .. '; aiBrain[M27AirOverseer.refiOurMassInAirAA]=' .. aiBrain[M27AirOverseer.refiOurMassInAirAA] .. '; bHavePowerForAir=' .. tostring(bHavePowerForAir) .. '; aiBrain:GetEconomyStoredRatio(ENERGY)=' .. aiBrain:GetEconomyStoredRatio('ENERGY'))
                                     end
@@ -1761,7 +1787,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             iTotalWanted = math.min(aiBrain[M27AirOverseer.refiAirAANeeded], 2)
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 9 then --No living air scouts - get more if have certain level of mass
+                                elseif iCurrentConditionToTry == 10 then --No living air scouts - get more if have certain level of mass
                                     if bHavePowerForAir and (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 5 or not(M27Conditions.HaveLowMass(aiBrain))) and aiBrain[M27AirOverseer.refiOurMassInAirAA] > 75 then
                                         local iCurAirScouts = aiBrain:GetCurrentUnits(refCategoryAirScout)
                                         if not(aiBrain[M27AirOverseer.refbHaveOmniVision]) and (iCurAirScouts == 0 or (iCurAirScouts <= 3 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 and (iCurAirScouts <= 1 or aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] >= 5 or iCurAirScouts < aiBrain:GetCurrentUnits(categories.EXPERIMENTAL) + 1))) then
@@ -1770,7 +1796,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         end
                                     end
 
-                                elseif iCurrentConditionToTry == 10 then --Signifcant AirAA shortfall
+                                elseif iCurrentConditionToTry == 11 then --Signifcant AirAA shortfall
                                     if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; aiBrain[M27AirOverseer.refiAirAAWanted]='..aiBrain[M27AirOverseer.refiAirAAWanted]..'; aiBrain[M27AirOverseer.refiTeamMassInAirAA]='..aiBrain[M27AirOverseer.refiTeamMassInAirAA]..'; aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]) end
                                     if bHavePowerForAir and (aiBrain[M27AirOverseer.refiAirAANeeded] >= 2 or (aiBrain[M27AirOverseer.refiAirAAWanted] >= 10 and aiBrain[M27AirOverseer.refiTeamMassInAirAA] / math.max(aiBrain[M27AirOverseer.refiHighestEnemyAirThreat], 1) < 0.7)) then
                                         --Do we have at least 2 air factories? Then ensure we are always building at least 1 AA unit from one of them
@@ -1781,7 +1807,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 11 then --2nd strat bomber if first not died yet and dont have any idle bombers; also build 2nd/3rd strat if have more AA than enemy and they lack T3 AA
+                                elseif iCurrentConditionToTry == 12 then --2nd strat bomber if first not died yet and dont have any idle bombers; also build 2nd/3rd strat if have more AA than enemy and they lack T3 AA
                                     if iFactoryTechLevel >= 3 and (M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][3]) or M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][3][1]) or M27UnitInfo.IsUnitValid(aiBrain[M27AirOverseer.reftBomberEffectiveness][3][1][M27AirOverseer.subrefoBomber])) then
                                         if iAvailableT3Bombers == 0 or (iAvailableT3Bombers <= 2 and aiBrain[M27AirOverseer.refbHaveAirControl] and not(aiBrain[M27AirOverseer.refbEnemyHasHadCruisersOrT3AA])) then
                                             --1st Bomber still alive - check have lifetime build count <=2
@@ -1793,7 +1819,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 12 then
+                                elseif iCurrentConditionToTry == 13 then
                                     --Emergency bomber defence but with less of a unit limitation and with an increased range %
                                     local iEmergencyRange
                                     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 2 then
@@ -1811,7 +1837,6 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': iEmergencyRange=' .. iEmergencyRange .. '; refiModDistFromStartNearestOutstandingThreat=' .. aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] .. '; bHavePowerForAir=' .. tostring(bHavePowerForAir) .. '; Energy stored=' .. aiBrain:GetEconomyStoredRatio('ENERGY'))
                                     end
-                                    local iCurT1Bombers = aiBrain:GetCurrentUnits(refCategoryBomber)
                                     if aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] <= iEmergencyRange and (bHavePowerForAir or aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.8) then
                                         --Dont build more bombers for defence if we already have lots available, unless enemy has a land experimental nearby
                                         if aiBrain[M27AirOverseer.refiPreviousAvailableBombers] <= math.min(15 * aiBrain[M27Overseer.refiEnemyHighestTechLevel], math.max(5 * aiBrain[M27Overseer.refiEnemyHighestTechLevel], aiBrain[M27Overseer.refiHighestEnemyGroundUnitHealth] / 250)) then
@@ -1903,7 +1928,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 13 then --AirAA needed
+                                elseif iCurrentConditionToTry == 14 then --AirAA needed
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': aiBrain[M27AirOverseer.refiAirAANeeded]=' .. aiBrain[M27AirOverseer.refiAirAANeeded] .. ' so will build airAA if its >0')
                                     end
@@ -1915,13 +1940,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         iCategoryToBuild = refCategoryAirAA
                                         iTotalWanted = aiBrain[M27AirOverseer.refiAirAANeeded]
                                     end
-                                elseif iCurrentConditionToTry == 14 then
+                                elseif iCurrentConditionToTry == 15 then
                                     --First ever transport
                                     if bHavePowerForAir and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryTransport) <= 0 and M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]) == false then
                                         iCategoryToBuild = M27UnitInfo.refCategoryTransport
                                         iTotalWanted = 1
                                     end
-                                elseif iCurrentConditionToTry == 15 then
+                                elseif iCurrentConditionToTry == 16 then
                                     --Engi for first ever transport
                                     if M27Utilities.IsTableEmpty(aiBrain[M27Transport.reftTransportsWaitingForEngi]) == false then
                                         for iTransport, oTransport in aiBrain[M27Transport.reftTransportsWaitingForEngi] do
@@ -1932,12 +1957,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 16 then
+                                elseif iCurrentConditionToTry == 17 then
                                     if aiBrain[M27Navy.refbEnemyNavyPreventingBuildingNavy] and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTorpBomber) <= 10 then
                                         iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
                                         iTotalWanted = 2
                                     end
-                                elseif iCurrentConditionToTry == 17 then
+                                elseif iCurrentConditionToTry == 18 then
                                     --Want 1 idle T1 bomber assuming have at least 30 gross mass income
                                     if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 3 and bHavePowerForAir and aiBrain[M27AirOverseer.refiPreviousAvailableBombers] <= 0 and iCurT1Bombers < 150 then
                                         iCategoryToBuild = refCategoryBomber * categories.TECH1
@@ -1946,7 +1971,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             LOG(sFunctionRef .. ': Want at least 1 idle T1 bomber so will build t1 bomber')
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 18 then
+                                elseif iCurrentConditionToTry == 19 then
                                     --Torp bombers, unless need more AA and have more torps than AA
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': iCurrentConditionToTry=' .. iCurrentConditionToTry .. '; bHavePowerForAir=' .. tostring(bHavePowerForAir) .. '; aiBrain[M27AirOverseer.refiTorpBombersWanted]=' .. aiBrain[M27AirOverseer.refiTorpBombersWanted])
@@ -1966,7 +1991,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             iTotalWanted = aiBrain[M27AirOverseer.refiTorpBombersWanted]
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 19 then --Bombers for air domination
+                                elseif iCurrentConditionToTry == 20 then --Bombers for air domination
                                     if bHavePowerForAir and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber) < 10 then
                                         if bDebugMessages == true then
                                             LOG(sFunctionRef .. ': Air domination - Want bombers for targets and have fewer than 10 bombers (or in air dominance mode) and condition is later tahn the one checking if airAA needed')
@@ -1975,7 +2000,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         iTotalWanted = 2 --math.max(1, aiBrain[M27AirOverseer.refiBombersWanted])
                                         if aiBrain[M27AirOverseer.refbHaveAirControl] then iTotalWanted = 3 end
                                     end
-                                elseif iCurrentConditionToTry == 20 then --More air scouts
+                                elseif iCurrentConditionToTry == 21 then --More air scouts
                                     if bHavePowerForAir and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) and aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] > 0 then
                                         local iMinScoutsWanted = 2
                                         if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 12 and M27MapInfo.rMapPlayableArea[3] - M27MapInfo.rMapPlayableArea[1] >= 500 then iMinScoutsWanted = 4 end
@@ -1987,12 +2012,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             iTotalWanted = math.min(2, aiBrain[M27AirOverseer.refiExtraAirScoutsWanted])
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 21 then --Engineers - initial BO or soon overflowing mass
+                                elseif iCurrentConditionToTry == 22 then --Engineers - initial BO or soon overflowing mass
                                     if aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] > 0 or ((aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 200) and aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] + aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted] + aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted] > 0) then
                                         iCategoryToBuild = refCategoryEngineer
                                         iTotalWanted = math.max(1, aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted])
                                     end
-                                elseif iCurrentConditionToTry == 22 then
+                                elseif iCurrentConditionToTry == 23 then
                                     --AirAA units if we already have bombers
                                     if aiBrain[M27AirOverseer.refiOurMassInAirAA] < (aiBrain[M27Overseer.refiOurHighestAirFactoryTech] * aiBrain[M27Overseer.refiOurHighestAirFactoryTech] + 1) * 50 then
                                         --Dont have much airAA - build AirAA unless we have no bombers and no AirAA needed
@@ -2005,7 +2030,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             iCategoryToBuild = refCategoryAirAA
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 23 then
+                                elseif iCurrentConditionToTry == 24 then
                                     --Transport
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': Considering if we want to build a transport. bHavePowerForAir=' .. tostring(bHavePowerForAir) .. '; aiBrain[M27AirOverseer.refiOurMassInAirAA]=' .. aiBrain[M27AirOverseer.refiOurMassInAirAA] .. '; Is table of transports waiting for engis empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27Transport.reftTransportsWaitingForEngi])))
@@ -2039,7 +2064,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         end
                                     end
 
-                                elseif iCurrentConditionToTry == 24 then --Effective bombers
+                                elseif iCurrentConditionToTry == 25 then --Effective bombers
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': Will build bombers if they are effective or we are UEF T2+ factory that hasnt built many t1 bombers; bHavePowerForAir=' .. tostring(bHavePowerForAir) .. '; iFactoryTechLevel=' .. iFactoryTechLevel .. '; Are bombers effective=' .. tostring(aiBrain[M27AirOverseer.refbBombersAreEffective][iFactoryTechLevel]) .. '; Are they really effective=' .. tostring(aiBrain[M27AirOverseer.refbBombersAreReallyEffective][iFactoryTechLevel]) .. '; Do we have low mass=' .. tostring(M27Conditions.HaveLowMass(aiBrain)) .. '; Number of bombers at cur tech level=' .. aiBrain:GetCurrentUnits(refCategoryBomber * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)))
                                     end
@@ -2067,7 +2092,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 25 then
+                                elseif iCurrentConditionToTry == 26 then
                                     if bHavePowerForAir then
                                         if bDebugMessages == true then
                                             LOG(sFunctionRef .. ': aiBrain[M27AirOverseer.refiAirAAWanted]=' .. aiBrain[M27AirOverseer.refiAirAAWanted] .. ' so will build airAA if its >0')
@@ -2080,24 +2105,24 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             iTotalWanted = 1
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 26 then
+                                elseif iCurrentConditionToTry == 27 then
                                     --Min of 3 engineers of the current tech level
                                     if iFactoryTechLevel >= 2 and iFactoryTechLevel >= aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)) < 3 then
                                         iCategoryToBuild = refCategoryEngineer
                                         iTotalWanted = 1
                                     end
-                                elseif iCurrentConditionToTry == 27 then
+                                elseif iCurrentConditionToTry == 28 then
                                     if bHavePowerForAir and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) and aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] > 0 and (aiBrain:GetEconomyStored('MASS') > 10 or aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] > 5) then
                                         iCategoryToBuild = refCategoryAirScout
                                         iTotalWanted = aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]
                                     end
                                 elseif aiBrain:GetEconomyStored('MASS') > 100 then
-                                    if iCurrentConditionToTry == 28 then
+                                    if iCurrentConditionToTry == 29 then
                                         if bHavePowerForAir and aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted] > 0 then
                                             iCategoryToBuild = refCategoryEngineer
                                             iTotalWanted = aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted]
                                         end
-                                    elseif iCurrentConditionToTry == 29 then
+                                    elseif iCurrentConditionToTry == 30 then
                                         --Bomber defence
                                         if bDebugMessages == true then
                                             LOG(sFunctionRef .. ': Outstanding threat=' .. aiBrain[M27Overseer.refiPercentageOutstandingThreat] .. '; Bobmer defence range=' .. aiBrain[M27AirOverseer.refiBomberDefenceModDistance]..'; aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat])
@@ -2117,17 +2142,17 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         end
                                     elseif M27Conditions.HaveLowMass(aiBrain) == false then
-                                        if iCurrentConditionToTry == 30 then
+                                        if iCurrentConditionToTry == 31 then
                                             if aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted] > 0 then
                                                 iCategoryToBuild = refCategoryEngineer
                                                 iTotalWanted = aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted]
                                             end
-                                        elseif iCurrentConditionToTry == 31 then
+                                        elseif iCurrentConditionToTry == 32 then
                                             if aiBrain[M27EngineerOverseer.reftiBOActiveSpareEngineersByTechLevel][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]] < 2 then
                                                 iCategoryToBuild = refCategoryEngineer
                                                 iTotalWanted = 2 - aiBrain[M27EngineerOverseer.reftiBOActiveSpareEngineersByTechLevel][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]]
                                             end
-                                        elseif iCurrentConditionToTry == 32 then
+                                        elseif iCurrentConditionToTry == 33 then
                                             if bHavePowerForAir and not (iStrategy == M27Overseer.refStrategyEcoAndTech or iStrategy == M27Overseer.refStrategyTurtle) and not (M27Conditions.HaveLowMass(aiBrain)) and aiBrain[M27AirOverseer.refbBombersAreEffective][iFactoryTechLevel] == true then
                                                 if bDebugMessages == true then
                                                     LOG(sFunctionRef .. ': Dont have low mass and not ecoing so will build bombers if we have targets for them')
@@ -2148,13 +2173,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                     end
                                                 end
                                             end
-                                        elseif iCurrentConditionToTry == 33 then
+                                        elseif iCurrentConditionToTry == 34 then
                                             --AirAA if dont ahve air control (rdundancy condition)
                                             if not(aiBrain[M27AirOverseer.refbHaveAirControl]) and bHavePowerForAir and not (iStrategy == M27Overseer.refStrategyEcoAndTech or iStrategy == M27Overseer.refStrategyTurtle) and not (M27Conditions.HaveLowMass(aiBrain)) then
                                                 iCategoryToBuild = refCategoryAirAA
                                                 iTotalWanted = 10
                                             end
-                                        elseif iCurrentConditionToTry == 34 then
+                                        elseif iCurrentConditionToTry == 35 then
                                             --Build spare air scouts
                                             if not (iStrategy == M27Overseer.refStrategyEcoAndTech) and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) then
                                                 local iAvailableAirScouts = 0
