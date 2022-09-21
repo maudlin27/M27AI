@@ -11768,8 +11768,7 @@ end--]]
                             if iCurRadarCount == 0 and iNetCurEnergyIncome > 5 and iEnergyStored >= 2000 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 2.5 then
                                 iActionToAssign = refActionBuildT1Radar
                                 iMaxEngisWanted = 1
-                            elseif bHaveLowMass == false then
-
+                            else
                                 --Already have a radar, check if we or an ally has T3
                                 if iNearbyOmniCount == nil then
                                     local tNearbyOmni = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT3Radar, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 250, 'Ally')
@@ -11777,34 +11776,46 @@ end--]]
                                     else iNearbyOmniCount = 0 end
                                 end
                                 if iNearbyOmniCount == 0 then
-                                    local iOmniWanted = 0
-                                    --GetResourcesNearTargetLocation(tTargetPos, iMaxDistance, bMexNotHydro)
-                                    if iT3Power == nil then iT3Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH3) end
-                                    --Only get omni if we have several T3 power, and we have no nearby enemies (within 175, as T2 radar is 200 range; also not much point if enemy start is within 250 of us)
-                                    if iHighestFactoryOrEngineerTechAvailable >= 3 and iNetCurEnergyIncome >= 300 and iT3Power > 1 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 175 and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 250 then
-                                        --Also want at least 2 T3 mexes (or 4 if we're in eco mode), assuming we have that many near our start position
-                                        local iT3MexesWantedFirst = M27MapInfo.GetResourcesNearTargetLocation(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 40, true)
-                                        if M27Utilities.IsTableEmpty(iT3MexesWantedFirst) == true then iT3MexesWantedFirst = 1 else iT3MexesWantedFirst = table.getn(iT3MexesWantedFirst) end
+                                    if bHaveLowMass == false then
+                                        local iOmniWanted = 0
+                                        --GetResourcesNearTargetLocation(tTargetPos, iMaxDistance, bMexNotHydro)
+                                        if iT3Power == nil then iT3Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH3) end
+                                        --Only get omni if we have several T3 power, and we have no nearby enemies (within 175, as T2 radar is 200 range; also less of a point if enemy start is within 250 of us)
+                                        if iHighestFactoryOrEngineerTechAvailable >= 3 and iNetCurEnergyIncome >= 300 and iT3Power > 1 and (iNetCurEnergyIncome >= 500 or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 175 and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 250) then
+                                            --Also want at least 2 T3 mexes (or 4 if we're in eco mode), assuming we have that many near our start position
+                                            local iT3MexesWantedFirst = M27MapInfo.GetResourcesNearTargetLocation(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 40, true)
+                                            if M27Utilities.IsTableEmpty(iT3MexesWantedFirst) == true then iT3MexesWantedFirst = 1 else iT3MexesWantedFirst = table.getn(iT3MexesWantedFirst) end
 
-                                        if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) then iT3MexesWantedFirst = math.min(4, iT3MexesWantedFirst)
-                                        else iT3MexesWantedFirst = math.min(2, iT3MexesWantedFirst) end
-                                        if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) >= iT3MexesWantedFirst then
-                                            iOmniWanted = 1
+                                            if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) then iT3MexesWantedFirst = math.min(4, iT3MexesWantedFirst)
+                                            else iT3MexesWantedFirst = math.min(2, iT3MexesWantedFirst) end
+                                            if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) >= iT3MexesWantedFirst then
+                                                iOmniWanted = 1
+                                            end
                                         end
-                                    end
-                                    if iOmniWanted > 0 and (GetGameTimeSeconds() >= 1200 or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 or aiBrain:GetEconomyStored('MASS') >= 2500) then
-                                        iActionToAssign = refActionBuildT3Radar
-                                        iMinEngiTechLevelWanted = 3
-                                        iMaxEngisWanted = 3
+                                        if iOmniWanted > 0 and (GetGameTimeSeconds() >= 1200 or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 or aiBrain:GetEconomyStored('MASS') >= 2500) then
+                                            iActionToAssign = refActionBuildT3Radar
+                                            iMinEngiTechLevelWanted = 3
+                                            iMaxEngisWanted = 3
+                                        else
+                                            if iT2Power == nil then iT2Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH2) end
+                                            if iT2Power + iT3Power > 0 then
+                                                --Do we already have T2 radar
+                                                if iCurT2RadarCount == nil then iCurT2RadarCount = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Radar) end
+                                                if iCurT2RadarCount == 0 and iNetCurEnergyIncome >= 40 then
+                                                    iActionToAssign = refActionBuildT2Radar
+                                                    iMinEngiTechLevelWanted = 2
+                                                    iMaxEngisWanted = 3
+                                                end
+                                            end
+                                        end
                                     else
-                                        if iT2Power == nil then iT2Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH2) end
-                                        if iT2Power + iT3Power > 0 then
-                                            --Do we already have T2 radar
-                                            if iCurT2RadarCount == nil then iCurT2RadarCount = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Radar) end
-                                            if iCurT2RadarCount == 0 and iNetCurEnergyIncome >= 40 then
-                                                iActionToAssign = refActionBuildT2Radar
-                                                iMinEngiTechLevelWanted = 2
-                                                iMaxEngisWanted = 3
+                                        --Still consider omni in certain situations even if have low mass
+                                        if iNetCurEnergyIncome >= 275 and (aiBrain[M27Overseer.refbEnemyHasMobileT2PlusStealth] or (aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 250 and (GetGameTimeSeconds() >= 1800 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 12.5) or (M27Utilities.IsTableEmpty(aiBrain[M27PlatoonUtilities.reftSkirmisherPlatoonWantingIntel]) == false and (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFatboy) >= 1 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySniperBot) >= 8))) then
+                                            iActionToAssign = refActionBuildT3Radar
+                                            iMinEngiTechLevelWanted = 3
+                                            iMaxEngisWanted = 1
+                                            if iNetCurEnergyIncome >= 300 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 12.5 then
+                                                iMaxEngisWanted = iMaxEngisWanted + 1
                                             end
                                         end
                                     end

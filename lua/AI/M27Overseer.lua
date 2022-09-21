@@ -194,6 +194,7 @@ refiLastCheckedScoutAssignments = 'M27OverseerLastCheckedScoutAssignments' --aga
 
 refiSearchRangeForEnemyStructures = 'M27EnemyStructureSearchRange'
 refbEnemyHasTech2PD = 'M27EnemyHasTech2PD'
+refbEnemyHasMobileT2PlusStealth = 'M27EnemyHasMobileStealth' --against aiBrain, true if enemy has mobile T2+ stealth
 
 refiOurHighestFactoryTechLevel = 'M27OverseerOurHighestFactoryTech'
 refiOurHighestAirFactoryTech = 'M27OverseerOurHighestAirFactoryTech'

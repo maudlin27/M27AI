@@ -1521,9 +1521,15 @@ function OnDetectedBy(oUnitDetected, iBrainIndex)
     if M27Utilities.bM27AIInGame then
         local aiBrain = ArmyBrains[iBrainIndex]
         --LOG('OnDetectedBy: UnitID='..oUnitDetected.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitDetected)..'; tAllAIBrainsByArmyIndex[iBrainIndex] name='..M27Overseer.tAllAIBrainsByArmyIndex[iBrainIndex].Nickname..'; ArmyBrains nickname='..ArmyBrains[iBrainIndex].Nickname..'; Does entity contain navy='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitDetected.UnitId))..'; aiBrain.M27AI='..tostring((aiBrain.M27AI or false)))
-        if aiBrain.M27AI and not(oUnitDetected[M27UnitInfo.reftLastKnownPosition]) and M27UnitInfo.IsUnitValid(oUnitDetected) and EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitDetected.UnitId) and aiBrain.M27Team then
-            --LOG('OnDetectedBy: aiBrain='..aiBrain.Nickname..' has just detected unit '..oUnitDetected.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitDetected))
-            M27Navy.UpdateUnitPond(oUnitDetected, aiBrain.M27Team, IsEnemy(iBrainIndex, oUnitDetected:GetAIBrain():GetArmyIndex()))
+        if aiBrain.M27AI then
+            if not(oUnitDetected[M27UnitInfo.reftLastKnownPosition]) and M27UnitInfo.IsUnitValid(oUnitDetected) and EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitDetected.UnitId) and aiBrain.M27Team then
+                --LOG('OnDetectedBy: aiBrain='..aiBrain.Nickname..' has just detected unit '..oUnitDetected.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitDetected))
+                M27Navy.UpdateUnitPond(oUnitDetected, aiBrain.M27Team, IsEnemy(iBrainIndex, oUnitDetected:GetAIBrain():GetArmyIndex()))
+            end
+            --Mobile stealth flag
+            if not(aiBrain[M27Overseer.refbEnemyHasMobileT2PlusStealth]) and EntityCategoryContains(categories.STEALTH * categories.MOBILE * categories.LAND + categories.STEALTH * categories.MOBILE * categories.NAVAL - categories.TECH1, oUnitDetected.UnitId) then
+                aiBrain[M27Overseer.refbEnemyHasMobileT2PlusStealth] = true
+            end
         end
     end
 end
