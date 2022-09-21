@@ -11882,7 +11882,7 @@ end--]]
                                         end
                                     else
                                         --Still consider omni in certain situations even if have low mass
-                                        if iNetCurEnergyIncome >= 275 and (aiBrain[M27Overseer.refbEnemyHasMobileT2PlusStealth] or (aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 250 and (GetGameTimeSeconds() >= 1800 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 12.5) or (M27Utilities.IsTableEmpty(aiBrain[M27PlatoonUtilities.reftSkirmisherPlatoonWantingIntel]) == false and (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFatboy) >= 1 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySniperBot) >= 8))) then
+                                        if iNetCurEnergyIncome >= 275 and (aiBrain[M27Overseer.refbEnemyHasMobileT2PlusStealth] or (aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 250 and (GetGameTimeSeconds() >= 1800 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 12.5) or (M27Utilities.IsTableEmpty(aiBrain[M27PlatoonUtilities.reftSkirmisherPlatoonWantingIntel]) == false and (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFatboy) >= 1 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySniperBot) >= 8)))) then
                                             iActionToAssign = refActionBuildT3Radar
                                             iMinEngiTechLevelWanted = 3
                                             iMaxEngisWanted = 1

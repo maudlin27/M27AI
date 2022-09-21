@@ -272,7 +272,8 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
 
                         local iMassKilled = (oUnitKilled.Sync.totalMassKilled or 0)
                         if bDebugMessages == true then LOG(sFunctionRef..': Just killed '..oUnitKilled.UnitId..'; Mass that unit had killed='..iMassKilled..'; Is this chat message empty='..(M27Chat.tiM27VoiceTauntByType['Killed deadly unit'] or 'nil')..'; BP mass cost='..(oUnitKilled:GetBlueprint().Economy.BuildCostMass or 'nil')..'; Vet level='..(oUnitKilled.Sync.VeteranLevel or 'nil')) end
-                        if iMassKilled >= 1000 and not(M27Chat.tiM27VoiceTauntByType['Killed deadly unit']) and not(EntityCategoryContains(categories.COMMAND, oUnitKilled.UnitId)) and oUnitKilled.Sync.VeteranLevel >= 5 and oUnitKilled.GetAIBrain and not(M27Logic.IsCivilianBrain(oUnitKilled:GetAIBrain())) then
+                        --Dont send message unless the killer is still alive (to avoid e.g. ACU killing something via its death explosion)
+                        if iMassKilled >= 1000 and M27UnitInfo.IsUnitValid(instigator) and not(M27Chat.tiM27VoiceTauntByType['Killed deadly unit']) and not(EntityCategoryContains(categories.COMMAND, oUnitKilled.UnitId)) and oUnitKilled.Sync.VeteranLevel >= 5 and oUnitKilled.GetAIBrain and not(M27Logic.IsCivilianBrain(oUnitKilled:GetAIBrain())) then
                             --local oBP = oUnitKilled:GetBlueprint()
                             --if iMassKilled >= oBP.Economy.BuildCostMass * 7 then
                             local sMessage = 'FINALLY killed that annoying '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)
