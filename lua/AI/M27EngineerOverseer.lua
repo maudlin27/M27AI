@@ -8301,31 +8301,85 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
 
                             --SMD
                             if not(bWantFortification) and iMassInvested >= 15000 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == false and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 500 then
-                                --Are we protected by SMD?
+                                if aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 2340 and GetGameTimeSeconds() <= 2460 then bDebugMessages = true end
 
-
-                                --Does the enemy only ahve 1 nuke launcher?
-                                if table.getsize(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) <= 1 then
-                                    bCoveredBySMD = false
-                                    if M27Utilities.IsTableEmpty(tSMD) == false then
-                                        oClosestUnitToFirebase = M27Utilities.GetNearestUnit(tFirebaseUnits, aiBrain[reftFirebasePosition][iFirebaseRef], aiBrain)
-                                        if oClosestUnitToFirebase then
-                                            bCoveredBySMD = IsUnitCoveredBySMD(aiBrain, oClosestUnitToFirebase, tSMD, aiBrain[M27Overseer.reftEnemyNukeLaunchers])
+                                --Check table is all valid units
+                                local bRemoveUnitCheck = true
+                                while bRemoveUnitCheck do
+                                    bRemoveUnitCheck = false
+                                    for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyNukeLaunchers] do
+                                        if not(M27UnitInfo.IsUnitValid(oUnit)) then
+                                            table.remove(aiBrain[M27Overseer.reftEnemyNukeLaunchers], iUnit)
+                                            bRemoveUnitCheck = true
                                         end
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Just considered if closest unit to firebase is covered by SMD. oClosestUnitToFirebase='..oClosestUnitToFirebase.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestUnitToFirebase)..'; bCoveredBySMD='..tostring(bCoveredBySMD or false)) end
                                     end
-                                    if not(bCoveredBySMD) then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Will check for if we have SMD within 65 of here, and if not then will say we want to build SMD') end
-                                        CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], M27UnitInfo.refCategorySMD, 65, 1)
+                                end
+                                local iEnemyNukes = 0 --Cant use table.getn
+                                local iEnemyBattleshipNukes = 0
+                                local iEnemyNormalNukes = 0
+                                local bEnemyNukeNotConstructed = true
+                                if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == false then
+                                    for iNuke, oNuke in aiBrain[M27Overseer.reftEnemyNukeLaunchers] do
+                                        if M27UnitInfo.IsUnitValid(oNuke) then
+                                            if EntityCategoryContains(categories.BATTLESHIP, oNuke.UnitId) then iEnemyBattleshipNukes = iEnemyBattleshipNukes + 1
+                                            else
+                                                iEnemyNormalNukes = iEnemyNormalNukes + 1
+                                            end
+
+                                            if oNuke:GetFractionComplete() >= 0.95 then bEnemyNukeNotConstructed = false end
+                                        end
                                     end
-                                else
-                                    --Enemy has multiple nukes so want that many smd at firebase
-                                    local iEnemyNukes = table.getsize(aiBrain[M27Overseer.reftEnemyNukeLaunchers])
-                                    local tOurFirebaseSMD = EntityCategoryFilterDown(M27UnitInfo.refCategorySMD, tFirebaseUnits)
-                                    local iOurFirebaseSMD = 0
-                                    if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategorySMD, tFirebaseUnits)) == false then iOurFirebaseSMD = table.getn(tOurFirebaseSMD) end
-                                    if iOurFirebaseSMD < iEnemyNukes then
-                                        CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], M27UnitInfo.refCategorySMD, 65, iEnemyNukes)
+                                elseif bDebugMessages == true then LOG(sFunctionRef..': No SML detected but will build SMD anyway as a precaution as we have a good economy')
+                                end
+                                iEnemyNukes = math.max(iEnemyNormalNukes, iEnemyBattleshipNukes, 1) --Redundancy - if table isnt empty enemy must have at least one, and will assume they have 1 if we are building as a precaution
+                                if iEnemyNukes > 0 then
+
+                                    --Are we protected by SMD?
+
+
+                                    --Does the enemy only ahve 1 nuke launcher?
+
+                                    if aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySMD) <= iEnemyNukes * 2 then
+                                        local oFurthestUnitFromFirebase
+                                        local iClosestDist = 10000
+                                        local iFurthestDist = 0
+                                        local iCurDist
+                                        for iUnit, oUnit in tFirebaseUnits do
+                                            iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[reftFirebasePosition][iFirebaseRef])
+                                            if iCurDist < iClosestDist then
+                                                iClosestDist = iCurDist
+                                                oClosestUnitToFirebase = oUnit
+                                            end
+                                            if iCurDist > iFurthestDist then
+                                                iFurthestDist = iCurDist
+                                                oFurthestUnitFromFirebase = oUnit
+                                            end
+                                        end
+
+                                        local iSMDSearchRange = math.max(80, iFurthestDist + 5)
+
+                                        if table.getsize(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) <= 1 then
+                                            bCoveredBySMD = false
+                                            if M27Utilities.IsTableEmpty(tSMD) == false then
+                                                oClosestUnitToFirebase = M27Utilities.GetNearestUnit(tFirebaseUnits, aiBrain[reftFirebasePosition][iFirebaseRef], aiBrain)
+                                                if oClosestUnitToFirebase then
+                                                    bCoveredBySMD = IsUnitCoveredBySMD(aiBrain, oClosestUnitToFirebase, tSMD, aiBrain[M27Overseer.reftEnemyNukeLaunchers])
+                                                end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Just considered if closest unit to firebase is covered by SMD. oClosestUnitToFirebase='..oClosestUnitToFirebase.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestUnitToFirebase)..'; bCoveredBySMD='..tostring(bCoveredBySMD or false)) end
+                                            end
+                                            if not(bCoveredBySMD) then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Will check for if we have SMD within 65 of here, and if not then will say we want to build SMD') end
+                                                CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], M27UnitInfo.refCategorySMD, iSMDSearchRange, 1)
+                                            end
+                                        else
+                                            --Enemy has multiple nukes so want that many smd at firebase
+                                            local tOurFirebaseSMD = EntityCategoryFilterDown(M27UnitInfo.refCategorySMD, tFirebaseUnits)
+                                            local iOurFirebaseSMD = 0
+                                            if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategorySMD, tFirebaseUnits)) == false then iOurFirebaseSMD = table.getn(tOurFirebaseSMD) end
+                                            if iOurFirebaseSMD < iEnemyNukes then
+                                                CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], M27UnitInfo.refCategorySMD, iSMDSearchRange, iEnemyNukes)
+                                            end
+                                        end
                                     end
                                 end
                             end
@@ -10397,6 +10451,7 @@ end--]]
                             end
                         end
                     elseif iCurrentConditionToTry == 18 then --SMD
+                        if GetGameTimeSeconds() >= 2340 and GetGameTimeSeconds() <= 2460 and aiBrain:GetArmyIndex() == 4 and tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
                         if bDebugMessages == true then LOG(sFunctionRef..': Checking if need to build SMD; iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable..'; M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers])='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]))..'; will still build if no SMLs if we have good economy') end
                         if iHighestFactoryOrEngineerTechAvailable >= 3 and (M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == false or aiBrain[M27Overseer.refbEnemyFiredNuke] or (not(bHaveLowMass)) and not(bHaveLowPower) and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 300 and (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 25 or (GetGameTimeSeconds() >= 780 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 15) or (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 12 and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryExperimentalLevel) >= 2))) then
                             --Do we have as many SMD as they have nuke launchers? Or 1 more if they have no nukes (meaning we want to build SMD as a precaution)
@@ -10426,18 +10481,34 @@ end--]]
                                 end
                             end
                             local iEnemyNukes = 0 --Cant use table.getn
+                            local iEnemyBattleshipNukes = 0
+                            local iEnemyNormalNukes = 0
                             local bEnemyNukeNotConstructed = true
                             if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == false then
                                 for iNuke, oNuke in aiBrain[M27Overseer.reftEnemyNukeLaunchers] do
                                     if M27UnitInfo.IsUnitValid(oNuke) then
-                                        iEnemyNukes = iEnemyNukes + 1
+                                        if EntityCategoryContains(categories.BATTLESHIP, oNuke.UnitId) then iEnemyBattleshipNukes = iEnemyBattleshipNukes + 1
+                                        else
+                                            iEnemyNormalNukes = iEnemyNormalNukes + 1
+                                        end
+
                                         if oNuke:GetFractionComplete() >= 0.95 then bEnemyNukeNotConstructed = false end
                                     end
                                 end
                             elseif bDebugMessages == true then LOG(sFunctionRef..': No SML detected but will build SMD anyway as a precaution as we have a good economy')
                             end
-                            iEnemyNukes = math.max(iEnemyNukes, 1) --Redundancy - if table isnt empty enemy must have at least one, and will assume they have 1 if we are building as a precaution
-                            if bDebugMessages == true then LOG(sFunctionRef..': iSMDsWeHave='..iSMDsWeHave..'; iEnemyNukes='..iEnemyNukes..'; iSMDsWithNoMissiles='..iSMDsWithNoMissiles) end
+                            iEnemyNukes = math.max(iEnemyNormalNukes, iEnemyBattleshipNukes, 1) --Redundancy - if table isnt empty enemy must have at least one, and will assume they have 1 if we are building as a precaution
+                            if iEnemyNukes > 1 then bDebugMessages = true end
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef..': iSMDsWeHave='..iSMDsWeHave..'; iEnemyNukes='..iEnemyNukes..'; iSMDsWithNoMissiles='..iSMDsWithNoMissiles)
+                                if iEnemyNukes > 1 then
+
+                                    LOG(sFunctionRef..': Will now list out each nuke unit ID')
+                                    for iNuke, oNuke in aiBrain[M27Overseer.reftEnemyNukeLaunchers] do
+                                        LOG(sFunctionRef..': iNuke='..iNuke..'; oNuke='..oNuke.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNuke))
+                                    end
+                                end
+                            end
                             if iSMDsWeHave < iEnemyNukes then
                                 aiBrain[refbNeedResourcesForMissile] = true
                                 iMinEngiTechLevelWanted = 3
@@ -10542,6 +10613,7 @@ end--]]
                             if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) and not(aiBrain[M27Overseer.refbEnemyFiredNuke]) then iMaxEngisWanted = 2 end
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': Finsihed considering if want to build or assist SMD. iActionToAssign='..(iActionToAssign or 'nil')) end
+                        bDebugMessages = false
                     elseif iCurrentConditionToTry == 19 then --Emergency AA when non-air threat near our base and we have no or little AA
                         if bDebugMessages == true then LOG(sFunctionRef..': Considering if we want to build static AA as an emergency; aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]..'; aiBrain[M27AirOverseer.refiOurMassInAirAA]='..aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; aiBrain[M27AirOverseer.refiOurMassInMAA]='..aiBrain[M27AirOverseer.refiOurMassInMAA]..'; iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable) end
                         if aiBrain[M27AirOverseer.refiAirAANeeded] > 0 and not(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftNearestEnemyAirThreat])) and M27Utilities.GetDistanceBetweenPositions(aiBrain[M27AirOverseer.reftNearestEnemyAirThreat], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(150, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5) then
