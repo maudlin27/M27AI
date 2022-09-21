@@ -80,6 +80,7 @@ refActionBuildSecondTMD = 48
 refActionBuildNavalFactory = 49
 refActionAssistNavalFactory = 50
 refActionNavalSpareAction = 51
+refActionBuildWall = 52
 tiEngiActionsThatDontBuild = {refActionReclaimArea, refActionSpare, refActionNavalSpareAction, refActionHasNearbyEnemies, refActionReclaimUnit, refActionReclaimTrees, refActionUpgradeBuilding, refActionAssistSMD, refActionAssistTML, refActionAssistAirFactory, refActionAssistNavalFactory, refActionUpgradeHQ, refActionAssistNuke, refActionLoadOnTransport, refActionAssistShield}
 --NOTE: IF ADDING MORE ACTIONS, UPDATE THE ACTIONS IN THE POWER STALL MANAGER
 --ALSO update the actions noted in RefreshT3ArtiAdjacencyLocations as being ones that can ignore when deciding whether to clear existing engineer commands
@@ -5330,15 +5331,17 @@ function GetCategoryToBuildFromAction(iActionToAssign, iMinTechLevel, aiBrain)
         iCategoryToBuild = M27UnitInfo.refCategoryQuantumOptics
     elseif iActionToAssign == refActionBuildHive then
         iCategoryToBuild = M27UnitInfo.refCategoryHive
+    elseif iActionToAssign == refActionBuildWall then
+        iCategoryToBuild = M27UnitInfo.refCategoryWall
     else
         M27Utilities.ErrorHandler('Need to add code for action='..(iActionToAssign or 'nil'))
     end
     if iMinTechLevel > 1 then
-        if iMinTechLevel == 3 then iCategoryToBuild = iCategoryToBuild * categories.TECH3 + iCategoryToBuild*categories.EXPERIMENTAL
-        else iCategoryToBuild = iCategoryToBuild - categories.TECH1
+    if iMinTechLevel == 3 then iCategoryToBuild = iCategoryToBuild * categories.TECH3 + iCategoryToBuild*categories.EXPERIMENTAL
+    else iCategoryToBuild = iCategoryToBuild - categories.TECH1
         end
-    end
-    return iCategoryToBuild
+        end
+        return iCategoryToBuild
 end
 
 function UpgradeBuildingActionCompleteChecker(aiBrain, oEngineer, oBuildingToUpgrade)
@@ -5376,6 +5379,7 @@ function ReissueEngineerOldOrders(aiBrain, oEngineer, bClearActionsFirst)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ReissueEngineerOldOrders'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if GetGameTimeSeconds() >= 870 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
     --if GetEngineerUniqueCount(oEngineer) == 61 and GetGameTimeSeconds() >= 780 then bDebugMessages = true else bDebugMessages = false end
 
     if bClearActionsFirst then
@@ -5386,10 +5390,12 @@ function ReissueEngineerOldOrders(aiBrain, oEngineer, bClearActionsFirst)
     end
     --reftEngineerActionsByEngineerRef Records actions by engineer reference; aiBrain[reftEngineerActionsByEngineerRef][iUniqueRef][BuildingQueue]: returns {LocRef, EngRef, AssistingRef, ActionRef, refbPrimaryBuilder, refEngineerAssignmentActualLocation} but not in that order - i.e. use subtable keys to reference these; buildingqueue will be 1 for the first queueud building by the unit, 2 for the second etc. (e.g. t1 power)
     local iUC = GetEngineerUniqueCount(oEngineer)
+    if bDebugMessages == true then LOG(sFunctionRef..': Considering oEngineer with UC='..iUC..'; bClearActionsFirst='..tostring((bClearActionsFirst or false))..'; Is table of actions for this UC empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerActionsByEngineerRef][iUC]))) end
     if M27Utilities.IsTableEmpty(aiBrain[reftEngineerActionsByEngineerRef][iUC]) then
         if EntityCategoryContains(categories.COMMAND, oEngineer.UnitId) then LOG(sFunctionRef..': Unable to reissue old orders as are dealing with ACU')
         else
             --Could happen if platoon former calls this and the engineer doesnt have any action to start with
+            if bDebugMessages == true then LOG(sFunctionRef..': Will reassign engi') end
             ForkThread(DelayedEngiReassignment, aiBrain, true, {oEngineer})
             --M27Utilities.ErrorHandler(sFunctionRef..': Cant find any actions for this engineer with iUC='..iUC..'; Engi='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer))
         end
@@ -5420,8 +5426,10 @@ function ReissueEngineerOldOrders(aiBrain, oEngineer, bClearActionsFirst)
                 if tSubtable[refiCategoryBuilt] then
                     --Can we still build at teh target location?
                     local sBPWanted = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, tSubtable[refiCategoryBuilt], oEngineer)
+                    if bDebugMessages == true then LOG(sFunctionRef..': iQueue='..iQueue..'; sBPWanted='..sBPWanted or 'nil') end
                     if CanBuildAtLocation(aiBrain, sBPWanted, tSubtable[refEngineerAssignmentActualLocation], nil, false, false) then
                         --NOTE: Dont want to move near construction as are calling this function if we think we have just got within build range as well
+                        if bDebugMessages == true then LOG(sFunctionRef..': WIll build '..sBPWanted..' at location '..repru(tSubtable[refEngineerAssignmentActualLocation])) end
                         IssueBuildMobile({oEngineer}, tSubtable[refEngineerAssignmentActualLocation], sBPWanted, {})
                     else
                         --Is the same building owned by an ally within 1 of this spot that matches this category? (e.g. we may have started construction and stopped)
@@ -6945,7 +6953,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                                     tWallLocation = { tTargetLocation[1] + iAdjustX, 0, tTargetLocation[3] + iAdjustZ }
                                                     tWallLocation[2] = GetSurfaceHeight(tWallLocation[1], tWallLocation[3])
                                                     IssueBuildMobile({ oEngineer }, tWallLocation, sWall, {})
-                                                    UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tWallLocation, false, iConditionNumber, nil, true, nil, iCategoryToBuild)
+                                                    UpdateEngineerActionTrackers(aiBrain, oEngineer, refActionBuildWall, tWallLocation, false, iConditionNumber, nil, true, nil, iCategoryToBuild)
                                                 end
                                             end
                                         end
