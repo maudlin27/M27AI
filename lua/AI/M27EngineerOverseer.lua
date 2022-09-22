@@ -5379,7 +5379,7 @@ function ReissueEngineerOldOrders(aiBrain, oEngineer, bClearActionsFirst)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ReissueEngineerOldOrders'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetGameTimeSeconds() >= 870 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
+    if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
     --if GetEngineerUniqueCount(oEngineer) == 61 and GetGameTimeSeconds() >= 780 then bDebugMessages = true else bDebugMessages = false end
 
     if bClearActionsFirst then
@@ -5402,6 +5402,7 @@ function ReissueEngineerOldOrders(aiBrain, oEngineer, bClearActionsFirst)
     else
         local bActionToBuild
         for iQueue, tSubtable in aiBrain[reftEngineerActionsByEngineerRef][iUC] do
+            if bDebugMessages == true then LOG(sFunctionRef..': iQueue='..iQueue..'; Do we have a valid object target='..tostring(M27UnitInfo.IsUnitValid(tSubtable[refoObjectTarget]))) end
             if tSubtable[refoObjectTarget] then
                 --Were assisting something
                 if M27UnitInfo.IsUnitValid(tSubtable[refoObjectTarget]) then
@@ -6953,7 +6954,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                                     tWallLocation = { tTargetLocation[1] + iAdjustX, 0, tTargetLocation[3] + iAdjustZ }
                                                     tWallLocation[2] = GetSurfaceHeight(tWallLocation[1], tWallLocation[3])
                                                     IssueBuildMobile({ oEngineer }, tWallLocation, sWall, {})
-                                                    UpdateEngineerActionTrackers(aiBrain, oEngineer, refActionBuildWall, tWallLocation, false, iConditionNumber, nil, true, nil, iCategoryToBuild)
+                                                    UpdateEngineerActionTrackers(aiBrain, oEngineer, refActionBuildWall, tWallLocation, false, iConditionNumber, nil, true, nil, M27UnitInfo.refCategoryWall)
                                                 end
                                             end
                                         end
