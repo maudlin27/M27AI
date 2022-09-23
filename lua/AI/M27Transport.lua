@@ -127,8 +127,8 @@ function LoadEngineerOnTransport(aiBrain, oEngineer, oTransport)
         aiBrain[reftEngineersWaitingForTransport][M27EngineerOverseer.GetEngineerUniqueCount(oEngineer)] = oEngineer
         oEngineer[refoTransportToLoadOnto] = oTransport
     else
-        IssueClearCommands({oEngineer})
-        IssueClearCommands({oTransport})
+        M27Utilities.IssueTrackedClearCommands({oEngineer})
+        M27Utilities.IssueTrackedClearCommands({oTransport})
         IssueTransportLoad({oEngineer}, oTransport)
         oEngineer[M27UnitInfo.refbSpecialMicroActive] = true
         oTransport[M27UnitInfo.refbSpecialMicroActive] = true
@@ -352,7 +352,7 @@ function TransportManager(aiBrain)
             if bDebugMessages == true then LOG(sFunctionRef..': Considering available transport '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oUnit[refiEngisLoaded]='..(oUnit[refiEngisLoaded] or 0)..'; bUnloadFirst='..tostring(bUnloadFirst)) end
 
             if bUnloadFirst then
-                IssueClearCommands({oUnit})
+                M27Utilities.IssueTrackedClearCommands({oUnit})
                 M27AirOverseer.ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
                 oUnit[M27AirOverseer.refbOnAssignment] = true
                 IssueTransportUnload({oUnit}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
@@ -371,7 +371,7 @@ function TransportManager(aiBrain)
                 end
 
                 if bSendToRallyPoint then
-                    IssueClearCommands({oUnit})
+                    M27Utilities.IssueTrackedClearCommands({oUnit})
                     M27AirOverseer.ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
                     IssueMove({oUnit}, tRallyPoint)
                     if bDebugMessages == true then LOG(sFunctionRef..': Telling transport to return to rally point '..repru(tRallyPoint)) end
@@ -390,7 +390,7 @@ function TransportManager(aiBrain)
                 aiBrain[reftEngineersWaitingForTransport][iEngi] = nil
             else
                 if not(M27UnitInfo.IsUnitValid(oEngi[refoTransportToLoadOnto])) then
-                    IssueClearCommands({oEngi})
+                    M27Utilities.IssueTrackedClearCommands({oEngi})
                     aiBrain[reftEngineersWaitingForTransport][iEngi] = nil
                     M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
                 else
@@ -409,7 +409,7 @@ function TransportManager(aiBrain)
                 if bDebugMessages == true then
                     LOG(sFunctionRef..': Transport is already full so will clear all engineers wanting to load into the transport')
                     for iEngi, oEngi in tEngiGroup do
-                        IssueClearCommands({oEngi})
+                        M27Utilities.IssueTrackedClearCommands({oEngi})
                         oEngi[refoTransportToLoadOnto] = nil
                         oEngi[refiAssignedPlateau] = nil
                         M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi)
@@ -420,8 +420,8 @@ function TransportManager(aiBrain)
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': iTransportRef='..iTransportRef..'; Is special micro active='..tostring(oTransportWanted[M27UnitInfo.refbSpecialMicroActive])) end
                 if not(oTransportWanted[M27UnitInfo.refbSpecialMicroActive]) then
-                    IssueClearCommands(tEngiGroup)
-                    IssueClearCommands({oTransportWanted})
+                    M27Utilities.IssueTrackedClearCommands(tEngiGroup)
+                    M27Utilities.IssueTrackedClearCommands({oTransportWanted})
                     IssueTransportLoad(tEngiGroup, oTransportWanted)
                     oTransportWanted[M27UnitInfo.refbSpecialMicroActive] = true
 
@@ -451,8 +451,8 @@ function TransportManager(aiBrain)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Will reset special micro flag, or if we have engis in engi group will reissue order to load') end
                                 oTransportWanted[refiWaitingForEngiCount] = 0
                                 if M27Utilities.IsTableEmpty(tEngiGroup) == false then
-                                    IssueClearCommands(tEngiGroup)
-                                    IssueClearCommands({oTransportWanted})
+                                    M27Utilities.IssueTrackedClearCommands(tEngiGroup)
+                                    M27Utilities.IssueTrackedClearCommands({oTransportWanted})
                                     IssueTransportLoad(tEngiGroup, oTransportWanted)
                                     oTransportWanted[M27UnitInfo.refbSpecialMicroActive] = true
                                     for iEngi, oEngi in tEngiGroup do

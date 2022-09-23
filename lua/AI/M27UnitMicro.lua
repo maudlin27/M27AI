@@ -80,7 +80,7 @@ function MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
     M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)--]]
 
     if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for move commands for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iTimeToRun='..iTimeToRun..'; iCurFacingDirection='..iCurFacingDirection..'; iAngleFromUnitToBomb='..iAngleFromUnitToBomb..'; iFacingAngleWanted='..iFacingAngleWanted..'; tUnitStartPosition='..repru(oUnit:GetPosition())..'; tPositionToRunFrom='..repru(tPositionToRunFrom)) end
-    IssueClearCommands({oUnit})
+    M27Utilities.IssueTrackedClearCommands({oUnit})
     tTempLocationToMove = oUnit:GetPosition()
     local iDistanceAlreadyMoved = 0
 
@@ -142,7 +142,7 @@ function MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
     local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionAtOrNearTargetInPathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, true, false)
     if tNewTargetInSameGroup then
         if bDebugMessages == true then LOG(sFunctionRef..': Starting bomber dodge for unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; tNewTargetInSameGroup='..repru(tNewTargetInSameGroup)) end
-        --IssueClearCommands({oUnit})
+        --M27Utilities.IssueTrackedClearCommands({oUnit})
         IssueMove({oUnit}, tNewTargetInSameGroup)
 
         TrackTemporaryUnitMicro(oUnit, iTimeToRun)
@@ -200,7 +200,7 @@ function ForkedMoveInHalfCircle(oUnit, iTimeToRun, tPositionToRunFrom)
     M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)--]]
 
     if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for move commands; iTimeToRun='..iTimeToRun..'; iStartTime='..iStartTime..'; iCurFacingDirection='..iCurFacingDirection..'; iAngleToTargetToEscape='..iAngleToTargetToEscape..'; iFacingAngleWanted='..iFacingAngleWanted..'; tUnitStartPosition='..repru(tUnitStartPosition)) end
-    IssueClearCommands({oUnit})
+    M27Utilities.IssueTrackedClearCommands({oUnit})
     local iTempAngleDirectionToMove = iCurFacingDirection + iInitialAngleAdj * iAngleAdjFactor
     while not(iTempAngleDirectionToMove == iFacingAngleWanted) do
         iLoopCount = iLoopCount + 1
@@ -301,7 +301,7 @@ function ForkedMoveInCircle(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontCle
     local iGameTime = GetGameTimeSeconds()
     if oUnit[M27UnitInfo.refbSpecialMicroActive] and iGameTime - oUnit[M27UnitInfo.refiGameTimeMicroStarted] < iRecentMicroThreshold then bRecentMicro = true end
 
-    if bRecentMicro == false and not(bDontClearCommandsFirst) then IssueClearCommands({oUnit}) end
+    if bRecentMicro == false and not(bDontClearCommandsFirst) then M27Utilities.IssueTrackedClearCommands({oUnit}) end
     if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for move commands; iTimeToRun='..iTimeToRun..'; iStartTime='..iStartTime..'; iCurFacingDirection='..iCurFacingDirection..'; tUnitStartPosition='..repru(tUnitStartPosition)) end
     local iTempAngleDirectionToMove = iCurFacingDirection + iInitialAngleAdj * iAngleAdjFactor
     local iTempDistanceAwayToMove
@@ -380,7 +380,7 @@ function MoveInOppositeDirectionTemporarily(oUnit, iTimeToMove)
             local iRecentMicroThreshold = 1
             local iGameTime = GetGameTimeSeconds()
             if oUnit[M27UnitInfo.refbSpecialMicroActive] and iGameTime - oUnit[M27UnitInfo.refiGameTimeMicroStarted] < iRecentMicroThreshold then bRecentMicro = true end
-            if bRecentMicro == false then IssueClearCommands({oUnit}) end
+            if bRecentMicro == false then M27Utilities.IssueTrackedClearCommands({oUnit}) end
             IssueMove({oUnit}, tNewTargetInSameGroup)
 
             TrackTemporaryUnitMicro(oUnit, iTimeToMove)
@@ -489,7 +489,7 @@ function DodgeShot(oTarget, oWeapon, oAttacker, iTimeToDodge)
         bAttackMove = true
     end
     if bDebugMessages == true then LOG(sFunctionRef..': oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; clearing current orders which have a possible destination of '..repru(tCurDestination)..'; and giving an order to move to '..repru(tTempDestination)..'; Dist from our position to temp position='..M27Utilities.GetDistanceBetweenPositions(oTarget:GetPosition(), tTempDestination)) end
-    IssueClearCommands({oTarget})
+    M27Utilities.IssueTrackedClearCommands({oTarget})
     TrackTemporaryUnitMicro(oTarget, iTimeToDodge)
     IssueMove({oTarget}, tTempDestination)
     --Also send an order to go to the destination that we had before
@@ -1227,7 +1227,7 @@ end
     local iStartTime = GetGameTimeSeconds()
     --local iAngleToTarget
 
-    --IssueClearCommands({oBomber})
+    --M27Utilities.IssueTrackedClearCommands({oBomber})
     --Config:
     local iTicksBetweenOrders = 5
     --local tiAngleToUse = {50, -50, 50}
@@ -1256,7 +1256,7 @@ end
     while GetGameTimeSeconds() - iStartTime < iReloadTime do
         iCurTick = iCurTick + 1
         if iCurTick == 1 then
-            IssueClearCommands({oBomber})
+            M27Utilities.IssueTrackedClearCommands({oBomber})
             iFacingDirection = M27UnitInfo.GetUnitFacingAngle(oBomber)
             iAngleToTarget = M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oTarget:GetPosition())
             iCurAngleDif = iFacingDirection - iAngleToTarget
@@ -1337,7 +1337,7 @@ end
             end
             M27AirOverseer.IssueNewAttackToBomber(oBomber, oTarget, 1, true)
         else
-            IssueClearCommands({oBomber})
+            M27Utilities.IssueTrackedClearCommands({oBomber})
             ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oBomber)
         end
     end
@@ -1371,7 +1371,7 @@ function HoverBombTarget(aiBrain, oBomber, oTarget)
         local iStartTime = GetGameTimeSeconds()
         --local iAngleToTarget
 
-        --IssueClearCommands({oBomber})
+        --M27Utilities.IssueTrackedClearCommands({oBomber})
         --Config:
         local iTicksBetweenOrders = 5
         --local tiAngleToUse = {50, -50, 50}
@@ -1426,7 +1426,7 @@ function HoverBombTarget(aiBrain, oBomber, oTarget)
             end
 
             if iCurTick == 1 then
-                IssueClearCommands({oBomber})
+                M27Utilities.IssueTrackedClearCommands({oBomber})
 
                 iActualAngleToUse = iFacingDirection + iAngleAdjustToUse
                 tTempTarget = M27Utilities.MoveInDirection(oBomber:GetPosition(), iActualAngleToUse, iDistanceAwayToMove, true)
@@ -1450,7 +1450,7 @@ function HoverBombTarget(aiBrain, oBomber, oTarget)
                 if bTriedMovingForwardsAndTurning then
                     break
                 else
-                    IssueClearCommands({oBomber})
+                    M27Utilities.IssueTrackedClearCommands({oBomber})
                     tTempTarget = M27Utilities.MoveInDirection(oBomber:GetPosition(), iFacingDirection, 20, true)
                     IssueMove({oBomber}, tTempTarget)
                     bTriedMovingForwardsAndTurning = true
@@ -1491,13 +1491,13 @@ function HoverBombTarget(aiBrain, oBomber, oTarget)
                 if tGroundTarget then
                     if bDebugMessages == true then LOG(sFunctionRef..': Issuing attack order on ground='..repru(tGroundTarget)) end
                     oBomber[M27AirOverseer.reftGroundAttackLocation] = tGroundTarget
-                    IssueClearCommands({oBomber})
+                    M27Utilities.IssueTrackedClearCommands({oBomber})
                     IssueAttack({oBomber}, tGroundTarget)
                 else
                     M27AirOverseer.IssueNewAttackToBomber(oBomber, oTarget, 1, true)
                 end
             else
-                IssueClearCommands({oBomber})
+                M27Utilities.IssueTrackedClearCommands({oBomber})
                 if bDebugMessages == true then LOG(sFunctionRef..': Cleared bomber commands and will call the bomber target recheck') end
                 ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oBomber)
             end
@@ -1580,7 +1580,7 @@ function TurnAirUnitAndMoveToTarget(aiBrain, oBomber, tDirectionToMoveTo, iMaxAc
             break
         else
             if iCurTick == 1 then
-                IssueClearCommands({oBomber})
+                M27Utilities.IssueTrackedClearCommands({oBomber})
 
                 iActualAngleToUse = iFacingDirection + iAngleAdjustToUse
                 tTempTarget = M27Utilities.MoveInDirection(oBomber:GetPosition(), iActualAngleToUse, iDistanceAwayToMove, true)
@@ -1600,7 +1600,7 @@ function TurnAirUnitAndMoveToTarget(aiBrain, oBomber, tDirectionToMoveTo, iMaxAc
 
     if M27UnitInfo.IsUnitValid(oBomber) then
         oBomber[M27UnitInfo.refbSpecialMicroActive] = false
-        IssueClearCommands({oBomber})
+        M27Utilities.IssueTrackedClearCommands({oBomber})
         IssueMove({oBomber}, tDirectionToMoveTo)
         if bDebugMessages == true then LOG(sFunctionRef..': Just cleared bomber '..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..' commands and told it to move to '..repru(tDirectionToMoveTo)..'; GameTime='..GetGameTimeSeconds()) end
     end
@@ -1640,7 +1640,7 @@ function ExperimentalSAMHitAndRun(oBomber, oTarget)
         local iStartTime = GetGameTimeSeconds()
         --local iAngleToTarget
 
-        --IssueClearCommands({oBomber})
+        --M27Utilities.IssueTrackedClearCommands({oBomber})
         --Config:
         local iTicksBetweenOrders = 5
         --local tiAngleToUse = {50, -50, 50}
@@ -1706,7 +1706,7 @@ function ExperimentalSAMHitAndRun(oBomber, oTarget)
                 break
             else
                 if iCurTick == 1 then
-                    IssueClearCommands({oBomber})
+                    M27Utilities.IssueTrackedClearCommands({oBomber})
 
                     iActualAngleToUse = iFacingDirection + iAngleAdjustToUse
                     tTempTarget = M27Utilities.MoveInDirection(oBomber:GetPosition(), iActualAngleToUse, iDistanceAwayToMove, true)
@@ -1735,7 +1735,7 @@ function ExperimentalSAMHitAndRun(oBomber, oTarget)
             --The below time means we dont maximise DPS, but we increase survivability by increasing the distance at which the bomb can be fired
             local iTimeToStartTurn = iMoveStartTime + iReloadTime - math.min(iReloadTime, (iTimeToTurn * 2)) + 4
 
-            IssueClearCommands({oBomber})
+            M27Utilities.IssueTrackedClearCommands({oBomber})
             IssueMove({oBomber}, M27Utilities.MoveInDirection(oTarget:GetPosition(), iAngleAwayWanted, iMaxDistanceAwayWanted, true))
 
             while GetGameTimeSeconds() < iTimeToStartTurn do
@@ -1779,7 +1779,7 @@ function ExperimentalSAMHitAndRun(oBomber, oTarget)
                     end
 
                     if iCurTick == 1 then
-                        IssueClearCommands({oBomber})
+                        M27Utilities.IssueTrackedClearCommands({oBomber})
 
                         iActualAngleToUse = iFacingDirection + iAngleAdjustToUse
                         tTempTarget = M27Utilities.MoveInDirection(oBomber:GetPosition(), iActualAngleToUse, iDistanceAwayToMove, true)
@@ -1829,13 +1829,13 @@ function ExperimentalSAMHitAndRun(oBomber, oTarget)
                         if tGroundTarget then
                             if bDebugMessages == true then LOG(sFunctionRef..': Issuing attack order on ground='..repru(tGroundTarget)) end
                             oBomber[M27AirOverseer.reftGroundAttackLocation] = tGroundTarget
-                            IssueClearCommands({oBomber})
+                            M27Utilities.IssueTrackedClearCommands({oBomber})
                             IssueAttack({oBomber}, tGroundTarget)
                         else
                             M27AirOverseer.IssueNewAttackToBomber(oBomber, oTarget, 1, true)
                         end
                     else
-                        IssueClearCommands({oBomber})
+                        M27Utilities.IssueTrackedClearCommands({oBomber})
                         if bDebugMessages == true then LOG(sFunctionRef..': Cleared bomber'..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..' commands and will call delayed bomber target recheck') end
                         ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oBomber)
                     end

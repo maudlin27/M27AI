@@ -1479,3 +1479,16 @@ function AreAllChokepointsCoveredByTeam(aiBrain)
     end
     return bCovered
 end
+
+function HaveApproachingLandExperimentalThreat(aiBrain)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'HaveApproachingLandExperimentalThreat'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then LOG(sFunctionRef..': Is nearest land experimental valid='..tostring(M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoNearestRangeAdjustedLandExperimental]))..'; Nearest distance adjusted for range='..(aiBrain[M27Overseer.refiNearestRangeAdjustedLandExperimental] or 'nil')..'; Distance threshold='..math.max(180, math.min(300, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.55))) end
+    if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoNearestRangeAdjustedLandExperimental]) and aiBrain[M27Overseer.refiNearestRangeAdjustedLandExperimental] <= math.max(180, math.min(300, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.55)) then
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return true
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return false
+end

@@ -108,6 +108,11 @@ refbAreBigThreats = 'M27OverseerAreBigThreats'
 refbEnemyFiredNuke = 'M27OverseerEnemyFiredNuke' --against aiBrain, true if an enemy has fired a nuke
 refbDefendAgainstArti = 'M27OverseerDefendAgainstArti' --set to true if have activated logic to defend against enemy arti or novax
 refbCloakedEnemyACU = 'M27OverseerCloakedACU'
+
+refoNearestRangeAdjustedLandExperimental = 'M27OverseerNearestLandExperiObject' --against aiBrain, distance less unit's range
+refiNearestRangeAdjustedLandExperimental = 'M27OverseerNearestLandExperiDistance' --against aibrain, nearest based on distance less range (i.e. distance until it is in range of our startp osition)
+
+
 --Total threat values e.g. used for firebase chokepoints
 refiTotalEnemyLongRangeThreat = 'M27OverseerLongRangeThreat' --against aiBrain, returns the mass value, even if under construction
 refiTotalEnemyShortRangeThreat = 'M27OverseerShortRangeThreat' --as above
@@ -189,6 +194,7 @@ refiLastCheckedScoutAssignments = 'M27OverseerLastCheckedScoutAssignments' --aga
 
 refiSearchRangeForEnemyStructures = 'M27EnemyStructureSearchRange'
 refbEnemyHasTech2PD = 'M27EnemyHasTech2PD'
+refbEnemyHasMobileT2PlusStealth = 'M27EnemyHasMobileStealth' --against aiBrain, true if enemy has mobile T2+ stealth
 
 refiOurHighestFactoryTechLevel = 'M27OverseerOurHighestFactoryTech'
 refiOurHighestAirFactoryTech = 'M27OverseerOurHighestAirFactoryTech'
@@ -3949,7 +3955,7 @@ function ThreatAssessAndRespond(aiBrain)
                                     oPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
                                     --oPlatoon[M27PlatoonUtilities.refiLastPathTarget] = 1
                                     oPlatoon[M27PlatoonUtilities.refbOverseerAction] = true
-                                    --IssueClearCommands(oPlatoon:GetPlatoonUnits())
+                                    --M27Utilities.IssueTrackedClearCommands(oPlatoon:GetPlatoonUnits())
                                     if bDebugMessages == true then
                                         local iPlatoonCount = oPlatoon[M27PlatoonUtilities.refiPlatoonCount]
                                         if iPlatoonCount == nil then
@@ -4249,7 +4255,7 @@ function ThreatAssessAndRespond(aiBrain)
                                         else
                                             --oBasePlatoon[M27PlatoonUtilities.refbOverseerAction] = false --Got wierd results when put this tofalse with aeon (v45 WIP - e.g. combat patrol platoons would stop and start and barely move) so would need to spend more time looking into if did decide to change
                                         end
-                                        --IssueClearCommands(oBasePlatoon:GetPlatoonUnits())
+                                        --M27Utilities.IssueTrackedClearCommands(oBasePlatoon:GetPlatoonUnits())
                                         oBasePlatoon[M27PlatoonUtilities.reftMovementPath] = {}
                                         oBasePlatoon[M27PlatoonUtilities.reftMovementPath][1] = tEnemyThreatGroup[reftFrontPosition]
                                         oBasePlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
@@ -4423,7 +4429,7 @@ function ThreatAssessAndRespond(aiBrain)
 
                                                     if oUnit[iArmyIndex][refiAssignedThreat] <= iAssignedThreatWanted then
                                                         oUnit[iArmyIndex][refiAssignedThreat] = oUnit[iArmyIndex][refiAssignedThreat] + tTorpSubtable[refiCurThreat]
-                                                        IssueClearCommands({ tTorpSubtable[refoTorpUnit] })
+                                                        M27Utilities.IssueTrackedClearCommands({ tTorpSubtable[refoTorpUnit] })
                                                         IssueAttack({ tTorpSubtable[refoTorpUnit] }, oUnit)
                                                         M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit, 1, true)
                                                         for iUnit, oUnit in tEnemyUnits do
@@ -4452,7 +4458,7 @@ function ThreatAssessAndRespond(aiBrain)
                                 --[[if bACUNeedsTorpSupport then
                                     for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableTorpBombers] do
                                         if not(oUnit[M27AirOverseer.refbOnAssignment]) then
-                                            IssueClearCommands({oUnit})
+                                            M27Utilities.IssueTrackedClearCommands({oUnit})
                                             IssueAggressiveMove({oUnit}, oACU:GetPosition())
                                             oUnit[M27AirOverseer.refbOnAssignment] = true
                                             --oUnit[M27AirOverseer.refbTorpBomberProtectingACU] = true
@@ -4634,7 +4640,7 @@ function ThreatAssessAndRespond(aiBrain)
                     LOG(sFunctionRef .. ': TorpBomber=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; tCurDestination=' .. repru((tCurDestination or { 'nil' })) .. '; will attackmove to rally point if destination is too far from rally point. Rallypoint=' .. repru(tRallyPoint) .. '; dist to rallypoint=' .. M27Utilities.GetDistanceBetweenPositions((tCurDestination or { 0, 0, 0 }), tRallyPoint) .. '; oUnit[M27AirOverseer.refbOnAssignment]=' .. tostring(oUnit[M27AirOverseer.refbOnAssignment]))
                 end
                 if not (tCurDestination) or M27Utilities.GetDistanceBetweenPositions(tCurDestination, tRallyPoint) >= 10 then
-                    IssueClearCommands({ oUnit })
+                    M27Utilities.IssueTrackedClearCommands({ oUnit })
                     IssueAggressiveMove({ oUnit }, tRallyPoint)
                 end
             end
@@ -5577,7 +5583,7 @@ function ACUManager(aiBrain)
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Clearing commands for ACU')
                             end
-                            IssueClearCommands({ M27Utilities.GetACU(aiBrain) })
+                            M27Utilities.IssueTrackedClearCommands({ M27Utilities.GetACU(aiBrain) })
                             IssueMove({ oACU }, M27Logic.GetNearestRallyPoint(aiBrain, tACUPos, oACU))
                         end
                     else
@@ -6713,19 +6719,53 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             aiBrain[refbAreBigThreats] = true
         end
 
-        --Coordinate friendly experimentals if enemy has land experimentals
+        --Coordinate friendly experimentals if enemy has land experimentals, and record nearest enemy land experimental
+        if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy land experimentals empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]))) end
         if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false then
             local bEnemyHasLandExperimental = false
+            local iClosestExperimentalDistLessRange = 10000
+            local iCurDist
+            local iCurRange
+            local oClosestExperimental
+
+
             for iUnit, oUnit in aiBrain[reftEnemyLandExperimentals] do
-                if oUnit:GetFractionComplete() >= 0.9 then
-                    bEnemyHasLandExperimental = true
-                    break
+                if M27UnitInfo.IsUnitValid(oUnit) then
+                    if oUnit:GetFractionComplete() >= 0.9 then
+                        bEnemyHasLandExperimental = true
+                        iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                        iCurRange = M27UnitInfo.GetUnitMaxGroundRange(oUnit)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurDist='..(iCurDist or 'nil')..'; iCurRange='..(iCurRange or 'nil')) end
+                        if iCurDist - iCurRange < iClosestExperimentalDistLessRange then
+                            iClosestExperimentalDistLessRange = iCurDist - iCurRange
+                            oClosestExperimental = oUnit
+                        end
+                    end
                 end
             end
             if bEnemyHasLandExperimental then
                 ForkThread(CoordinateLandExperimentals, aiBrain)
+                aiBrain[refoNearestRangeAdjustedLandExperimental] = oClosestExperimental
+                aiBrain[refiNearestRangeAdjustedLandExperimental] = iClosestExperimentalDistLessRange
+                if bDebugMessages == true then LOG(sFunctionRef..': Enemy has land experimental, oClosestExperimental='..oClosestExperimental.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestExperimental)..'; iClosestExperimentalDistLessRange='..iClosestExperimentalDistLessRange..'; Is unit valid='..tostring(M27UnitInfo.IsUnitValid(aiBrain[refoNearestRangeAdjustedLandExperimental])))
+                    if aiBrain[refoNearestRangeAdjustedLandExperimental] then LOG(sFunctionRef..': aiBrain[refoNearestRangeAdjustedLandExperimental].UnitId='..(aiBrain[refoNearestRangeAdjustedLandExperimental].UnitId or 'nil')) end
+                end
+            else
+                --Clear if unit is no longer valid (otherwise want to retain so we know the threat is there)
+                if not(M27UnitInfo.IsUnitValid(aiBrain[refoNearestRangeAdjustedLandExperimental])) then
+                    aiBrain[refoNearestRangeAdjustedLandExperimental] = nil
+                    aiBrain[refiNearestRangeAdjustedLandExperimental] = nil
+                    if bDebugMessages == true then LOG(sFunctionRef..': Clearing values for nearest land experimental') end
+                end
+            end
+        else
+            if not(M27UnitInfo.IsUnitValid(aiBrain[refoNearestRangeAdjustedLandExperimental])) then
+                aiBrain[refoNearestRangeAdjustedLandExperimental] = nil
+                aiBrain[refiNearestRangeAdjustedLandExperimental] = nil
+                if bDebugMessages == true then LOG(sFunctionRef..': Clearing values for nearest land experimental') end
             end
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': Finished recording nearest land experimental, is unit valid='..tostring(M27UnitInfo.IsUnitValid(aiBrain[refoNearestRangeAdjustedLandExperimental]))) end
         --Coordinate novax
         if M27Utilities.IsTableEmpty(aiBrain[reftEnemyArtiAndExpStructure]) == false then
             local bEnemyHasAlmostCompleteArti = false
@@ -7308,6 +7348,14 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                                 bWantToEco = true
                                             end
                                         end
+
+                                        --Eco if enemy has T3 arti/novax and we dont have all t3 mexes at our base and have low mass and units that need shielding (as we may not have the mass needed to shield/defend against the arti)
+                                        if not(bWantToEco) and aiBrain[refbDefendAgainstArti] and math.min(aiBrain[M27EconomyOverseer.refiMexPointsNearBase], 6) > aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) and M27Conditions.HaveLowMass(aiBrain) and aiBrain[refiModDistFromStartNearestThreat] >= math.min(150, aiBrain[refiDistanceToNearestEnemyBase] * 0.35) then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Want to defend against arti but we dont have good eco so will try and improve eco to support things like shields') end
+                                            bWantToEco = true
+                                        end
+
+
                                         if bDebugMessages == true then LOG(sFunctionRef..': Do we want to eco based on initial logic (will change this to false in a moment in certain cases)='..tostring(bWantToEco)) end
                                         if bWantToEco == true then
                                             if not (bChokepointsAreProtected) and not(bAlliesAreCloserToEnemy) and not(bTemporaryTurtleMode) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
@@ -9106,7 +9154,11 @@ end
 
 function TestCustom(aiBrain)
     local sFunctionRef = 'TestCustom'
-    LOG('Table with table key will get printed to give reference')
+
+    M27Utilities.DrawLocation({640.69580078125, 18.948984146118, 367.01770019531}, nil, 3, 200, 4)
+
+
+    --[[LOG('Table with table key will get printed to give reference')
     local tTempTable = {1,2,3}
     local tTableWithTable = {}
     tTableWithTable[tTempTable] = 1
@@ -9161,7 +9213,7 @@ function TestCustom(aiBrain)
         --ACU unit
         reprsl(M27Utilities.GetACU(aiBrain)[reftPotentialFlankingUnits])
 
-    end
+    end--]]
 
     --Spawn monkeylord for enemy at certain point in game
     --[[if aiBrain:GetArmyIndex() == 4 then

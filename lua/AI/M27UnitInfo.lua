@@ -740,6 +740,7 @@ function GetBlueprintMaxGroundRange(oBP)
             end
         end
     end
+    return iMaxRange
 end
 
 function GetUnitMaxGroundRange(oUnit)

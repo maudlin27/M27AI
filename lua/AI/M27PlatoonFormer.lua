@@ -66,7 +66,7 @@ function CreatePlatoon(aiBrain, sPlatoonPlan, oPlatoonUnits) --, bRunImmediately
             --Removed below since the normal platoon logic should handle this if have assigend to a retreating platoon, and any other platoon would just override this with a new movement path anyway
             --[[if bRunImmediately then
                 if bDebugMessages == true then LOG(sFunctionRef..': We want the units to run immediately') end
-                IssueClearCommands(oPlatoonUnits)
+                M27Utilities.IssueTrackedClearCommands(oPlatoonUnits)
                 IssueMove(oPlatoonUnits, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
             end--]]
 
@@ -780,7 +780,7 @@ function CombatPlatoonFormer(aiBrain)
                         if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == false then
                             for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
                                 if M27UnitInfo.IsUnitValid(oUnit) then
-                                    IssueClearCommands({ oUnit })
+                                    M27Utilities.IssueTrackedClearCommands({ oUnit })
                                     IssueMove({ oUnit }, tTargetPosition)
                                     if M27Config.M27ShowUnitNames == true then M27PlatoonUtilities.UpdateUnitNames({ oUnit }, 'WaitingToForm '..sPlatoonToForm) end
                                 else
@@ -1189,7 +1189,7 @@ function GetClosestPlatoonOrUnitWantingMobileShield(aiBrain, tStartPosition, oSh
         end
     end
 
-    --Consider if naval unit is closer, and if so assign the shield to a pond instead
+    --Consider if naval unit is closer, and if so assign the shield to a pond instead (shield boat includes mobile shields that can hover)
     if EntityCategoryContains(M27UnitInfo.refCategoryShieldBoat, oShield.UnitId) then
         local iPond = M27Navy.GetPondToFocusOn(aiBrain)
         if M27UnitInfo.IsUnitValid(M27Team.tTeamData[aiBrain.M27Team][M27Team.refoClosestFriendlyUnitToEnemyByPond][iPond]) then
@@ -1342,10 +1342,11 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
         if M27Utilities.IsTableEmpty(tMobileShieldUnits) == false then
             for iUnit, oUnit in tMobileShieldUnits do
                 if M27UnitInfo.IsUnitValid(oUnit) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Considering shield oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering shield oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Assigned pond='..(oUnit[M27Navy.refiAssignedPond] or 'nil')) end
                     --Are we already in a mobile shield platoon or assigned to a naval pond?
                     if oUnit[M27Navy.refiAssignedPond] then
                         --Are we assigned to naval idle platoon? if not then assign
+                        if bDebugMessages == true then LOG(sFunctionRef..': Will assign to idle navy if not already. Does it have idle navy platoon already='..tostring(oUnit.PlatoonHandle == aiBrain[M27PlatoonTemplates.refoIdleNavy])) end
                         if not(oUnit.PlatoonHandle == aiBrain[M27PlatoonTemplates.refoIdleNavy]) then AddIdleUnitsToPlatoon(aiBrain, { oUnit }, aiBrain[M27PlatoonTemplates.refoIdleNavy]) end
                     elseif oUnit.PlatoonHandle and oUnit.PlatoonHandle.GetPlan and oUnit.PlatoonHandle:GetPlan() == 'M27MobileShield' then
                         if bDebugMessages == true then LOG(sFunctionRef..': Are already in a mobile shield platoon or assigned a pond. Assigned pond='..(oUnit[M27Navy.refiAssignedPond] or 'nil')) end
@@ -1465,7 +1466,7 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
                     if bDebugMessages == true then LOG(sFunctionRef..': No platoons or TML threatened mexes to help, will tell platoon to go to rally point') end
                     aiBrain[refbUsingMobileShieldsForPlatoons] = false
                     --Retreat the shield
-                    IssueClearCommands({oCurUnitToAssign})
+                    M27Utilities.IssueTrackedClearCommands({oCurUnitToAssign})
                     IssueMove({oCurUnitToAssign}, M27Logic.GetNearestRallyPoint(aiBrain, oCurUnitToAssign:GetPosition(), oCurUnitToAssign))
                 else
                     if bDebugMessages == true then
@@ -1556,7 +1557,7 @@ function MobileStealthPlatoonFormer(aiBrain, tMobileStealthUnits)
             if not(oPlatoonOrUnitToHelp) then
                 bNoMorePlatoonsToHelp = true
                 if bDebugMessages == true then LOG(sFunctionRef..': No platoons to help, will tell platoon to go to rally point') end
-                IssueClearCommands({oCurUnitToAssign})
+                M27Utilities.IssueTrackedClearCommands({oCurUnitToAssign})
                 IssueMove({oCurUnitToAssign}, M27Logic.GetNearestRallyPoint(aiBrain, oCurUnitToAssign:GetPosition(), oCurUnitToAssign))
             else
                 if bDebugMessages == true then
@@ -1870,7 +1871,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
 
                     if bFactoryNotBuilding then
 
-                        IssueClearCommands(tUnitsToClear)
+                        M27Utilities.IssueTrackedClearCommands(tUnitsToClear)
                         if bDebugMessages == true then LOG(sFunctionRef..': Clearing all units in tUnitsToClear, will list out') for iUnitToClear, oUnitToClear in tUnitsToClear do LOG('Clearing unit '..oUnitToClear.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToClear)) end end
                     else
                         bIssueTemporaryMoveOrder = false

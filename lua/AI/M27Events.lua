@@ -249,6 +249,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                         iCurPond = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oUnitKilled:GetPosition())
                     end
                     M27Team.tTeamData[aiBrain.M27Team][M27Team.refiDestroyedNavalFactoriesByPond][iCurPond] = (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiDestroyedNavalFactoriesByPond][iCurPond] or 0) + 1
+                    M27Team.tTeamData[aiBrain.M27Team][M27Team.refiTimeOfLastNavalFactoryDestruction][iCurPond] = GetGameTimeSeconds()
 
                 end
             end
@@ -272,7 +273,8 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
 
                         local iMassKilled = (oUnitKilled.Sync.totalMassKilled or 0)
                         if bDebugMessages == true then LOG(sFunctionRef..': Just killed '..oUnitKilled.UnitId..'; Mass that unit had killed='..iMassKilled..'; Is this chat message empty='..(M27Chat.tiM27VoiceTauntByType['Killed deadly unit'] or 'nil')..'; BP mass cost='..(oUnitKilled:GetBlueprint().Economy.BuildCostMass or 'nil')..'; Vet level='..(oUnitKilled.Sync.VeteranLevel or 'nil')) end
-                        if iMassKilled >= 1000 and not(M27Chat.tiM27VoiceTauntByType['Killed deadly unit']) and not(EntityCategoryContains(categories.COMMAND, oUnitKilled.UnitId)) and oUnitKilled.Sync.VeteranLevel >= 5 and oUnitKilled.GetAIBrain and not(M27Logic.IsCivilianBrain(oUnitKilled:GetAIBrain())) then
+                        --Dont send message unless the killer is still alive (to avoid e.g. ACU killing something via its death explosion)
+                        if iMassKilled >= 1000 and M27UnitInfo.IsUnitValid(instigator) and not(M27Chat.tiM27VoiceTauntByType['Killed deadly unit']) and not(EntityCategoryContains(categories.COMMAND, oUnitKilled.UnitId)) and oUnitKilled.Sync.VeteranLevel >= 5 and oUnitKilled.GetAIBrain and not(M27Logic.IsCivilianBrain(oUnitKilled:GetAIBrain())) then
                             --local oBP = oUnitKilled:GetBlueprint()
                             --if iMassKilled >= oBP.Economy.BuildCostMass * 7 then
                             local sMessage = 'FINALLY killed that annoying '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)
@@ -537,7 +539,7 @@ function OnUnitDeath(oUnit)
                         if M27Utilities.IsTableEmpty(oUnit[M27EngineerOverseer.reftAssistingEngineers]) == false then
                             for iEngi, oEngi in oUnit[M27EngineerOverseer.reftAssistingEngineers] do
                                 if M27UnitInfo.IsUnitValid(oEngi) then
-                                    IssueClearCommands({ oEngi })
+                                    M27Utilities.IssueTrackedClearCommands({ oEngi })
                                     M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
                                 end
                             end
@@ -725,7 +727,7 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                                                     --Is the unit within range of us?
                                                     local iOurMaxRange = M27Logic.GetUnitMaxGroundRange({self})
                                                     if M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition()) > iOurMaxRange then
-                                                        IssueClearCommands({self})
+                                                        M27Utilities.IssueTrackedClearCommands({self})
                                                         IssueMove({self}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                                                     end
                                                 end
@@ -971,7 +973,7 @@ function OnMissileBuilt(self, weapon)
                             --if oEngineer:IsUnitState('Building') or oEngineer:IsUnitState('Repairing') then bDebugMessages = true M27Utilities.ErrorHandler('Clearing an engineer whose unit state is building or repairing') end
                             --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
                             if oEngineer.GetFocusUnit and oEngineer:GetFocusUnit() == self then
-                                IssueClearCommands({oEngineer})
+                                M27Utilities.IssueTrackedClearCommands({oEngineer})
                                 M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngineer, true)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Cleared engineer UC='..M27EngineerOverseer.GetEngineerUniqueCount(oEngineer)..' with LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)) end
                             end
@@ -993,7 +995,7 @@ function OnMissileBuilt(self, weapon)
                     for iSubtable, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionAssistSMD] do
                         if bDebugMessages == true then LOG(sFunctionRef..': Cycling through each assigned subtable. Engineer='..tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef].UnitId..M27UnitInfo.GetUnitLifetimeCount(tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef])..' with UC='..M27EngineerOverseer.GetEngineerUniqueCount(tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef])..'; Unit being assisted='..tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef][M27EngineerOverseer.refoUnitBeingAssisted].UnitId..M27UnitInfo.GetUnitLifetimeCount(tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef][M27EngineerOverseer.refoUnitBeingAssisted])) end
                         if tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef][M27EngineerOverseer.refoUnitBeingAssisted] == self then
-                            if M27UnitInfo.IsUnitValid(tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]) then IssueClearCommands({tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]}) end
+                            if M27UnitInfo.IsUnitValid(tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]) then M27Utilities.IssueTrackedClearCommands({tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]}) end
                             M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef], true)
                             if bDebugMessages == true then LOG(sFunctionRef..': Have sent a clear commands action to the engineer') end
                         end
@@ -1048,7 +1050,7 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                 end
             end
             if bCancelAndReclaim then
-                IssueClearCommands({oEngineer})
+                M27Utilities.IssueTrackedClearCommands({oEngineer})
                 IssueReclaim({oEngineer}, oConstruction)
                 if oUnitToSwitchTo then
                     IssueRepair({oEngineer}, oUnitToSwitchTo)
@@ -1152,7 +1154,7 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                             end
                         end
                         if bReclaimAnyway or (oUnitToSwitchTo and not(oUnitToSwitchTo == oConstruction)) then
-                            IssueClearCommands({oEngineer})
+                            M27Utilities.IssueTrackedClearCommands({oEngineer})
                             IssueReclaim({oEngineer}, oConstruction)
                             if oUnitToSwitchTo then
                                 IssueRepair({oEngineer}, oUnitToSwitchTo)
@@ -1245,7 +1247,7 @@ function OnConstructed(oEngineer, oJustBuilt)
                     local sLocationRef = M27Utilities.ConvertLocationToStringRef(oJustBuilt:GetPosition())
                     if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionBuildMex]) == false then
                         for iEngi, oEngi in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionBuildMex] do
-                            IssueClearCommands({ oEngi })
+                            M27Utilities.IssueTrackedClearCommands({ oEngi })
                             M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
                         end
                     end
@@ -1307,7 +1309,7 @@ function OnConstructed(oEngineer, oJustBuilt)
                     for iAssistingEngi, oAssistingEngi in oEngineer[M27EngineerOverseer.reftAssistingEngineers] do
                         --Dont clear engineers still travelling to the naval factory
                         if M27Utilities.GetDistanceBetweenPositions(oAssistingEngi:GetPosition(), oEngineer:GetPosition()) <= 30 then
-                            IssueClearCommands({ oAssistingEngi})
+                            M27Utilities.IssueTrackedClearCommands({ oAssistingEngi})
                             ClearEngineerActionTrackers(aiBrain, oAssistingEngi, true)
                         end
                     end
@@ -1350,7 +1352,7 @@ function OnConstructed(oEngineer, oJustBuilt)
             if EntityCategoryContains(M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryEngineer, oEngineer.UnitId) and M27Utilities.IsTableEmpty(oJustBuilt[M27EngineerOverseer.reftAssistingEngineers]) == false then
             for iEngi, oEngi in oJustBuilt[M27EngineerOverseer.reftAssistingEngineers] do
             if M27UnitInfo.IsUnitValid(oEngi) then
-            IssueClearCommands({ oEngi })
+            M27Utilities.IssueTrackedClearCommands({ oEngi })
             M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
             end
             end
@@ -1435,7 +1437,7 @@ function OnReclaimFinished(oEngineer, oReclaim)
                             local tEnemiesToReclaim = oEngineer:GetAIBrain():GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryAllNavy - categories.COMMAND - categories.SUBCOMMANDER, oEngineer:GetPosition(), iBuildRange, 'Enemy')
                             if M27Utilities.IsTableEmpty(tEnemiesToReclaim) == false then
                                 local oUnitToReclaim = M27Utilities.GetNearestUnit(tEnemiesToReclaim, oEngineer:GetPosition())
-                                IssueClearCommands({oEngineer}) --need to clear commands or else we will continue reclaiming a wreck when we coudl be reclaiming an enemy
+                                M27Utilities.IssueTrackedClearCommands({oEngineer}) --need to clear commands or else we will continue reclaiming a wreck when we coudl be reclaiming an enemy
                                 IssueReclaim({oEngineer}, oUnitToReclaim)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Telling engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to reclaim enemy unit '..oUnitToReclaim.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToReclaim)) end
                             else
@@ -1450,7 +1452,7 @@ function OnReclaimFinished(oEngineer, oReclaim)
                     end
                 end
             elseif oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionSelenMexBuild and not(oEngineer:IsUnitState('Building')) and not(oEngineer:IsUnitState('Repairing')) then
-                IssueClearCommands({oEngineer})
+                M27Utilities.IssueTrackedClearCommands({oEngineer})
                 M27EngineerOverseer.BuildStructureAtLocation(oEngineer:GetAIBrain(), oEngineer, M27UnitInfo.refCategoryT1Mex, 1, nil, oEngineer[M27EngineerOverseer.reftEngineerCurrentTarget], true, false, nil, true, nil, nil, M27EngineerOverseer.refActionSelenMexBuild)
                 if bDebugMessages == true then LOG(sFunctionRef..': Engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' has just finished reclaiming something, and its action was selenbuildmex, so will try and get it to build a mex at its target location of '..repru((oEngineer[M27EngineerOverseer.reftEngineerCurrentTarget] or {'nil'}))) end
             end
@@ -1500,7 +1502,7 @@ function OnTransportUnload(oUnit, oTransport, bone)
             local sFunctionRef = 'OnTransportUnload'
             local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-            IssueClearCommands({oUnit})
+            M27Utilities.IssueTrackedClearCommands({oUnit})
             oUnit[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
             --Make sure we have correctly recorded the plateau if we have landed engineers
 
@@ -1521,9 +1523,15 @@ function OnDetectedBy(oUnitDetected, iBrainIndex)
     if M27Utilities.bM27AIInGame then
         local aiBrain = ArmyBrains[iBrainIndex]
         --LOG('OnDetectedBy: UnitID='..oUnitDetected.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitDetected)..'; tAllAIBrainsByArmyIndex[iBrainIndex] name='..M27Overseer.tAllAIBrainsByArmyIndex[iBrainIndex].Nickname..'; ArmyBrains nickname='..ArmyBrains[iBrainIndex].Nickname..'; Does entity contain navy='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitDetected.UnitId))..'; aiBrain.M27AI='..tostring((aiBrain.M27AI or false)))
-        if aiBrain.M27AI and not(oUnitDetected[M27UnitInfo.reftLastKnownPosition]) and M27UnitInfo.IsUnitValid(oUnitDetected) and EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitDetected.UnitId) and aiBrain.M27Team then
-            --LOG('OnDetectedBy: aiBrain='..aiBrain.Nickname..' has just detected unit '..oUnitDetected.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitDetected))
-            M27Navy.UpdateUnitPond(oUnitDetected, aiBrain.M27Team, IsEnemy(iBrainIndex, oUnitDetected:GetAIBrain():GetArmyIndex()))
+        if aiBrain.M27AI then
+            if not(oUnitDetected[M27UnitInfo.reftLastKnownPosition]) and M27UnitInfo.IsUnitValid(oUnitDetected) and EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitDetected.UnitId) and aiBrain.M27Team then
+                --LOG('OnDetectedBy: aiBrain='..aiBrain.Nickname..' has just detected unit '..oUnitDetected.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitDetected))
+                M27Navy.UpdateUnitPond(oUnitDetected, aiBrain.M27Team, IsEnemy(iBrainIndex, oUnitDetected:GetAIBrain():GetArmyIndex()))
+            end
+            --Mobile stealth flag
+            if not(aiBrain[M27Overseer.refbEnemyHasMobileT2PlusStealth]) and EntityCategoryContains(categories.STEALTH * categories.MOBILE * categories.LAND + categories.STEALTH * categories.MOBILE * categories.NAVAL - categories.TECH1, oUnitDetected.UnitId) then
+                aiBrain[M27Overseer.refbEnemyHasMobileT2PlusStealth] = true
+            end
         end
     end
 end
