@@ -66,7 +66,7 @@ function CreatePlatoon(aiBrain, sPlatoonPlan, oPlatoonUnits) --, bRunImmediately
             --Removed below since the normal platoon logic should handle this if have assigend to a retreating platoon, and any other platoon would just override this with a new movement path anyway
             --[[if bRunImmediately then
                 if bDebugMessages == true then LOG(sFunctionRef..': We want the units to run immediately') end
-                IssueClearCommands(oPlatoonUnits)
+                M27Utilities.IssueTrackedClearCommands(oPlatoonUnits)
                 IssueMove(oPlatoonUnits, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
             end--]]
 
@@ -780,7 +780,7 @@ function CombatPlatoonFormer(aiBrain)
                         if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == false then
                             for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
                                 if M27UnitInfo.IsUnitValid(oUnit) then
-                                    IssueClearCommands({ oUnit })
+                                    M27Utilities.IssueTrackedClearCommands({ oUnit })
                                     IssueMove({ oUnit }, tTargetPosition)
                                     if M27Config.M27ShowUnitNames == true then M27PlatoonUtilities.UpdateUnitNames({ oUnit }, 'WaitingToForm '..sPlatoonToForm) end
                                 else
@@ -1466,7 +1466,7 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
                     if bDebugMessages == true then LOG(sFunctionRef..': No platoons or TML threatened mexes to help, will tell platoon to go to rally point') end
                     aiBrain[refbUsingMobileShieldsForPlatoons] = false
                     --Retreat the shield
-                    IssueClearCommands({oCurUnitToAssign})
+                    M27Utilities.IssueTrackedClearCommands({oCurUnitToAssign})
                     IssueMove({oCurUnitToAssign}, M27Logic.GetNearestRallyPoint(aiBrain, oCurUnitToAssign:GetPosition(), oCurUnitToAssign))
                 else
                     if bDebugMessages == true then
@@ -1557,7 +1557,7 @@ function MobileStealthPlatoonFormer(aiBrain, tMobileStealthUnits)
             if not(oPlatoonOrUnitToHelp) then
                 bNoMorePlatoonsToHelp = true
                 if bDebugMessages == true then LOG(sFunctionRef..': No platoons to help, will tell platoon to go to rally point') end
-                IssueClearCommands({oCurUnitToAssign})
+                M27Utilities.IssueTrackedClearCommands({oCurUnitToAssign})
                 IssueMove({oCurUnitToAssign}, M27Logic.GetNearestRallyPoint(aiBrain, oCurUnitToAssign:GetPosition(), oCurUnitToAssign))
             else
                 if bDebugMessages == true then
@@ -1871,7 +1871,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
 
                     if bFactoryNotBuilding then
 
-                        IssueClearCommands(tUnitsToClear)
+                        M27Utilities.IssueTrackedClearCommands(tUnitsToClear)
                         if bDebugMessages == true then LOG(sFunctionRef..': Clearing all units in tUnitsToClear, will list out') for iUnitToClear, oUnitToClear in tUnitsToClear do LOG('Clearing unit '..oUnitToClear.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToClear)) end end
                     else
                         bIssueTemporaryMoveOrder = false

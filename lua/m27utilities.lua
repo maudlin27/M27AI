@@ -2049,3 +2049,15 @@ function Test()
             end
     )
 end
+
+function IssueTrackedClearCommands(tUnits)
+    --Intended so we can add logging to make it easier to confirm if we are clearing a unit's orders
+    --Below is example if want to give an alert in the log when a unit has its orders cleared
+    --[[for iUnit, oUnit in tUnits do
+        if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'url01077' then
+            LOG('About to issue clear commands for unit url01077')
+            ErrorHandler('Audit trail game time='..GetGameTimeSeconds(), true)
+        end
+    end--]]
+    IssueClearCommands(tUnits)
+end

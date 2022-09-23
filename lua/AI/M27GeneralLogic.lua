@@ -5334,7 +5334,7 @@ function GetT3ArtiTarget(oT3Arti)
         end
     end
     if tTarget then
-        IssueClearCommands({oT3Arti})
+        M27Utilities.IssueTrackedClearCommands({oT3Arti})
         IssueAttack({oT3Arti}, tTarget)
         if bDebugMessages == true then LOG(sFunctionRef..': Told oT3Arti '..oT3Arti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oT3Arti)..' to attack tTarget '..repru(tTarget)) end
         oT3Arti[M27UnitInfo.refoLastTargetUnit] = oTarget
@@ -5398,7 +5398,7 @@ function RefreshT3ArtiAdjacencyLocations(oT3Arti)
                                             for iActionRef, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sCancelLocationRef] do
                                                 for iUniqueEngiRef, oEngineer in tSubtable do
                                                     if bDebugMessages == true then LOG(sFunctionRef..': About to clear oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' which was recorded as having iActionRef='..iActionRef) end
-                                                    IssueClearCommands({oEngineer})
+                                                    M27Utilities.IssueTrackedClearCommands({oEngineer})
                                                     M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngineer, true)
                                                 end
                                             end

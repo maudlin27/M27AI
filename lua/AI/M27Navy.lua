@@ -1045,7 +1045,7 @@ function ReassignNavalEngineer(oEngineer)
     if not(oPrimaryFactory) then
         --No naval factories near us so no longer have the engineer assigned to the pond
         oEngineer[refiAssignedPond] = nil
-        IssueClearCommands({oEngineer})
+        M27Utilities.IssueTrackedClearCommands({oEngineer})
         M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngineer, true)
         if bDebugMessages == true then LOG(sFunctionRef..': No naval factory so clearing engineer assigned pond and trackers') end
     else
@@ -1257,7 +1257,7 @@ function MoveUnitTowardsTarget(oUnit, tTarget, bAttackMove, sOrderDesc)
     local bRefreshOrder = ShouldWeRefreshUnitOrder(oUnit, iOrderType, tTarget, nil)
     --LOG('Move Unit Towards Target: oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; bRefreshOrder='..tostring(bRefreshOrder)..'; iOrderType='..iOrderType..'; bAttackMove='..tostring(bAttackMove)..'; Unit last order type='..(oUnit[M27PlatoonUtilities.refiLastOrderType] or 'nil')..'; Distance to last target='..M27Utilities.GetDistanceBetweenPositions((oUnit[M27UnitInfo.reftLastOrderTarget] or {0,0,0}), tTarget))
     if bRefreshOrder then
-        IssueClearCommands({oUnit})
+        M27Utilities.IssueTrackedClearCommands({oUnit})
         oUnit[M27UnitInfo.refoLastOrderUnitTarget] = nil
         if bAttackMove then
             IssueAggressiveMove({oUnit}, tTarget)
@@ -1274,7 +1274,7 @@ function TellUnitToAttackTarget(oUnit, oTarget, sOrderDesc)
     local bRefreshOrder = ShouldWeRefreshUnitOrder(oUnit, M27PlatoonUtilities.refiOrderIssueAttack, oTarget:GetPosition(), oTarget)
     --LOG('TellUnitToAttackTarget: oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; bRefreshOrder='..tostring(bRefreshOrder))
     if bRefreshOrder then
-        IssueClearCommands({oUnit})
+        M27Utilities.IssueTrackedClearCommands({oUnit})
         IssueAttack({oUnit}, oTarget)
         oUnit[M27PlatoonUtilities.refiLastOrderType] = M27PlatoonUtilities.refiOrderIssueAttack
         oUnit[M27UnitInfo.reftLastOrderTarget] = oTarget:GetPosition()

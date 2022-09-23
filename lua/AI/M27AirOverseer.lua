@@ -434,7 +434,7 @@ function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit, bDontIssueCommands)
     oAirUnit[reftGroundAttackLocation] = nil
 
     if not (bDontIssueCommands) then
-        IssueClearCommands({ oAirUnit })
+        M27Utilities.IssueTrackedClearCommands({ oAirUnit })
         if EntityCategoryContains(M27UnitInfo.refCategoryTorpBomber, oAirUnit.UnitId) then
             IssueAggressiveMove({ oAirUnit }, GetAirRallyPoint(aiBrain))
         else
@@ -802,7 +802,7 @@ function CheckForBetterBomberTargets(oBomber, bOneOff)
                             --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                             ClearAirUnitAssignmentTrackers(aiBrain, oBomber, true)
                             TrackBomberTarget(oBomber, oNewTarget, iHighestPriority)
-                            IssueClearCommands({ oBomber })
+                            M27Utilities.IssueTrackedClearCommands({ oBomber })
                             TellBomberToAttackTarget(oBomber, oNewTarget, false, false)
                             if bDebugMessages == true then LOG(sFunctionRef..': Told bomber '..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..' to clear its current target and attack a new target '..oNewTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNewTarget)) end
                             break --Need to stop or else risk this function being called numerous times at once for the same unit
@@ -1304,7 +1304,7 @@ function OneOffTargetNearbyEngineer(aiBrain, oBomber)
             if oNearestUnshieldedEngi then
                 ClearAirUnitAssignmentTrackers(aiBrain, oBomber, true)
                 TrackBomberTarget(oBomber, oNearestUnshieldedEngi, 1)
-                IssueClearCommands({ oBomber })
+                M27Utilities.IssueTrackedClearCommands({ oBomber })
                 TellBomberToAttackTarget(oBomber, oNearestUnshieldedEngi, false, false)
                 for iMexBomber, oMexBomber in aiBrain[reftMexHunterT1Bombers] do
                     if oMexBomber == oBomber then
@@ -1501,7 +1501,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
 
                         --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
 
-                        IssueClearCommands({oBomber})
+                        M27Utilities.IssueTrackedClearCommands({oBomber})
                         if bAttackMove then IssueAggressiveMove({oBomber}, tNewTarget)
                         else IssueMove({oBomber}, tNewTarget)
                         end
@@ -1593,7 +1593,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                 if oNearestGroundAA then
                                     --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                                     ClearAirUnitAssignmentTrackers(aiBrain, oBomber, true)
-                                    IssueClearCommands({ oBomber })
+                                    M27Utilities.IssueTrackedClearCommands({ oBomber })
                                     IssueAttack({ oBomber }, oNearestGroundAA)
                                     for iGroundAA, oGroundAA in tAllValidAATargets do
                                         IssueAttack({ oBomber }, oGroundAA)
@@ -1748,7 +1748,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                             end
                                             ClearAirUnitAssignmentTrackers(aiBrain, oBomber, true)
                                             TrackBomberTarget(oBomber, oTargetToSwitchTo, 1)
-                                            IssueClearCommands({ oBomber })
+                                            M27Utilities.IssueTrackedClearCommands({ oBomber })
                                             --T3+ bombers - consider moving away from target first to make sure have a clear shot
                                             if M27UnitInfo.GetUnitTechLevel(oBomber) >= 3 or M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oTargetToSwitchTo:GetPosition()) >= 100 then
                                                 TellBomberToAttackTarget(oBomber, oTargetToSwitchTo, false)
@@ -1807,7 +1807,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                 ClearTrackersOnUnitsTargets(oBomber, true)
                                 table.remove(oBomber[reftTargetList], oBomber[refiCurTargetNumber])
                                 --Clear current target
-                                IssueClearCommands({ oBomber })
+                                M27Utilities.IssueTrackedClearCommands({ oBomber })
                                 --Reissue orders to attack each subsequent target
                                 if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == false then
                                     for iTarget, tTarget in oBomber[reftTargetList] do
@@ -1837,7 +1837,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                     if M27Utilities.IsTableEmpty(tPreTargetViaPoint) == false then
                                         --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                                         --Expect to be blocked so want to reissue
-                                        IssueClearCommands({ oBomber })
+                                        M27Utilities.IssueTrackedClearCommands({ oBomber })
                                         if bDebugMessages == true then LOG(sFunctionRef..': Bomber expects to be blocked so will clear commands and then reissue orders to its target list. bomber='..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)) end
                                         if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == false then
                                             for iTarget, tTarget in oBomber[reftTargetList] do
@@ -2719,7 +2719,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                                                 local iLifetimeCount = M27UnitInfo.GetUnitLifetimeCount(oUnit)
                                                                 LOG(sFunctionRef .. ': About to clear scouts path and then reissue remaining paths that scout hasnt reached yet; scout unique count=' .. iLifetimeCount)
                                                             end
-                                                            IssueClearCommands({ oUnit })
+                                                            M27Utilities.IssueTrackedClearCommands({ oUnit })
                                                             ClearPreviousMovementEntries(aiBrain, oUnit) --Will remove earlier movement path entries and update assignment trackers
 
                                                             for iPath, tPath in oUnit[reftMovementPath] do
@@ -2881,7 +2881,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                                 bUnitIsUnassigned = true
                                                 if bReturnToRallyPoint == true then
                                                     --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
-                                                    IssueClearCommands({ oUnit })
+                                                    M27Utilities.IssueTrackedClearCommands({ oUnit })
                                                     IssueMove({ oUnit }, GetAirRallyPoint(aiBrain))
                                                     if bDebugMessages == true then
                                                         LOG(sFunctionRef .. ': Cleared commants for unit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit))
@@ -3171,7 +3171,7 @@ function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
                                         if not (bAlreadyTryingToRefuel) and not (oUnit:IsUnitState('Attached')) then
                                             --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                                             ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
-                                            IssueClearCommands({ oUnit })
+                                            M27Utilities.IssueTrackedClearCommands({ oUnit })
                                             IssueTransportLoad({ oUnit }, oStaging)
                                             oUnit[refbSentRefuelCommand] = true
                                             oUnit[refoAirStagingAssigned] = oStaging
@@ -3316,7 +3316,7 @@ function UnloadUnit(oTransport)
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': Issuing clear commands')
         end
-        IssueClearCommands({ oTransport })
+        M27Utilities.IssueTrackedClearCommands({ oTransport })
         IssueTransportUnload({ oTransport }, { tTransportPosition[1] + 5, tTransportPosition[2], tTransportPosition[3] + 5 })
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -3846,7 +3846,7 @@ end
 
 function DedicatedScoutManager(aiBrain, oScout, oAssistTarget)
     oScout[refbOnAssignment] = true
-    IssueClearCommands({ oScout })
+    M27Utilities.IssueTrackedClearCommands({ oScout })
     oScout[refoAssignedAirScout] = oAssistTarget
     oAssistTarget[refoAssignedAirScout] = oScout
     --local iAngleFromBaseToTarget = M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oAssistTarget:GetPosition())
@@ -3877,7 +3877,7 @@ function DedicatedScoutManager(aiBrain, oScout, oAssistTarget)
         --Reset values so can be used by normal overseer functionality
         oScout[refoAssignedAirScout] = nil
         oScout[refbOnAssignment] = false
-        IssueClearCommands({ oScout })
+        M27Utilities.IssueTrackedClearCommands({ oScout })
         IssueMove({ oScout }, GetAirRallyPoint(aiBrain))
     end
 end
@@ -3941,7 +3941,7 @@ function AirScoutManager(aiBrain)
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': About to issue clear command to scout with unit number=' .. M27UnitInfo.GetUnitLifetimeCount(oUnit))
                     end
-                    IssueClearCommands({ oUnit })
+                    M27Utilities.IssueTrackedClearCommands({ oUnit })
                     --Issue moves to the targets and update tracker for this
                     iMoveCount = 0
                     for iWaypoint, tWaypoint in tMovementPath do
@@ -4388,7 +4388,7 @@ function TellBomberToAttackTarget(oBomber, oTarget, bClearCommands, bAreHoverBom
         LOG(sFunctionRef .. ': tPreTargetViaPoint=' .. repru((tPreTargetViaPoint or { 'nil' })))
     end
     if bClearCommands then
-        IssueClearCommands({ oBomber })
+        M27Utilities.IssueTrackedClearCommands({ oBomber })
     end
     if M27Utilities.IsTableEmpty(tPreTargetViaPoint) == false then
         IssueMove({ oBomber }, tPreTargetViaPoint)
@@ -6611,7 +6611,7 @@ function AirBomberManager(aiBrain)
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Telling ' .. oBomber.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oBomber) .. ' to move to nearest rapply point=' .. repru(tRallyPoint))
                             end
-                            IssueClearCommands({ oBomber })
+                            M27Utilities.IssueTrackedClearCommands({ oBomber })
                             if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance and M27UnitInfo.GetUnitTechLevel(oBomber) <= 2 then
                                 IssueAggressiveMove({ oBomber }, tRallyPoint)
                             else
@@ -7189,7 +7189,7 @@ function AirAAManager(aiBrain)
                                 LOG(sFunctionRef .. ': Clearing commands for closest airAA and then telling it to attack oCurTarget, ClosestAirAA=' .. oClosestAirAA.UnitId .. '; Unique ID=' .. iLifetimeCount .. '; iClosestAirAARef=' .. iClosestAirAARef .. 'ClosestAA Pos=' .. repru(oClosestAirAA:GetPosition()))
                             end
                             ClearAirUnitAssignmentTrackers(aiBrain, oClosestAirAA, true)
-                            IssueClearCommands({ oClosestAirAA })
+                            M27Utilities.IssueTrackedClearCommands({ oClosestAirAA })
                             IssueAttack({ oClosestAirAA }, oCurTarget)
                             IssueAggressiveMove({ oClosestAirAA }, tStartPosition)
                             if M27Config.M27ShowUnitNames == true and oClosestAirAA.GetUnitId then
@@ -7323,10 +7323,10 @@ function AirAAManager(aiBrain)
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Sending airAA unit ' .. tValue['Unit'].UnitId .. M27UnitInfo.GetUnitLifetimeCount(tValue['Unit']) .. ' to alt rally point; dist to rally=' .. tValue['DistToAlt'])
                         end
-                        IssueClearCommands({ oAirAA })
+                        M27Utilities.IssueTrackedClearCommands({ oAirAA })
                         IssueMove({ oAirAA }, tAltRallyPoint)
                     else
-                        IssueClearCommands({ oAirAA })
+                        M27Utilities.IssueTrackedClearCommands({ oAirAA })
                         IssueMove({ oAirAA }, tAirRallyPoint)
                     end
                 end
@@ -7337,7 +7337,7 @@ function AirAAManager(aiBrain)
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Clearing commands of airAA unit ' .. oAirAA.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oAirAA))
                         end
-                        IssueClearCommands({ oAirAA })
+                        M27Utilities.IssueTrackedClearCommands({ oAirAA })
                         IssueMove({ oAirAA }, tAirRallyPoint)
                     end
                 end
@@ -8173,7 +8173,7 @@ function NovaxCoreTargetLoop(aiBrain, oNovax, bCalledFromUnitDeath)
                     LOG(sFunctionRef .. ': Issuing new order to novax, telling it to move to ' .. repru(oNovax[reftLastIssuedOrderLocation]))
                 end
                 if not (bCalledFromUnitDeath) or (oNovax.GetNavigator and oNovax:GetNavigator()) then
-                    IssueClearCommands({ oNovax })
+                    M27Utilities.IssueTrackedClearCommands({ oNovax })
                 end
                 oNovax[reftLastIssuedOrderLocation] = { oTarget:GetPosition()[1], oTarget:GetPosition()[2], oTarget:GetPosition()[3] }
                 IssueMove({ oNovax }, oNovax[reftLastIssuedOrderLocation])
@@ -8187,7 +8187,7 @@ function NovaxCoreTargetLoop(aiBrain, oNovax, bCalledFromUnitDeath)
                     LOG(sFunctionRef .. ': Issuing new order to novax, telling it to attack target=' .. oTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oTarget))
                 end
                 if not (bCalledFromUnitDeath) or (oNovax.GetNavigator and oNovax:GetNavigator()) then
-                    IssueClearCommands({ oNovax })
+                    M27Utilities.IssueTrackedClearCommands({ oNovax })
                 end
                 IssueAttack({ oNovax }, oTarget)
                 oNovax[refiLastIssuedOrderType] = iOrderType
@@ -8207,7 +8207,7 @@ function NovaxCoreTargetLoop(aiBrain, oNovax, bCalledFromUnitDeath)
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Issuing new order to novax, telling it to move to nearest enemy start location')
             end
-            IssueClearCommands({ oNovax })
+            M27Utilities.IssueTrackedClearCommands({ oNovax })
             oNovax[reftLastIssuedOrderLocation] = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
             IssueMove({ oNovax }, oNovax[reftLastIssuedOrderLocation])
             oNovax[refiLastIssuedOrderType] = iOrderType
@@ -9069,7 +9069,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             end
             local tTempLocation
             if bRefreshAttack then
-                IssueClearCommands({ oUnit })
+                M27Utilities.IssueTrackedClearCommands({ oUnit })
                 oUnit[refoLastUnitTarget] = oAttackTarget
                 if bIsCzar then
                     --Ground fire if target is underwater
@@ -9124,7 +9124,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 LOG(sFunctionRef .. ': tLocationToMoveTo=' .. repru(tLocationToMoveTo) .. '; oUnit[reftLastLocationTarget]=' .. repru(oUnit[reftLastLocationTarget] or { 'nil' }))
             end
             if not (oUnit[reftLastLocationTarget]) or (bIsCzar and M27Utilities.GetDistanceBetweenPositions(oUnit[reftLastLocationTarget], tLocationToMoveTo) >= 3.5) or M27Utilities.GetDistanceBetweenPositions(oUnit[reftLastLocationTarget], tLocationToMoveTo) >= 5 or M27Logic.IsUnitIdle(oUnit) then
-                IssueClearCommands({ oUnit })
+                M27Utilities.IssueTrackedClearCommands({ oUnit })
                 IssueMove({ oUnit }, tLocationToMoveTo)
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': Updating last location target from ' .. repru(oUnit[reftLastLocationTarget] or { 'nil' }) .. ' to ' .. repru(tLocationToMoveTo))

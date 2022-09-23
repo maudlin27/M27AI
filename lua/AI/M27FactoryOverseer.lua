@@ -3205,7 +3205,7 @@ function FactoryMainOverseerLoop(aiBrain, tAllFactories, iTicksWaited)
                                                                             LOG(sFunctionRef .. ': Issuing clear command to unit with lifetime count=' .. M27UnitInfo.GetUnitLifetimeCount(oLastUnit) .. ' and ID=' .. sUnitID)
                                                                         end
 
-                                                                        IssueClearCommands({ oLastUnit })
+                                                                        M27Utilities.IssueTrackedClearCommands({ oLastUnit })
                                                                     end
                                                                     if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oLastUnit.UnitId) then
                                                                         M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oLastUnit, true)

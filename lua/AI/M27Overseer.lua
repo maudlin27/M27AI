@@ -3955,7 +3955,7 @@ function ThreatAssessAndRespond(aiBrain)
                                     oPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
                                     --oPlatoon[M27PlatoonUtilities.refiLastPathTarget] = 1
                                     oPlatoon[M27PlatoonUtilities.refbOverseerAction] = true
-                                    --IssueClearCommands(oPlatoon:GetPlatoonUnits())
+                                    --M27Utilities.IssueTrackedClearCommands(oPlatoon:GetPlatoonUnits())
                                     if bDebugMessages == true then
                                         local iPlatoonCount = oPlatoon[M27PlatoonUtilities.refiPlatoonCount]
                                         if iPlatoonCount == nil then
@@ -4255,7 +4255,7 @@ function ThreatAssessAndRespond(aiBrain)
                                         else
                                             --oBasePlatoon[M27PlatoonUtilities.refbOverseerAction] = false --Got wierd results when put this tofalse with aeon (v45 WIP - e.g. combat patrol platoons would stop and start and barely move) so would need to spend more time looking into if did decide to change
                                         end
-                                        --IssueClearCommands(oBasePlatoon:GetPlatoonUnits())
+                                        --M27Utilities.IssueTrackedClearCommands(oBasePlatoon:GetPlatoonUnits())
                                         oBasePlatoon[M27PlatoonUtilities.reftMovementPath] = {}
                                         oBasePlatoon[M27PlatoonUtilities.reftMovementPath][1] = tEnemyThreatGroup[reftFrontPosition]
                                         oBasePlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
@@ -4429,7 +4429,7 @@ function ThreatAssessAndRespond(aiBrain)
 
                                                     if oUnit[iArmyIndex][refiAssignedThreat] <= iAssignedThreatWanted then
                                                         oUnit[iArmyIndex][refiAssignedThreat] = oUnit[iArmyIndex][refiAssignedThreat] + tTorpSubtable[refiCurThreat]
-                                                        IssueClearCommands({ tTorpSubtable[refoTorpUnit] })
+                                                        M27Utilities.IssueTrackedClearCommands({ tTorpSubtable[refoTorpUnit] })
                                                         IssueAttack({ tTorpSubtable[refoTorpUnit] }, oUnit)
                                                         M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit, 1, true)
                                                         for iUnit, oUnit in tEnemyUnits do
@@ -4458,7 +4458,7 @@ function ThreatAssessAndRespond(aiBrain)
                                 --[[if bACUNeedsTorpSupport then
                                     for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableTorpBombers] do
                                         if not(oUnit[M27AirOverseer.refbOnAssignment]) then
-                                            IssueClearCommands({oUnit})
+                                            M27Utilities.IssueTrackedClearCommands({oUnit})
                                             IssueAggressiveMove({oUnit}, oACU:GetPosition())
                                             oUnit[M27AirOverseer.refbOnAssignment] = true
                                             --oUnit[M27AirOverseer.refbTorpBomberProtectingACU] = true
@@ -4640,7 +4640,7 @@ function ThreatAssessAndRespond(aiBrain)
                     LOG(sFunctionRef .. ': TorpBomber=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; tCurDestination=' .. repru((tCurDestination or { 'nil' })) .. '; will attackmove to rally point if destination is too far from rally point. Rallypoint=' .. repru(tRallyPoint) .. '; dist to rallypoint=' .. M27Utilities.GetDistanceBetweenPositions((tCurDestination or { 0, 0, 0 }), tRallyPoint) .. '; oUnit[M27AirOverseer.refbOnAssignment]=' .. tostring(oUnit[M27AirOverseer.refbOnAssignment]))
                 end
                 if not (tCurDestination) or M27Utilities.GetDistanceBetweenPositions(tCurDestination, tRallyPoint) >= 10 then
-                    IssueClearCommands({ oUnit })
+                    M27Utilities.IssueTrackedClearCommands({ oUnit })
                     IssueAggressiveMove({ oUnit }, tRallyPoint)
                 end
             end
@@ -5583,7 +5583,7 @@ function ACUManager(aiBrain)
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Clearing commands for ACU')
                             end
-                            IssueClearCommands({ M27Utilities.GetACU(aiBrain) })
+                            M27Utilities.IssueTrackedClearCommands({ M27Utilities.GetACU(aiBrain) })
                             IssueMove({ oACU }, M27Logic.GetNearestRallyPoint(aiBrain, tACUPos, oACU))
                         end
                     else
@@ -9155,6 +9155,8 @@ end
 
 function TestCustom(aiBrain)
     local sFunctionRef = 'TestCustom'
+
+    M27Utilities.DrawLocation({640.69580078125, 18.948984146118, 367.01770019531}, nil, 3, 200, 4)
 
 
     --[[LOG('Table with table key will get printed to give reference')

@@ -118,7 +118,7 @@ Platoon = Class(M27PlatoonClass) {
 
                 eng.ProcessBuildDone = false
                 if bDebugMessages == true then LOG('Platoon: ProcessBuildCommand: Just before issue clear commands to eng UnitId='..eng.UnitId) end
-                IssueClearCommands({eng})
+                M27Utilities.IssueTrackedClearCommands({eng})
                 local commandDone = false
                 local PlatoonPos
                 local iCount = 0
@@ -269,7 +269,7 @@ Platoon = Class(M27PlatoonClass) {
                         --tTarget = {iDestX, iCurHeight, iDestZ}
                         --LOG('CanPathTo '..tTarget[1]..'-'..tTarget[2]..'-'..tTarget[3]..'='..tostring(eng:CanPathTo(tTarget)))
                         if bDebugMessages==true then LOG('ReclaimPlatoon: Starting for loop, on cycle 1.  GetGameTimeSeconds='..GetGameTimeSeconds()) end
-                        IssueClearCommands({eng})
+                        M27Utilities.IssueTrackedClearCommands({eng})
                         IssueAggressiveMove({eng}, tTarget )
                         if bDebugMessages==true then LOG('ReclaimPlatoon: Telling enginneer to attack-move to tTarget='..tTarget[1]..'-'..tTarget[2]..'-'..tTarget[3]..'; GetGameTimeSeconds='..GetGameTimeSeconds()) end
                     end
@@ -473,7 +473,7 @@ Platoon = Class(M27PlatoonClass) {
                                 if self[M27PlatoonUtilities.refiCurrentAction] == nil then
                                     --Previously issued a temporary action but dont have one now; reissue guard command
                                     bIssuedTemporaryAction = false
-                                    IssueClearCommands(self:GetPlatoonUnits())
+                                    M27Utilities.IssueTrackedClearCommands(self:GetPlatoonUnits())
                                     M27PlatoonUtilities.MoveNearHydroAndAssistEngiBuilder(self, oGuardedUnit, tNearestHydro)
                                 end
                             end
@@ -505,7 +505,7 @@ Platoon = Class(M27PlatoonClass) {
             --disband platoon:
             if self and aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(self) then
                 if bPlatoonNameDisplay == true then M27PlatoonUtilities.UpdatePlatoonName(self, 'No custom platoon AI') end
-                --IssueClearCommands({eng})
+                --M27Utilities.IssueTrackedClearCommands({eng})
                 --self:Stop()
                 if bDebugMessages == true then LOG('M27AssistHydroEngi: About to disband platoon') end
                 self:PlatoonDisband()
