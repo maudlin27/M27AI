@@ -192,7 +192,8 @@ function DetermineMaxTerrainHeightDif()
     ['adaptive millennium'] = 0.16, --Default and 0.15 results in top right and bottom left being thought to be plateaus when theyre not, 0.17 shows them as pathable
     ['Pelagial v2'] = 0.18, --Fails to detect northern island as pathable at 0.17, succeeds at 0.18
     ['Battle Swamp'] = 0.19, --Fails to detect some at 0.15, locates at 0.18 although small sections showing as impathable
-    ['Dark Liver Mirrored'] = 0.28 --Fails to detect some at 0.28 (all but bottom-left are identified); at 0.32 it still fails to detect it but now starts seeing impathable cliffs as being pathable; so wont be able to actually make it detect everythign correctly
+    ['Dark Liver Mirrored'] = 0.28, --Fails to detect some at 0.28 (all but bottom-left are identified); at 0.32 it still fails to detect it but now starts seeing impathable cliffs as being pathable; so wont be able to actually make it detect everythign correctly
+    ['Fuji Phantoms'] = 0.18 --0.17 - middle shows as impathable; 0.18 - might show a bit too much of cliffs as pathable, but is lowest value where mid shows as pathable
     }
     local sMapName = ScenarioInfo.name
     iMaxHeightDif = (tMapHeightOverride[sMapName] or iMaxHeightDif)

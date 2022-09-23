@@ -2128,7 +2128,6 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
                 if M27Utilities.IsTableEmpty(tOurAntiNavy) and EntityCategoryContains(categories.COMMAND, oUnderwaterUnit.UnitId) and (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] or 0) >= 500 and M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPond] ) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.ANTINAVY * categories.MOBILE, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPond])) == false  then
                     --ACU platoon and enemy has antinavy in this pond so just run
                     oPlatoon[refiCurrentAction] = refActionRun
-                    bDebugMessages = true
                     if bDebugMessages == true then LOG(sFunctionRef..': ACU has entered water with antinavy so want it to run') end
                 else
                     local tNearbyAntiNavy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTorpedoLandAndNavy, oUnderwaterUnit:GetPosition(), iSearchRange, 'Enemy')
@@ -3325,7 +3324,6 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                             --Does the enemy have significant amount of buildings to destroy?
                             if oPlatoon[refiEnemyStructuresInRange] >= 30 or M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemyStructuresInRange], false, nil, nil, false, true, false) >= 10000 then
                                 oPlatoon[refiCurrentAction] = refActionAttack
-                                bDebugMessages = true
                                 if bDebugMessages == true then LOG(sFunctionRef..': Lots of buildings nearby so will attack') end
                             end
                         end

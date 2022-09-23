@@ -7351,7 +7351,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
                                         --Eco if enemy has T3 arti/novax and we dont have all t3 mexes at our base and have low mass and units that need shielding (as we may not have the mass needed to shield/defend against the arti)
                                         if not(bWantToEco) and aiBrain[refbDefendAgainstArti] and math.min(aiBrain[M27EconomyOverseer.refiMexPointsNearBase], 6) > aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) and M27Conditions.HaveLowMass(aiBrain) and aiBrain[refiModDistFromStartNearestThreat] >= math.min(150, aiBrain[refiDistanceToNearestEnemyBase] * 0.35) then
-                                            bDebugMessages = true
                                             if bDebugMessages == true then LOG(sFunctionRef..': Want to defend against arti but we dont have good eco so will try and improve eco to support things like shields') end
                                             bWantToEco = true
                                         end
