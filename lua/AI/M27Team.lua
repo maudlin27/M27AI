@@ -34,6 +34,7 @@ refbActiveNavalManager = 'NavalActiveManager' --True/false
 reftEnemyUnitsByPond = 'NavalEnemyUnitsByPond' --[x] is the pond ref, returns table of enemy units
 reftFriendlyUnitsByPond = 'NavalM27UnitsByPond' --[x] is the pond ref; only stores M27 naval units
 refiDestroyedNavalFactoriesByPond = 'NavalM27FailedBuildAttempts' --[x] is the pond ref; number of naval factories that have been destroyed by pond
+refiTimeOfLastNavalFactoryDestruction = 'NavalM27TimeOfLastNavalFactoryDestruction' --[x] is the pond ref; gametime in seconds
 refoClosestEnemyNavalUnitByPond = 'NavalM27ClosestEnemy' --[x] is the pond ref
 refoClosestFriendlyUnitToEnemyByPond = 'NavalM27ClosestFriendlyToEnemy' --[x] is the pond ref
 refoPrimaryNavalFactoryByPond = 'NavalM27PrimaryNavalFactory' --[x] is the pond ref
@@ -676,6 +677,7 @@ function TeamInitialisation(iTeamRef)
     tTeamData[iTeamRef][reftEnemyUnitsByPond] = {}
     tTeamData[iTeamRef][reftFriendlyUnitsByPond] = {}
     tTeamData[iTeamRef][refiDestroyedNavalFactoriesByPond] = {}
+    tTeamData[iTeamRef][refiTimeOfLastNavalFactoryDestruction] = {}
     tTeamData[iTeamRef][refoPrimaryNavalFactoryByPond] = {}
     tTeamData[iTeamRef][refiTimeOfLastPrimaryNavalUpdateByPond] = {}
     tTeamData[iTeamRef][refiTimeOfLastNavalUnitCheckByPond] = {}

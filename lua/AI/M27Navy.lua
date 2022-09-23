@@ -741,6 +741,7 @@ function UpdateUnitPond(oUnit, iM27TeamUpdatingFor, bIsEnemy, iPondRefOverride)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateUnitPond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if bDebugMessages == true then M27Utilities.ErrorHandler('Audit trail', true) end
 
     --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xes02051' and oUnit:GetAIBrain():GetArmyIndex() == 2 and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
 
@@ -771,8 +772,10 @@ function UpdateUnitPond(oUnit, iM27TeamUpdatingFor, bIsEnemy, iPondRefOverride)
                 AddUnitToPond(oUnit, iCurPond, iM27TeamUpdatingFor, bIsEnemy)
             end
         else
-            if bDebugMessages == true then LOG(sFunctionRef..': Adding unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to pond '..iCurPond) end
-            AddUnitToPond(oUnit, iCurPond, iM27TeamUpdatingFor, bIsEnemy)
+            if iCurPond > 0 then
+                if bDebugMessages == true then LOG(sFunctionRef..': Adding unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to pond '..iCurPond) end
+                AddUnitToPond(oUnit, iCurPond, iM27TeamUpdatingFor, bIsEnemy)
+            end
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -2871,6 +2874,11 @@ end
 function GetShieldBoatsWanted(aiBrain, oFactory)
     --Returns the number wanted ignoring tech and power limitations, i.e. based solely on naval composition
     --oFactory can also just be a unit (e.g. the shield unit itself)
+    local bDebugMessages = false
+    if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetShieldBoatsWanted'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local iPond = oFactory[refiAssignedPond] or GetPondToFocusOn(aiBrain)
 
     function GetExistingCruisers()
@@ -2886,6 +2894,7 @@ function GetShieldBoatsWanted(aiBrain, oFactory)
 
 
     local iShieldBoatsWanted = 0
+    if bDebugMessages == true then LOG(sFunctionRef..': aiBrain index='..aiBrain:GetArmyIndex()..'; Factory='..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; iPond='..iPond..'; Naval threat for pond='..M27Team.tTeamData[aiBrain.M27Team][M27Team.refiFriendlyNavalThreatByPond][iPond]..'; iExistingCruisers='..GetExistingCruisers()) end
     if EntityCategoryContains(categories.UEF, oFactory.UnitId) then
         --1 for every 3.5k surface threat, provided have at least 1.5k threat
         if M27Team.tTeamData[aiBrain.M27Team][M27Team.refiFriendlyNavalThreatByPond][iPond] >= 1750 then
@@ -2904,5 +2913,6 @@ function GetShieldBoatsWanted(aiBrain, oFactory)
             if iExistingCruisers > 0 then iShieldBoatsWanted = iShieldBoatsWanted + math.min(2, iExistingCruisers) end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iShieldBoatsWanted
 end

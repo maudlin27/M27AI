@@ -1402,7 +1402,7 @@ function GetUpgradeCombatWeighting(sEnhancementRef, iFaction)
     --iFaction: 1: UEF, 2: Aeon, 3: Cybran, 4: Seraphim, 5: Nomads
     --Obtain using aiBrain:GetFactionIndex()
 
-    local iMinor = 0.5
+    local iMinor = 0.4
     local iMajor = 1.2
     local iDeadly = 2
     local iNone = 0

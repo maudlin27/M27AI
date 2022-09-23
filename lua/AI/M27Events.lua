@@ -249,6 +249,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                         iCurPond = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oUnitKilled:GetPosition())
                     end
                     M27Team.tTeamData[aiBrain.M27Team][M27Team.refiDestroyedNavalFactoriesByPond][iCurPond] = (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiDestroyedNavalFactoriesByPond][iCurPond] or 0) + 1
+                    M27Team.tTeamData[aiBrain.M27Team][M27Team.refiTimeOfLastNavalFactoryDestruction][iCurPond] = GetGameTimeSeconds()
 
                 end
             end

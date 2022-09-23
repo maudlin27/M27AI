@@ -2865,6 +2865,45 @@ function ManageMassStalls(aiBrain)
                                             --Determine mass cost per BP
                                             if bDebugMessages == true then LOG(sFunctionRef..': aiBrain='..oUnit:GetAIBrain():GetArmyIndex()..'; Unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oUnit[M27UnitInfo.refsUpgradeRef]='..(oUnit[M27UnitInfo.refsUpgradeRef] or 'nil')..'; Upgrade mass cost='..(M27UnitInfo.GetUpgradeMassCost(oUnit, oUnit[M27UnitInfo.refsUpgradeRef]) or 'nil')..'; Upgrade build time='..(M27UnitInfo.GetUpgradeBuildTime(oUnit, oUnit[M27UnitInfo.refsUpgradeRef]) or 'nil')) end
                                             iMassPerBP = M27UnitInfo.GetUpgradeMassCost(oUnit, oUnit[M27UnitInfo.refsUpgradeRef]) / (M27UnitInfo.GetUpgradeBuildTime(oUnit, oUnit[M27UnitInfo.refsUpgradeRef]) or 1)
+                                        else
+                                            --Engineer - adjust energy consumption based on what are building
+                                            if oUnit[M27EngineerOverseer.refiEngineerCurrentAction] and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit.UnitId) then
+                                                if oUnit[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionAssistAirFactory then
+                                                    iMassPerBP = 0.18 --asf is 0.117; strat is 0.22; T1 bomber is 0.18
+                                                elseif oUnit[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionBuildSMD then
+                                                    iMassPerBP = 1.28
+                                                elseif oUnit[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionBuildExperimental then
+                                                    if aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27EngineerOverseer.refiExperimentalAir then
+                                                        iMassPerBP = 0.7 --approximation, aeon is higher, cybran much lower, sera around this
+                                                    elseif aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27EngineerOverseer.refiExperimentalArti then
+                                                        if EntityCategoryContains(categories.UEF, oUnit.UnitId) then iMassPerBP = 0.75
+                                                        elseif EntityCategoryContains(categories.CYBRAN, oUnit.UnitId) then iMassPerBP = 0.917
+                                                        elseif EntityCategoryContains(categories.AEON, oUnit.UnitId) then iMassPerBP = 2.025
+                                                        else
+                                                            iMassPerBP = 0.8
+                                                        end
+                                                    elseif aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27EngineerOverseer.refiExperimentalYolona then
+                                                        iMassPerBP = 0.75
+                                                    elseif aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27EngineerOverseer.refiExperimentalParagon then
+                                                        iMassPerBP = 0.77
+                                                    end
+                                                elseif oUnit[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionBuildSecondExperimental then
+                                                    if aiBrain[M27EngineerOverseer.refiLastSecondExperimentalRef] == M27EngineerOverseer.refiExperimentalAir then
+                                                        iMassPerBP = 0.7
+                                                    elseif aiBrain[M27EngineerOverseer.refiLastSecondExperimentalRef] == M27EngineerOverseer.refiExperimentalArti then
+                                                        if EntityCategoryContains(categories.UEF, oUnit.UnitId) then iMassPerBP = 0.75
+                                                        elseif EntityCategoryContains(categories.CYBRAN, oUnit.UnitId) then iMassPerBP = 0.917
+                                                        elseif EntityCategoryContains(categories.AEON, oUnit.UnitId) then iMassPerBP = 2.025
+                                                        else
+                                                            iMassPerBP = 0.8
+                                                        end
+                                                    elseif aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27EngineerOverseer.refiExperimentalYolona then
+                                                        iMassPerBP = 0.75
+                                                    elseif aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27EngineerOverseer.refiExperimentalParagon then
+                                                        iMassPerBP = 0.77
+                                                    end
+                                                end
+                                            end
                                         end
                                         if oBP.Economy.BuildRate then
                                             iCurUnitMassUsage = oBP.Economy.BuildRate * iMassPerBP

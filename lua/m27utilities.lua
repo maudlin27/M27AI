@@ -462,7 +462,7 @@ function DrawLocation(tLocation, relativeStart, iColour, iDisplayCount, iCircleS
     --ErrorHandler('Shouldnt be drawing anything')
     if IsTableEmpty(tLocation) then ErrorHandler('tLocation is empty')
     else
-        ForkThread(SteppingStoneForDrawLocations, {tLocation}, relativeStart, iColour, iDisplayCount, iCircleSize)
+        ForkThread(SteppingStoneForDrawLocations, {tLocation}, (relativeStart or false), iColour, iDisplayCount, iCircleSize)
     end
 end
 

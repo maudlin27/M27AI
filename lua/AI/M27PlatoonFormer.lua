@@ -1189,7 +1189,7 @@ function GetClosestPlatoonOrUnitWantingMobileShield(aiBrain, tStartPosition, oSh
         end
     end
 
-    --Consider if naval unit is closer, and if so assign the shield to a pond instead
+    --Consider if naval unit is closer, and if so assign the shield to a pond instead (shield boat includes mobile shields that can hover)
     if EntityCategoryContains(M27UnitInfo.refCategoryShieldBoat, oShield.UnitId) then
         local iPond = M27Navy.GetPondToFocusOn(aiBrain)
         if M27UnitInfo.IsUnitValid(M27Team.tTeamData[aiBrain.M27Team][M27Team.refoClosestFriendlyUnitToEnemyByPond][iPond]) then
@@ -1342,10 +1342,11 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
         if M27Utilities.IsTableEmpty(tMobileShieldUnits) == false then
             for iUnit, oUnit in tMobileShieldUnits do
                 if M27UnitInfo.IsUnitValid(oUnit) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Considering shield oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering shield oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Assigned pond='..(oUnit[M27Navy.refiAssignedPond] or 'nil')) end
                     --Are we already in a mobile shield platoon or assigned to a naval pond?
                     if oUnit[M27Navy.refiAssignedPond] then
                         --Are we assigned to naval idle platoon? if not then assign
+                        if bDebugMessages == true then LOG(sFunctionRef..': Will assign to idle navy if not already. Does it have idle navy platoon already='..tostring(oUnit.PlatoonHandle == aiBrain[M27PlatoonTemplates.refoIdleNavy])) end
                         if not(oUnit.PlatoonHandle == aiBrain[M27PlatoonTemplates.refoIdleNavy]) then AddIdleUnitsToPlatoon(aiBrain, { oUnit }, aiBrain[M27PlatoonTemplates.refoIdleNavy]) end
                     elseif oUnit.PlatoonHandle and oUnit.PlatoonHandle.GetPlan and oUnit.PlatoonHandle:GetPlan() == 'M27MobileShield' then
                         if bDebugMessages == true then LOG(sFunctionRef..': Are already in a mobile shield platoon or assigned a pond. Assigned pond='..(oUnit[M27Navy.refiAssignedPond] or 'nil')) end

@@ -5379,7 +5379,6 @@ function ReissueEngineerOldOrders(aiBrain, oEngineer, bClearActionsFirst)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ReissueEngineerOldOrders'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
     --if GetEngineerUniqueCount(oEngineer) == 61 and GetGameTimeSeconds() >= 780 then bDebugMessages = true else bDebugMessages = false end
 
     if bClearActionsFirst then
@@ -8310,7 +8309,6 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
 
                             --SMD
                             if not(bWantFortification) and iMassInvested >= 15000 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == false and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 500 then
-                                if aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 2340 and GetGameTimeSeconds() <= 2460 then bDebugMessages = true end
 
                                 --Check table is all valid units
                                 local bRemoveUnitCheck = true
@@ -10460,7 +10458,6 @@ end--]]
                             end
                         end
                     elseif iCurrentConditionToTry == 18 then --SMD
-                        if GetGameTimeSeconds() >= 2340 and GetGameTimeSeconds() <= 2460 and aiBrain:GetArmyIndex() == 4 and tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
                         if bDebugMessages == true then LOG(sFunctionRef..': Checking if need to build SMD; iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable..'; M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers])='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]))..'; will still build if no SMLs if we have good economy') end
                         if iHighestFactoryOrEngineerTechAvailable >= 3 and (M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == false or aiBrain[M27Overseer.refbEnemyFiredNuke] or (not(bHaveLowMass)) and not(bHaveLowPower) and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 300 and (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 25 or (GetGameTimeSeconds() >= 780 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 15) or (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 12 and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryExperimentalLevel) >= 2))) then
                             --Do we have as many SMD as they have nuke launchers? Or 1 more if they have no nukes (meaning we want to build SMD as a precaution)
@@ -10507,7 +10504,6 @@ end--]]
                             elseif bDebugMessages == true then LOG(sFunctionRef..': No SML detected but will build SMD anyway as a precaution as we have a good economy')
                             end
                             iEnemyNukes = math.max(iEnemyNormalNukes, iEnemyBattleshipNukes, 1) --Redundancy - if table isnt empty enemy must have at least one, and will assume they have 1 if we are building as a precaution
-                            if iEnemyNukes > 1 then bDebugMessages = true end
                             if bDebugMessages == true then
                                 LOG(sFunctionRef..': iSMDsWeHave='..iSMDsWeHave..'; iEnemyNukes='..iEnemyNukes..'; iSMDsWithNoMissiles='..iSMDsWithNoMissiles)
                                 if iEnemyNukes > 1 then
@@ -10622,7 +10618,6 @@ end--]]
                             if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) and not(aiBrain[M27Overseer.refbEnemyFiredNuke]) then iMaxEngisWanted = 2 end
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': Finsihed considering if want to build or assist SMD. iActionToAssign='..(iActionToAssign or 'nil')) end
-                        bDebugMessages = false
                     elseif iCurrentConditionToTry == 19 then --Emergency AA when non-air threat near our base and we have no or little AA
                         if bDebugMessages == true then LOG(sFunctionRef..': Considering if we want to build static AA as an emergency; aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]..'; aiBrain[M27AirOverseer.refiOurMassInAirAA]='..aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; aiBrain[M27AirOverseer.refiOurMassInMAA]='..aiBrain[M27AirOverseer.refiOurMassInMAA]..'; iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable) end
                         if aiBrain[M27AirOverseer.refiAirAANeeded] > 0 and not(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftNearestEnemyAirThreat])) and M27Utilities.GetDistanceBetweenPositions(aiBrain[M27AirOverseer.reftNearestEnemyAirThreat], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(150, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5) then
@@ -10713,7 +10708,6 @@ end--]]
                             iMaxEngisWanted = math.min(50, aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] / 30)
                             if bDebugMessages == true then LOG(sFunctionRef..': Will assist air fac, iMaxEngisWanted='..tostring(iMaxEngisWanted)) end
                         end
-                        bDebugMessages = false
                     elseif iCurrentConditionToTry == 22 then --Backup power - build 2nd power if have very low power and first pgen isnt constructing
                         if bHaveVeryLowPower and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 500 and not(bHaveLowMass) then
                             --Have at least 2 T3 PGens equivalent so build more power if our primary engineer for building power isnt constructing (e.g. if are trying to build power around t3 arti this can happen)
@@ -10858,7 +10852,7 @@ end--]]
                                 if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy units empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPondWanted]))..'; Naval facs destroyed in this pond='..(M27Team.tTeamData[aiBrain.M27Team][M27Team.refiDestroyedNavalFactoriesByPond][iPondWanted] or 0)..'; Is table of friendly units for this pond empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][iPondWanted]))) end
                                 if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 4 or M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPondWanted]) == false then
                                     --Have we had a naval factory destroyed in this pond?
-                                    if (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiDestroyedNavalFactoriesByPond][iPondWanted] or 0) == 0 then
+                                    if (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiDestroyedNavalFactoriesByPond][iPondWanted] or 0) == 0 or (GetGameTimeSeconds() - M27Team.tTeamData[aiBrain.M27Team][M27Team.refiTimeOfLastNavalFactoryDestruction][iPondWanted] >= 90 and M27UnitInfo.IsUnitValid(M27Navy.GetPrimaryNavalFactory(aiBrain, iPondWanted)) and M27Navy.GetPrimaryNavalFactory(aiBrain, iPondWanted):GetHealthPercent() >= 0.8) or (GetGameTimeSeconds() - M27Team.tTeamData[aiBrain.M27Team][M27Team.refiTimeOfLastNavalFactoryDestruction][iPondWanted] >= 480 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 8 and M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTorpBombers]) == false)  then
                                         --We want to support the pond - how many engineers does it need?
                                         local tCurPondEngis
                                         if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][iPondWanted]) == false then tCurPondEngis = EntityCategoryFilterDown(M27UnitInfo.refCategoryEngineer, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][iPondWanted]) end
@@ -10878,9 +10872,10 @@ end--]]
                                                 local tBuildLocation = M27Navy.tPondDetails[iPondWanted][M27Navy.subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber]
                                                 local iMinDistanceForEnemyNavy = 100
                                                 if aiBrain[M27AirOverseer.refbHaveAirControl] and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTorpBomber) >= 2 then
-                                                    iMinDistanceForEnemyNavy = 150
+                                                    iMinDistanceForEnemyNavy = 130
                                                 end
-                                                if bDebugMessages == true then LOG(sFunctionRef..': Have enemies in pond '..iPondWanted..'. tBuildLocation='..repru(tBuildLocation)) end
+                                                if (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiDestroyedNavalFactoriesByPond][iPondWanted] or 0) > 0 then iMinDistanceForEnemyNavy = iMinDistanceForEnemyNavy + 50 end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Have enemies in pond '..iPondWanted..'. tBuildLocation='..repru(tBuildLocation)..'; iMinDistanceForEnemyNavy='..iMinDistanceForEnemyNavy) end
 
                                                 for iUnit, oUnit in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPondWanted] do
                                                     if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' in pond '..iPondWanted..'; Unit position='..repru(oUnit:GetPosition())) end

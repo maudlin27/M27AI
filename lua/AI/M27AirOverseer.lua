@@ -5786,7 +5786,7 @@ function AirBomberManager(aiBrain)
                             local tEnemySAMs
                             if iTargetCount == 0 then
                                 --Enemy navy and land experimentals up to 70% of distsance to enemy base, with <=2 SAMs coverage
-                                tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface - categories.TECH1 + M27UnitInfo.refCategoryLandExperimental, tStartPoint, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.7, 'Enemy')
+                                tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface - categories.TECH1 - categories.STRUCTURE + M27UnitInfo.refCategoryLandExperimental, tStartPoint, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.7, 'Enemy')
                                 tEnemySAMs = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, tStartPoint, aiBrain[refiMaxScoutRadius], 'Enemy')
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Checking enemy naval threats; is table empty=' .. tostring(M27Utilities.IsTableEmpty(tEnemies)))
@@ -5842,8 +5842,8 @@ function AirBomberManager(aiBrain)
                             end
                             if iTargetCount == 0 then
                                 iCurPriority = 4
-                                --Vulnerable T3 mobile land, T2 mexes, and T2 fixed arti
-                                tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand * categories.TECH3 + M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryFixedT2Arti, tStartPoint, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.8, 'Enemy')
+                                --Vulnerable T3 mobile land, T2 mexes, T2 fixed arti and T2+ naval fac
+                                tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand * categories.TECH3 + M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryNavalSurface * categories.STRUCTURE - categories.TECH1, tStartPoint, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.8, 'Enemy')
                                 local tNearbyOtherUnits
                                 if M27Utilities.IsTableEmpty(tEnemies) == false then
                                     for iUnit, oUnit in tEnemies do

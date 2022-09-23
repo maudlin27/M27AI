@@ -6720,7 +6720,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         end
 
         --Coordinate friendly experimentals if enemy has land experimentals, and record nearest enemy land experimental
-        bDebugMessages = true
         if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy land experimentals empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]))) end
         if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false then
             local bEnemyHasLandExperimental = false
@@ -6733,7 +6732,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             for iUnit, oUnit in aiBrain[reftEnemyLandExperimentals] do
                 if M27UnitInfo.IsUnitValid(oUnit) then
                     if oUnit:GetFractionComplete() >= 0.9 then
-                        bDebugMessages = true
                         bEnemyHasLandExperimental = true
                         iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                         iCurRange = M27UnitInfo.GetUnitMaxGroundRange(oUnit)
@@ -6768,7 +6766,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             end
         end
         if bDebugMessages == true then LOG(sFunctionRef..': Finished recording nearest land experimental, is unit valid='..tostring(M27UnitInfo.IsUnitValid(aiBrain[refoNearestRangeAdjustedLandExperimental]))) end
-        bDebugMessages = false
         --Coordinate novax
         if M27Utilities.IsTableEmpty(aiBrain[reftEnemyArtiAndExpStructure]) == false then
             local bEnemyHasAlmostCompleteArti = false
@@ -7351,6 +7348,15 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                                 bWantToEco = true
                                             end
                                         end
+
+                                        --Eco if enemy has T3 arti/novax and we dont have all t3 mexes at our base and have low mass and units that need shielding (as we may not have the mass needed to shield/defend against the arti)
+                                        if not(bWantToEco) and aiBrain[refbDefendAgainstArti] and math.min(aiBrain[M27EconomyOverseer.refiMexPointsNearBase], 6) > aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) and M27Conditions.HaveLowMass(aiBrain) and aiBrain[refiModDistFromStartNearestThreat] >= math.min(150, aiBrain[refiDistanceToNearestEnemyBase] * 0.35) then
+                                            bDebugMessages = true
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Want to defend against arti but we dont have good eco so will try and improve eco to support things like shields') end
+                                            bWantToEco = true
+                                        end
+
+
                                         if bDebugMessages == true then LOG(sFunctionRef..': Do we want to eco based on initial logic (will change this to false in a moment in certain cases)='..tostring(bWantToEco)) end
                                         if bWantToEco == true then
                                             if not (bChokepointsAreProtected) and not(bAlliesAreCloserToEnemy) and not(bTemporaryTurtleMode) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
