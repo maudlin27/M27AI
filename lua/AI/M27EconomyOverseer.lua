@@ -126,9 +126,6 @@ function GetUnitReclaimTargets(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     aiBrain[reftUnitsToReclaim] = {}
 
-    --local tNearbyAdjacencyUnits
-    if aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
-
     --Dont have any power in shortlist if we are powerstalling (or have in last 10s) or dont have >=99% energy stored
     if not (aiBrain[refbStallingEnergy]) and aiBrain:GetEconomyStoredRatio('ENERGY') > 0.99 and GetGameTimeSeconds() - aiBrain[refiLastEnergyStall] >= 10 then
 
@@ -168,7 +165,7 @@ function GetUnitReclaimTargets(aiBrain)
                             iCurTransferCount = iCurTransferCount + 1
                             if iCurTransferCount >= 1 then break end --Only transfer 1 T2 PGen at a time
                         else
-                            if not(oUnit.oldowner == aiBrain:GetArmyIndex()) then
+                            if oUnit.oldowner and not(oUnit.oldowner == aiBrain:GetArmyIndex()) then
                                 M27Team.TransferUnitsToPlayer({oUnit}, oUnit.oldowner, false)
                                 break --Dont want to transfer more than 1 at at time due to risk of power stalling
                             else
@@ -222,7 +219,6 @@ function GetUnitReclaimTargets(aiBrain)
                 if bDebugMessages == true then LOG(sFunctionRef..': Considering T1 Pgen unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Wanted for adjacency='..tostring(oUnit[refbWantForAdjacency] or false)) end
                 if not (oUnit[refbWantForAdjacency]) then
                     if oTeammateWantingPower and oUnit:GetFractionComplete() == 1 then
-                        if aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
                         --if not(oUnit[M27UnitInfo.refoOriginalBrainOwner]) then oUnit[M27UnitInfo.refoOriginalBrainOwner] = aiBrain end
                         --Above is covered by .oldowner - need to use .oldowner as the old unit gets removed and a new unit created in its place
 

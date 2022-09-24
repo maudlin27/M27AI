@@ -500,7 +500,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
             local iCount = 0
             local bPlateauFactory = false
-            if not((oFactory[M27Transport.refiAssignedPlateau] or aiBrain[refiOurBasePlateauGroup]) == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then bPlateauFactory = true end
+            if not((oFactory[M27Transport.refiAssignedPlateau] or aiBrain[refiOurBasePlateauGroup]) == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
+                --Could cliffbuild naval fac so dont want to apply plateau logic or show error
+                if not(bIsNavalFactory) then
+                    bPlateauFactory = true
+                end
+            end
 
             --Plateau variables
             local iCurDFTanks = 0 --Used for plateau
