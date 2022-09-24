@@ -126,7 +126,7 @@ function GetUnitReclaimTargets(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     aiBrain[reftUnitsToReclaim] = {}
 
-    local tNearbyAdjacencyUnits
+    --local tNearbyAdjacencyUnits
     if aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
 
     --Dont have any power in shortlist if we are powerstalling (or have in last 10s) or dont have >=99% energy stored
@@ -162,13 +162,14 @@ function GetUnitReclaimTargets(aiBrain)
                     oUnit[refbWantForAdjacency] = M27Conditions.IsBuildingWantedForAdjacency(oUnit)
                     if not (oUnit[refbWantForAdjacency]) then
                         if oTeammateWantingPower and oUnit:GetFractionComplete() == 1 then
-                            if not(oUnit[M27UnitInfo.refoOriginalBrainOwner]) then oUnit[M27UnitInfo.refoOriginalBrainOwner] = aiBrain end
+                            --if not(oUnit[M27UnitInfo.refoOriginalBrainOwner]) then oUnit[M27UnitInfo.refoOriginalBrainOwner] = aiBrain end
+                            --Above is already done via .oldowner field on a unit, and the above doesnt work since a new unit gets created to transfer a unit to a player
                             M27Team.TransferUnitsToPlayer({oUnit}, oTeammateWantingPower:GetArmyIndex(), false)
                             iCurTransferCount = iCurTransferCount + 1
                             if iCurTransferCount >= 1 then break end --Only transfer 1 T2 PGen at a time
                         else
-                            if oUnit[M27UnitInfo.refoOriginalBrainOwner] and not(oUnit[M27UnitInfo.refoOriginalBrainOwner] == aiBrain) then
-                                M27Team.TransferUnitsToPlayer({oUnit}, oUnit[M27UnitInfo.refoOriginalBrainOwner]:GetArmyIndex(), false)
+                            if not(oUnit.oldowner == aiBrain:GetArmyIndex()) then
+                                M27Team.TransferUnitsToPlayer({oUnit}, oUnit.oldowner, false)
                                 break --Dont want to transfer more than 1 at at time due to risk of power stalling
                             else
                                 table.insert(aiBrain[reftUnitsToReclaim], oUnit)
@@ -182,6 +183,7 @@ function GetUnitReclaimTargets(aiBrain)
         --Reclaim T1 power if we have T2+ power and enough gross income
 
         --v44 - removed some of the tests so only considers if flagged that its wanted for adjacency (i.e. for T3 arti)
+        if bDebugMessages == true then LOG(sFunctionRef..': Considering T1 power. iT3Power='..iT3Power..'; T2 power='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Power)..'; Gross energy income='..aiBrain[refiGrossEnergyBaseIncome]..'; Net energy income='..aiBrain[refiNetEnergyBaseIncome]) end
         if (iT3Power >= 1 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Power) >= 2) and aiBrain[refiGrossEnergyBaseIncome] >= 110 and aiBrain[refiNetEnergyBaseIncome] > 10 then --and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT2Arti) <= 0 then
             --Do we have a teammate who needs more energy?
             local oTeammateWantingPower
@@ -203,6 +205,12 @@ function GetUnitReclaimTargets(aiBrain)
                 end
             end
             local iCurTransferCount = 0
+            if bDebugMessages == true then
+                if oTeammateWantingPower == nil then LOG(sFunctionRef..': Dont have a teammate wanting power')
+                else
+                    LOG(sFunctionRef..': Have teammate wanting power='..oTeammateWantingPower.Nickname)
+                end
+            end
 
             --All T1 power
             for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT1Power, false, true) do
@@ -211,17 +219,30 @@ function GetUnitReclaimTargets(aiBrain)
                 --if M27Utilities.IsTableEmpty(tNearbyAdjacencyUnits) == true then
                 --if not (oUnit[refbWantForAdjacency]) then
                 oUnit[refbWantForAdjacency] = M27Conditions.IsBuildingWantedForAdjacency(oUnit)
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering T1 Pgen unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Wanted for adjacency='..tostring(oUnit[refbWantForAdjacency] or false)) end
                 if not (oUnit[refbWantForAdjacency]) then
                     if oTeammateWantingPower and oUnit:GetFractionComplete() == 1 then
-                        if not(oUnit[M27UnitInfo.refoOriginalBrainOwner]) then oUnit[M27UnitInfo.refoOriginalBrainOwner] = aiBrain end
+                        if aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
+                        --if not(oUnit[M27UnitInfo.refoOriginalBrainOwner]) then oUnit[M27UnitInfo.refoOriginalBrainOwner] = aiBrain end
+                        --Above is covered by .oldowner - need to use .oldowner as the old unit gets removed and a new unit created in its place
+
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to gift PGen '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to player '..oTeammateWantingPower.Nickname..'; PGen position='..repru(oUnit:GetPosition())) end
                         M27Team.TransferUnitsToPlayer({oUnit}, oTeammateWantingPower:GetArmyIndex(), false)
                         iCurTransferCount = iCurTransferCount + 1
                         if iCurTransferCount >= 3 then break end
                     else
-                        if oUnit[M27UnitInfo.refoOriginalBrainOwner] and not(oUnit[M27UnitInfo.refoOriginalBrainOwner] == aiBrain) then
-                            M27Team.TransferUnitsToPlayer({oUnit}, oUnit[M27UnitInfo.refoOriginalBrainOwner]:GetArmyIndex(), false)
+                        if bDebugMessages == true then
+                            if oUnit.oldowner then LOG(sFunctionRef..': PGen original owner index='..oUnit.oldowner)
+                            else
+                                LOG(sFunctionRef..': Pgen doesnt have an original owner. M27TempTestIndex='..(oUnit['M27TempTestIndex'] or 'nil')..'; PGen position='..repru(oUnit:GetPosition()))
+                            end
+                        end
+                        if oUnit.oldowner and not(oUnit.oldowner == aiBrain:GetArmyIndex()) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Transferring unit back to original owner who has index='..oUnit.oldowner) end
+                            M27Team.TransferUnitsToPlayer({oUnit}, oUnit.oldowner, false)
                             break --Dont want to transfer more than 1 at at time due to risk of power stalling
                         else
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will add unit to list of units to be reclaimed') end
                             table.insert(aiBrain[reftUnitsToReclaim], oUnit)
                         end
                     end

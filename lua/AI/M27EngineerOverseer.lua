@@ -8378,12 +8378,12 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                                                 CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], M27UnitInfo.refCategorySMD, iSMDSearchRange, 1)
                                             end
                                         else
-                                            --Enemy has multiple nukes so want that many smd at firebase
+                                            --Enemy has multiple nukes so want 2 smd at firebase
                                             local tOurFirebaseSMD = EntityCategoryFilterDown(M27UnitInfo.refCategorySMD, tFirebaseUnits)
                                             local iOurFirebaseSMD = 0
                                             if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategorySMD, tFirebaseUnits)) == false then iOurFirebaseSMD = table.getn(tOurFirebaseSMD) end
-                                            if iOurFirebaseSMD < iEnemyNukes then
-                                                CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], M27UnitInfo.refCategorySMD, iSMDSearchRange, iEnemyNukes)
+                                            if iOurFirebaseSMD < math.min(2, iEnemyNukes) then
+                                                CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], M27UnitInfo.refCategorySMD, iSMDSearchRange, math.min(2, iEnemyNukes))
                                             end
                                         end
                                     end
