@@ -1069,12 +1069,12 @@ function ReassignNavalEngineer(oEngineer)
             if bDebugMessages == true then LOG(sFunctionRef..': Have low power as recently stalled') end
             bHaveLowPower = true
         else
-            if aiBrain:GetEconomyStoredRatio('ENERGY') < 0.99 and (aiBrain:GetEconomyStored('ENERGY') < 1000 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] <= 0) then
+            if aiBrain:GetEconomyStoredRatio('ENERGY') < 0.99 and (aiBrain:GetEconomyStored('ENERGY') < 1000 or aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] <= 0) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Have low power as dont have much stored') end
                 bHaveLowPower = true
             end
         end
-        if bHaveLowPower and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50000 then bHaveLowPower = false end
+        if bHaveLowPower and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 50000 then bHaveLowPower = false end
 
 
         while iCurLoopCount <= 100 do

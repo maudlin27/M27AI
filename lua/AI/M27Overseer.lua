@@ -5367,9 +5367,9 @@ function ACUManager(aiBrain)
 
                                     local iEnemyMass = (1 + iEnemyT1Mex * 2 + iEnemyT2Mex * 6 + iEnemyT3Mex * 18 + iEnemyStorage) * 0.1
                                     if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': iEnemyMass=' .. iEnemyMass .. '; our gross mass income=' .. aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] .. '; will inflate enemy mass income since we may lack good intel')
+                                        LOG(sFunctionRef .. ': iEnemyMass=' .. iEnemyMass .. '; our gross mass income=' .. aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] .. '; will inflate enemy mass income since we may lack good intel')
                                     end
-                                    if iEnemyMass * 1.3 + 0.5 < aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] then
+                                    if iEnemyMass * 1.3 + 0.5 < aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] then
                                         bAheadOnEco = true
                                     end
                                 end
@@ -5399,7 +5399,7 @@ function ACUManager(aiBrain)
                 end
                 --Override - dont include ACU in attack if we are massively ahead on eco
                 if bIncludeACUInAttack then
-                    if (iLastDistanceToACU > iACURange or M27UnitInfo.GetUnitHealthPercent(oACU) <= 0.75) and iOurACUDistToOurBase > aiBrain[refiDistanceToNearestEnemyBase] * 0.6 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 16 and not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
+                    if (iLastDistanceToACU > iACURange or M27UnitInfo.GetUnitHealthPercent(oACU) <= 0.75) and iOurACUDistToOurBase > aiBrain[refiDistanceToNearestEnemyBase] * 0.6 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 16 and not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
                         bIncludeACUInAttack = false
                         --Dont include ACU in attack if there are nearby enemy T1 PD and not about to kill their ACU
                     elseif oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemyStructuresInRange] > 0 and oEnemyACUToConsiderAttacking:GetHealth() >= 600 then
@@ -6001,7 +6001,7 @@ function SetMaximumFactoryLevels(aiBrain)
             if aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] > 0 then
                 aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
             else
-                aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(4, math.max(1, math.ceil(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] / 10)))
+                aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(4, math.max(1, math.ceil(aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 10)))
             end
         end
         --local iMexCount = aiBrain:GetCurrentUnits(refCategoryMex)
@@ -6021,34 +6021,34 @@ function SetMaximumFactoryLevels(aiBrain)
             end
             if not (M27Conditions.HaveLowMass(aiBrain)) and aiBrain:GetEconomyStoredRatio('MASS') > 0.2 then
                 iPrimaryFactoriesWanted = math.max(5 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.35))
-                if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 15 then
-                    iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] / 6.5))
+                if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 15 then
+                    iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 6.5))
                 end
             elseif not (M27Conditions.HaveLowMass(aiBrain)) then
                 iPrimaryFactoriesWanted = math.max(4 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.25))
-                if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 15 then
-                    iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] / 8))
+                if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 15 then
+                    iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 8))
                 end
             else
                 --Have low mass
                 iPrimaryFactoriesWanted = math.max(1, math.floor(iMexesToBaseCalculationOn * 0.175))
-                if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 15 then
-                    iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] / 5))
+                if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 15 then
+                    iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 5))
                 end
             end
         else
             if M27Conditions.HaveLowMass(aiBrain) then
                 iPrimaryFactoriesWanted = math.max(5 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.5))
-                if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 15 then
-                    iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] / 8))
+                if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 15 then
+                    iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 8))
                 end
                 if aiBrain[M27AirOverseer.refbBomberDefenceRestrictedByAA] then
                     iPrimaryFactoriesWanted = iPrimaryFactoriesWanted + 1
                 end
             else
                 iPrimaryFactoriesWanted = math.max(6 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.7))
-                if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 15 then
-                    iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] / 6))
+                if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 15 then
+                    iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 6))
                 end
                 --Do we have lots of air factories and are restricted by enemy AA?
                 if aiBrain[M27AirOverseer.refbBomberDefenceRestrictedByAA] then
@@ -6102,12 +6102,12 @@ function SetMaximumFactoryLevels(aiBrain)
 
         --Increase air factories wanted if enemy has significant land threat and we have the economy to support more air factories (so we can better respond if enemy tries to attack us) providing we arent saving eco to get t3 arti
         if (aiBrain[refiTotalEnemyShortRangeThreat] >= 20000 or aiBrain[refiTotalEnemyLongRangeThreat] >= 20000) and aiBrain[M27AirOverseer.refiPreviousAvailableBombers] <= 80 and not(aiBrain[refbDefendAgainstArti]) then
-            aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(aiBrain[reftiMaxFactoryByType][refFactoryTypeAir], math.min(15, (aiBrain[refiTotalEnemyShortRangeThreat] + aiBrain[refiTotalEnemyLongRangeThreat]) / 5000, aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] / 2))
+            aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(aiBrain[reftiMaxFactoryByType][refFactoryTypeAir], math.min(15, (aiBrain[refiTotalEnemyShortRangeThreat] + aiBrain[refiTotalEnemyLongRangeThreat]) / 5000, aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 2))
         end
 
         if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill or aiBrain[refiAIBrainCurrentStrategy] == refStrategyProtectACU then
             --aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
-            if aiBrain:GetEconomyStoredRatio('MASS') > 0.1 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > 1 then
+            if aiBrain:GetEconomyStoredRatio('MASS') > 0.1 and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] > 1 then
                 aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = iAirFactoriesOwned + 1
             else
                 aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(1, iAirFactoriesOwned)
@@ -6154,10 +6154,10 @@ function SetMaximumFactoryLevels(aiBrain)
         --Reduce air factories wanted based on gross energy.  Air fac uses 90 energy for intercepter (T1)
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]=' .. (aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] or 'nil'))
-            LOG(sFunctionRef .. ': aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]=' .. (aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] or 'nil'))
+            LOG(sFunctionRef .. ': aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]=' .. (aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] or 'nil'))
             LOG(sFunctionRef .. ': aiBrain[refiOurHighestAirFactoryTech]=' .. (aiBrain[refiOurHighestAirFactoryTech] or 'nil'))
         end
-        aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(1, math.min((aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] or 1), math.floor(aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] / (13 * aiBrain[refiOurHighestAirFactoryTech] * aiBrain[refiOurHighestAirFactoryTech]))))
+        aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(1, math.min((aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] or 1), math.floor(aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] / (13 * aiBrain[refiOurHighestAirFactoryTech] * aiBrain[refiOurHighestAirFactoryTech]))))
 
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': bActiveExperimental=' .. tostring(bActiveExperimental) .. '; Idle factories=' .. aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused])
@@ -6474,22 +6474,22 @@ function UpdateFurthestBuildingDistances(aiBrain)
     --Records the high value buildings we have furthest from our base, used to help decide on bomber and land defence ranges as well as potential eco decisions
 
     local iHighValueCategories = categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT2Power + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAirFactory
-    if aiBrain[refiOurHighestFactoryTechLevel] < 3 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] <= 4 then
+    if aiBrain[refiOurHighestFactoryTechLevel] < 3 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] <= 4 then
         local iCategoryToSearchFor
-        if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] < 3 then
-            if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 100 then
+        if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] < 3 then
+            if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] < 100 then
                 iCategoryToSearchFor = M27UnitInfo.refCategoryHydro + M27UnitInfo.refCategoryT1Mex
             else
                 iCategoryToSearchFor = M27UnitInfo.refCategoryT1Mex
             end
-        elseif aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 100 then
+        elseif aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] < 100 then
             iCategoryToSearchFor = M27UnitInfo.refCategoryHydro
         end
 
-        if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] < 3 then
+        if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] < 3 then
             iHighValueCategories = iHighValueCategories + M27UnitInfo.refCategoryT1Mex
         end
-        if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 100 then
+        if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] < 100 then
             iHighValueCategories = iHighValueCategories + M27UnitInfo.refCategoryHydro
         end
     end
@@ -6873,7 +6873,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 iMassAtLeast3mAgo = 0
             end
             if bTimeForLongRefresh == true then
-                table.insert(aiBrain[reftiMexIncomePrevCheck], 1, aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome])
+                table.insert(aiBrain[reftiMexIncomePrevCheck], 1, aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome])
                 aiBrain[refiTimeOfLastMexIncomeCheck] = iCurTime
             end
 
@@ -7302,10 +7302,10 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                                         bWantToEco = true
                                                     else
                                                         if bDebugMessages == true then
-                                                            LOG(sFunctionRef .. ': Dont want to eco based on initial tests. Still eco if havent increased mass income for a while unless nearby threat. aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; iMassAtLeast3mAgo='..iMassAtLeast3mAgo..'; aiBrain[refiPercentageOutstandingThreat]='..aiBrain[refiPercentageOutstandingThreat]..'; iLandCombatUnits='..iLandCombatUnits)
+                                                            LOG(sFunctionRef .. ': Dont want to eco based on initial tests. Still eco if havent increased mass income for a while unless nearby threat. aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; iMassAtLeast3mAgo='..iMassAtLeast3mAgo..'; aiBrain[refiPercentageOutstandingThreat]='..aiBrain[refiPercentageOutstandingThreat]..'; iLandCombatUnits='..iLandCombatUnits)
                                                         end
                                                         --Has our mass income not changed recently, but we dont appear to be losing significantly on the battlefield?
-                                                        if iCurTime > 100 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo < 1 and aiBrain[refiPercentageOutstandingThreat] > 0.55 and iLandCombatUnits >= 30 then
+                                                        if iCurTime > 100 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] - iMassAtLeast3mAgo < 1 and aiBrain[refiPercentageOutstandingThreat] > 0.55 and iLandCombatUnits >= 30 then
                                                             if bDebugMessages == true then
                                                                 LOG(sFunctionRef .. ': Ok defence coverage and income not changed in a while so will eco')
                                                             end
@@ -7375,7 +7375,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Our ACU is near enemy base') end
                                             elseif not(bChokepointsAreProtected) and not(bAlliesAreCloserToEnemy) and not(bTemporaryTurtleMode) and aiBrain[refiTotalEnemyShortRangeThreat] >= 2500 and iMexesInPathingGroupWeHaveClaimed < iOurTeamsShareOfMexesOnMap * 1.3 and not(aiBrain[refbNeedIndirect]) then
                                                 --Does the enemy have more mobile threat than us and our allies, and we have < 65% mex control, and have gained income recently
-                                                if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo >= 1 then
+                                                if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] - iMassAtLeast3mAgo >= 1 then
                                                     local iSearchRange = math.min(600, aiBrain[refiDistanceToNearestEnemyBase] + 60, aiBrain[M27AirOverseer.refiMaxScoutRadius])
                                                     local tAllThreatUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryShortRangeMobile, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iSearchRange, 'Ally')
 
@@ -7448,7 +7448,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
 
             --Reduce air scouting threshold for enemy base if likely to be considering whether to build a nuke or not
-            if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 7 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 250 and aiBrain[refiOurHighestFactoryTechLevel] >= 3 and (not (aiBrain[M27EngineerOverseer.refiLastExperimentalReference]) or aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27EngineerOverseer.refiExperimentalNuke) then
+            if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 7 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 250 and aiBrain[refiOurHighestFactoryTechLevel] >= 3 and (not (aiBrain[M27EngineerOverseer.refiLastExperimentalReference]) or aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27EngineerOverseer.refiExperimentalNuke) then
                 local iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                 aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiCurrentScoutingInterval] = math.min(45, aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiCurrentScoutingInterval])
             end
@@ -7503,7 +7503,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 tsGameState['03. EnemyT2PlusNavyNearBase'] = aiBrain[refbT2NavyNearOurBase]
 
                 --Economy:
-                tsGameState['04.iMassGrossIncome'] = aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]
+                tsGameState['04.iMassGrossIncome'] = aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]
                 tsGameState['04.iMassNetIncome'] = aiBrain:GetEconomyTrend('MASS')
                 tsGameState['04.iEnergyNetIncome'] = aiBrain:GetEconomyTrend('ENERGY')
                 tsGameState['04.iMassStored'] = aiBrain:GetEconomyStored('MASS')
@@ -7718,17 +7718,17 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             end
 
             --Also set health to run as a high value if we have high mass and energy income and enemy is at tech 3
-            if aiBrain[refiEnemyHighestTechLevel] >= 3 and (aiBrain[refiHighestEnemyGroundUnitHealth] >= 5000 or aiBrain[refiTotalEnemyShortRangeThreat] >= 10000) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50 then
+            if aiBrain[refiEnemyHighestTechLevel] >= 3 and (aiBrain[refiHighestEnemyGroundUnitHealth] >= 5000 or aiBrain[refiTotalEnemyShortRangeThreat] >= 10000) and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 50 then
                 if bDebugMessages == true then LOG(sFunctionRef..': Enemy has access to tech 3, and we have at least 100 mass per second income') end
-                if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 13 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 100 then
+                if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 13 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 100 then
                     if not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
                         --Increase health to run above max health (so even with mobile shields we will run) if dont have gun upgrade or v.high economy
-                        if not (M27Conditions.DoesACUHaveGun(aiBrain, true, oACU)) or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 26 or aiBrain[refiEnemyHighestTechLevel] >= 4 then
+                        if not (M27Conditions.DoesACUHaveGun(aiBrain, true, oACU)) or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 26 or aiBrain[refiEnemyHighestTechLevel] >= 4 then
                             aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() + 15000
                             if bDebugMessages == true then LOG(sFunctionRef..': Enemy has T4 or we dont have gun or have lots of mass so will force ACU to run') end
                         else
                             --Enemy has t3, and we have decent eco; run if we dont have lots of enhancements
-                            if iUpgradeCount < 3 or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 20 then
+                            if iUpgradeCount < 3 or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 20 then
                                 aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
                                 if bDebugMessages == true then LOG(sFunctionRef..': Have high mass income and not many upgrades so will force ACU to run') end
 
@@ -7736,7 +7736,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                 aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.95
                                 if bDebugMessages == true then LOG(sFunctionRef..': Have at least 3 upgrades so will only retreat if ACU not at full health') end
                             end
-                            if bDebugMessages == true then LOG(sFunctionRef..': iUpgradeCount='..iUpgradeCount..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; health to run on after adjusting for this='..aiBrain[refiACUHealthToRunOn]) end
+                            if bDebugMessages == true then LOG(sFunctionRef..': iUpgradeCount='..iUpgradeCount..'; aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; health to run on after adjusting for this='..aiBrain[refiACUHealthToRunOn]) end
                         end
                     else
                         aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)

@@ -5485,10 +5485,10 @@ function DetermineActionForNearbyMex(oPlatoon)
             --Turtle mode - want ACU to get to chokepoint asap so dont want it to build on mexes it comes across if it has ok mass income
             local iMexSearchRange = 18
             if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle then
-                if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 1.1 then
+                if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 1.1 then
 
 
-                    if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 1.3 then
+                    if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 1.3 then
                         iMexSearchRange = oFirstBuilder:GetBlueprint().Economy.MaxBuildDistance
                     else
                         iMexSearchRange = 13
@@ -5496,7 +5496,7 @@ function DetermineActionForNearbyMex(oPlatoon)
                         --Do nothing
                 end
             end
-            if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] <= 1.8 or ((oFirstBuilder:IsUnitState('Building') or oFirstBuilder:IsUnitState('Repairing')) and oFirstBuilder:GetFocusUnit() and EntityCategoryContains(M27UnitInfo.refCategoryMex, oFirstBuilder:GetFocusUnit())) then
+            if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] <= 1.8 or ((oFirstBuilder:IsUnitState('Building') or oFirstBuilder:IsUnitState('Repairing')) and oFirstBuilder:GetFocusUnit() and EntityCategoryContains(M27UnitInfo.refCategoryMex, oFirstBuilder:GetFocusUnit())) then
 
             --If we dont have enough power, limit the number of mexes we get
             local bHaveEnoughPower = false
@@ -5504,7 +5504,7 @@ function DetermineActionForNearbyMex(oPlatoon)
 
                 if not(M27Utilities.IsACU(oFirstBuilder)) or not(M27Conditions.DoesACUHaveBigGun(aiBrain)) then
                     --Initial build order (if dont have enough power)
-                    if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 11 then bHaveEnoughPower = true
+                    if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 11 then bHaveEnoughPower = true
                     else
                         local iCurMexes = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex)
                         --Initial build order: Hydro
@@ -5519,7 +5519,7 @@ function DetermineActionForNearbyMex(oPlatoon)
                             end
                         else
                             --Initial build order: Non-hydro: 2 pgens, 2 mexes, 2 pgens
-                            local iCurPGens = math.max(aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Power), math.floor((aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] - 2)/2))
+                            local iCurPGens = math.max(aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Power), math.floor((aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] - 2)/2))
                             if iCurPGens >= 2 and iCurMexes < 2 then bHaveEnoughPower = true
                             elseif iCurPGens >= 4 and iCurMexes < 4 then bHaveEnoughPower = true
                             end
@@ -5532,7 +5532,7 @@ function DetermineActionForNearbyMex(oPlatoon)
 
 
                     --If have less tahn 20 power and are more likely to stall power than mass then call logic to build power first
-                    if bHaveEnoughPower and not(oFirstBuilder:IsUnitState('Building')) and not(oFirstBuilder:IsUnitState('Repairing')) and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 20 and aiBrain:GetEconomyStored('ENERGY') <= 2000 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 0 and (aiBrain:GetEconomyStored('MASS') >= 50 or (aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 0 and aiBrain:GetEconomyStored('MASS') >= 15)) then
+                    if bHaveEnoughPower and not(oFirstBuilder:IsUnitState('Building')) and not(oFirstBuilder:IsUnitState('Repairing')) and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] < 20 and aiBrain:GetEconomyStored('ENERGY') <= 2000 and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] < 0 and (aiBrain:GetEconomyStored('MASS') >= 50 or (aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > 0 and aiBrain:GetEconomyStored('MASS') >= 15)) then
                         if bDebugMessages == true then LOG(sFunctionRef..': Still have lowish power, will see if want to build power first rather than mass') end
                         DetermineIfACUShouldBuildPower(oPlatoon)
                         if oPlatoon[refiCurrentAction] then
@@ -5715,25 +5715,25 @@ function DetermineIfACUShouldBuildPower(oPlatoon)
             if aiBrain:GetEconomyStoredRatio('MASS') >= 0.1 and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) then
                 if aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes] <= 1 then iGrossEnergyWanted = math.min(45, iGrossEnergyWanted + 7) end
                 --Allow ACU to build power if its still not that far from our base, we have at least 2 factories, are high mass and low power, and dont ahve tech 2
-                if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 1 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] <= (iGrossEnergyWanted + 10) and aiBrain:GetEconomyStoredRatio('MASS') >= 0.2 and (aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.75 or aiBrain[M27EconomyOverseer.refbStallingEnergy]) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories) >= 2 and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
+                if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 1 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] <= (iGrossEnergyWanted + 10) and aiBrain:GetEconomyStoredRatio('MASS') >= 0.2 and (aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.75 or aiBrain[M27EconomyOverseer.refbStallingEnergy]) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories) >= 2 and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
                     iGrossEnergyWanted = math.min(iGrossEnergyWanted + 10, 50)
                 end
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': iGrossEnergyIncome='..aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]..'; iGrossEnergyWanted='..iGrossEnergyWanted) end
-            if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] <= iGrossEnergyWanted then
+            if bDebugMessages == true then LOG(sFunctionRef..': iGrossEnergyIncome='..aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]..'; iGrossEnergyWanted='..iGrossEnergyWanted) end
+            if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] <= iGrossEnergyWanted then
                 --Only get power if we have <90% energy stored or 3 factories
                 local iCurLandFactories = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories)
-                if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= iEneryBeforeSecondFac and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.9 and iCurLandFactories < math.min(3, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand]) then
+                if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= iEneryBeforeSecondFac and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.9 and iCurLandFactories < math.min(3, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand]) then
                     if bDebugMessages == true then LOG(sFunctionRef..': Have fewer than 3 factories so want to get factory instead') end
                     --Do nothing as want to build factory in next step
-                elseif aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= iEneryBeforeSecondFac and iCurLandFactories == 1 and aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] > 1 then
+                elseif aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= iEneryBeforeSecondFac and iCurLandFactories == 1 and aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] > 1 then
                     --Second land factory so do nothing as will build in next step
                     if bDebugMessages == true then LOG(sFunctionRef..': Only have 1 land factory and want more than 1 so will do nothing so we get a land factory') end
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..': Want more energy, will build unless are far from base') end
                     if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(250, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.4) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Near start of game so will build power unless we are near a hydro; NearHydro='..tostring(M27Conditions.HydroNearACUAndBase(aiBrain, true, false))..'; aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]..'; WOuld expect platoon to have already been given action to build hydro though by this point, unless construction hasnt started') end
-                        if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 10 or not(M27Conditions.HydroNearACUAndBase(aiBrain, true, false)) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Near start of game so will build power unless we are near a hydro; NearHydro='..tostring(M27Conditions.HydroNearACUAndBase(aiBrain, true, false))..'; aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]='..aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]..'; WOuld expect platoon to have already been given action to build hydro though by this point, unless construction hasnt started') end
+                        if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 10 or not(M27Conditions.HydroNearACUAndBase(aiBrain, true, false)) then
                             oPlatoon[refiCurrentAction] = refActionBuildInitialPower
                             if bDebugMessages == true then LOG(sFunctionRef..': Will build pgen') end
                         else
@@ -5745,7 +5745,7 @@ function DetermineIfACUShouldBuildPower(oPlatoon)
                             oPlatoon[refiCurrentAction] = refActionBuildInitialPower
                         else
                             --If we already have 1 hydro then build t1 power anyway unless unbuilt hydro is really close to ACU
-                            if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 10 then
+                            if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 10 then
                                 local tNearbyHydro = M27MapInfo.GetResourcesNearTargetLocation(GetPlatoonFrontPosition(oPlatoon), 25, false)
                                 if M27Utilities.IsTableEmpty(tNearbyHydro) == false then tNearbyHydro = M27EngineerOverseer.FilterLocationsBasedOnIfUnclaimed(aiBrain, tNearbyHydro, false) end
                                 if M27Utilities.IsTableEmpty(tNearbyHydro) == true then
@@ -5769,7 +5769,7 @@ function DetermineIfACUShouldBuildFactory(oPlatoon)
     --if oPlatoon[refbACUInPlatoon] == true then --Already have this in the determine platoon action function, and might want to use this function for another unit
     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
     local iFactoryCount = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories)
-    if bDebugMessages == true then LOG(sFunctionRef..': About to see if want to build a land factory. EnergyIncome='..aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]..'; MassNetIncome='..aiBrain:GetEconomyTrend('MASS')..'Stored energy='..aiBrain:GetEconomyStored('ENERGY')..'; StoredMass='..aiBrain:GetEconomyStored('MASS')..'; LandFactoryCount='..iFactoryCount) end
+    if bDebugMessages == true then LOG(sFunctionRef..': About to see if want to build a land factory. EnergyIncome='..aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]..'; MassNetIncome='..aiBrain:GetEconomyTrend('MASS')..'Stored energy='..aiBrain:GetEconomyStored('ENERGY')..'; StoredMass='..aiBrain:GetEconomyStored('MASS')..'; LandFactoryCount='..iFactoryCount) end
 
     if not(M27Conditions.DoesACUHaveBigGun(aiBrain)) and (not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance) or M27Utilities.GetACU(aiBrain):IsUnitState('Building')) then
         if oPlatoon[refiEnemiesInRange] == 0 and oPlatoon[refiEnemyStructuresInRange] == 0 and (aiBrain[M27Overseer.refiSearchRangeForEnemyStructures] >= 60 or M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, GetPlatoonFrontPosition(oPlatoon), 60, 'Enemy'))) then
@@ -5801,7 +5801,7 @@ function DetermineIfACUShouldBuildFactory(oPlatoon)
                             oPlatoon[refiCurrentAction] = refActionBuildFactory
                         else
                             if iFactoryCount < 2 then
-                                if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 10 then --Have at least 100 gross energy income per second
+                                if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 10 then --Have at least 100 gross energy income per second
                                     if aiBrain:GetEconomyTrend('MASS') >= 0.2 then --At least 2 net mass income per second
                                         if iStoredEnergy >= 250 then
                                             if aiBrain:GetEconomyStored('MASS') >= 20 then
@@ -5949,7 +5949,7 @@ function DetermineActionForNearbyReclaim(oPlatoon, bIgnoreNearbyEnemies)
     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
     --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 and GetGameTimeSeconds() >= 660 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oPlatoon[refiReclaimers]='..oPlatoon[refiReclaimers]) end
-    if oPlatoon[refiReclaimers] > 0 and (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 0.8 or GetGameTimeSeconds() >= 180) then --Have 3 mexes already
+    if oPlatoon[refiReclaimers] > 0 and (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 0.8 or GetGameTimeSeconds() >= 180) then --Have 3 mexes already
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code for '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]) end
         --Check we aren't full with mass
 
@@ -6000,7 +6000,7 @@ function DetermineActionForNearbyReclaim(oPlatoon, bIgnoreNearbyEnemies)
                         local iMinIndividualReclaim = 4
                         --Will we be wanting more reclaim than this?
 
-                        if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 46 then
+                        if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 46 then
                             local bWantEnergy, bWantMass = M27Conditions.WantEnergyOrMassReclaim(aiBrain)
                             --Dont want ACU to be trying to get individual trees if already ahve high energy income as better uses for its time
                             if bWantEnergy then iMinIndividualReclaim = 50 end
@@ -6355,7 +6355,7 @@ function ConsiderConstructionForACU(aiBrain, oPlatoon, oACU) --Intended to be ru
                                 if aiBrain:GetEconomyStored('MASS') == 0 then DetermineActionForNearbyReclaim(oPlatoon) end
                                 if bDebugMessages == true then LOG(sFunctionRef..': If are mass stalling will check for nearby reclaim. aiBrain:GetEconomyStored(MASS)='..aiBrain:GetEconomyStored('MASS')..'; Platoona ction after checking for nearby reclaim='..(oPlatoon[refiCurrentAction] or 'nil')) end
                                 if not(oPlatoon[refiCurrentAction]) then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Already have 3 T2 PD at firebase. Checking if enough resources to help with fortification. M27Conditions.HaveLowMass(aiBrain)='..tostring(M27Conditions.HaveLowMass(aiBrain))..'; Energy income='..aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]..'; Energy stored='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; Time of last energy stall='..GetGameTimeSeconds() - (aiBrain[M27EconomyOverseer.refiLastEnergyStall] or -100)) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Already have 3 T2 PD at firebase. Checking if enough resources to help with fortification. M27Conditions.HaveLowMass(aiBrain)='..tostring(M27Conditions.HaveLowMass(aiBrain))..'; Energy income='..aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome]..'; Energy stored='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; Time of last energy stall='..GetGameTimeSeconds() - (aiBrain[M27EconomyOverseer.refiLastEnergyStall] or -100)) end
 
                                     --Do we have building or repairing unit state with a previous action to build?
                                     if (oACU:IsUnitState('Building') or (oACU:IsUnitState('Repairing') and oACU:GetFocusUnit():GetFractionComplete() < 1)) and (oPlatoon[reftPrevAction][1] == refActionBuildStructure or oPlatoon[reftPrevAction][1] == refActionAssistConstruction) then
@@ -6400,11 +6400,11 @@ function ConsiderConstructionForACU(aiBrain, oPlatoon, oACU) --Intended to be ru
 
                                             --Does the firebase want fortification and we have enough resources to help it?
                                             if bDebugMessages == true then LOG(sFunctionRef..': Are there enemies near the firebase or do we have enough resources to help? iNearestEnemy='..iNearestEnemy..'; aiBrain:GetEconomyStoredRatio(ENERGY)='..aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.9..'; HaveLowMass='..tostring(M27Conditions.HaveLowMass(aiBrain))) end
-                                            if (iNearestEnemy <= 120 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.9) or (not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > 0 and not((GetGameTimeSeconds() - (aiBrain[M27EconomyOverseer.refiLastEnergyStall] or -100)) <= 1)) then
+                                            if (iNearestEnemy <= 120 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.9) or (not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] > 0 and not((GetGameTimeSeconds() - (aiBrain[M27EconomyOverseer.refiLastEnergyStall] or -100)) <= 1)) then
                                                 --UEF specific - build ravager if enemy likely within range of it (or will be soon) and dont already have at least 5
                                                 if EntityCategoryContains(categories.UEF * categories.COMMAND, oPlatoon[refoFrontUnit]) and oPlatoon[refoFrontUnit]:HasEnhancement('T3Engineering') then
                                                     local tNearbyRavagers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryPD * categories.TECH3, GetPlatoonFrontPosition(oPlatoon), 40, 'Ally')
-                                                    if M27Utilities.IsTableEmpty(tNearbyRavagers) or (iNearestEnemy <= 90 and table.getn(tNearbyRavagers) < math.min(10, math.max(2, math.ceil(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]) / 20))) then
+                                                    if M27Utilities.IsTableEmpty(tNearbyRavagers) or (iNearestEnemy <= 90 and table.getn(tNearbyRavagers) < math.min(10, math.max(2, math.ceil(aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]) / 20))) then
                                                         oPlatoon[refiCurrentAction] = refActionBuildStructure
                                                         oPlatoon[refiStructureCategoryToBuild] = M27UnitInfo.refCategoryPD * categories.TECH3
                                                         oPlatoon[reftStructureLocationToBuild] = aiBrain[M27MapInfo.reftChokepointBuildLocation]
@@ -6901,8 +6901,8 @@ function DecideWhetherACUShouldAssistConstruction(aiBrain, oPlatoon)
 
 
     --Do we have enough mass and energy to want to use ACU to build?
-    if bDebugMessages == true then LOG(sFunctionRef..': Checking if we have enough resources for ACU to assist construction.  Have low mass='..tostring(M27Conditions.HaveLowMass(aiBrain))..'; Energy net income='..aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]..'; Stalling energy='..tostring(aiBrain[M27EconomyOverseer.refbStallingEnergy])) end
-    if not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > 0 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.9 and not(aiBrain[M27EconomyOverseer.refbStallingEnergy]) then
+    if bDebugMessages == true then LOG(sFunctionRef..': Checking if we have enough resources for ACU to assist construction.  Have low mass='..tostring(M27Conditions.HaveLowMass(aiBrain))..'; Energy net income='..aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome]..'; Stalling energy='..tostring(aiBrain[M27EconomyOverseer.refbStallingEnergy])) end
+    if not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] > 0 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.9 and not(aiBrain[M27EconomyOverseer.refbStallingEnergy]) then
         if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) or M27Utilities.GetACU(aiBrain):HasEnhancement('AdvancedEngineering') or M27Utilities.GetACU(aiBrain):HasEnhancement('T3Engineering') then
             local iBuildRange = (oPlatoon[reftBuilders][1]:GetBlueprint().Economy.MaxBuildDistance or 0)
             if bDebugMessages == true then LOG(sFunctionRef..'Will see if any buildings in our build range that arent yet complete; iBuildRange='..(iBuildRange or 0)) end
@@ -8591,7 +8591,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                             --Check if is a hydro near the ACU
                             if M27Conditions.ACUShouldAssistEarlyHydro(aiBrain) == true then
                                 --Do we have power already? Check have >= 10 per tick (so 100)
-                                if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] <= 10 then
+                                if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] <= 10 then
                                     bMoveToHydro = true
                                 end
                             end
@@ -12105,7 +12105,7 @@ function ProcessPlatoonAction(oPlatoon)
                             oEngineer[M27EngineerOverseer.reftEngineerCurrentTarget] = oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]]
                             if bDebugMessages == true then LOG(sFunctionRef..': Have set engineer '..oEngineer.UnitId..' with LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to have a current target of '..repru(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]] or {'nil'})..'; oEngineer[M27EngineerOverseer.reftEngineerCurrentTarget]='..repru(oEngineer[M27EngineerOverseer.reftEngineerCurrentTarget] or {'nil'})) end
                             local iMinIndividualReclaim = 5
-                            if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 46 then
+                            if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 46 then
                                 local bWantEnergy, bWantMass = M27Conditions.WantEnergyOrMassReclaim(aiBrain)
                                 --Dont want ACU to be trying to get individual trees if already ahve high energy income as better uses for its time
                                 if bWantEnergy then iMinIndividualReclaim = 50 end
@@ -12219,8 +12219,8 @@ function ProcessPlatoonAction(oPlatoon)
                             local iEnergyIncomeNeeded = math.max((2400 - aiBrain:GetEconomyStored('ENERGY')), 1) / 300 + iExistingAirFactories * 12
                             local iMinGrossIncomeWanted = 18
                             if aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes] == 1 then iMinGrossIncomeWanted = 16 end
-                            if bDebugMessages == true then LOG(sFunctionRef..': Considering if we have energy to support an air factory. aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]..'; Stored energy='..aiBrain:GetEconomyStored('ENERGY')..'; iEnergyIncomeNeeded='..iEnergyIncomeNeeded..'; aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]='..aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]..'; iExistingAirFactories='..iExistingAirFactories) end
-                            if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 16 and (aiBrain:GetEconomyStored('ENERGY') >= 2500 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= iEnergyIncomeNeeded) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering if we have energy to support an air factory. aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]='..aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]..'; Stored energy='..aiBrain:GetEconomyStored('ENERGY')..'; iEnergyIncomeNeeded='..iEnergyIncomeNeeded..'; aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome]='..aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome]..'; iExistingAirFactories='..iExistingAirFactories) end
+                            if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 16 and (aiBrain:GetEconomyStored('ENERGY') >= 2500 or aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] >= iEnergyIncomeNeeded) then
                                 --We have enough energy to support an air factory, check if we're relatively close to our base
                                 if bDebugMessages == true then LOG(sFunctionRef..': Have enough energy, checking if we are close to base; Distance between ACU and base='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
                                 if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 90 then
