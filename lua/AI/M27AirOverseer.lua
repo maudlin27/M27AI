@@ -1260,6 +1260,7 @@ function IssueNewAttackToBomber(oBomber, oTarget, iPriority, bAreHoverBombing)
     local aiBrain = oBomber:GetAIBrain()
     local iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oTarget)
     --IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead, bIgnoreMobileShields, bTreatPartCompleteAsComplete)
+
     local iNearbyShieldCurHealth, iNearbyShieldMaxHealth = M27Logic.IsTargetUnderShield(aiBrain, oTarget, 0, true, false, true)
     local iHealthPercent = M27UnitInfo.GetUnitHealthPercent(oTarget)
     if iHealthPercent == 0 then
