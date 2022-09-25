@@ -4408,7 +4408,7 @@ function ThreatAssessAndRespond(aiBrain)
                                         --Manually create tables as having issues with entitycategoryfilterdown
                                         for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
                                             if M27UnitInfo.IsUnitValid(oUnit) then
-                                                if EntityCategoryContains(M27UnitInfo.refCategoryGroundAA + categories.SHIELD, oUnit.UnitId) then table.insert(tEnemyPriorityUnits, oUnit)
+                                                if EntityCategoryContains(M27UnitInfo.refCategoryGroundAA + categories.SHIELD + M27UnitInfo.refCategoryStealthBoat, oUnit.UnitId) then table.insert(tEnemyPriorityUnits, oUnit)
                                                 elseif EntityCategoryContains(M27UnitInfo.refCategorySubmarine + M27UnitInfo.refCategoryFrigate, oUnit.UnitId) then table.insert(tEnemyMedPriorityUnits, oUnit)
                                                 else table.insert(tEnemyLowPriorityUnits, oUnit)
                                                 end

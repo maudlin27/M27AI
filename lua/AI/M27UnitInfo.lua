@@ -224,6 +224,7 @@ refCategoryMissileNavy = categories.NAVAL * categories.SILO + categories.BATTLES
 refCategorySubmarine = categories.NAVAL * categories.SUBMERSIBLE * categories.ANTINAVY
 refCategoryCooper = categories.NAVAL * categories.ANTINAVY * categories.TECH2 - categories.SUBMERSIBLE - categories.DESTROYER
 refCategoryShieldBoat = categories.NAVAL * categories.SHIELD + categories.HOVER * categories.SHIELD --Includes mobile land shields that can hover
+refCategoryStealthBoat = categories.NAVAL * categories.STEALTHFIELD
 
 
 --Multi-category:
