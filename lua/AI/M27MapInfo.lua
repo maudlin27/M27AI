@@ -533,7 +533,7 @@ function InSameSegmentGroup(oUnit, tDestination, bReturnUnitGroupOnly, bReturnDe
             end
             if iUnitGroup == iTargetGroup then return true else return false end
         end
-        end
+    end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 

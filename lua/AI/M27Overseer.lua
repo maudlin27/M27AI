@@ -4449,7 +4449,6 @@ function ThreatAssessAndRespond(aiBrain)
                                                         end
 
                                                         if oUnit[iArmyIndex][refiAssignedThreat] <= iAssignedThreatWanted then
-                                                            if EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, oUnit.UnitId) then bDebugMessages = true end
                                                             oUnit[iArmyIndex][refiAssignedThreat] = oUnit[iArmyIndex][refiAssignedThreat] + tTorpSubtable[refiCurThreat]
                                                             M27Utilities.IssueTrackedClearCommands({ tTorpSubtable[refoTorpUnit] })
                                                             IssueAttack({ tTorpSubtable[refoTorpUnit] }, oUnit)

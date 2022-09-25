@@ -57,24 +57,38 @@ subrefBuildLocationByStartPosition = 'PondBuildLocationByStart' --Subtable, key 
 
 function CheckForPondNearNavalUnit(oUnit)
     --Looks at area around unit to see if in a recognised pond, if so then updates pathing of all points in the area.  Returns the revised pond (or 0 if no revised one found)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
+    local sFunctionRef = 'CheckForPondNearNavalUnit'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if oUnit:GetAIBrain():GetArmyIndex() == 5 and (oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xss0212' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xss01032') then bDebugMessages = true end
+    if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), {618.28161621094, 17.507583618164, 200.2126007080}) <= 2 then bDebugMessages = true end
+
+
     local iPond = 0
     local tStartPosition = oUnit:GetPosition()
     local sLocationRef = M27Utilities.ConvertLocationToReference(tStartPosition)
     local sPathing = M27UnitInfo.refPathingTypeNavy
+    if bDebugMessages == true then LOG(sFunctionRef..': About to check pathing for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' if we havent already checked. sLocationRef='..sLocationRef..'; tManualPathingChecks for this='..repru(M27MapInfo.tManualPathingChecks[sPathing][sLocationRef])) end
     if not(M27MapInfo.tManualPathingChecks[sPathing][sLocationRef]) then
         M27MapInfo.tManualPathingChecks[sPathing][sLocationRef] = {tStartPosition[1], tStartPosition[2], tStartPosition[3]}
 
         --Can we find a nearby pond?
         local iAlternativePond
         local tAlternativeLocation
-        local iInterval = 4
+        local iInterval = 2
+        local iMaxSearch = 8 --Tried 4 but an under construction unit at a naval fac doesnt register as being in the same pond
+        if EntityCategoryContains(categories.NAVAL, oUnit.UnitId) and oUnit:GetFractionComplete() < 1 then iMaxSearch = 16 end
         local iSegmentSize = M27MapInfo.iSizeOfBaseLevelSegment
+        if bDebugMessages == true then LOG(sFunctionRef..': About to search for nearby location that is in a recognised pond. iInterval='..iInterval..'; iMaxSearch='..iMaxSearch..'; iSegmentSize='..iSegmentSize) end
+        local bFoundValidMatch = false
 
-        for iModX = -iInterval, iInterval, iInterval do
-            for iModZ = -iInterval, iInterval, iInterval do
+        for iModX = -iMaxSearch, iMaxSearch, iInterval do
+            for iModZ = -iMaxSearch, iMaxSearch, iInterval do
                 tAlternativeLocation = {tStartPosition[1] + iModX, 0, tStartPosition[3] + iModZ}
                 iAlternativePond = M27MapInfo.GetSegmentGroupOfLocation(sPathing, tAlternativeLocation)
+                if bDebugMessages == true then LOG(sFunctionRef..': iModX='..iModX..'; iModZ='..iModZ..'; tAlternativeLocation='..repru(tAlternativeLocation)..'; Dist to start position='..M27Utilities.GetDistanceBetweenPositions(tStartPosition, tAlternativeLocation)..'; iAlternativePond='..iAlternativePond) end
                 if tPondDetails[iAlternativePond] and (tPondDetails[iAlternativePond][subrefPondSize] or 0) >= iMinPondSize then
+                    bFoundValidMatch = true
                     iPond = iAlternativePond
                     --Have a replacement pond to use
                     local iBaseSegmentX, iBaseSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tAlternativeLocation)
@@ -88,17 +102,40 @@ function CheckForPondNearNavalUnit(oUnit)
                     elseif iModZ > 0 then iMinZ = 0 iMaxZ = iModX
                     else iMinZ = 0 iMaxZ = 0
                     end
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef..': Valid pond, will draw in blue and update all nearby pond references from start position to here')
+                        M27Utilities.DrawLocation(tAlternativeLocation, nil, 1, 200)
+                    end
 
                     for iXAdj = iMinX / iSegmentSize, iMaxX / iSegmentSize, 1 do
                         for iZAdj = iMinZ / iSegmentSize, iMaxZ / iSegmentSize, 1 do
                             if not(tPondDetails[M27MapInfo.tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX + iXAdj][iBaseSegmentZ + iZAdj]]) or (tPondDetails[M27MapInfo.tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX + iXAdj][iBaseSegmentZ + iZAdj]] or 0) < iMinPondSize then
                                 M27MapInfo.tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX + iXAdj][iBaseSegmentZ + iZAdj] = iPond
+                                if bDebugMessages == true then
+                                    local iSegmentX = iBaseSegmentX + iXAdj
+                                    local iSegmentZ = iBaseSegmentX + iZAdj
+                                    local tSegmentLocation = M27MapInfo.GetPositionFromPathingSegments(iSegmentX, iSegmentZ)
+                                    LOG(sFunctionRef..': Updating pond for segment X='..iSegmentX..'; Z='..iSegmentZ..' to pond '..iPond..'; whill draw in white, position='..repru(tSegmentLocation))
+
+                                    M27Utilities.DrawLocation(tSegmentLocation, nil, 7, 200)
+                                end
                             end
                         end
                     end
+                    --Make sure we update our current position segment as well
+                    local iStartSegmentX, iStartSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tStartPosition)
+                    M27MapInfo.tPathingSegmentGroupBySegment[sPathing][iStartSegmentX][iStartSegmentZ] = iPond
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef..': Updating start position pond to '..iPond..' and colouring in white, iStartSegmentX='..iStartSegmentX..'; iStartSegmentZ='..iStartSegmentZ)
+                        M27Utilities.DrawLocation(tStartPosition, nil, 7, 200)
+                    end
                     break
+                elseif bDebugMessages == true then
+                    LOG(sFunctionRef..': Location not valid pond, will draw in red')
+                    M27Utilities.DrawLocation(tAlternativeLocation, nil, 2, 200)
                 end
             end
+            if bFoundValidMatch then break end
         end
 
     end
@@ -742,8 +779,10 @@ function UpdateUnitPond(oUnit, iM27TeamUpdatingFor, bIsEnemy, iPondRefOverride)
     local sFunctionRef = 'UpdateUnitPond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if bDebugMessages == true then M27Utilities.ErrorHandler('Audit trail', true) end
+    if oUnit:GetAIBrain():GetArmyIndex() == 5 and (oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xss0212' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xss01032') then bDebugMessages = true end
 
     --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xes02051' and oUnit:GetAIBrain():GetArmyIndex() == 2 and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, bIsEnemy='..tostring((bIsEnemy or false))..'; Unit brain index='..oUnit:GetAIBrain():GetArmyIndex()..'; Unit assigned pond='..(oUnit[refiAssignedPond] or 'nil')..'; Contains fixed pond category='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryPondFixedCategory, oUnit.UnitId))) end
 
     if bIsEnemy or (oUnit:GetAIBrain().M27AI and (not(oUnit[refiAssignedPond]) or not(EntityCategoryContains(M27UnitInfo.refCategoryPondFixedCategory, oUnit.UnitId)))) then --and not(oUnit[reftiTeamRefsUpdatedFor][iM27TeamUpdatingFor])) then
         local iCurPond = iPondRefOverride or M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oUnit:GetPosition())
@@ -751,8 +790,10 @@ function UpdateUnitPond(oUnit, iM27TeamUpdatingFor, bIsEnemy, iPondRefOverride)
         --if tPondDetails[iCurPond] then LOG('Pond size='..(tPondDetails[iCurPond][subrefPondSize] or 'nil')) end
         if not(tPondDetails[iCurPond]) or (tPondDetails[iCurPond][subrefPondSize] or 0) <= iMinPondSize then
             --If have a naval unit that isnt amphibious then update pathing
+            if bDebugMessages == true then LOG(sFunctionRef..': Dont have details for the pond recorded, if its a naval unit then will check for if there is a pond nearby') end
             if EntityCategoryContains(categories.NAVAL * categories.MOBILE - categories.HOVER - categories.AMPHIBIOUS - categories.AIR - categories.LAND, oUnit.UnitId) then
                 iCurPond = CheckForPondNearNavalUnit(oUnit)
+                if bDebugMessages == true then LOG(sFunctionRef..': iCurPond after checking for pond near naval unit='..iCurPond) end
             else
                 iCurPond = 0
             end
@@ -1378,10 +1419,13 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
         while bRemoveUnits do
             bRemoveUnits = false
             for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond] do
+
                 if not(M27UnitInfo.IsUnitValid(oUnit)) then
                     bRemoveUnits = true
                     iRemovedUnits = iRemovedUnits + 1
                     table.remove(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond], iUnit)
+                else
+                    if oUnit:GetAIBrain():GetArmyIndex() == 5 and (oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xss0212' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xss01032') then bDebugMessages = true end
                 end
             end
             if iRemovedUnits >= 5 then break end
@@ -1895,11 +1939,11 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                         iBestRangeDistance = iRange
                         iBestRangeRatio = tiOurRatioVsEnemyByRange[iRange]
                     end
-                    if bDebugMessages == true then LOG(sFunctionRef..': iRange='..iRange..'; iOurCumulativeThreat='..iOurCumulativeThreat..'; iLowThreatThreshold='..iLowThreatThreshold..'; iRatioCap='..iRatioCap..'; iEnemyCumulativeThreat='..iEnemyCumulativeThreat..'; tiOurRatioVsEnemyByRange[iRange]='..tiOurRatioVsEnemyByRange[iRange]..'; iBestRangeRatio='..iBestRangeRatio..'; iBestRangeDistance='..iBestRangeDistance) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iRange='..iRange..'; iOurCumulativeThreat='..iOurCumulativeThreat..'; iLowThreatThreshold='..iLowThreatThreshold..'; iRatioCap='..iRatioCap..'; iEnemyCumulativeThreat='..iEnemyCumulativeThreat..'; tiOurRatioVsEnemyByRange[iRange]='..tiOurRatioVsEnemyByRange[iRange]..'; iBestRangeRatio='..iBestRangeRatio..'; iBestRangeDistance='..(iBestRangeDistance or 'nil')) end
                 end
 
                 iMinRangeForEngagement = math.min(110, (iBestRangeDistance or 0)) --Can engagement min range based on range of Aeon battleship, so all battleships should be able to engage
-                if bDebugMessages == true then LOG(sFunctionRef..': Set min range for engagement to iBestRangeDistance='..iBestRangeDistance) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Set min range for engagement to iBestRangeDistance='..(iBestRangeDistance or 'nil')) end
             end
 
             --Reduce min range for engagement to 0 if enemy near our base

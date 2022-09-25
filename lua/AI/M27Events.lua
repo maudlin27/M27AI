@@ -1232,6 +1232,7 @@ function OnConstructed(oEngineer, oJustBuilt)
 
             --Make sure we have a LC set for this unit
             local iLC = M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)
+            if oJustBuilt.UnitId == 'xss0103' and M27UnitInfo.GetUnitLifetimeCount(oJustBuilt) == 2 and oJustBuilt:GetAIBrain():GetArmyIndex() == 5 then bDebugMessages = true end
 
 
 
@@ -1242,7 +1243,7 @@ function OnConstructed(oEngineer, oJustBuilt)
             local aiBrain = oJustBuilt:GetAIBrain()
 
             if bDebugMessages == true then
-                LOG(sFunctionRef..': oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; oJustBuilt='..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt))
+                LOG(sFunctionRef..': oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; oJustBuilt='..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)..'; Assigned pond='..(oJustBuilt[M27Navy.refiAssignedPond] or 'nil'))
                 LOG('Have we just built experimental level unit='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryExperimentalLevel, oJustBuilt.UnitId))..'; LC for experimental level='..M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryExperimentalLevel)..'; T3 arti LC='..M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryFixedT3Arti))
             end
 
@@ -1338,13 +1339,6 @@ function OnConstructed(oEngineer, oJustBuilt)
                         end
                     end
                 end
-
-                --Update pond
-                if not(oJustBuilt[M27Navy.refiAssignedPond]) then M27Navy.UpdateUnitPond(oJustBuilt, oJustBuilt:GetAIBrain().M27Team, false) end
-                --Just built a naval based building?
-            elseif EntityCategoryContains(M27UnitInfo.refCategorySonar + M27UnitInfo.refCategoryNavalFactory + M27UnitInfo.refCategoryTorpedoLauncher, oJustBuilt.UnitId) then
-                if not(oJustBuilt[M27Navy.refiAssignedPond]) then M27Navy.UpdateUnitPond(oJustBuilt, oJustBuilt:GetAIBrain().M27Team, false) end
-
                 --Other tracking
             else
                 --Have we just built an experimental unit? If so then tell our ACU to return to base as even if we havent scouted enemy threat they could have an experimental by now
@@ -1370,6 +1364,12 @@ function OnConstructed(oEngineer, oJustBuilt)
                 if EntityCategoryContains(M27UnitInfo.refCategoryQuantumOptics, oJustBuilt.UnitId) then
                     ForkThread(M27AirOverseer.QuantumOpticsManager, aiBrain, oJustBuilt)
                 end
+            end
+
+
+            --Update pond
+            if not(oJustBuilt[M27Navy.refiAssignedPond]) and (EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, oEngineer.UnitId) or EntityCategoryContains(categories.NAVAL + M27UnitInfo.refCategorySonar + M27UnitInfo.refCategoryNavalFactory + M27UnitInfo.refCategoryTorpedoLauncher, oJustBuilt.UnitId)) then
+                M27Navy.UpdateUnitPond(oJustBuilt, oJustBuilt:GetAIBrain().M27Team, false)
             end
 
             --If have just upgraded a shield then clear tracking (redundancy as should also trigger from 'death' of old shield)
