@@ -11229,7 +11229,6 @@ end--]]
                         end
                     elseif iCurrentConditionToTry == 35 then --If are rebuilding a mex or have a T3 mex under construction then treat as a high priority if getting low on mass (since want to complete it to get more mass)
                         if not(bHaveVeryLowPower) then
-                            if tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
                             if bDebugMessages == true then LOG(sFunctionRef..': Is table of build t3 over t2 empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildT3MexOverT2]))..'; Is table of T3 under construction empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftT3MexesUnderConstruction]))) end
                             if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildT3MexOverT2]) == false and bHaveLowMass then
                                 --Refresh the list of mexes
@@ -11563,12 +11562,15 @@ end--]]
                         end
                     elseif iCurrentConditionToTry == 45 then --Higher priority air staging for if we have lots of air units wanting refueling
                         if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..': bHaveLowPower='..tostring(bHaveLowPower)..'; aiBrain[M27AirOverseer.refiAirStagingWanted]='..(aiBrain[M27AirOverseer.refiAirStagingWanted] or 'nil')) end
-                        if bHaveLowPower == false and (aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) >= 3 and aiBrain:GetCurrentUnits(refCategoryAirStaging) == 0 then
-                            iActionToAssign = refActionBuildAirStaging
-                            iSearchRangeForNearestEngi = 100
-                            iMaxEngisWanted = 1
-                            if not(bHaveLowMass) and not(bHaveLowPower) then iMaxEngisWanted = 2 end
-                            if bDebugMessages == true then LOG(sFunctionRef..': Setting action to be build air staging, iMaxEngisWanted='..iMaxEngisWanted) end
+                        if bHaveLowPower == false and aiBrain:GetCurrentUnits(refCategoryAirStaging) == 0 then
+                            local iLCT2PlusAirBuilt = M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAirNonScout - categories.TECH1)
+                            if ((aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) >= 3 or iLCT2PlusAirBuilt >= 5 or ((aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) > 0 and iLCT2PlusAirBuilt >= 2)) then
+                                iActionToAssign = refActionBuildAirStaging
+                                iSearchRangeForNearestEngi = 100
+                                iMaxEngisWanted = 1
+                                if not(bHaveLowMass) and not(bHaveLowPower) then iMaxEngisWanted = 2 end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Setting action to be build air staging, iMaxEngisWanted='..iMaxEngisWanted) end
+                            end
                         end
                     elseif iCurrentConditionToTry == 46 then --Fortify firebase
                         --if tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
@@ -11688,7 +11690,6 @@ end--]]
                                     end
 
                                     if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftMexesToCtrlK]) == false or M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildT3MexOverT2]) == false then
-                                        if tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
                                         iActionToAssign = refActionBuildT3MexOverT2
                                         iMaxEngisWanted = 10
                                         tExistingLocationsToPickFrom = {}

@@ -60,8 +60,6 @@ function CheckForPondNearNavalUnit(oUnit)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
     local sFunctionRef = 'CheckForPondNearNavalUnit'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if oUnit:GetAIBrain():GetArmyIndex() == 5 and (oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xss0212' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xss01032') then bDebugMessages = true end
-    if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), {618.28161621094, 17.507583618164, 200.2126007080}) <= 2 then bDebugMessages = true end
 
 
     local iPond = 0
@@ -779,7 +777,6 @@ function UpdateUnitPond(oUnit, iM27TeamUpdatingFor, bIsEnemy, iPondRefOverride)
     local sFunctionRef = 'UpdateUnitPond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if bDebugMessages == true then M27Utilities.ErrorHandler('Audit trail', true) end
-    if oUnit:GetAIBrain():GetArmyIndex() == 5 and (oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xss0212' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xss01032') then bDebugMessages = true end
 
     --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xes02051' and oUnit:GetAIBrain():GetArmyIndex() == 2 and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, bIsEnemy='..tostring((bIsEnemy or false))..'; Unit brain index='..oUnit:GetAIBrain():GetArmyIndex()..'; Unit assigned pond='..(oUnit[refiAssignedPond] or 'nil')..'; Contains fixed pond category='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryPondFixedCategory, oUnit.UnitId))) end
@@ -1424,8 +1421,6 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                     bRemoveUnits = true
                     iRemovedUnits = iRemovedUnits + 1
                     table.remove(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond], iUnit)
-                else
-                    if oUnit:GetAIBrain():GetArmyIndex() == 5 and (oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xss0212' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xss01032') then bDebugMessages = true end
                 end
             end
             if iRemovedUnits >= 5 then break end

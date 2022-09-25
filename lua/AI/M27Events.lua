@@ -1232,7 +1232,6 @@ function OnConstructed(oEngineer, oJustBuilt)
 
             --Make sure we have a LC set for this unit
             local iLC = M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)
-            if oJustBuilt.UnitId == 'xss0103' and M27UnitInfo.GetUnitLifetimeCount(oJustBuilt) == 2 and oJustBuilt:GetAIBrain():GetArmyIndex() == 5 then bDebugMessages = true end
 
 
 

@@ -4453,9 +4453,11 @@ function ThreatAssessAndRespond(aiBrain)
                                                             M27Utilities.IssueTrackedClearCommands({ tTorpSubtable[refoTorpUnit] })
                                                             IssueAttack({ tTorpSubtable[refoTorpUnit] }, oUnit)
                                                             M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit, 1, true)
-                                                            for iUnit, oUnit in tEnemyUnits do
-                                                                IssueAttack({ tTorpSubtable[refoTorpUnit] }, oUnit)
-                                                                M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit, 1, false)
+                                                            if M27Utilities.IsTableEmpty(tEnemyPriorityUnits) == false then
+                                                                for iUnit, oUnit in tEnemyPriorityUnits do
+                                                                    IssueAttack({ tTorpSubtable[refoTorpUnit] }, oUnit)
+                                                                    M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit, 1, false)
+                                                                end
                                                             end
                                                             IssueAggressiveMove({ tTorpSubtable[refoTorpUnit] }, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                                                             tTorpSubtable[refoTorpUnit][M27AirOverseer.refbOnAssignment] = true
