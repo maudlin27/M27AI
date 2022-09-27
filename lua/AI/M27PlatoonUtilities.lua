@@ -10807,7 +10807,7 @@ function ProcessPlatoonAction(oPlatoon)
                             tDFTargetPosition = { }
                             local tNearbyEnemiesOfInterest
 
-                            if oPlatoon[refiPlatoonMaxRange] >= 60 and not(M27UnitInfo.IsUnitUnderwater(oPlatoon[refoFrontUnit])) then oPlatoon[M27PlatoonTemplates.refbAttackMove] = true
+                            if oPlatoon[refiPlatoonMaxRange] >= 60 and not(M27UnitInfo.IsUnitUnderwater(oPlatoon[refoFrontUnit])) and not(oPlatoon[refoFrontUnit][M27UnitInfo.refbLastShotBlocked]) then oPlatoon[M27PlatoonTemplates.refbAttackMove] = true
                             else
                                 if bDebugMessages == true then LOG(sFunctionRef..': Either our range is <60 or we are underwater so wont attackmove') end
                                 oPlatoon[M27PlatoonTemplates.refbAttackMove] = false
