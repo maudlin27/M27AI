@@ -5785,7 +5785,7 @@ end
 
 function ReplaceT2WithT3Monitor(aiBrain, oEngineer, oActionTargetObject)
     --Call this via forkthread; will check if oEngineer is near the target object, and if the target object exists, and once it is, will get it rebuilt with a T3 mex
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ReplaceT2WithT3Monitor'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
@@ -6995,7 +6995,6 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                     local sLocationRef = M27Utilities.ConvertLocationToReference(tTargetLocation)
                                     aiBrain[reftSpareEngineerAttackMoveTimeByLocation][sLocationRef] = GetGameTimeSeconds()
                                 elseif iActionToAssign == refActionBuildT3MexOverT2 then
-                                    bDebugMessages = true
                                     --Want to move near the location first, wait for it to be ctrl-Kd, and then build
 
                                     --First make sure we can build a T3 mex with this engineer (e.g. in case unit restrictions are active or somethign unexpected has happened)
@@ -9123,7 +9122,7 @@ function RefreshUnderConstructionT3MexList(aiBrain)
 end
 
 function ConsiderRefreshingMexesToCtrlK(aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ConsiderRefreshingMexesToCtrlK'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -11241,7 +11240,6 @@ end--]]
                             else
                                 RefreshUnderConstructionT3MexList(aiBrain)
                                 if M27Utilities.IsTableEmpty(aiBrain[reftT3MexesUnderConstruction]) == false then
-                                    bDebugMessages = true
                                     iActionToAssign = refActionBuildT3MexOnly
                                     tExistingLocationsToPickFrom = {}
                                     local iClosestLocation = 10000
@@ -11261,7 +11259,6 @@ end--]]
                             end
                         end
                     elseif iCurrentConditionToTry == 36 then --More engineers for navy if are behind
-                        bDebugMessages = false
                         local iPondWanted = M27Navy.GetPondToFocusOn(aiBrain)
                         if iPondWanted and M27Team.tTeamData[aiBrain.M27Team][M27Team.refbHaveNavalShortfall][iPondWanted] then
                             local iPondEngisWanted
@@ -11713,7 +11710,6 @@ end--]]
                             end
                         end
                     elseif iCurrentConditionToTry == 48 then --Make sure we have at least 2 T3 land factories if we have significant mass and want more engineers
-                        bDebugMessages = false
                         if iEngineersWantedPreReset >= 5 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 15 and aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > 0 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.25 and not(bHaveVeryLowPower) and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 3 then
                             local iExistingT3LandFactories = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * categories.TECH3)
                             if iExistingT3LandFactories < 2 or (iExistingT3LandFactories < 3 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 25) or (iExistingT3LandFactories < 4 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 35) then

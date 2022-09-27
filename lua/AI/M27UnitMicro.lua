@@ -470,7 +470,6 @@ function DodgeShot(oTarget, oWeapon, oAttacker, iTimeToDodge)
     if oNavigator and oNavigator.GetCurrentTargetPos then
         tCurDestination = oNavigator:GetCurrentTargetPos()
     else
-        bDebugMessages = true
         if oAttacker.GetPosition then
             if bDebugMessages == true then LOG(sFunctionRef..': Attacker has position so will get this') end
             tCurDestination = oAttacker:GetPosition()
@@ -488,7 +487,6 @@ function DodgeShot(oTarget, oWeapon, oAttacker, iTimeToDodge)
             end
         end
         if bDebugMessages == true then LOG(sFunctionRef..': tCurDestination after backup options='..repru(tCurDestination)) end
-        bDebugMessages = false
     end
     local iCurFacingAngle = M27UnitInfo.GetUnitFacingAngle(oTarget)
     local iAngleToDestination = M27Utilities.GetAngleFromAToB(oTarget:GetPosition(), tCurDestination)
@@ -520,7 +518,7 @@ function DodgeShot(oTarget, oWeapon, oAttacker, iTimeToDodge)
 end
 
 function ConsiderDodgingShot(oUnit, oWeapon)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ConsiderDodgingShot'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then

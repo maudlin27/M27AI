@@ -4495,7 +4495,6 @@ function ThreatAssessAndRespond(aiBrain)
                                 LOG(sFunctionRef .. ': Dont have enough torp bombers; iCumulativeTorpBomberThreatShortfall=' .. iCumulativeTorpBomberThreatShortfall)
                             end
                         end
-                        bDebugMessages = false
                     end --Not dealing with navy
                 end
             end --for each tEnemyThreatGroup

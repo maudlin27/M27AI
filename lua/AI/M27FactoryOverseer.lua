@@ -1554,14 +1554,39 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     iCategoryToBuild = M27UnitInfo.refCategoryAirAA
                                 else
                                     bReachedLastOption = true
-                                    if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoACUKillTarget])) or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27UnitInfo.IsUnitUnderwater(M27Utilities.GetACU(aiBrain))) then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': ACU is underwater so will get torp bombers') end
+                                    local bWantTorps = false
+                                    if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoACUKillTarget])) then
+                                        bWantTorps = true
+                                    elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU then
+                                        local oACU = M27Utilities.GetACU(aiBrain)
+                                        if M27UnitInfo.IsUnitUnderwater(oACU) then
+                                            local iCurPond = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oACU:GetPosition())
+                                            if M27Navy.tPondDetails[iCurPond] and M27Navy.tPondDetails[iCurPond][M27Navy.subrefPondSize] then
+                                                --Does the enemy have any naval units in the pond, or is it a large pond?
+                                                if M27Navy.tPondDetails[iCurPond][M27Navy.subrefPondSize] > M27Navy.iMinPondSize * 5 then
+                                                    bWantTorps = true
+                                                else
+                                                    --Does enemy have naval units in this pond?
+                                                    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]) == false and M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iCurPond]) == false then
+                                                        bWantTorps = true
+                                                    end
+                                                end
+                                            end
+                                        end
+
+                                    end
+                                    if bWantTorps then
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': ACU is underwater so will get torp bombers')
+                                        end
                                         iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
                                     else
-                                        if bDebugMessages == true then LOG(sFunctionRef..': No air units near acu so build bombers') end
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': No air units near acu so build bombers')
+                                        end
                                         iCategoryToBuild = M27UnitInfo.refCategoryBomber
                                     end
-                                end
+                            end
                                 iTotalWanted = 100
                             else
                                 if iCurrentConditionToTry == 1 then
@@ -1798,7 +1823,21 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                     iCategoryToBuild = M27UnitInfo.refCategoryBomber * categories.TECH1
                                                 end
                                             else
-                                                iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
+                                                --Only get torp bombers if it's in a big pond (no point if it's in a verysmall river)
+                                                local iCurPond = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, aiBrain[M27Overseer.refoNearestRangeAdjustedLandExperimental]:GetPosition())
+                                                local bWantTorpBomber = false
+                                                if M27Navy.tPondDetails[iCurPond] and M27Navy.tPondDetails[iCurPond][M27Navy.subrefPondSize] then
+                                                    if M27Navy.tPondDetails[iCurPond][M27Navy.subrefPondSize] > math.min(M27Navy.iMinPondSize * 0.5, 150) then
+                                                        bWantTorpBomber = true
+                                                    end
+                                                end
+                                                if bWantTorpBomber then
+                                                    iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
+                                                else
+                                                    if iCurT1Bombers < 80 then
+                                                        iCategoryToBuild = M27UnitInfo.refCategoryBomber * categories.TECH1
+                                                    end
+                                                end
                                             end
                                         else
                                             --Get t1 bombers if dont have many already, or T3 bombers otherwise
@@ -1824,54 +1863,74 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         end
                                         iCategoryToBuild = refCategoryAirScout
                                         iTotalWanted = 1
-                                    elseif (aiBrain[M27AirOverseer.refiTorpBombersWanted] > 0 or aiBrain[M27Overseer.refbT2NavyNearOurBase] or M27UnitInfo.IsUnitUnderwater(M27Utilities.GetACU(aiBrain))) and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryTorpBomber, 2) then
+                                    elseif (aiBrain[M27AirOverseer.refiTorpBombersWanted] > 0 or aiBrain[M27Overseer.refbT2NavyNearOurBase]) and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryTorpBomber, 2) then
                                         if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': Lifetime torp bomber count is <2 so will build torp bomber as ACU is underwater')
+                                            LOG(sFunctionRef .. ': Lifetime torp bomber count is <2 so will build torp bomber as want torp bombers or have navy near our base')
                                         end
                                         iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
                                         iTotalWanted = 2
-                                    elseif M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryBomber, 1) == true then
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': Never built bomber so building as high priority')
-                                        end
-                                        iCategoryToBuild = refCategoryBomber
-                                        iTotalWanted = 1
-                                    elseif iFactoryTechLevel >= 3 then
-                                        --Want either c. 1 T3 or 5 T2 power before try building these ahead of engineers
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': T3 factory so considering if want a first T3 spy plane or strat')
-                                        end
-                                        if (bHavePowerForAir or aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 250) and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAirScout * categories.TECH3, 1) == true and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) then
-                                            if bDebugMessages == true then
-                                                LOG(sFunctionRef .. ': Never built spy plane so building as high priority')
-                                            end
-                                            iCategoryToBuild = refCategoryAirScout * categories.TECH3
-                                            iTotalWanted = 1
-                                        elseif (bHavePowerForAir or aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 275) and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryBomber * categories.TECH3, 1) == true and (aiBrain[M27AirOverseer.refiAirAAWanted] <= 1 or M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy'))) then
-                                            if bDebugMessages == true then
-                                                LOG(sFunctionRef .. ': Never built strat bomber so building as high priority')
-                                            end
-                                            iCategoryToBuild = refCategoryBomber * categories.TECH3
-                                            iTotalWanted = 1
-                                        end
-                                        if bDebugMessages == true then
-                                            if not (iCategoryToBuild) then
-                                                LOG('Dont have anything to build after doing lifetime build check; lifetime build check for bomer=' .. tostring(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryBomber * categories.TECH3, 1)) .. '; DOes the enemy have T3 air=' .. tostring(M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA * categories.TECH3 + M27UnitInfo.refCategoryGroundAA * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy'))))
-                                            else
-                                                LOG('Have a category to build')
+                                    else
+                                        --Torp bombers on standby if not built before and ACU in large body of water (so are prepared for e.g. enemy subs)
+                                        local bWantTorpBomber = false
+                                        if M27UnitInfo.IsUnitUnderwater(M27Utilities.GetACU(aiBrain)) and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryTorpBomber, 2) then
+                                            local oACU = M27Utilities.GetACU(aiBrain)
+                                            local iCurPond = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oACU:GetPosition())
+                                            if M27Navy.tPondDetails[iCurPond] and M27Navy.tPondDetails[iCurPond][M27Navy.subrefPondSize] then
+                                                if M27Navy.tPondDetails[iCurPond][M27Navy.subrefPondSize] > M27Navy.iMinPondSize * 5 then
+                                                    bWantTorpBomber = true
+                                                end
                                             end
                                         end
-                                    elseif iFactoryTechLevel == 1 and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 500 then
-                                        --Increase high priority air scout and t1 bomber to 2 (as engis will be more important for expanding)
-                                        if M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAirScout, 2) == true and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) then
-                                            iCategoryToBuild = refCategoryAirScout
-                                        elseif aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] <= 0 and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryBomber, 2) == true then
-                                            if bDebugMessages == true then
-                                                LOG(sFunctionRef .. ': Will build highest tech bomber possible; however as factory tech level is 1 this means we will just build T1 bombers')
+                                        if bWantTorpBomber then
+                                            iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
+                                            iTotalWanted = 2
+                                        else
+                                            if M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryBomber, 1) == true then
+                                                if bDebugMessages == true then
+                                                    LOG(sFunctionRef .. ': Never built bomber so building as high priority')
+                                                end
+                                                iCategoryToBuild = refCategoryBomber
+                                                iTotalWanted = 1
+                                            elseif iFactoryTechLevel >= 3 then
+                                                --Want either c. 1 T3 or 5 T2 power before try building these ahead of engineers
+                                                if bDebugMessages == true then
+                                                    LOG(sFunctionRef .. ': T3 factory so considering if want a first T3 spy plane or strat')
+                                                end
+                                                if (bHavePowerForAir or aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 250) and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAirScout * categories.TECH3, 1) == true and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) then
+                                                    if bDebugMessages == true then
+                                                        LOG(sFunctionRef .. ': Never built spy plane so building as high priority')
+                                                    end
+                                                    iCategoryToBuild = refCategoryAirScout * categories.TECH3
+                                                    iTotalWanted = 1
+                                                elseif (bHavePowerForAir or aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 275) and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryBomber * categories.TECH3, 1) == true and (aiBrain[M27AirOverseer.refiAirAAWanted] <= 1 or M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy'))) then
+                                                    if bDebugMessages == true then
+                                                        LOG(sFunctionRef .. ': Never built strat bomber so building as high priority')
+                                                    end
+                                                    iCategoryToBuild = refCategoryBomber * categories.TECH3
+                                                    iTotalWanted = 1
+                                                end
+                                                if bDebugMessages == true then
+                                                    if not (iCategoryToBuild) then
+                                                        LOG('Dont have anything to build after doing lifetime build check; lifetime build check for bomer=' .. tostring(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryBomber * categories.TECH3, 1)) .. '; DOes the enemy have T3 air=' .. tostring(M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA * categories.TECH3 + M27UnitInfo.refCategoryGroundAA * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy'))))
+                                                    else
+                                                        LOG('Have a category to build')
+                                                    end
+                                                end
+                                            elseif iFactoryTechLevel == 1 and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 500 then
+                                                --Increase high priority air scout and t1 bomber to 2 (as engis will be more important for expanding)
+                                                if M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAirScout, 2) == true and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) then
+                                                    iCategoryToBuild = refCategoryAirScout
+                                                elseif aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] <= 0 and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryBomber, 2) == true then
+                                                    if bDebugMessages == true then
+                                                        LOG(sFunctionRef .. ': Will build highest tech bomber possible; however as factory tech level is 1 this means we will just build T1 bombers')
+                                                    end
+                                                    iCategoryToBuild = refCategoryBomber
+                                                end
                                             end
-                                            iCategoryToBuild = refCategoryBomber
                                         end
                                     end
+
+
                                 elseif iCurrentConditionToTry == 8 then
                                     --Initial engis
                                     if M27Conditions.LifetimeBuildCountLessThan(aiBrain, refCategoryEngineer, aiBrain[refiInitialEngineersWanted] + 1) == true then
@@ -2329,11 +2388,10 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     bReachedLastOption = true
                                     break
                                 end
-                            end
+                                end
 
                             --=======NAVAL FACTORY------------------
                         elseif bIsNavalFactory then
-                            if aiBrain:GetArmyIndex() == 2 and iFactoryTechLevel >= 2 then bDebugMessages = true end
                             if oFactory == M27Navy.GetPrimaryNavalFactory(aiBrain, oFactory[M27Navy.refiAssignedPond]) then M27Team.tTeamData[aiBrain.M27Team][M27Team.refbHaveNavalShortfall][oFactory[M27Navy.refiAssignedPond]] = true end
                             iTotalWanted = 3 --As are looking at things on a team wide basis and this only checks on an aibrain basis will just try and build lots of the one category
                             if iCurrentConditionToTry == 1 then --Immediate threat to base

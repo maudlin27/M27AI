@@ -1388,7 +1388,7 @@ end
 
 function AddStealthAssignment(oUnitToSupport, oClosestStealth, tOurBase)
     --Assignes closest stealth to support oUnitToSupport and gets it to move there, by reference to our base
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AddStealthAssignment'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -2155,13 +2155,23 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                     bConsolidateForces = true
                     local tTablesOfUnitsToAverage = {}
                     if M27Utilities.IsTableEmpty(tFriendliesNearFront) == false then
-                        table.insert(tTablesOfUnitsToAverage, EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer, tFriendliesNearFront))
+                        local tMobileFriendliesNearFront = EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer, tFriendliesNearFront)
+                        if M27Utilities.IsTableEmpty(tMobileFriendliesNearFront) == false then
+                            table.insert(tTablesOfUnitsToAverage, tMobileFriendliesNearFront)
+                        end
                     end
                     if M27Utilities.IsTableEmpty(tFriendlyNearbyReinforcements) == false then
-                        table.insert(tTablesOfUnitsToAverage, EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer, tFriendlyNearbyReinforcements))
+                        local tMobileFriendliesNearFront = EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer, tFriendlyNearbyReinforcements)
+                        if M27Utilities.IsTableEmpty(tMobileFriendliesNearFront) == false then
+                            table.insert(tTablesOfUnitsToAverage, tMobileFriendliesNearFront)
+                        end
                     end
+                    if M27Utilities.IsTableEmpty(tTablesOfUnitsToAverage) == false then
 
-                    tGlobalNavalDestination = M27Utilities.GetAveragePositionOfMultipleTablesOfUnits(tTablesOfUnitsToAverage)
+                        tGlobalNavalDestination = M27Utilities.GetAveragePositionOfMultipleTablesOfUnits(tTablesOfUnitsToAverage)
+                    else
+                        tGlobalNavalDestination = { tOurBase[1], tOurBase[2], tOurBase[3] }
+                    end
 
                     if bDebugMessages == true then
                         local iUnits = 0
@@ -2185,13 +2195,22 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                         bConsolidateForces = true
                         local tTablesOfUnitsToAverage = {}
                         if M27Utilities.IsTableEmpty(tFriendliesNearFront) == false then
-                            table.insert(tTablesOfUnitsToAverage, EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer, tFriendliesNearFront))
+                            local tMobileFriendliesNearFront = EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer, tFriendliesNearFront)
+                            if M27Utilities.IsTableEmpty(tMobileFriendliesNearFront) == false then
+                                table.insert(tTablesOfUnitsToAverage, tMobileFriendliesNearFront)
+                            end
                         end
                         if M27Utilities.IsTableEmpty(tFriendlyNearbyReinforcements) == false then
-                            table.insert(tTablesOfUnitsToAverage, EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer, tFriendlyNearbyReinforcements))
+                            local tMobileFriendliesNearFront = EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer, tFriendlyNearbyReinforcements)
+                            if M27Utilities.IsTableEmpty(tMobileFriendliesNearFront) == false then
+                                table.insert(tTablesOfUnitsToAverage, tMobileFriendliesNearFront)
+                            end
                         end
                         if M27Utilities.IsTableEmpty(tFriendlyFurtherAwayReinforcements) == false then
-                            table.insert(tTablesOfUnitsToAverage, EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer, tFriendlyFurtherAwayReinforcements))
+                            local tMobileFriendliesNearFront = EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer, tFriendlyFurtherAwayReinforcements)
+                            if M27Utilities.IsTableEmpty(tMobileFriendliesNearFront) == false then
+                                table.insert(tTablesOfUnitsToAverage, tMobileFriendliesNearFront)
+                            end
                         end
 
                         if M27Utilities.IsTableEmpty(tTablesOfUnitsToAverage) == false then
