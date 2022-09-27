@@ -29,6 +29,7 @@ reftiTeamRefsUpdatedFor = 'M27UpdatedTeamRefs' --Reflects M27 team ref numbers t
 refbTempIsUnderwater = 'M27IsUnderwater' --Temporary for units - set when analysing naval threats only, so can refer to it later in code
 refbRechargeShield = 'M27NavyRechargeShield' --against unit, true if want to recharge shield
 reftoAssignedShields = 'M27NavyAssignedShields' --against unit, table of all shields assigned to support this unit
+reftoAssignedStealth = 'M27NavyAssignedStealth' --against unit, table of all stealth boats assigned to support this unit
 refoSupportTarget = 'M27NavySupportTarget' --against unit, the unit that it is supporting (e.g. for a shield this would be the unit it is shielding)
 
 --TeamData variables (references are to tTeamData[aiBrain.M27Team] - see M27Team
@@ -1333,6 +1334,18 @@ function RemoveShieldAssignment(oShield)
     end
     oShield[refoSupportTarget] = nil
 end
+function RemoveStealthAssignment(oStealth)
+    local oUnitToSupport = oStealth[refoSupportTarget]
+    if M27UnitInfo.IsUnitValid(oUnitToSupport) and M27Utilities.IsTableEmpty(oUnitToSupport[reftoAssignedStealth]) == false then
+        for iSupportingStealth, oSupportingStealth in oUnitToSupport[reftoAssignedStealth] do
+            if oSupportingStealth == oStealth then
+                table.remove(oUnitToSupport[reftoAssignedStealth], iSupportingStealth)
+                break
+            end
+        end
+    end
+    oStealth[refoSupportTarget] = nil
+end
 
 function AddShieldAssignment(oUnitToSupport, oClosestShield, tOurBase)
     --Assignes closest shield to support oUnitToSupport and gets it to move there, by reference to our base
@@ -1371,6 +1384,45 @@ function AddShieldAssignment(oUnitToSupport, oClosestShield, tOurBase)
         M27Utilities.ErrorHandler('Passed invalid unit to support for shield assignment')
     end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function AddStealthAssignment(oUnitToSupport, oClosestStealth, tOurBase)
+    --Assignes closest stealth to support oUnitToSupport and gets it to move there, by reference to our base
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'AddStealthAssignment'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if M27UnitInfo.IsUnitValid(oUnitToSupport) then --Redundancy
+        --Are we already assigned a support target that is different? If so then remove cur assignment
+        if oClosestStealth[refoSupportTarget] then
+            if not(oClosestStealth[refoSupportTarget] == oUnitToSupport) then
+                RemoveStealthAssignment(oClosestStealth)
+            end
+        end
+        oClosestStealth[refoSupportTarget] = oUnitToSupport
+        if not(oUnitToSupport[reftoAssignedStealth]) then oUnitToSupport[reftoAssignedStealth] = {} end
+        table.insert(oUnitToSupport[reftoAssignedStealth], oClosestStealth)
+
+        --Move the stealth so it covers the unit if it doesnt already
+        local iStealthRadius = oClosestStealth:GetBlueprint().Intel.RadarStealthFieldRadius * 0.8
+        local iTargetSpeed = oUnitToSupport:GetBlueprint().Physics.MaxSpeed
+        --local iDistToTarget = M27Utilities.GetDistanceBetweenPositions(oClosestStealth:GetPosition(), oUnitToSupport:GetPosition())
+        local iDistFromTarget = math.max(2, iStealthRadius - iTargetSpeed * 1.5 - 3)
+        if iDistFromTarget <= 2 then iDistFromTarget = -2 end
+
+        --if iDistFromTarget > 2 then
+        local tMoveTarget = M27Utilities.MoveInDirection(oUnitToSupport:GetPosition(), M27Utilities.GetAngleFromAToB(oUnitToSupport:GetPosition(), tOurBase), iDistFromTarget, true, false)
+        MoveUnitTowardsTarget(oClosestStealth, tMoveTarget, false, 'St:'..oUnitToSupport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToSupport))
+        if bDebugMessages == true then LOG(sFunctionRef..': oClosestStealth='..oClosestStealth.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestStealth)..'; oUnitToSupport='..oUnitToSupport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToSupport)..'; Our position='..repru(oClosestStealth:GetPosition())..'; Unit to support posiiton='..repru(oUnitToSupport:GetPosition())..'; Distance to position='..M27Utilities.GetDistanceBetweenPositions(oClosestStealth:GetPosition(), oUnitToSupport:GetPosition())..'; iStealthRadius='..iStealthRadius..'; iTargetSpeed='..iTargetSpeed..'; iDistFromTarget='..iDistFromTarget..'; tMoveTarget='..repru(tMoveTarget)..'; Distance to move target='..M27Utilities.GetDistanceBetweenPositions(tMoveTarget, oClosestStealth:GetPosition())) end
+        --else
+        --Need to be so close to the target that probably want to be infront of it rather than behind - decided to leave as the lower speed means cant keep up
+
+        --GuardTarget(oClosestStealth, oUnitToSupport)
+        --end
+    else
+        M27Utilities.ErrorHandler('Passed invalid unit to support for stealth assignment')
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 
@@ -2667,6 +2719,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
             local iCurShieldHealth, iMaxShieldHealth
             local iShieldPercent
             local tShieldsToAssign = {}
+            local tStealthToAssign = {}
 
             for iUnit, oUnit in tSupportUnits do
                 if bDebugMessages == true then LOG(sFunctionRef..': Considering if unit is a shield and if its available. oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
@@ -2697,6 +2750,10 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                             if bDebugMessages == true then LOG(sFunctionRef..': Have added unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to table of shields that will assign shortly') end
                         end
                     end
+                elseif EntityCategoryContains(M27UnitInfo.refCategoryStealthBoat, oUnit.UnitId) then
+                    --Cover the closest non-stealth boat mobile surface unit
+                    table.insert(tStealthToAssign, oUnit)
+
                 else
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': Sending move command to oUnit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' to ' .. repru(tSupportDestination))
@@ -2818,8 +2875,126 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                         end
                     end
                     for iShield, oClosestShield in tShieldsToAssign do
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have no more priority units, assigning shield '..oClosetsShield.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestShield)..' to oRemainingUnitPriority='..oRemainingUnitPriority.UnitId..M27UnitInfo.GetUnitLifetimeCount(oRemainingUnitPriority)) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have no more priority units, assigning shield '..oClosestShield.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestShield)..' to oRemainingUnitPriority='..oRemainingUnitPriority.UnitId..M27UnitInfo.GetUnitLifetimeCount(oRemainingUnitPriority)) end
                         AddShieldAssignment(oRemainingUnitPriority, oClosestShield, tOurBase)
+                    end
+                end
+            end
+
+            ---->>>>Stealth boats<<<<----
+            --Largely copy of shield boat logic, but done differently in case we ever want shield boats to cover submersible units
+            if M27Utilities.IsTableEmpty(tStealthToAssign) == false then
+                local tUnitsToStealthByPriority = {}
+                local iCurPriority = 1
+                local iSurfaceCombatCategory = M27UnitInfo.refCategoryNavalSurface * categories.DIRECTFIRE + M27UnitInfo.refCategoryNavalSurface * categories.INDIRECTFIRE + M27UnitInfo.refCategoryNavalSurface * categories.ANTINAVY
+                local oClosestSurface1, oClosestSurface2, oClosestSurface3
+                local iClosestSurface1 = 100000
+                local iClosestSurface2 = 100000
+                local iClosestSurface3 = 100000
+
+                local iCurDist
+
+                function AddUnitToPriorityList(oUnit)
+                    table.insert(tUnitsToStealthByPriority, oUnit)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Added unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to priority list, iCurPriority='..iCurPriority..'; Distance to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tEnemyBase)) end
+                    iCurPriority = iCurPriority + 1
+                end
+
+
+                local tSurfaceCombat = EntityCategoryFilterDown(iSurfaceCombatCategory, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
+                if M27Utilities.IsTableEmpty(tSurfaceCombat) == false then
+                    for iUnit, oUnit in tSurfaceCombat do
+                        iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tEnemyBase)
+                        if iCurDist < iClosestSurface3 then
+                            if iCurDist < iClosestSurface2 then
+                                if iCurDist < iClosestSurface1 then
+                                    oClosestSurface3 = oClosestSurface2
+                                    iClosestSurface3 = iClosestSurface2
+                                    oClosestSurface2 = oClosestSurface1
+                                    iClosestSurface2 = iClosestSurface1
+                                    oClosestSurface1 = oUnit
+                                    iClosestSurface1 = iCurDist
+                                else
+                                    --Closet than 2 not 1
+                                    oClosestSurface3 = oClosestSurface2
+                                    iClosestSurface3 = iClosestSurface2
+                                    oClosestSurface2 = oUnit
+                                    iClosestSurface2 = iCurDist
+                                end
+                            else
+                                oClosestSurface3 = oUnit
+                                iClosestSurface3 = iCurDist
+                            end
+                        end
+                    end
+                end
+                if oClosestSurface1 then AddUnitToPriorityList(oClosestSurface1) end
+                local oClosestCruiser1, oClosestCruiser2
+                local iClosestCruiser1 = 100000
+                local iClosestCruiser2 = 100000
+                local tCruisers = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiser, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
+                if M27Utilities.IsTableEmpty(tCruisers) == false then
+                    for iUnit, oUnit in tCruisers do
+                        iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tOurBase)
+                        if iCurDist < iClosestCruiser2 then
+                            if iCurDist < iClosestCruiser1 then
+                                oClosestCruiser2 = oClosestCruiser1
+                                iClosestCruiser2 = iClosestCruiser1
+                                oClosestCruiser1 = oUnit
+                                iClosestCruiser1 = iCurDist
+                            else
+                                oClosestCruiser2 = oUnit
+                                iClosestCruiser2 = iCurDist
+                            end
+                        end
+                    end
+                end
+                if oClosestCruiser1 then AddUnitToPriorityList(oClosestCruiser1) end
+
+                if not(bAllOutSubAttack) and not(EntityCategoryContains(M27UnitInfo.refCategoryCruiser + iSurfaceCombatCategory,oClosestFriendlyUnitToEnemyBase.UnitId)) then
+                    AddUnitToPriorityList(oClosestFriendlyUnitToEnemyBase)
+                end
+                if oClosestSurface2 then AddUnitToPriorityList(oClosestSurface2) end
+                if oClosestSurface3 then AddUnitToPriorityList(oClosestSurface3) end
+                if oClosestCruiser2 then AddUnitToPriorityList(oClosestCruiser2) end
+
+
+                --Find the nearest stealth to each priority unit to stealth
+                local oClosestStealth
+                local iClosestStealthDist = 100000
+                local iClosestStealthRef
+
+                for iUnit, oUnit in tUnitsToStealthByPriority do
+                    iClosestStealthDist = 100000
+                    for iStealth, oStealth in tStealthToAssign do
+                        iCurDist = M27Utilities.GetDistanceBetweenPositions(oStealth:GetPosition(), oUnit:GetPosition())
+                        if bDebugMessages == true then LOG(sFunctionRef..': Looking for closest stealth to oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; stealth='..oStealth.UnitId..M27UnitInfo.GetUnitLifetimeCount(oStealth)..'; iCurDist='..iCurDist) end
+                        if iCurDist < iClosestStealthDist then
+                            iClosestStealthRef = iStealth
+                            oClosestStealth = oStealth
+                            iClosestStealthDist = iCurDist
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Will assign stealth '..oClosestStealth.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestStealth)..' with aiBrain index='..oClosestStealth:GetAIBrain():GetArmyIndex()..' to priority unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iClosestStealthDist='..iClosestStealthDist) end
+                    AddStealthAssignment(oUnit, oClosestStealth, tOurBase)
+                    table.remove(tStealthToAssign, iClosestStealthRef)
+                    if M27Utilities.IsTableEmpty(tStealthToAssign) then break end
+                end
+                --Assign any spare stealth boats to the closest friendly unit to the front
+                if bDebugMessages == true then LOG(sFunctionRef..': Finished assigning stealth boats to priority units. Is table of stealth to assign empty='..tostring(M27Utilities.IsTableEmpty(tStealthToAssign))) end
+                if M27Utilities.IsTableEmpty(tStealthToAssign) == false then
+                    local oRemainingUnitPriority = oClosestFriendlyUnitToEnemyBase
+                    if bAllOutSubAttack and EntityCategoryContains(categories.SUBMERSIBLE + categories.AMPHIBIOUS - categories.HOVER, oClosestFriendlyUnitToEnemyBase.UnitId) then
+                        local tSurfaceUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAllAmphibiousAndNavy - categories.SUBMIERSIBLE, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
+                        if M27Utilities.IsTableEmpty(tSurfaceUnits) == false then
+                            oRemainingUnitPriority = M27Utilities.GetNearestUnit(tSurfaceUnits, tEnemyBase)
+                        else
+                            M27Utilities.ErrorHandler('Dont have any surface units but should at least have the stealth boats that are considering')
+                        end
+                    end
+                    for iStealth, oClosestStealth in tStealthToAssign do
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have no more priority units, assigning stealth boat '..oClosestStealth.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestStealth)..' to oRemainingUnitPriority='..oRemainingUnitPriority.UnitId..M27UnitInfo.GetUnitLifetimeCount(oRemainingUnitPriority)) end
+                        AddStealthAssignment(oRemainingUnitPriority, oClosestStealth, tOurBase)
                     end
                 end
             end

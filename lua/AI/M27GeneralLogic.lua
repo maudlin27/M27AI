@@ -2016,12 +2016,18 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                     elseif EntityCategoryContains(M27UnitInfo.refCategoryCruiserCarrier, oUnit.UnitId) then
                                         if EntityCategoryContains(categories.CYBRAN * categories.TECH2, oUnit.UnitId) then iMassMod = 0.55
                                         elseif EntityCategoryContains(categories.AEON, oUnit.UnitId) then
-                                            iMassMod = 0.35
+                                            iMassMod = 0.2 --Aeon cruiser loses vs 2 UEF frigates in sandbox (it kills 1 just before it dies)
                                         else
-                                            iMassMod = 0.2 --e.g. uef cruiser
+                                            iMassMod = 0.15 --e.g. uef cruiser - 1 frigate can almost solo it if it dodges the missiles
                                         end
                                     elseif EntityCategoryContains(M27UnitInfo.refCategoryAttackBot * categories.TECH1, oUnit.UnitId) then
                                         iMassMod = 0.85
+                                    elseif EntityCategoryContains(categories.BATTLESHIP - M27UnitInfo.refCategoryBattlecruiser, oUnit.UnitId) then
+                                        iMassMod = 0.85
+                                    elseif EntityCategoryContains(categories.DESTROYER, oUnit.UnitId) then
+                                        iMassMod = 0.95
+                                    elseif EntityCategoryContains(M27UnitInfo.refCategoryFrigate * categories.CYBRAN, oUnit.UnitId) then
+                                        iMassMod = 1.05
                                     else iMassMod = 1
                                     end
                                 elseif EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oUnit.UnitId) then
