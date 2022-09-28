@@ -2852,7 +2852,6 @@ function GetLocationValue(aiBrain, tLocation, tStartPoint, sPathing, iSegmentGro
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetLocationValue'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if M27Utilities.GetDistanceBetweenPositions(tLocation, {385.5, 34.73828125, 245.5 }) <= 10 then bDebugMessages = true end
     local tAllUnits
     local iTotalValue = 0
     local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
@@ -2951,7 +2950,6 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
     local sFunctionRef = 'GetPriorityACUDestination'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tHighestValueLocation
-    if GetGameTimeSeconds() >= 340 then bDebugMessages = true end
 
     --Check we can path to the enemy base or (if we cant) that the last intel path is reasonably far away from our base
     if oPlatoon[M27PlatoonUtilities.refbNeedToHeal] then

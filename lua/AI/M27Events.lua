@@ -1393,12 +1393,15 @@ function OnConstructed(oEngineer, oJustBuilt)
         --Engineer callbacks
         if oEngineer:GetAIBrain().M27AI and not (oEngineer.Dead) then
             if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer:GetUnitId()) then
-                local sFunctionRef = 'OnConstructed'
-                local bDebugMessages = false
-                if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-                ForkThread(M27EngineerOverseer.ReassignEngineers, oEngineer:GetAIBrain(), true, { oEngineer })
-                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                --Dont do this if just built t1 pd as want it to have walls
+                if not(EntityCategoryContains(M27UnitInfo.refCategoryWall + M27UnitInfo.refCategoryPD * categories.TECH1, oJustBuilt.UnitId)) then
+                    local sFunctionRef = 'OnConstructed'
+                    local bDebugMessages = false
+                    if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                    ForkThread(M27EngineerOverseer.ReassignEngineers, oEngineer:GetAIBrain(), true, { oEngineer })
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                end
             elseif EntityCategoryContains(categories.COMMAND, oEngineer.UnitId) then
                 local bDebugMessages = false
                 local sFunctionRef = 'OnConstructed'

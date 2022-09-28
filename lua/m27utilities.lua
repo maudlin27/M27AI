@@ -245,7 +245,6 @@ function DrawCircleAroundPoint(tLocation, iColour, iDisplayCount, iCircleSize)
         local iCurDrawCount = 0
         if bDebugMessages == true then LOG('About to draw circle at table location ='..repru(tLocation)) end
         while true do
-            bFirstLocation = true
             DrawCircle(tLocation, iCircleSize, sColour)
             iCurDrawCount = iCurDrawCount + 1
             if iCurDrawCount > iMaxDrawCount then return end
@@ -2053,10 +2052,12 @@ end
 function IssueTrackedClearCommands(tUnits)
     --Intended so we can add logging to make it easier to confirm if we are clearing a unit's orders
     --Below is example if want to give an alert in the log when a unit has its orders cleared
-    --[[for iUnit, oUnit in tUnits do
-        if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'url01077' then
-            LOG('About to issue clear commands for unit url01077')
-            ErrorHandler('Audit trail game time='..GetGameTimeSeconds(), true)
+    --[[if GetGameTimeSeconds() >= 360 and tUnits[1]:GetAIBrain():GetArmyIndex() == 5 and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, tUnits[1]) then
+        for iUnit, oUnit in tUnits do
+            if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uel01052' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uel01054' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uel01055' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uel010516' then
+                LOG('About to issue clear commands for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                ErrorHandler('Audit trail game time='..GetGameTimeSeconds(), true)
+            end
         end
     end--]]
     IssueClearCommands(tUnits)

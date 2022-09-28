@@ -4293,10 +4293,12 @@ function ThreatAssessAndRespond(aiBrain)
                                         --ACU isnt moving near where we want it to, update its movement path if it doesnt have nearby enemies
                                         if oACUPlatoon[M27PlatoonUtilities.refiEnemiesInRange] == 0 or M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE, M27Utilities.GetACU(aiBrain):GetPosition(), 23, 'Enemy')) == true then
                                             --ACU range is 22
+                                            oACUPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
                                             oACUPlatoon[M27PlatoonUtilities.reftMovementPath][1] = tEnemyThreatGroup[reftFrontPosition]
                                             oACUPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
                                             oACUPlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReissueMovementPath
                                             oACUPlatoon[M27PlatoonUtilities.refbOverseerAction] = true
+                                            if bDebugMessages == true then LOG(sFunctionRef..': ACU not moving where we want it to, updating movement path to enemy threat group front position='..repru(tEnemyThreatGroup[reftFrontPosition])..'; Distance to ACU='..M27Utilities.GetDistanceBetweenPositions(tEnemyThreatGroup[reftFrontPosition], M27PlatoonUtilities.GetPlatoonFrontPosition(oACUPlatoon))) end
                                         end
                                     end
                                 end

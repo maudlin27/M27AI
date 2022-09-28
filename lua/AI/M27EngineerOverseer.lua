@@ -1325,7 +1325,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                 end
 
                 --Keep building if we are building PD even if it isnt done yet
-                if not(bKeepBuilding) and (oEngineer[refiEngineerCurrentAction] == refActionBuildEmergencyPD or oEngineer[refiEngineerCurrentAction] == refActionFortifyFirebase) then bKeepBuilding = true end
+                if not(bKeepBuilding) and (oEngineer[refiEngineerCurrentAction] == refActionBuildEmergencyPD or oEngineer[refiEngineerCurrentAction] == refActionFortifyFirebase or oEngineer[refiEngineerCurrentAction] == refActionBuildWall) then bKeepBuilding = true end
                 if bDebugMessages == true then LOG(sFunctionRef..': Have far away enemies that arent close, bKeepBuilding='..tostring(bKeepBuilding)) end
                 if bKeepBuilding == false then
                     if bDebugMessages == true then LOG(sFunctionRef..': Dont want to keep building') end
@@ -1405,9 +1405,14 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                 end
                 --end
             else
-                if bDebugMessages == true then LOG(sFunctionRef..': No reclaim target; bKeepBuilding='..tostring(bKeepBuilding)..'; if engi is near our base then will keep building anyway') end
-                if not(bKeepBuilding) and M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oEngineer:GetPosition()) <= 30 then
-                    bKeepBuilding = true
+
+                if bDebugMessages == true then LOG(sFunctionRef..': No reclaim target; bKeepBuilding='..tostring(bKeepBuilding)..'; if engi is near our base then will keep building anyway. oEngineer[refiEngineerCurrentAction]='..(oEngineer[refiEngineerCurrentAction] or 'nil')) end
+                if not(bKeepBuilding) then
+                    if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oEngineer:GetPosition()) <= 30 then
+                        bKeepBuilding = true
+                    elseif (oEngineer[refiEngineerCurrentAction] == refActionBuildEmergencyPD or oEngineer[refiEngineerCurrentAction] == refActionFortifyFirebase or oEngineer[refiEngineerCurrentAction] == refActionBuildWall) then
+                        bKeepBuilding = true
+                    end
                 end
                 if bKeepBuilding == false then
                     --Nearby enemy but we dont know if its an engineer so we want to run back towards base
