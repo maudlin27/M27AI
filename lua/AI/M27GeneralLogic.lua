@@ -2852,48 +2852,78 @@ function GetLocationValue(aiBrain, tLocation, tStartPoint, sPathing, iSegmentGro
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetLocationValue'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local tEnemyUnits
+    if M27Utilities.GetDistanceBetweenPositions(tLocation, {385.5, 34.73828125, 245.5 }) <= 10 then bDebugMessages = true end
+    local tAllUnits
     local iTotalValue = 0
+    local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
 
     --Value of all nearby mexes
     for iMex, tMex in M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup] do
         if math.abs(tMex[1] - tLocation[1]) <= 30 and math.abs(tMex[3] - tLocation[3]) <= 30 then
             --have a mex, check who has built on item
             iTotalValue = iTotalValue + 25
-            tEnemyUnits = GetUnitsInRect(Rect(tLocation[1]-0.2, tLocation[3]-0.2, tLocation[1]+0.2, tLocation[3]+0.2))
-            if M27Utilities.IsTableEmpty(tEnemyUnits) == true then
+            tAllUnits = GetUnitsInRect(Rect(tLocation[1]-0.2, tLocation[3]-0.2, tLocation[1]+0.2, tLocation[3]+0.2))
+            if M27Utilities.IsTableEmpty(tAllUnits) == true then
                 --Noone has the mex so of some value
                 iTotalValue = iTotalValue + 75
             else
-                tEnemyUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryMex, tEnemyUnits)
-                if M27Utilities.IsTableEmpty(tEnemyUnits) == true then
+                tAllUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryMex, tAllUnits)
+                if M27Utilities.IsTableEmpty(tAllUnits) == true then
+                    --No-one has built on it so of value
                     iTotalValue = iTotalValue + 75
                 else
                     --Someone has claimed the mex, is it us or enemy?
-                    if IsEnemy(aiBrain:GetArmyIndex(), tEnemyUnits[1]:GetAIBrain():GetArmyIndex()) then
-                        iTotalValue = iTotalValue + 75 + math.max(100, tEnemyUnits[1]:GetBlueprint().Economy.BuildCostMass)
+                    if IsEnemy(aiBrain:GetArmyIndex(), tAllUnits[1]:GetAIBrain():GetArmyIndex()) then
+                        iTotalValue = iTotalValue + 75 + math.max(100, tAllUnits[1]:GetBlueprint().Economy.BuildCostMass)
                     end
                 end
             end
+            if bDebugMessages == true then LOG(sFunctionRef..': iMex of '..iMex..' is within 30, so increased total value, total value after increase='..iTotalValue) end
         end
     end
 
     --Factor in enemy mobile units
-    tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat + M27UnitInfo.refCategoryEngineer, tLocation, 40, 'Enemy')
+    local tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat + M27UnitInfo.refCategoryEngineer, tLocation, 40, 'Enemy')
     if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
         iTotalValue = iTotalValue + GetCombatThreatRating(aiBrain, tEnemyUnits, true, nil, nil, false, false)
+        if bDebugMessages == true then LOG(sFunctionRef..': Increased total value for nearby combat units, total value post increase='..iTotalValue) end
     end
 
     --Factor in reclaim: 60% of cur segment, 30% of adjacent segments (i.e. would rather target units than reclaim)
     local iBaseReclaimSegmentX, iBaseReclaimSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tLocation)
-    iTotalValue = iTotalValue + 0.3 * (M27MapInfo.tReclaimAreas[iBaseReclaimSegmentX][iBaseReclaimSegmentZ][M27MapInfo.refReclaimTotalMass] or 0)
+    local iCurReclaimFactor
+
+    function GetSegmentReclaimValue(iReclaimSegmentX, iReclaimSegmentZ)
+        local iCurReclaimFactor
+        if (M27MapInfo.tReclaimAreas[iBaseReclaimSegmentX][iBaseReclaimSegmentZ][M27MapInfo.refReclaimTotalMass] or 0) > 20 then
+            if M27MapInfo.tReclaimAreas[iBaseReclaimSegmentX][iBaseReclaimSegmentZ][M27MapInfo.refReclaimHighestIndividualReclaim] > 250 then
+                iCurReclaimFactor = 0.3
+            elseif M27MapInfo.tReclaimAreas[iBaseReclaimSegmentX][iBaseReclaimSegmentZ][M27MapInfo.refReclaimHighestIndividualReclaim] > 100 then
+                iCurReclaimFactor = 0.2
+            elseif M27MapInfo.tReclaimAreas[iBaseReclaimSegmentX][iBaseReclaimSegmentZ][M27MapInfo.refReclaimHighestIndividualReclaim] > 50 then
+                iCurReclaimFactor = 0.1
+            elseif M27MapInfo.tReclaimAreas[iBaseReclaimSegmentX][iBaseReclaimSegmentZ][M27MapInfo.refReclaimHighestIndividualReclaim] < 10 then
+                iCurReclaimFactor = 0.02
+            else
+                iCurReclaimFactor = 0.05
+            end
+        end
+        if iCurReclaimFactor then
+            return iCurReclaimFactor * M27MapInfo.tReclaimAreas[iBaseReclaimSegmentX][iBaseReclaimSegmentZ][M27MapInfo.refReclaimTotalMass]
+        else
+            return 0
+        end
+    end
+
+    iTotalValue = iTotalValue + GetSegmentReclaimValue(iBaseReclaimSegmentX, iBaseReclaimSegmentZ)
     for iAdjustX = -1, 1, 1 do
         for iAdjustZ = -1, 1, 1 do
             if iBaseReclaimSegmentX + iAdjustX > 0 and iBaseReclaimSegmentZ + iAdjustZ > 0 then
-                iTotalValue = iTotalValue + 0.3 * (M27MapInfo.tReclaimAreas[iBaseReclaimSegmentX + iAdjustX][iBaseReclaimSegmentZ + iAdjustZ][M27MapInfo.refReclaimTotalMass] or 0)
+                iTotalValue = iTotalValue + GetSegmentReclaimValue(iBaseReclaimSegmentX + iAdjustX, iBaseReclaimSegmentZ + iAdjustZ)
             end
         end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': Total value after reclaim adjustment='..iTotalValue) end
 
 
     --Adjust value based on distance
@@ -2904,8 +2934,10 @@ function GetLocationValue(aiBrain, tLocation, tStartPoint, sPathing, iSegmentGro
     --% reduction based on how much of a detour to enemy base
     iTotalValue = iTotalValue * iStartToEnemyBase / (iStartToTarget + iTargetToEnemyBase)
 
-    --Also prioritise locations close to the ACU
+    --Also prioritise locations close to the ACU, but not if ACU is withi n5 of them (suggesting it has already chosen it as a location)
     iTotalValue = iTotalValue * (1 - 0.5 * (iStartToTarget / iStartToEnemyBase))
+    if iStartToTarget <= 5 then iTotalValue = iTotalValue * 0.7 end
+    if bDebugMessages == true then LOG(sFunctionRef..': Total value after distance adjustments='..iTotalValue) end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iTotalValue
@@ -2913,12 +2945,13 @@ end
 
 function GetPriorityACUDestination(aiBrain, oPlatoon)
     --Factors in reclaim, enemy units, enemy mexes, and how much of a detour the location would be from the enemy base to decide whether to go somewhere other than the enemy base
-    --Intended for use on ACU when want ACU heading into combat (e.g. it has gun upgrade)
+    --Intended for use on ACU when want ACU heading into combat (e.g. it has gun upgrade); also used as a backup where we are going to go to enemy base due to not finding anything with the pre-gun logic
     --Works off platoon variable in case we want to reuse this function for other units in the future
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetPriorityACUDestination'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tHighestValueLocation
+    if GetGameTimeSeconds() >= 340 then bDebugMessages = true end
 
     --Check we can path to the enemy base or (if we cant) that the last intel path is reasonably far away from our base
     if oPlatoon[M27PlatoonUtilities.refbNeedToHeal] then
@@ -2973,17 +3006,46 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
                 local iCurValueLocation
 
                 if bDebugMessages == true then LOG(sFunctionRef..': Value of enemy start location='..iHighestValueLocation..'; will consider if any mexes have a better value') end
+                local tiMexesConsideredByRef = {} --Key is the iMex value, returns true if considered; stored here for mex by pathing and grouping when its considered
+                local iMexesConsideredCount = 0
+
                 --tMexByPathingAndGrouping = {} --Stores position of each mex based on the segment that it's part of; [a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
                 if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup]) == false then
                     for iMex, tMex in M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup] do
                         if M27Utilities.GetDistanceBetweenPositions(tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) <= 200 and M27Utilities.GetDistanceBetweenPositions(tMex, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= iMaxDistFromBase then
                             --Check not tried going here here lots before
                             if (oPlatoon[M27PlatoonUtilities.reftDestinationCount][M27Utilities.ConvertLocationToReference(tMex)] or 0) <= 3 or M27MapInfo.CanWeMoveInSameGroupInLineToTarget(sPathing, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), tMex) then
+                                tiMexesConsideredByRef[iMex] = true
+                                iMexesConsideredCount = iMexesConsideredCount + 1
                                 iCurValueLocation = GetLocationValue(aiBrain, tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathing, iSegmentGroup)
                                 if iCurValueLocation > iHighestValueLocation then
                                     if bDebugMessages == true then LOG(sFunctionRef..': tMex='..repru(tMex)..'; value of location='..iCurValueLocation) end
                                     iHighestValueLocation = iCurValueLocation
                                     tHighestValueLocation = tMex
+                                end
+                            end
+                        end
+                    end
+                end
+                --Expand search range if we havent considered many mexes and new target isnt far from us and is owned by us
+                if bDebugMessages == true then LOG(sFunctionRef..': Will consider if we should try more locations further away. iMexesConsideredCount='..iMexesConsideredCount..'; Distance between cur location and platoon front position='..M27Utilities.GetDistanceBetweenPositions(tHighestValueLocation, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))..'; Is table of allied mexes near the highest value location empty='..tostring(M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMex, tHighestValueLocation, 3, 'Ally')))) end
+                if iMexesConsideredCount <= 16 and M27Utilities.GetDistanceBetweenPositions(tHighestValueLocation, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) <= 15 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMex, tHighestValueLocation, 3, 'Ally')) == false then
+                    if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup]) == false then
+                        for iMex, tMex in M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup] do
+                            if bDebugMessages == true then LOG(sFunctionRef..': Checking if considered mex before and if its within larger range. iMex='..iMex..'; tiMexesConsideredByRef[iMex]='..tostring(tiMexesConsideredByRef[iMex] or false)..'; Distance to platoon='..M27Utilities.GetDistanceBetweenPositions(tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))..'; Distance from start='..M27Utilities.GetDistanceBetweenPositions(tMex, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
+                            if not(tiMexesConsideredByRef[iMex]) and M27Utilities.GetDistanceBetweenPositions(tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) <= 350 and M27Utilities.GetDistanceBetweenPositions(tMex, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= iMaxDistFromBase then
+                                tiMexesConsideredByRef[iMex] = true
+                                iMexesConsideredCount = iMexesConsideredCount + 1
+                                if bDebugMessages == true then LOG(sFunctionRef..': Destination count of mex='..(oPlatoon[M27PlatoonUtilities.reftDestinationCount][M27Utilities.ConvertLocationToReference(tMex)] or 0)..'; Can we move in same line to target='..tostring(M27MapInfo.CanWeMoveInSameGroupInLineToTarget(sPathing, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), tMex))) end
+                                --Check not tried going here here lots before
+                                if (oPlatoon[M27PlatoonUtilities.reftDestinationCount][M27Utilities.ConvertLocationToReference(tMex)] or 0) <= 3 or M27MapInfo.CanWeMoveInSameGroupInLineToTarget(sPathing, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), tMex) then
+                                    iCurValueLocation = GetLocationValue(aiBrain, tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathing, iSegmentGroup)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iCurValueLocation='..iCurValueLocation) end
+                                    if iCurValueLocation > iHighestValueLocation then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Extended range, tMex='..repru(tMex)..'; value of location='..iCurValueLocation) end
+                                        iHighestValueLocation = iCurValueLocation
+                                        tHighestValueLocation = tMex
+                                    end
                                 end
                             end
                         end
