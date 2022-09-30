@@ -193,7 +193,9 @@ function DetermineMaxTerrainHeightDif()
     ['Pelagial v2'] = 0.18, --Fails to detect northern island as pathable at 0.17, succeeds at 0.18
     ['Battle Swamp'] = 0.19, --Fails to detect some at 0.15, locates at 0.18 although small sections showing as impathable
     ['Dark Liver Mirrored'] = 0.28, --Fails to detect some at 0.28 (all but bottom-left are identified); at 0.32 it still fails to detect it but now starts seeing impathable cliffs as being pathable; so wont be able to actually make it detect everythign correctly
-    ['Fuji Phantoms'] = 0.18 --0.17 - middle shows as impathable; 0.18 - might show a bit too much of cliffs as pathable, but is lowest value where mid shows as pathable
+    ['Fuji Phantoms'] = 0.18, --0.17 - middle shows as impathable; 0.18 - might show a bit too much of cliffs as pathable, but is lowest value where mid shows as pathable
+    ['Grave Wind'] = 0.26, --some of the ramps show as partially impathable at default, not critical issue but changed to reduce potential issues
+    ['Exo 50-T testing ground'] = 0.2,
     }
     local sMapName = ScenarioInfo.name
     iMaxHeightDif = (tMapHeightOverride[sMapName] or iMaxHeightDif)
@@ -533,7 +535,7 @@ function InSameSegmentGroup(oUnit, tDestination, bReturnUnitGroupOnly, bReturnDe
             end
             if iUnitGroup == iTargetGroup then return true else return false end
         end
-        end
+    end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 

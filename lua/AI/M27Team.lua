@@ -252,8 +252,8 @@ function AllocateTeamEnergyResources(iTeam, iFirstM27Brain)
                     --Have lots of energy but flagged as stalling energy so dont want to give any energy or claim any
                     if bDebugMessages == true then LOG(sFunctionRef..': Dont want to give or receive energy') end
                 end
-            elseif oBrain:GetEconomyStoredRatio('ENERGY') >= 0.95 and oBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > 0 and not(oBrain[M27EconomyOverseer.refbStallingEnergy]) then
-                table.insert(tBrainsWithEnergyAndEnergyAvailable, {[subrefBrain] = oBrain, [subrefEnergyAvailable] = math.max(oBrain[M27EconomyOverseer.refiEnergyNetBaseIncome], oBrain:GetEconomyStored('ENERGY') * 0.02)})
+            elseif oBrain:GetEconomyStoredRatio('ENERGY') >= 0.95 and oBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] > 0 and not(oBrain[M27EconomyOverseer.refbStallingEnergy]) then
+                table.insert(tBrainsWithEnergyAndEnergyAvailable, {[subrefBrain] = oBrain, [subrefEnergyAvailable] = math.max(oBrain[M27EconomyOverseer.refiNetEnergyBaseIncome], oBrain:GetEconomyStored('ENERGY') * 0.02)})
                 if bDebugMessages == true then LOG(sFunctionRef..': Have energy available to give') end
             else
                 --Enemies near our ACU, we can overcharge them, and we dont have strong energy, so keep what energy we have for ourself
@@ -272,10 +272,10 @@ function AllocateTeamEnergyResources(iTeam, iFirstM27Brain)
             else
                 --Do we have enough to offer some?
                 if oBrain:GetEconomyStoredRatio('ENERGY') > 0.3 and not(oBrain[M27EconomyOverseer.refbStallingEnergy]) then
-                    if oBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 0 and oBrain:GetEconomyStoredRatio('ENERGY') >= 0.98 then
+                    if oBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] < 0 and oBrain:GetEconomyStoredRatio('ENERGY') >= 0.98 then
                         table.insert(tBrainsWithEnergyAndEnergyAvailable, {[subrefBrain] = oBrain, [subrefEnergyAvailable] = oBrain:GetEconomyStored('ENERGY') * 0.02})
                         if bDebugMessages == true then LOG(sFunctionRef..': Have energy available to give') end
-                    elseif oBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > 0 then
+                    elseif oBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] > 0 then
                         table.insert(tBrainsWithEnergyAndEnergyAvailable, {[subrefBrain] = oBrain, [subrefEnergyAvailable] = iEnergyStorageMax * (oBrain:GetEconomyStoredRatio('ENERGY') - 0.3)})
                         if bDebugMessages == true then LOG(sFunctionRef..': Have positive energy income so have energy avialable to give') end
                     else
@@ -401,10 +401,10 @@ function AllocateTeamMassResources(iTeam, iFirstM27Brain)
             else
                 --Do we have enough to offer some?
                 if oBrain:GetEconomyStoredRatio('MASS') > 0.25 and not(oBrain[M27EconomyOverseer.refbStallingMass]) and not(M27Conditions.HaveLowMass(oBrain)) then
-                    if oBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0 and oBrain:GetEconomyStoredRatio('MASS') >= 0.3 then
+                    if oBrain[M27EconomyOverseer.refiNetMassBaseIncome] < 0 and oBrain:GetEconomyStoredRatio('MASS') >= 0.3 then
                         table.insert(tBrainsWithMassAndMassAvailable, {[subrefBrain] = oBrain, [subrefMassAvailable] = oBrain:GetEconomyStored('MASS') * 0.02})
                         if bDebugMessages == true then LOG(sFunctionRef..': Have Mass available to give even though have negative mass income') end
-                    elseif oBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 0 then
+                    elseif oBrain[M27EconomyOverseer.refiNetMassBaseIncome] > 0 then
                         table.insert(tBrainsWithMassAndMassAvailable, {[subrefBrain] = oBrain, [subrefMassAvailable] = iMassStorageMax * (oBrain:GetEconomyStoredRatio('MASS') - 0.25)})
                         if bDebugMessages == true then LOG(sFunctionRef..': Have positive Mass income so have Mass avialable to give') end
                     else
@@ -573,7 +573,7 @@ function GiveResourcesToAllyDueToParagon(aiBrain)
         for iBrain, oBrain in aiBrain[M27Overseer.toAllyBrains] do
             if oBrain.M27AI then
                 --Check we dont have a paragon and arent overflowing mass
-                if oM27Ally[M27EconomyOverseer.refiMassGrossBaseIncome] < 1000 and aiBrain:GetEconomyStoredRatio('MASS') <= 0.8 then
+                if oM27Ally[M27EconomyOverseer.refiGrossMassBaseIncome] < 1000 and aiBrain:GetEconomyStoredRatio('MASS') <= 0.8 then
                     oM27Ally = oBrain
                 end
             else

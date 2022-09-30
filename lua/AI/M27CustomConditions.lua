@@ -138,7 +138,7 @@ function DoWeWantPriorityT2LandFactoryHQ(aiBrain, iOptionalLandFactoryCount)
         end
         if not(bAlreadyGettingT2LandFacOrT2Air) then
             local iCurrentCombatUnits = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandCombat)
-            if iCurrentCombatUnits >= 40 or (iCurrentCombatUnits >= 30 and (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 5 or aiBrain:GetEconomyStored('MASS') >= 1000)) then
+            if iCurrentCombatUnits >= 40 or (iCurrentCombatUnits >= 30 and (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 5 or aiBrain:GetEconomyStored('MASS') >= 1000)) then
                 bGetT2FactoryEvenWithLowMass = true
             end
         end
@@ -500,7 +500,7 @@ function NoEnemyUnitsNearACU(aiBrain, iMaxSearchRange, iMinSearchRange)
 end
 
 function HaveEnoughGrossIncomeToForceFirstUpgrade(aiBrain)
-    if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 4 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 60 then return true else return false end
+    if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 4 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 60 then return true else return false end
 end
 
 
@@ -521,10 +521,10 @@ function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
             if ACUShouldRunFromBigThreat(aiBrain) then
                 bWantToGetGun = false
             else
-                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 1.4 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 26 and (M27Utilities.GetACU(aiBrain):GetHealth() >= 7500 or M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= M27Overseer.iDistanceFromBaseToBeSafe) and
-                        (aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 40 or
-                                (M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 50 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 34) or
-                                (M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 20 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 28)) then
+                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 1.4 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 26 and (M27Utilities.GetACU(aiBrain):GetHealth() >= 7500 or M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= M27Overseer.iDistanceFromBaseToBeSafe) and
+                        (aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 40 or
+                                (M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 50 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 34) or
+                                (M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 20 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 28)) then
                     return true
                 else
                     if HaveEnoughGrossIncomeToForceFirstUpgrade(aiBrain) and (M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 150 or M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), M27Logic.GetNearestRallyPoint(aiBrain, M27Utilities.GetACU(aiBrain):GetPosition())) <= 30) then bWantToGetGun = true
@@ -532,7 +532,7 @@ function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
                         local iResourceThresholdAdjustFactor = 1
                         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance or aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 700 or not (aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]) or (not (aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]) and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 450) then
                             iResourceThresholdAdjustFactor = 2.5
-                        elseif M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]) == false or (aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] > 1 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 75) then
+                        elseif M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]) == false or (aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] > 1 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] < 75) then
                             iResourceThresholdAdjustFactor = 1.5
                         elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
                             iResourceThresholdAdjustFactor = 1.3
@@ -553,13 +553,13 @@ function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
 
 
                         if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': GrowwEnergyIncome=' .. aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] .. '; Netincome=' .. aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] .. '; Net income based on trend=' .. aiBrain:GetEconomyTrend('ENERGY') .. '; EnergyStored=' .. aiBrain:GetEconomyStored('ENERGY')..'; iResourceThresholdAdjustFactor='..iResourceThresholdAdjustFactor..'; ACU health%'..M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain))..'; Dist from ACU to our base='..M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Close distance='..math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)))
+                            LOG(sFunctionRef .. ': GrowwEnergyIncome=' .. aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] .. '; Netincome=' .. aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] .. '; Net income based on trend=' .. aiBrain:GetEconomyTrend('ENERGY') .. '; EnergyStored=' .. aiBrain:GetEconomyStored('ENERGY')..'; iResourceThresholdAdjustFactor='..iResourceThresholdAdjustFactor..'; ACU health%'..M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain))..'; Dist from ACU to our base='..M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Close distance='..math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)))
                         end
-                        if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 120 * 0.1 * iResourceThresholdAdjustFactor then
+                        if aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] < 120 * 0.1 * iResourceThresholdAdjustFactor then
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Net energy income is too low, only get gun if we have lots of energy stored')
                             end
-                            if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 0 and aiBrain:GetEconomyStored('ENERGY') >= 9000 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] > 55 * iResourceThresholdAdjustFactor then
+                            if aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] >= 0 and aiBrain:GetEconomyStored('ENERGY') >= 9000 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] > 55 * iResourceThresholdAdjustFactor then
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Have small net energy income and 9k stored and 550+ gross income so will ugprade anyway')
                                 end
@@ -571,13 +571,13 @@ function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
                                 bWantToGetGun = false
                             end
                         else
-                            if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 170 * 0.1 * iResourceThresholdAdjustFactor and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 500 * 0.1 * iResourceThresholdAdjustFactor then
+                            if aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] < 170 * 0.1 * iResourceThresholdAdjustFactor and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] < 500 * 0.1 * iResourceThresholdAdjustFactor then
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Energy net income < 170 per second and gross < 500 per second so dont want to proceed')
                                 end
                                 bWantToGetGun = false
                             else
-                                iGrossEnergyIncome = aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]
+                                iGrossEnergyIncome = aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]
                                 if iGrossEnergyIncome < 45 * iResourceThresholdAdjustFactor then
                                     --450 per second
                                     if bDebugMessages == true then
@@ -627,10 +627,10 @@ function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
     --Adjust based on what strategy we are using
     if bWantToGetGun then
         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
-            if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 then bWantToGetGun = false end
+            if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] < 10 then bWantToGetGun = false end
         elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
-            if bDebugMessages == true then LOG(sFunctionRef..': Are ecoing so check we have enough power both now and if we start building a t2 pgen. Energy ratio='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; Net energy income='..aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]..'; Gross energy income='..aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]) end
-            if (aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] <= 22.5) or (aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] <= 125) or aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 75 then
+            if bDebugMessages == true then LOG(sFunctionRef..': Are ecoing so check we have enough power both now and if we start building a t2 pgen. Energy ratio='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; Net energy income='..aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome]..'; Gross energy income='..aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]) end
+            if (aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] <= 22.5) or (aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] < 10 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] <= 125) or aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] < 75 then
                 --Are we about to start on a T2 PGen? If so then hold off on upgrade
                 if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]) == false or aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] > 1 then
                     if bDebugMessages == true then LOG(sFunctionRef..': Are ecoing and likely to start building a T2 Pgen so hold off so we dont powerstall') end
@@ -736,7 +736,7 @@ function WantToGetAnotherACUUpgrade(aiBrain)
                     elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle then iEnergyWanted = iEnergyWanted * 0.8
                     end
                     --Aif our ACU isnt going gun due to not pathign to enemy base then wait until we have enough energy to indicate we have T2 power as well
-                    if oACU[M27Overseer.refbACUCantPathAwayFromBase] and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 100 then iEnergyWanted = math.max(iEnergyWanted, aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] + 10) end
+                    if oACU[M27Overseer.refbACUCantPathAwayFromBase] and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] < 100 then iEnergyWanted = math.max(iEnergyWanted, aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] + 10) end
 
                     --Be more likely to get an upgrade if we are low health
                     iEnergyWanted = iEnergyWanted * math.max(0.4, oACU:GetHealth() / oACU:GetMaxHealth())
@@ -745,8 +745,8 @@ function WantToGetAnotherACUUpgrade(aiBrain)
 
 
 
-                    if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]='..aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]..'; iEnergyWanted='..iEnergyWanted) end
-                    if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > iEnergyWanted then
+                    if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome]='..aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome]..'; iEnergyWanted='..iEnergyWanted) end
+                    if aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] > iEnergyWanted then
                         --Do we have enough mass? Want this to represent <20% of our total mass income
                         local iUpgradeMassCost = oBP.Enhancements[sUpgradeRef].BuildCostMass
                         --Double the mass cost if its a really expensive upgrade
@@ -762,8 +762,8 @@ function WantToGetAnotherACUUpgrade(aiBrain)
                         iMassIncomePerTickWanted = iMassIncomePerTickWanted * math.max(0.4, oACU:GetHealth() / oACU:GetMaxHealth())
 
 
-                        if bDebugMessages == true then LOG(sFunctionRef..': Considering if enough mass income to get upgrade; iMassIncomePerTickWanted='..iMassIncomePerTickWanted..'; iUpgradeMassCost='..iUpgradeMassCost..'; iUpgradeBuildTime='..iUpgradeBuildTime..'; iACUBuildRate='..iACUBuildRate..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; aiBrain:GetEconomyStored(MASS)='..aiBrain:GetEconomyStored('MASS')) end
-                        if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= iMassIncomePerTickWanted and aiBrain:GetEconomyStored('MASS') >= 5 then --check we're not massively mass stalling
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering if enough mass income to get upgrade; iMassIncomePerTickWanted='..iMassIncomePerTickWanted..'; iUpgradeMassCost='..iUpgradeMassCost..'; iUpgradeBuildTime='..iUpgradeBuildTime..'; iACUBuildRate='..iACUBuildRate..'; aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; aiBrain:GetEconomyStored(MASS)='..aiBrain:GetEconomyStored('MASS')) end
+                        if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= iMassIncomePerTickWanted and aiBrain:GetEconomyStored('MASS') >= 5 then --check we're not massively mass stalling
                             --Do we have good health, and dont have map control?  If so then want to use ACU to attack
                             if bDebugMessages == true then LOG(sFunctionRef..': If have low health or nearby threats wont upgrade; M27UnitInfo.GetUnitHealthPercent(oACU)='..M27UnitInfo.GetUnitHealthPercent(oACU)..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
                             if M27UnitInfo.GetUnitHealthPercent(oACU) < 0.8 or (aiBrain[M27Overseer.refiPercentageOutstandingThreat] > 0.5 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] > 0.3) then
@@ -803,7 +803,7 @@ function WantToGetAnotherACUUpgrade(aiBrain)
         end
     end
     if bWantUpgrade and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
-        if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 then bWantUpgrade = false end
+        if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] < 10 then bWantUpgrade = false end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bWantUpgrade, bSafeToGetUpgrade
@@ -811,15 +811,15 @@ end
 
 function HaveLowMass(aiBrain)
     local bHaveLowMass = false
-    if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] <= 200 then --i.e. we dont ahve a paragon or crazy amount of SACUs
+    if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] <= 200 then --i.e. we dont ahve a paragon or crazy amount of SACUs
         local iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS')
         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle then
             if iMassStoredRatio <= 0.175 or aiBrain:GetEconomyStored('MASS') <= 500 then bHaveLowMass = true
-            elseif iMassStoredRatio <= 0.25 and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0.3 and aiBrain:GetEconomyStored('MASS') <= 1000 then bHaveLowMass = true
+            elseif iMassStoredRatio <= 0.25 and aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] < 0.3 and aiBrain:GetEconomyStored('MASS') <= 1000 then bHaveLowMass = true
             end
         else
             if iMassStoredRatio < 0.05 then bHaveLowMass = true
-            elseif (iMassStoredRatio < 0.15 or aiBrain:GetEconomyStored('MASS') < 250) and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0.2 then bHaveLowMass = true
+            elseif (iMassStoredRatio < 0.15 or aiBrain:GetEconomyStored('MASS') < 250) and aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] < 0.2 then bHaveLowMass = true
             end
         end
     end

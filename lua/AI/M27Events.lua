@@ -357,6 +357,12 @@ function OnMexDeath(oUnit)
                 aiBrain[M27EngineerOverseer.reftiResourceClaimedStatus][sLocationRef][M27EngineerOverseer.refiResourceStatus] = M27EngineerOverseer.refiStatusAvailable
             end
         end
+        if EntityCategoryContains(categories.TECH3, oUnit.UnitId) then
+            local aiBrain = oUnit:GetAIBrain()
+            if aiBrain.M27AI and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftT3MexesUnderConstruction]) then
+                ForkThread(M27EngineerOverseer.RefreshUnderConstructionT3MexList, aiBrain)
+            end
+        end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end
 end
@@ -1032,6 +1038,7 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
             oConstruction['M27FirstConstructionStart'] = true
             local aiBrain = oEngineer:GetAIBrain()
 
+
             --Game enders - check if we have already started a gameender nearby, and if so clear current building and reclaim it
             local bCancelAndReclaim = false
             local oUnitToSwitchTo
@@ -1056,6 +1063,23 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                     IssueRepair({oEngineer}, oUnitToSwitchTo)
                 end
             else
+                --T3 mex tracking
+                if EntityCategoryContains(M27UnitInfo.refCategoryT3Mex, oConstruction.UnitId) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer + categories.COMMAND + categories.SUBCOMMANDER + M27UnitInfo.refCategoryEngineerStation, oEngineer.UnitId) then
+                    local bAddToTable = true
+                    if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftT3MexesUnderConstruction]) == false then
+                        for iMex, oMex in aiBrain[M27EngineerOverseer.reftT3MexesUnderConstruction] do
+                            if oMex == oConstruction then
+                                bAddToTable = false
+                                break
+                            end
+                        end
+                    end
+                    if bAddToTable then
+                        table.insert( aiBrain[M27EngineerOverseer.reftT3MexesUnderConstruction], oConstruction)
+                    end
+                end
+
+
                 --Decide if we want to shield the construction
                 if EntityCategoryContains(categories.STRUCTURE + M27UnitInfo.refCategoryExperimentalStructure, oConstruction.UnitId) then
                     local oBP = oConstruction:GetBlueprint()
@@ -1218,7 +1242,7 @@ function OnConstructed(oEngineer, oJustBuilt)
             local aiBrain = oJustBuilt:GetAIBrain()
 
             if bDebugMessages == true then
-                LOG(sFunctionRef..': oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; oJustBuilt='..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt))
+                LOG(sFunctionRef..': oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; oJustBuilt='..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)..'; Assigned pond='..(oJustBuilt[M27Navy.refiAssignedPond] or 'nil'))
                 LOG('Have we just built experimental level unit='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryExperimentalLevel, oJustBuilt.UnitId))..'; LC for experimental level='..M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryExperimentalLevel)..'; T3 arti LC='..M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryFixedT3Arti))
             end
 
@@ -1314,13 +1338,6 @@ function OnConstructed(oEngineer, oJustBuilt)
                         end
                     end
                 end
-
-                --Update pond
-                if not(oJustBuilt[M27Navy.refiAssignedPond]) then M27Navy.UpdateUnitPond(oJustBuilt, oJustBuilt:GetAIBrain().M27Team, false) end
-                --Just built a naval based building?
-            elseif EntityCategoryContains(M27UnitInfo.refCategorySonar + M27UnitInfo.refCategoryNavalFactory + M27UnitInfo.refCategoryTorpedoLauncher, oJustBuilt.UnitId) then
-                if not(oJustBuilt[M27Navy.refiAssignedPond]) then M27Navy.UpdateUnitPond(oJustBuilt, oJustBuilt:GetAIBrain().M27Team, false) end
-
                 --Other tracking
             else
                 --Have we just built an experimental unit? If so then tell our ACU to return to base as even if we havent scouted enemy threat they could have an experimental by now
@@ -1348,15 +1365,24 @@ function OnConstructed(oEngineer, oJustBuilt)
                 end
             end
 
+
+            --Update pond
+            if not(oJustBuilt[M27Navy.refiAssignedPond]) and (EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, oEngineer.UnitId) or EntityCategoryContains(categories.NAVAL + M27UnitInfo.refCategorySonar + M27UnitInfo.refCategoryNavalFactory + M27UnitInfo.refCategoryTorpedoLauncher, oJustBuilt.UnitId)) then
+                M27Navy.UpdateUnitPond(oJustBuilt, oJustBuilt:GetAIBrain().M27Team, false)
+            end
+
             --If have just upgraded a shield then clear tracking (redundancy as should also trigger from 'death' of old shield)
             if EntityCategoryContains(M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryEngineer, oEngineer.UnitId) and M27Utilities.IsTableEmpty(oJustBuilt[M27EngineerOverseer.reftAssistingEngineers]) == false then
-            for iEngi, oEngi in oJustBuilt[M27EngineerOverseer.reftAssistingEngineers] do
-            if M27UnitInfo.IsUnitValid(oEngi) then
-            M27Utilities.IssueTrackedClearCommands({ oEngi })
-            M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
+                for iEngi, oEngi in oJustBuilt[M27EngineerOverseer.reftAssistingEngineers] do
+                    if M27UnitInfo.IsUnitValid(oEngi) then
+                        M27Utilities.IssueTrackedClearCommands({ oEngi })
+                        M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
+                    end
+                end
             end
-            end
-            end
+
+            --T3 mex tracking
+            if EntityCategoryContains(M27UnitInfo.refCategoryT3Mex, oJustBuilt.UnitId) then ForkThread(M27EngineerOverseer.RefreshUnderConstructionT3MexList, aiBrain) end
 
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         elseif M27Config.M27ShowEnemyUnitNames then
@@ -1367,12 +1393,15 @@ function OnConstructed(oEngineer, oJustBuilt)
         --Engineer callbacks
         if oEngineer:GetAIBrain().M27AI and not (oEngineer.Dead) then
             if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer:GetUnitId()) then
-                local sFunctionRef = 'OnConstructed'
-                local bDebugMessages = false
-                if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-                ForkThread(M27EngineerOverseer.ReassignEngineers, oEngineer:GetAIBrain(), true, { oEngineer })
-                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                --Dont do this if just built t1 pd as want it to have walls
+                if not(EntityCategoryContains(M27UnitInfo.refCategoryWall + M27UnitInfo.refCategoryPD * categories.TECH1, oJustBuilt.UnitId)) then
+                    local sFunctionRef = 'OnConstructed'
+                    local bDebugMessages = false
+                    if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                    ForkThread(M27EngineerOverseer.ReassignEngineers, oEngineer:GetAIBrain(), true, { oEngineer })
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                end
             elseif EntityCategoryContains(categories.COMMAND, oEngineer.UnitId) then
                 local bDebugMessages = false
                 local sFunctionRef = 'OnConstructed'

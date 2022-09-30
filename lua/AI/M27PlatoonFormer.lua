@@ -481,7 +481,7 @@ function CombatPlatoonFormer(aiBrain)
                     aiBrain[M27PlatoonUtilities.refbNeedEscortUnits] = false --Have just gone through the escort conditions - if not allocated to it, then suggests we dont need any more units
                     if iDefenceCoverage < math.min(0.5, iFirebasePercent) and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
                 elseif iCurrentConditionToTry == 5 then --1 active raider (unless relatively late game and are turtling)
-                    if not(iStrategy == M27Overseer.refStrategyTurtle) or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] < 4 then
+                    if not(iStrategy == M27Overseer.refStrategyTurtle) or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] < 4 then
                         iRaiders = M27PlatoonUtilities.GetActivePlatoonCount(aiBrain, 'M27MexLargerRaiderAI')
                         if bDebugMessages == true then LOG(sFunctionRef..': iRaiders='..iRaiders) end
                         if iRaiders < 1 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) then sPlatoonToForm = 'M27MexLargerRaiderAI' end

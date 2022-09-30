@@ -53,7 +53,7 @@ refsPathing = 'M27UnitPathing' --Pathing type of the unit
 reftPathingGroupCount = 'M27UnitPathingGroupCount' --Count of the pathing groups the unit has been in
 refiLastPathingGroup = 'M27UnitLastPathingGroup' --Last pathing group of the unit where there was sufficient count (done in platoon utilities)
 reftLastLocationOfPathingGroup = 'M27UnitLastLocationOfPathingGroup' --Unit's position when it last had a pathing group with sufficient count
-refoOriginalBrainOwner = 'M27UnitOriginalOwner' --used if transfer unit from one player to another, so can transfer it back later
+--refoOriginalBrainOwner = 'M27UnitOriginalOwner' --DO NOT USE - Looks like varaibles recorded against a unit pre-transfer get wiped out post-transfer; However also looks like units have a .oldowner field which should give this info
 refbTreatAsVisible = 'M27UnitTreatAsVisible' --used for unseen T2PD that damages us - means we will calculate threat on it
 reftLastKnownPosition = 'M27UnitLastKnownPosition' --Used for naval units to try and avoid AI cheating while giving it a basic memory
 
@@ -224,6 +224,9 @@ refCategoryMissileNavy = categories.NAVAL * categories.SILO + categories.BATTLES
 refCategorySubmarine = categories.NAVAL * categories.SUBMERSIBLE * categories.ANTINAVY
 refCategoryCooper = categories.NAVAL * categories.ANTINAVY * categories.TECH2 - categories.SUBMERSIBLE - categories.DESTROYER
 refCategoryShieldBoat = categories.NAVAL * categories.SHIELD + categories.HOVER * categories.SHIELD --Includes mobile land shields that can hover
+refCategoryStealthBoat = categories.NAVAL * categories.STEALTHFIELD
+refCategoryBattlecruiser = categories.BATTLESHIP * categories.PRODUCTFA * categories.UEF
+refCategoryBattleship = categories.BATTLESHIP - refCategoryBattlecruiser
 
 
 --Multi-category:

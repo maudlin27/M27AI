@@ -1260,6 +1260,7 @@ function IssueNewAttackToBomber(oBomber, oTarget, iPriority, bAreHoverBombing)
     local aiBrain = oBomber:GetAIBrain()
     local iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oTarget)
     --IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead, bIgnoreMobileShields, bTreatPartCompleteAsComplete)
+
     local iNearbyShieldCurHealth, iNearbyShieldMaxHealth = M27Logic.IsTargetUnderShield(aiBrain, oTarget, 0, true, false, true)
     local iHealthPercent = M27UnitInfo.GetUnitHealthPercent(oTarget)
     if iHealthPercent == 0 then
@@ -3416,9 +3417,9 @@ function UpdateScoutingSegmentRequirements(aiBrain)
     else
 
         --Change scouting interval for enemy base once we have access to T3 air and decent mass income
-        if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 3 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 12 then
-            aiBrain[refiIntervalEnemyBase] = math.max(40, 80 - (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - 10) * 4)
-            aiBrain[refiIntervalHighestPriority] = math.max(15, 30 - (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - 10) * 2)
+        if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 3 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 12 then
+            aiBrain[refiIntervalEnemyBase] = math.max(40, 80 - (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] - 10) * 4)
+            aiBrain[refiIntervalHighestPriority] = math.max(15, 30 - (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] - 10) * 2)
         end
 
         --Update enemy base to lower of its current value and the value for an enemy base (as the primary enemy base location may be different to the start position)
@@ -4034,7 +4035,7 @@ function QuantumOpticsManager(aiBrain, oUnit)
 
         while M27UnitInfo.IsUnitValid(oUnit) do
             if oUnit:GetFractionComplete() == 1 then
-                if aiBrain:GetEconomyStoredRatio('ENERGY') >= 1 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 250 and aiBrain:GetEconomyStored('ENERGY') >= 14000 and not (aiBrain[M27EconomyOverseer.refbStallingEnergy]) then
+                if aiBrain:GetEconomyStoredRatio('ENERGY') >= 1 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 250 and aiBrain:GetEconomyStored('ENERGY') >= 14000 and not (aiBrain[M27EconomyOverseer.refbStallingEnergy]) then
                     iSegmentXZOverdueNoScout = nil
                     iSegmentXZOverdueWithScout = nil
                     iLowestTimeUntilWantToScoutUnassigned = 10000
