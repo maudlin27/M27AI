@@ -1956,8 +1956,8 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
         local bNeedToUpgradeMexesByBase = false
         if not(aiBrain[refiMexPointsNearBase]) then
             aiBrain[refiMexPointsNearBase] = 0
-            if M27Utilities.IsTableEmpty(M27MapInfo.tResourceNearStart[aiBrain:GetArmyIndex()][1]) then
-                M27Utilities.ErrorHandler('No mexes recorded near start of our base')
+            if M27Utilities.IsTableEmpty(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1]) then
+                M27Utilities.ErrorHandler('No mexes recorded near start of our base for brain index '..aiBrain:GetArmyIndex()..'; Start number '..(aiBrain.M27StartPositionNumber or 'nil')..';MassCount='..(M27MapInfo.MassCount or 'nil'))
             else
                 for iMex, tMex in M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1] do
                     aiBrain[refiMexPointsNearBase] = aiBrain[refiMexPointsNearBase] + 1

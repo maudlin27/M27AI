@@ -95,17 +95,19 @@ bPathfindingAlreadyCommenced = false
 bMapDrawingAlreadyCommenced = {}
 bPathfindingComplete = false
 rMapPlayableArea = 2 --{x1,z1, x2,z2} - Set at start of the game, use instead of the scenarioinfo method
-iPathingIntervalSize = 0.5
+iPathingIntervalSize = 1
 iLowHeightDifThreshold = 0.007 --Used to trigger check for max height dif in an area
 iHeightDifAreaSize = 0.2 --T1 engineer is 0.6 x 0.9, so this results in a 1x1 size box by searching +- iHeightDifAreaSize if this is set to 0.5; however given are using a 0.25 interval size dont want this to be too large or destroys the purpose of the interval size and makes the threshold unrealistic
-iMaxHeightDif = 0.115 --NOTE: Map specific code should be added below in DetermineMaxTerrainHeightDif (hardcoded table with overrides by map name); Max dif in height allowed if move iPathingIntervalSize blocks away from current position in a straight line along x or z; Testing across 3 maps (africa, astro crater battles, open palms) a value of viable range across the 3 maps is a value between 0.11-0.119.  Open palms: 0.074: Incorrect (middle not shown as pathable); 0.075: Correct; 0.119: Correct; 0.12: Incorrect (side cliffs shown as pathable).  Africa: Africa: 0.109: Incorrect (ramps at top and bottom not shown as pathable); 0.11: Correct mostly (some water areas show as unpathable when I think they’re pathable); 0.119: Correct; 0.25: Correct* (I’m not sure on the pathability of some of the island sections)
+iMaxHeightDif = 0.75 --NOTE: Map specific code should be added below in DetermineMaxTerrainHeightDif (hardcoded table with overrides by map name); Max dif in height allowed if move iPathingIntervalSize blocks away from current position in a straight line along x or z; Testing across 3 maps (africa, astro crater battles, open palms) a value of viable range across the 3 maps is a value between 0.11-0.119.  Open palms: 0.074: Incorrect (middle not shown as pathable); 0.075: Correct; 0.119: Correct; 0.12: Incorrect (side cliffs shown as pathable).  Africa: Africa: 0.109: Incorrect (ramps at top and bottom not shown as pathable); 0.11: Correct mostly (some water areas show as unpathable when I think they’re pathable); 0.119: Correct; 0.25: Correct* (I’m not sure on the pathability of some of the island sections)
+iAmphibiousMaxHeightDif = 0.75 --for when moving from land to water, will use this height threshold
+bUseTerrainHeightForBeachCheck = false --If set to true for a map, then will compare terrain height of land to terrain height of water instead of surfaceheight
 --Since then have had various maps where need a higher value to detect ramps - see below for manual overrides
 local iChangeInHeightThreshold = 0.08 --Amount by which to change iMaxHeightDif if we have pathing inconsistencies
 iMinWaterDepth = 1.5 --Ships cant move right up to shore, this is a guess at how much clearance is needed (testing on Africa, depth of 2 leads to some pathable areas being considered unpathable)
 iWaterPathingIntervalSize = 1
 tWaterAreaAroundTargetAdjustments = {} --Defined in map initialisation
 iWaterMinArea = 3 --Square with x/z of this size must be underwater for the target position to be considered pathable; with value of 2 ships cant get as close to shore as expect them to
-iBaseLevelSegmentCap = 750 --Max size of segments to use
+iBaseLevelSegmentCap = 1024 --Max size of segments to use for 1 axis 20km map is 1024x1024 (i.e. 1024 means will only take shortcuts if map larger than 20km)
 iMapOutsideBoundSize = 3 --will treat positions within this size of map radius as being unpathable for pathing purposes
 iSizeOfBaseLevelSegment = 1 --Is updated by pathfinding code
 tPathingSegmentGroupBySegment = {} --[a][b][c]: a = pathing type; b = segment x, c = segment z
@@ -178,28 +180,31 @@ function DetermineMaxTerrainHeightDif()
     local sFunctionRef = 'DetermineMaxTerrainHeightDif'
 
     local tMapHeightOverride = {
-    ['serenity desert'] = 0.15,
-    ['serenity desert small'] = 0.15,
-    ['serenity desert small - FAF version'] = 0.15,
-    ['Adaptive Corona'] = 0.15,
-    ['Corona'] = 0.15,
-    ['Adaptive Flooded Corona'] = 0.15,
-    ['Fields of Isis'] = 0.15, --minor for completeness - one of cliffs reclaim looks like its pathable but default settings show it as non-pathable
-    ['Selkie Mirror'] = 0.15,
-    ['Flooded Strip Mine'] = 0.24, --middle island should be pathable by amphibious; ast 0.235 it isnt, at 0.24 it is
-    ['Adaptive Point of Reason'] = 0.26,
-    ['Hyperion'] = 0.215, --0.213 results in apparant plateau with 2 mexes (that is actually pathable) being treated as a plateau incorrectly
-    ['adaptive millennium'] = 0.16, --Default and 0.15 results in top right and bottom left being thought to be plateaus when theyre not, 0.17 shows them as pathable
-    ['Pelagial v2'] = 0.18, --Fails to detect northern island as pathable at 0.17, succeeds at 0.18
-    ['Battle Swamp'] = 0.19, --Fails to detect some at 0.15, locates at 0.18 although small sections showing as impathable
-    ['Dark Liver Mirrored'] = 0.28, --Fails to detect some at 0.28 (all but bottom-left are identified); at 0.32 it still fails to detect it but now starts seeing impathable cliffs as being pathable; so wont be able to actually make it detect everythign correctly
-    ['Fuji Phantoms'] = 0.18, --0.17 - middle shows as impathable; 0.18 - might show a bit too much of cliffs as pathable, but is lowest value where mid shows as pathable
-    ['Grave Wind'] = 0.26, --some of the ramps show as partially impathable at default, not critical issue but changed to reduce potential issues
-    ['Exo 50-T testing ground'] = 0.2,
+        --[[['serenity desert'] = 0.15,
+        ['serenity desert small'] = 0.15,
+        ['serenity desert small - FAF version'] = 0.15,
+        ['Adaptive Corona'] = 0.15,
+        ['Corona'] = 0.15,
+        ['Adaptive Flooded Corona'] = 0.15,
+        ['Fields of Isis'] = 0.15, --minor for completeness - one of cliffs reclaim looks like its pathable but default settings show it as non-pathable
+        ['Selkie Mirror'] = 0.15,--]]
+        --['Flooded Strip Mine'] = 1.2, --New 0.75 default approach: TerrainHeight beach: Use 1.2 as middle island and 4 corner islands by the middle should be pathable by amphibious; at 0.8 they arent; at 1.15 3/4 are, 1.2 all 4 are
+        --['Dark Liver Mirrored'] = 2.5, --New 0.75 default approach: TerrainHeight beach: Even at 2.5 some of the 1 mex islands are considered plateaus incorrectly
+        --[[['Adaptive Point of Reason'] = 0.26,
+        ['Hyperion'] = 0.215, --0.213 results in apparant plateau with 2 mexes (that is actually pathable) being treated as a plateau incorrectly
+        ['adaptive millennium'] = 0.16, --Default and 0.15 results in top right and bottom left being thought to be plateaus when theyre not, 0.17 shows them as pathable
+        ['Pelagial v2'] = 0.18, --Fails to detect northern island as pathable at 0.17, succeeds at 0.18
+        ['Battle Swamp'] = 0.19, --Fails to detect some at 0.15, locates at 0.18 although small sections showing as impathable
+        ['Fuji Phantoms'] = 0.18, --0.17 - middle shows as impathable; 0.18 - might show a bit too much of cliffs as pathable, but is lowest value where mid shows as pathable
+        ['Grave Wind'] = 0.26, --some of the ramps show as partially impathable at default, not critical issue but changed to reduce potential issues
+        ['Exo 50-T testing ground'] = 0.2,--]]
     }
     local sMapName = ScenarioInfo.name
-    iMaxHeightDif = (tMapHeightOverride[sMapName] or iMaxHeightDif)
-    if bDebugMessages == true then LOG(sFunctionRef..': sMapName='..sMapName..'; tMapHeightOverride='..(tMapHeightOverride[sMapName] or 'No override')..'; iMaxHeightDif='..iMaxHeightDif) end
+    --Specific map types - astro has issue with amphibious check so will set flag to use terrainheight instsead of surface height
+    local i, j = string.find(sMapName, "Astro")
+    if i and j then bUseTerrainHeightForBeachCheck = true end
+    iAmphibiousMaxHeightDif = (tMapHeightOverride[sMapName] or iAmphibiousMaxHeightDif)
+    if bDebugMessages == true then LOG(sFunctionRef..': sMapName='..sMapName..'; tMapHeightOverride='..(tMapHeightOverride[sMapName] or 'No override')..'; iMaxHeightDif='..iMaxHeightDif..'; Playable area='..repr(rMapPlayableArea)..'; bUseTerrainHeightForBeachCheck='..tostring(bUseTerrainHeightForBeachCheck)) end
 end
 
 
@@ -314,14 +319,14 @@ function RecordResourceLocations(aiBrain)
 end
 
 function RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, bMexNotHydro)
-    -- iStartPositionNumber is the army number, e.g. 1 for ARMY_1; iMaxDistance is the max distance for a mex to be returned (this only works the first time ever this function is called)
+    -- iStartPositionNumber is the .M27StartPositionNumber for the brain; iMaxDistance is the max distance for a mex to be returned (this only works the first time ever this function is called)
     --bMexNotHydro - true if looking for nearby mexes, false if looking for nearby hydros; defaults to true
 
     -- Returns a table containing positions of any mex meeting the criteria, unless bCountOnly is true in which case returns the no. of such mexes
     local sFunctionRef = 'RecordResourceNearStartPosition'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, iStartPositionNumber='..(iStartPositionNumber or 'nil')..'; iMaxDistance='..(iMaxDistance or 'nil')..'; bCountOnly='..tostring(bCountOnly or false)..'; bMexNotHydro='..tostring(bMexNotHydro or false)..'; Full PlayerStartPoints table='..repru(PlayerStartPoints)..'; GameTime='..GetGameTimeSeconds()) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, iStartPositionNumber='..(iStartPositionNumber or 'nil')..'; iMaxDistance='..(iMaxDistance or 'nil')..'; bCountOnly='..tostring(bCountOnly or false)..'; bMexNotHydro='..tostring(bMexNotHydro or false)..'; Full PlayerStartPoints table='..repru(PlayerStartPoints)..'; GameTime='..GetGameTimeSeconds()..'; MassCount='..(MassCount or 'nil')) end
     if iMaxDistance == nil then iMaxDistance = 12 end --NOTE: As currently only run the actual code to locate nearby mexes once, the first iMaxDistance will determine what to use, and any subsequent uses it wont matter
     if bMexNotHydro == nil then bMexNotHydro = true end
     if bCountOnly == nil then bCountOnly = false end
@@ -341,6 +346,8 @@ function RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCo
         if bMexNotHydro then AllResourcePoints = MassPoints
         else AllResourcePoints = HydroPoints end
 
+        local iClosestResource = 1000000
+
         if not(AllResourcePoints == nil) then
             if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through all resource points to find mexes near start position='..repru(pStartPos)..' for start position number='..iStartPositionNumber..'; PlayerStartPoints='..repru(PlayerStartPoints)) end
             for key,pResourcePos in AllResourcePoints do
@@ -351,6 +358,20 @@ function RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCo
                     if tResourceNearStart[iStartPositionNumber][iResourceType][iResourceCount] == nil then tResourceNearStart[iStartPositionNumber][iResourceType][iResourceCount] = {} end
                     tResourceNearStart[iStartPositionNumber][iResourceType][iResourceCount] = pResourcePos
                 end
+                iClosestResource = math.min(iDistance, iClosestResource)
+            end
+            if bMexNotHydro and not(bCountOnly) and iResourceCount <= 1 then
+                --Get the nearest mex to the start and then search here + 10
+                for key, pResourcePos in AllResourcePoints do
+                    iDistance = M27Utilities.GetDistanceBetweenPositions(pStartPos, pResourcePos)
+                    if iDistance <= iClosestResource + 10 then
+                        if bDebugMessages == true then LOG('Found position near to start; iDistance='..iDistance..'; imaxDistance='..iMaxDistance..'; pStartPos[1][3]='..pStartPos[1]..'-'..pStartPos[3]..'; pResourcePos='..pResourcePos[1]..'-'..pResourcePos[3]..'; bMexNotHydro='..tostring(bMexNotHydro)) end
+                        iResourceCount = iResourceCount + 1
+                        if tResourceNearStart[iStartPositionNumber][iResourceType][iResourceCount] == nil then tResourceNearStart[iStartPositionNumber][iResourceType][iResourceCount] = {} end
+                        tResourceNearStart[iStartPositionNumber][iResourceType][iResourceCount] = pResourcePos
+                    end
+                end
+
             end
         end
     end
@@ -2857,7 +2878,7 @@ function RecordBaseLevelPathability()
     local sPathingLand = M27UnitInfo.refPathingTypeLand
     local sPathingAmphibious = M27UnitInfo.refPathingTypeAmphibious
     local sPathingNavy = M27UnitInfo.refPathingTypeNavy
-    local sAllPathingTypes = {sPathingLand, sPathingAmphibious, sPathingNavy}
+    local sAllPathingTypes = {sPathingNavy, sPathingLand, sPathingAmphibious}
     --local sAllPathingTypes = {sPathingLand, sPathingAmphibious}
     local bCheckForWater, bCheckForLand, bLandPathing, bAmphibPathing, bNavyPathfinding
     local bWaterOrLandCheck
@@ -2886,8 +2907,11 @@ function RecordBaseLevelPathability()
 
     --Setup localised versions of global variables used by IsXPathableAlongLine
     local iMaxDifInHeight = iMaxHeightDif
+    local iMaxDifForLandToSea = iAmphibiousMaxHeightDif
     local iDifInHeightThreshold = iLowHeightDifThreshold
-    local iIntervalSize = iPathingIntervalSize
+    local bUseTerrainHeightNotSurfaceHeight = bUseTerrainHeightForBeachCheck
+
+    local iIntervalSize = math.floor(iPathingIntervalSize)
     local iNavyMinWaterDepth = iMinWaterDepth --Dif between terrain and surface height required to be pathable to most ships
     local tAdjustmentsForArea = tGeneralAreaAroundTargetAdjustments
     local tAreaAdjToSearch = tWaterAreaAroundTargetAdjustments
@@ -2900,8 +2924,65 @@ function RecordBaseLevelPathability()
         --local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         --local sFunctionRef = 'IsAmphibiousPathableAlongLine'
         --if bForceDebug then bDebugMessages = true end
+        local sTerrainType
+        local tiSurfaceHeights = {}
+        local tiTerrainHeights = {}
+        local iFloorStartX = math.floor(xStartInteger)
+        local iFloorStartZ = math.floor(zStartInteger)
+        local iFloorEndX = math.floor(xEndInteger)
+        local iFloorEndZ = math.floor(zEndInteger)
+        local bLineIncludesLand = false
+        for iCurX = math.min(iFloorStartX, iFloorEndX), math.max(iFloorStartX, iFloorEndX), 1 do
+            for iCurZ = math.min(iFloorStartZ, iFloorEndZ), math.max(iFloorStartZ, iFloorEndZ), 1 do
+                sTerrainType = GetTerrainType(iCurX,iCurZ)['Name']
+                if sTerrainType == 'Dirt09' or sTerrainType == 'Lava01' then
+                    --if bDebugMessages == true then LOG(sFunctionRef..': Terrain type is impassable') end
+                    return false
+                else
+                    --Are we on land?
+                    --if GetTerrainHeight(iCurX, iCurZ) > iMapWaterHeight then bLineIncludesLand = true end
+                    if bUseTerrainHeightNotSurfaceHeight and not(bLineIncludesLand) and GetTerrainHeight(iCurX, iCurZ) > iMapWaterHeight then bLineIncludesLand = true end
+                    if bLineIncludesLand then
+                        --Compare height difference of surface
+                        tiTerrainHeights[1] = GetTerrainHeight(iCurX - 1, iCurZ - 1)
+                        tiTerrainHeights[2] = GetTerrainHeight(iCurX - 1, iCurZ)
+                        if math.abs(tiTerrainHeights[1]-tiTerrainHeights[2]) > iMaxDifForLandToSea then return false
+                        else
+                            tiTerrainHeights[3] = GetTerrainHeight(iCurX, iCurZ)
+                            if math.abs(tiTerrainHeights[2] - tiTerrainHeights[3]) > iMaxDifForLandToSea then return false
+                            else
+                                tiTerrainHeights[4] = GetTerrainHeight(iCurX, iCurZ - 1)
+                                if math.abs(tiTerrainHeights[3] - tiTerrainHeights[4]) > iMaxDifForLandToSea then return false
+                                elseif math.abs(tiTerrainHeights[4] - tiTerrainHeights[1]) > iMaxDifForLandToSea then return false
+                                else
+                                    for _, iHeight in tiTerrainHeights do
+                                        if iHeight < iMapWaterHeight then return false end
+                                    end
+                                end
+                            end
+                        end
+                    else
+                        --Compare height difference of surface
+                        tiSurfaceHeights[1] = GetSurfaceHeight(iCurX - 1, iCurZ - 1)
+                        tiSurfaceHeights[2] = GetSurfaceHeight(iCurX - 1, iCurZ)
+                        if math.abs(tiSurfaceHeights[1]-tiSurfaceHeights[2]) > iMaxDifInHeight then return false
+                        else
+                            tiSurfaceHeights[3] = GetSurfaceHeight(iCurX, iCurZ)
+                            if math.abs(tiSurfaceHeights[2] - tiSurfaceHeights[3]) > iMaxDifInHeight then return false
+                            else
+                                tiSurfaceHeights[4] = GetSurfaceHeight(iCurX, iCurZ - 1)
+                                if math.abs(tiSurfaceHeights[3] - tiSurfaceHeights[4]) > iMaxDifInHeight then return false
+                                elseif math.abs(tiSurfaceHeights[4] - tiSurfaceHeights[1]) > iMaxDifInHeight then return false
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return true
 
-        local iCurDifInHeight
+        --[[local iCurDifInHeight
         local iIntervalX = xEndInteger - xStartInteger
         local iIntervalZ = zEndInteger - zStartInteger
         local iCurTerrainHeight
@@ -2981,7 +3062,7 @@ function RecordBaseLevelPathability()
             end
         end
         --if bDebugMessages == true then LOG(sFunctionRef..': Can path to the position') end
-        return true
+        return true--]]
     end
 
     function IsLandPathableAlongLine(xStartInteger, xEndInteger, zStartInteger, zEndInteger)
@@ -2990,7 +3071,47 @@ function RecordBaseLevelPathability()
         --local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         --if bForceDebug == true then bDebugMessages = true end
         --local sFunctionRef = 'IsLandPathableAlongLine'
+        --if xStartInteger >= 150 and xEndInteger <= 350 and zStartInteger >= 150 and zEndInteger <= 350 then bDebugMessages = true end
         --if bDebugMessages == true then LOG(sFunctionRef..': Start of code, X Start-End='..xStartInteger..'-'..xEndInteger..'; Z='..zStartInteger..'-'..zEndInteger..'; iMaxDifInHeight='..iMaxDifInHeight) end
+
+        local sTerrainType
+        local tiTerrainHeights = {}
+        local iFloorStartX = math.floor(xStartInteger)
+        local iFloorStartZ = math.floor(zStartInteger)
+        local iFloorEndX = math.floor(xEndInteger)
+        local iFloorEndZ = math.floor(zEndInteger)
+        --if bDebugMessages == true then LOG(sFunctionRef..': xStartInteger='..xStartInteger..'; xEndInteger='..xEndInteger..'; zStartInteger='..zStartInteger..';, zEndInteger='..zEndInteger) end
+        for iCurX = math.min(iFloorStartX, iFloorEndX), math.max(iFloorStartX, iFloorEndX), 1 do
+            for iCurZ = math.min(iFloorStartZ, iFloorEndZ), math.max(iFloorStartZ, iFloorEndZ), 1 do
+                sTerrainType = GetTerrainType(iCurX,iCurZ)['Name']
+                if sTerrainType == 'Dirt09' or sTerrainType == 'Lava01' then
+                    --if bDebugMessages == true then LOG(sFunctionRef..': Terrain type is impassable') end
+                    return false
+                else
+                    --Compare height difference of surface
+                    tiTerrainHeights[1] = GetTerrainHeight(iCurX - 1, iCurZ - 1)
+                    tiTerrainHeights[2] = GetTerrainHeight(iCurX - 1, iCurZ)
+                    if math.abs(tiTerrainHeights[1]-tiTerrainHeights[2]) > iMaxDifInHeight then return false
+                    else
+                        tiTerrainHeights[3] = GetTerrainHeight(iCurX, iCurZ)
+                        if math.abs(tiTerrainHeights[2] - tiTerrainHeights[3]) > iMaxDifInHeight then return false
+                        else
+                            tiTerrainHeights[4] = GetTerrainHeight(iCurX, iCurZ - 1)
+                            if math.abs(tiTerrainHeights[3] - tiTerrainHeights[4]) > iMaxDifInHeight then return false
+                            elseif math.abs(tiTerrainHeights[4] - tiTerrainHeights[1]) > iMaxDifInHeight then return false
+                            else
+                                for _, iHeight in tiTerrainHeights do
+                                    if iHeight < iMapWaterHeight then return false end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return true
+
+        --[[
         local iCurTerrainHeight
         local iNextTerrainHeight
         local iXFactor = 0
@@ -3046,7 +3167,7 @@ function RecordBaseLevelPathability()
             end
         end
         --if bDebugMessages == true then LOG(sFunctionRef..': Can path to the position') end
-        return true
+        return true--]]
     end
 
     function IsNavyPathableAlongLine(xStartInteger, xEndInteger, zStartInteger, zEndInteger)
@@ -3146,6 +3267,8 @@ function RecordBaseLevelPathability()
         end
         table.insert(tSegmentBySegmentGroup[sPathing][iPathingGroup], {iSegmentX, iSegmentZ})
     end
+
+    local iCurTerrainHeight, iCurSurfaceHeight
 
     for iPathingType, sPathing in sAllPathingTypes do
         if sPathing == M27UnitInfo.refPathingTypeNavy then iIntervalSize = iWaterPathingIntervalSize
@@ -4262,7 +4385,6 @@ function DrawMapPathing(aiBrain, sPathing, bDontDrawWaterIfPathingLand)
             else bDontDrawWaterIfPathingLand = true end
         end
         --Draw core pathing group
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local sFunctionRef = 'DrawMapPathing'
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code after waitticks') end
         local iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(PlayerStartPoints[aiBrain.M27StartPositionNumber])
@@ -4283,8 +4405,8 @@ function DrawMapPathing(aiBrain, sPathing, bDontDrawWaterIfPathingLand)
         end
 
         if iMaxSegments > 500 then
-            if bDontDrawWaterIfPathingLand and aiBrain:GetMapWaterRatio() >= 0.5 then iSegmentInterval = 2
-            else iSegmentInterval = 4 end
+            if bDontDrawWaterIfPathingLand and aiBrain:GetMapWaterRatio() >= 0.5 then iSegmentInterval = 6
+            else iSegmentInterval = 8 end
         elseif iSegmentInterval > 250 then
             if bDontDrawWaterIfPathingLand and aiBrain:GetMapWaterRatio() >= 0.4 and aiBrain:GetMapWaterRatio() <= 0.6 then iSegmentInterval = 1
             else iSegmentInterval = 2 end
@@ -4347,7 +4469,7 @@ function DrawMapPathing(aiBrain, sPathing, bDontDrawWaterIfPathingLand)
                 end
                 if iCurGroup == iStartingGroup then iMatches = iMatches + 1 end
             end
-            LOG('iMatches='..iMatches..'; iSegmentX-Z='..iSegmentX..'-'..iSegmentZ..'; Pathing group='..tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]..'; position='..repru(GetPositionFromPathingSegments(iSegmentX, iSegmentZ)))
+            if bDebugMessages == true then LOG('iMatches='..iMatches..'; iSegmentX-Z='..iSegmentX..'-'..iSegmentZ..'; Pathing group='..tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]..'; position='..repru(GetPositionFromPathingSegments(iSegmentX, iSegmentZ))) end
             iWaitCount = iWaitCount + 1
             if iWaitCount > 10 then
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
