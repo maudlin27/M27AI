@@ -11021,7 +11021,6 @@ end--]]
                                                         iActionToAssign = refActionAssistNavalFactory
                                                         iMaxEngisWanted = iPondEngisWanted + iCurPondEngis
                                                     else
-                                                        bDebugMessages = true
                                                         if bDebugMessages == true then LOG(sFunctionRef..': Is primary naval fac valid='..tostring(M27UnitInfo.IsUnitValid(oPrimaryNavalFac))..'; amphib pathing group='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oPrimaryNavalFac:GetPosition())..'; Base pathing group='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; therefore wont try and assist naval fac') end
                                                     end--]]
                                                 end

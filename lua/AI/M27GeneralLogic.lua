@@ -232,7 +232,6 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
         return M27MapInfo.GetReclaimLocationFromSegment(iEnergySegmentX, iEnergySegmentZ)
 
         --[[
-        bDebugMessages = true
         if bDebugMessages == true then LOG(sFunctionRef..': Want to find energy; engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' action='..(oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] or 'nil')) end
         --Want the nearest location that has a decent amount of power - manually calculate as fairly rare that want this info
         local rCurRect
