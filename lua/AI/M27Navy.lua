@@ -1462,7 +1462,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
 
 
     if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false then
-        --remove up to 5 obsolete units each cycle
+        --remove up to 100 obsolete units each cycle
         local bRemoveUnits = true
         local iRemovedUnits = 0
         while bRemoveUnits do
@@ -1475,7 +1475,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                     table.remove(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond], iUnit)
                 end
             end
-            if iRemovedUnits >= 5 then break end
+            if iRemovedUnits >= 100 then break end
         end
 
         if iRemovedUnits == 0 or M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false then
@@ -1501,7 +1501,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     if bDebugMessages == true then LOG(sFunctionRef..': About to update list of enemy units in pond nad calculate closest enemy unit. Is the table empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond]))) end
 
     if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond]) == false then
-        --remove up to 5 obsolete units each cycle
+        --remove up to 100 obsolete units each cycle
         local bRemoveUnits = true
         local iRemovedUnits = 0
         while bRemoveUnits do
@@ -1513,7 +1513,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                     table.remove(M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond], iUnit)
                 end
             end
-            if iRemovedUnits >= 20 then break end
+            if iRemovedUnits >= 100 then break end
         end
         if bDebugMessages == true then LOG(sFunctionRef..': iRemovedUnits='..iRemovedUnits..'; Is table empty now='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond]))..'; tOurBase='..repru(tOurBase)..'; Dist to aiBrain '..aiBrain.Nickname..' land base start pos='..M27Utilities.GetDistanceBetweenPositions(tOurBase, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; ai Brain start position='..repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
         if iRemovedUnits == 0 or M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond]) == false then
