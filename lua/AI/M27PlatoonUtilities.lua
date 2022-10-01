@@ -424,7 +424,9 @@ function PlatoonMove(oPlatoon, tLocation)
             if oPlatoon[refiCurrentAction] == refActionTemporaryRetreat or oPlatoon[refiCurrentAction] == refActionKitingRetreat or oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionReturnToBase then
                 if bDebugMessages == true then LOG(sFunctionRef..': Platoon is retreating so in most cases will want to move instead of attack-move') end
                 --If we have T3 mobile arti then just attack-move due to deployment time unless are close to a firebase, otherwise normal move if we have a run type action
-                if oPlatoon[refiIndirectUnits] > 0 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryT3MobileArtillery, oPlatoon[reftIndirectUnits])) == false then
+                --v58 - removed this as already ahve this logic when getting nearby enemies for the platoon, and will get inconsistent results
+                bAttackMove = false
+                --[[if oPlatoon[refiIndirectUnits] > 0 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryT3MobileArtillery, oPlatoon[reftIndirectUnits])) == false then
                     if bDebugMessages == true then LOG(sFunctionRef..': We have T3 mobile arti in platoon so will force an attackmove unless close to a firebase') end
                     bAttackMove = true
                     local aiBrain = oPlatoon:GetBrain()
@@ -440,7 +442,7 @@ function PlatoonMove(oPlatoon, tLocation)
                     end
                 else
                     bAttackMove = false
-                end
+                end--]]
             else
                 --Is it an experimental indirect unit? If so then refer to the main platoon attackmove command since its less reliable to attack-move e.g. with fatboy due to low arc
                 if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.EXPERIMENTAL, oPlatoon[reftIndirectUnits])) then
@@ -4213,19 +4215,32 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                     --Do we have intel coverage?  If not then retreat MMLs (but dont worry for T1 arti or T3 non-Aeon Arti)
                                                     local bRetreatNotAttack = false
 
-                                                    if not(M27Logic.GetIntelCoverageOfPosition(aiBrain, GetPlatoonFrontPosition(oPlatoon), math.min(40, iFrontUnitRange), false)) and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirect * categories.TECH2 + M27UnitInfo.refCategoryT3MobileArtillery * categories.AEON + M27UnitInfo.refCategoryShieldDisruptor, oPlatoon[reftIndirectUnits])) == false and (oPlatoon[refiEnemyStructuresInRange] == 0 or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetNearestUnit(oPlatoon[reftEnemyStructuresInRange], GetPlatoonFrontPosition(oPlatoon), aiBrain):GetPosition()) > oPlatoon[refiPlatoonMaxRange] + 10) then
-                                                        if bDebugMessages == true then LOG(sFunctionRef..': Have some T2 indirect units so will retreat from enemies as either dont have sufficient escort, or dont have intel coverage, and nearest structure isnt close') end
+                                                    if not(M27Logic.GetIntelCoverageOfPosition(aiBrain, GetPlatoonFrontPosition(oPlatoon), math.min(40, iFrontUnitRange), false)) and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirect * categories.TECH2 + M27UnitInfo.refCategoryT3MML + M27UnitInfo.refCategoryT3MobileArtillery * categories.AEON + M27UnitInfo.refCategoryShieldDisruptor, oPlatoon[reftIndirectUnits])) == false and (oPlatoon[refiEnemyStructuresInRange] == 0 or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetNearestUnit(oPlatoon[reftEnemyStructuresInRange], GetPlatoonFrontPosition(oPlatoon), aiBrain):GetPosition()) > oPlatoon[refiPlatoonMaxRange] + 10) then
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Have MML or Aeon mobile arti so will retreat from enemies as either dont have sufficient escort, or dont have intel coverage, and nearest structure isnt close') end
                                                         bRetreatNotAttack = true
                                                     else
-                                                        --Likely have non-Aeon T3 mobile arti in platoon so just attack unless near a chokepoint/firebase due to deploy time
+                                                        --Likely have non-Aeon T3 mobile arti in platoon so retreat if enemy is near or we are near a firebase, otherwise attack due to deploy time
                                                         if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebasePosition]) == false then
                                                             local iDistToFirebase
                                                             for iFirebaseRef, tFirebaseLocation in aiBrain[M27EngineerOverseer.reftFirebasePosition] do
                                                                 iDistToFirebase = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tFirebaseLocation)
-                                                                if iDistToFirebase <= 50 and iDistToFirebase >= 5 and (iDistToFirebase <= 25 or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))) then
+                                                                if iDistToFirebase <= 70 and iDistToFirebase >= 5 and (iDistToFirebase >= 30 or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) < M27Utilities.GetDistanceBetweenPositions(tFirebaseLocation, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))) then
                                                                     if bDebugMessages == true then LOG(sFunctionRef..': Are near a firebase so will stay here') end
                                                                     bRetreatNotAttack = true
                                                                     break
+                                                                end
+                                                            end
+                                                        end
+                                                        if not(bRetreatNotAttack) then
+                                                            --Is the enemy mobile unit at least 15 within our range?
+                                                            if oPlatoon[refiEnemiesInRange] > 0 then
+                                                                local iRetreatThreshold = math.max(iFrontUnitRange - 20, math.min(iFrontUnitRange * 0.7, iFrontUnitRange - 8))
+                                                                for iUnit, oUnit in oPlatoon[reftEnemiesInRange] do
+                                                                    if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oUnit:GetPosition()) <= iRetreatThreshold then
+                                                                        if bDebugMessages == true then LOG(sFunctionRef..': iRetreatThreshold='..iRetreatThreshold..'; Distance of oUnit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to platoon='..M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oUnit:GetPosition())) end
+                                                                        bRetreatNotAttack = true
+                                                                        break
+                                                                    end
                                                                 end
                                                             end
                                                         end
@@ -11374,7 +11389,8 @@ function ProcessPlatoonAction(oPlatoon)
                     end
 
                     oPlatoon[M27PlatoonTemplates.refbAttackMove] = false
-                    local tNewCurrentUnits = {}  --Will replace the norla units to apply the retreat/run action with this if we only have indirect fire units and some of these are T3 mobile arty
+                    --v58: Will address by only giving them the temporary retreat if enemy more than 20 within range, so have removed code leading to them attack-moving
+                    --[[local tNewCurrentUnits = {}  --Will replace the norla units to apply the retreat/run action with this if we only have indirect fire units and some of these are T3 mobile arty
                     if oPlatoon[refiIndirectUnits] > 0 and oPlatoon[refiDFUnits] == 0 then
                         if bDebugMessages == true then LOG(sFunctionRef..': Have indirect units in platoon, will check if we have any T3 mobile arti') end
 
@@ -11393,7 +11409,7 @@ function ProcessPlatoonAction(oPlatoon)
                             end
                         end
                         tCurrentUnits = tNewCurrentUnits
-                    end
+                    end--]]
                     if M27Utilities.IsTableEmpty(tCurrentUnits) == false then
                         --Do we have a chokepoint with an ACU near it and we are a combat platoon? If so then dont retreat
                         local bGoToChokepoint = false
