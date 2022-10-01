@@ -2920,6 +2920,8 @@ function RecordBaseLevelPathability()
 
 
     function IsAmphibiousPathableAlongLine(xStartInteger, xEndInteger, zStartInteger, zEndInteger)--, bForceDebug)
+        --Thanks to Balthazar for figuring out a more accurate test for pathability (look in whole integer intervals of 1 and compare height dif to see if it's >0.75)  - have used this idea to update my previous code
+
         --This is mostly a copy of land pathing but with changes for water
         --local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         --local sFunctionRef = 'IsAmphibiousPathableAlongLine'
@@ -3066,6 +3068,8 @@ function RecordBaseLevelPathability()
     end
 
     function IsLandPathableAlongLine(xStartInteger, xEndInteger, zStartInteger, zEndInteger)
+        --Thanks to Balthazar for figuring out a more accurate test for pathability (look in whole integer intervals of 1 and compare height dif to see if it's >0.75) - have used this idea to update my previous code
+
         --Assumes will call for positions in a straight line from each other
         --Can handle diagonals, but x and z differences must be identical (error handler re this can be uncommented out if come across issues)
         --local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
