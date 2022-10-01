@@ -11175,7 +11175,11 @@ function ProcessPlatoonAction(oPlatoon)
                                 oUnitToAttackInstead = nil
                             end
                             if oUnitToAttackInstead then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Issuing a manual attack order at unit '..oUnitToAttackInstead.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToAttackInstead)) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Issuing a manual attack order at unit '..oUnitToAttackInstead.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToAttackInstead)..'; Unit last order type='..(oPlatoon[refiLastOrderType] or 'nil')) end
+                                if not(oPlatoon[refiLastOrderType] == refiOrderIssueAttack) or not(oPlatoon[refoTemporaryAttackTarget] == oUnitToAttackInstead) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Platoon had a different order before or different target so will clear commands') end
+                                    M27Utilities.IssueTrackedClearCommands(oPlatoon[reftCurrentUnits])
+                                end
                                 IssueAttack(oPlatoon[reftCurrentUnits], oUnitToAttackInstead)
                                 oPlatoon[refoTemporaryAttackTarget] = oUnitToAttackInstead
                                 if not(M27UnitInfo.IsUnitValid(oUnitToAttackInstead)) then M27Utilities.ErrorHandler('Invalid oUnitToAttackInstead2 unit') end
