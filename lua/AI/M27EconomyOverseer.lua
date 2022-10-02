@@ -2770,8 +2770,11 @@ function ManageMassStalls(aiBrain)
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': UnitState=' .. M27Logic.GetUnitState(oUnit) .. '; Is ActiveHQUpgrades Empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades])))
                             end
-                            --SMD LOGIC - Check if already have 1 missile loaded before pausing
-                            if iCategoryRef == M27UnitInfo.refCategorySMD and oUnit.GetTacticalSiloAmmoCount and oUnit:GetTacticalSiloAmmoCount() >= 1 then
+                            --Factories, ACU and engineers - dont pause if >=85% done
+                            if bPauseNotUnpause and oUnit.GetWorkProgress and EntityCategoryContains(M27UnitInfo.refCategoryEngineer + categories.COMMAND + M27UnitInfo.refCategoryAllFactories, oUnit.UnitId) and (oUnit:GetWorkProgress() or 0) >= 0.85 then
+                                bApplyActionToUnit = false
+                                --SMD LOGIC - Check if already have 1 missile loaded before pausing
+                            elseif iCategoryRef == M27UnitInfo.refCategorySMD and oUnit.GetTacticalSiloAmmoCount and oUnit:GetTacticalSiloAmmoCount() >= 1 then
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Have SMD with at least 1 missile so will pause it')
                                 end
@@ -2849,10 +2852,10 @@ function ManageMassStalls(aiBrain)
                                     if oUnit:IsUnitState('Upgrading') then
                                         bApplyActionToUnit = false
                                     elseif oUnit.GetWorkProgress then
-                                        if oUnit:GetWorkProgress() >= 0.85 then
+                                        --if oUnit:GetWorkProgress() >= 0.85 then
                                             bApplyActionToUnit = false
                                             --dont pause t1 mex construction
-                                        elseif oUnit.GetFocusUnit and oUnit:GetFocusUnit() and oUnit:GetFocusUnit().UnitId and EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnit:GetFocusUnit().UnitId) then
+                                        if oUnit.GetFocusUnit and oUnit:GetFocusUnit() and oUnit:GetFocusUnit().UnitId and EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnit:GetFocusUnit().UnitId) then
                                             bApplyActionToUnit = false
                                         elseif aiBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and not(M27Conditions.DoesACUHaveUpgrade(aiBrain, oUnit)) then
                                             bApplyActionToUnit = false

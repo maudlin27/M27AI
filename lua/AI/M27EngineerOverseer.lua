@@ -5100,9 +5100,11 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
                         end
                         if not(iCategoryRef) then
                             --Still consider air experimental if we dont have much of an air shortfall and enemy has navy
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering if want air due to enemy navy or air control. aiBrain[M27AirOverseer.refbHaveAirControl]='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl])..'; aiBrain[M27AirOverseer.refiOurMassInAirAA]='..aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]..'; iAirRatioWanted='..iAirRatioWanted..'; aiBrain[M27AirOverseer.refiAirAAWanted]='..aiBrain[M27AirOverseer.refiAirAAWanted]) end
                             if aiBrain[M27AirOverseer.refbHaveAirControl] or aiBrain[M27AirOverseer.refiOurMassInAirAA] >= aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] * iAirRatioWanted or aiBrain[M27AirOverseer.refiAirAAWanted] <= 10 then
                                 if (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] or 0) >= 8000 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL) == 0 then
                                     iCategoryRef = refiExperimentalAir
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will build an air experimental') end
                                 end
                             end
                             if not(iCategoryRef) then
