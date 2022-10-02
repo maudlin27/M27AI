@@ -8842,7 +8842,7 @@ function GameSettingWarningsAndChecks(aiBrain)
     end
 
     if bIncompatible then
-        M27Chat.SendMessage(aiBrain, 'SendGameCompatibilityWarning', 'Less testing has been done with M27 on the following settings: ' .. sIncompatibleMessage .. ' If issues are encountered, report them to maudlin27 via Discord or the M27 forum thread, and include the replay ID.', 0, 10)
+        M27Chat.SendMessage(aiBrain, 'SendGameCompatibilityWarning', 'Less testing has been done with M27 on the following settings: ' .. sIncompatibleMessage .. ' report any issues to maudlin27 via Discord or the M27 forum thread, and include the replay ID.', 0, 10)
     end
     if bHaveOtherAIMod and not(bHaveOtherAI) and sUnnecessaryAIMod then
         M27Chat.SendMessage(aiBrain, 'UnnecessaryMods', 'No other AI detected, These AI mods can be disabled: '..sUnnecessaryAIMod, 1, 10)

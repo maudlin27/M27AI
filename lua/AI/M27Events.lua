@@ -87,7 +87,14 @@ function OnACUKilled(oUnit)
                     if GetGameTimeSeconds() >= 3600 and M27Conditions.GetLifetimeBuildCount(oACUBrain, M27UnitInfo.refCategoryExperimentalLevel) >= 3 then
                         M27Chat.SendMessage(oACUBrain, 'Epic game', 'That was an epic game!', 3, 10000)
                     else
-                        M27Chat.SendMessage(oACUBrain, 'Our ACU Died', 'gg', 3, 60)
+                        local iRandom = math.random(1,3)
+                        if iRandom == 1 and M27Conditions.GetLifetimeBuildCount(oACUBrain, M27UnitInfo.refCategoryExperimentalLevel) >= 2 then
+                            M27Chat.SendMessage(oACUBrain, 'Our ACU Died', 'gg, closer than I thought it would be', 3, 60)
+                        elseif iRandom == 2 then
+                            M27Chat.SendMessage(oACUBrain, 'Our ACU Died', 'gg wp', 3, 60)
+                        else
+                            M27Chat.SendMessage(oACUBrain, 'Our ACU Died', 'gg', 3, 60)
+                        end
                     end
 
                 end
@@ -277,11 +284,17 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                         if iMassKilled >= 1000 and M27UnitInfo.IsUnitValid(instigator) and not(M27Chat.tiM27VoiceTauntByType['Killed deadly unit']) and not(EntityCategoryContains(categories.COMMAND, oUnitKilled.UnitId)) and oUnitKilled.Sync.VeteranLevel >= 5 and oUnitKilled.GetAIBrain and not(M27Logic.IsCivilianBrain(oUnitKilled:GetAIBrain())) then
                             --local oBP = oUnitKilled:GetBlueprint()
                             --if iMassKilled >= oBP.Economy.BuildCostMass * 7 then
-                            local sMessage = 'FINALLY killed that annoying '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)
-                            if math.random(1,2) == 1 then
-                                sMessage = 'About time I killed that '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)
+                            if not(EntityCategoryContains(categories.COMMAND, instigator.UnitId)) or M27UnitInfo.GetUnitHealthPercent(instigator) >= 0.9 then
+
+                                local sMessage = 'FINALLY killed that annoying '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)
+                                local iRandom = math.random(1,3)
+                                if iRandom == 1 then
+                                    sMessage = 'About time I killed that '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)
+                                elseif iRandom == 2 then
+                                    sMessage = 'That '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)..' did way too much damage'
+                                end
+                                M27Chat.SendMessage(oKillerBrain, 'Killed deadly unit', sMessage, 2, 10000)
                             end
-                            M27Chat.SendMessage(oKillerBrain, 'Killed deadly unit', sMessage, 2, 10000)
                             --end
                         end
                     end

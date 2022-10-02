@@ -4921,7 +4921,42 @@ function AirBomberManager(aiBrain)
                 aiBrain[refbEnemyHasHadCruisersOrT3AA] = true
                 if not(M27Chat.tiM27VoiceTauntByType['LotsOfAA']) then
                     if M27Utilities.IsTableEmpty(tEnemyAAAndCruisers) == false and table.getn(tEnemyAAAndCruisers) >= 10 then
-                        M27Chat.SendMessage(aiBrain, 'LotsOfAA', 'That\'s a lot of anti-air commander.  Think it\'ll be enough to calm the fear?', 0, 10000)
+                        --Get the player with the most AA
+                        local toBrainByIndex = {}
+                        local tiCountByIndex = {}
+                        local iCurIndex
+                        local iMostAACount = 0
+                        for iUnit, oUnit in tEnemyAAAndCruisers do
+                            iCurIndex = oUnit:GetAIBrain():GetArmyIndex()
+                            if not(tiCountByIndex[iCurIndex]) then
+                                tiCountByIndex[iCurIndex] = 0
+                                toBrainByIndex[iCurIndex] = oUnit:GetAIBrain()
+                            end
+                            tiCountByIndex[iCurIndex] = tiCountByIndex[iCurIndex] + 1
+                        end
+                        local oMostAABrain
+                        for iIndex, iTotalCount in tiCountByIndex do
+                            if iTotalCount > iMostAACount then
+                                iMostAACount = iTotalCount
+                                oMostAABrain = toBrainByIndex[iIndex]
+                            end
+                        end
+                        local sEnemyName
+                        if oMostAABrain and oMostAABrain.Nickname then sEnemyName = oMostAABrain.Nickname
+                        else sEnemyName = 'commander'
+                        end
+
+                        local sMessage
+                        local iRandom = math.random(1, 3)
+                        if iRandom == 1 then
+                            sMessage = 'That\'s a lot of anti-air '..sEnemyName..'.  Think it\'ll be enough to calm the fear?', 0, 10000
+                        elseif iRandom == 2 then
+                            sMessage = 'Scared of strats much '..sEnemyName..'?'
+                        elseif iRandom == 3 then
+                            sMessage = 'You must really want to keep my air out of your base '..sEnemyName
+                        end
+
+                        M27Chat.SendMessage(aiBrain, 'LotsOfAA', sMessage, 0, 10000)
                     end
                 end
                 if bDebugMessages == true then
