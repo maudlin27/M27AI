@@ -1329,7 +1329,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 3 and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 then bDebugMessages = true end
-    --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
+    if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea02041' and GetGameTimeSeconds() >= 600 then bDebugMessages = true else bDebugMessages = false end
     local bRemoveCurTarget
     local bHaveMoveCommand = false
     local tTargetPos
@@ -1575,6 +1575,13 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                 local iCurDistanceFromGroundAA
                                 local iNearestGroundAA = 10000
                                 local tAllValidAATargets = {}
+                                if M27Utilities.IsTableEmpty(tNonHoverGroundAA) == true then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': No AA, will look for overlayAA and subs if our current target doesnt meet this and we arent targeting an ACU when in ACU kill mode') end
+                                    local iLowPriorityCat = M27UnitInfo.refCategoryAllNavy * categories.OVERLAYANTIAIR + M27UnitInfo.refCategorySubmarine
+                                    if not (EntityCategoryContains(iLowPriorityCat, oBomberCurTarget.UnitId)) and (not(EntityCategoryContains(categories.COMMAND, oBomberCurTarget.UnitId)) or not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill)) then
+                                        tNonHoverGroundAA = aiBrain:GetUnitsAroundPoint(iLowPriorityCat, oBomber:GetPosition(), 45, 'Enemy')
+                                    end
+                                end
                                 if M27Utilities.IsTableEmpty(tNonHoverGroundAA) == false then
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': Have enemy groundAA nearby, will see if its underwater')
@@ -2572,6 +2579,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
             for iUnit, oUnit in tAllAirOfType do
                 --if M27UnitInfo.GetUnitTechLevel(oUnit) == 4 then bDebugMessages = true else bDebugMessages = false end
                 --if M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 then bDebugMessages = true else bDebugMessages = false end
+                if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uea02041' and GetGameTimeSeconds() >= 600 then bDebugMessages = true else bDebugMessages = false end
                 bUnitIsUnassigned = false
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. '; iUnitType=' .. iUnitType .. '; iUnit=' .. iUnit .. '; ID and LC=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; checking if unit is dead and has fuel and whether its on assignment; oUnit[refbSentRefuelCommand]=' .. tostring(oUnit[refbSentRefuelCommand] or false))
