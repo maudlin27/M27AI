@@ -3259,6 +3259,16 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                             end
                         end
+                        --Air factory - cap on number of inties/AirAA based on our mass income, or if we are trying to build T1 AirAA and have T3 air factory
+                        if sBPIDToBuild and iFactoryTechLevel <= 2 and EntityCategoryContains(M27UnitInfo.refCategoryAirAA, sBPIDToBuild) and (M27Conditions.HaveLowMass(aiBrain) or (aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAirAA * categories.TECH3) >= 8)) then
+                            --Have low mass and are building AirAA - cancel in some cases
+                            if EntityCategoryContains(categories.TECH1, sBPIDToBuild) then
+                                if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirAA) >= 30 then sBPIDToBuild = nil end
+                            elseif EntityCategoryContains(categories.TECH2, sBPIDToBuild) and (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirAA - categories.TECH1) >= 10 or (aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 and M27Conditions.HaveLowMass(aiBrain) and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAirAA - categories.TECH1) >= 8)) then
+                                sBPIDToBuild = nil
+                            end
+
+                        end
                     end
                     if bReachedLastOption then
                         if bDebugMessages == true then

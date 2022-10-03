@@ -34,6 +34,7 @@ refbWillReclaimUnit = 'M27EconomyWillReclaimUnit' --Set against a unit, true if 
 
 reftUpgrading = 'M27UpgraderUpgrading' --[x] is the nth building upgrading, returns the object upgrading
 refiPausedUpgradeCount = 'M27UpgraderPausedCount' --Number of units where have paused the upgrade
+refiFailedUpgradeUnitSearchCount = 'M27FailedUpgradeUnitSearchCount' --against aiBrain, tracks number of times in a row we have fialed to find our desired category to upgrade
 local refbUpgradePaused = 'M27UpgraderUpgradePaused' --flags on particular unit if upgrade has been paused or not
 
 local refiEnergyStoredLastCycle = 'M27EnergyStoredLastCycle'
@@ -2462,15 +2463,18 @@ function UpgradeMainLoop(aiBrain)
                         LOG(sFunctionRef .. ': Got category to upgrade')
                     end
                     oUnitToUpgrade = GetUnitToUpgrade(aiBrain, iCategoryToUpgrade, tStartPosition)
-                    if oUnitToUpgrade == nil then
-                        --One likely explanation for htis is that there are enemies near the units of the category wanted
+                    if oUnitToUpgrade then
+                        aiBrain[refiFailedUpgradeUnitSearchCount] = 0
+                    else --Unit to upgrade is nil
+                        aiBrain[refiFailedUpgradeUnitSearchCount] = aiBrain[refiFailedUpgradeUnitSearchCount] + 1
+                        --One possible explanation for htis is that there are enemies near the units of the category wanted
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Couldnt find unit to upgrade, will revert to default categories, starting with T1 mex')
                         end
                         oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryT1Mex, tStartPosition)
-                        if oUnitToUpgrade == nil then
+                        if oUnitToUpgrade == nil and (aiBrain[refiFailedUpgradeUnitSearchCount] >= 30 or (not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and not(aiBrain[refbStallingEnergy]) and aiBrain[refiGrossMassBaseIncome] >= 4)) then
                             if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Will look for T2 mex')
+                                LOG(sFunctionRef .. ': Will look for T2 mex if our failure count is high')
                             end
                             oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryT2Mex, tStartPosition)
                             if oUnitToUpgrade == nil then
@@ -2535,6 +2539,9 @@ function UpgradeMainLoop(aiBrain)
                                     end
                                 end
                             end
+                        else
+                            bDebugMessages = true
+                            if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find a unit to upgrade of desired category, failure count='..aiBrain[refiFailedUpgradeUnitSearchCount]) end
                         end
                     end
                     if oUnitToUpgrade and not (oUnitToUpgrade.Dead) then
@@ -3570,6 +3577,7 @@ function UpgradeManager(aiBrain)
     aiBrain[reftT2MexesNearBase] = {}
     aiBrain[refoNearestT2MexToBase] = nil
     aiBrain[reftActiveHQUpgrades] = {}
+    aiBrain[refiFailedUpgradeUnitSearchCount] = 0
 
     --Economy - placeholder
     aiBrain[refiGrossEnergyBaseIncome] = 2
