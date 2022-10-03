@@ -4489,7 +4489,7 @@ function DetermineBomberDefenceRange(aiBrain)
         aiBrain[refiBomberDefenceModDistance] = math.min(130, math.max(60, 20 + aiBrain[M27Overseer.refiHighestMobileLandEnemyRange]))
         aiBrain[refiBomberDefenceCriticalThreatDistance] = math.max(50, aiBrain[refiBomberDefenceModDistance] - 20)
     else
-        aiBrain[refiBomberDefenceCriticalThreatDistance] = math.min(math.max(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.2, math.min(130, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35)), aiBrain[M27Overseer.refiMaxDefenceCoverageWanted])
+        aiBrain[refiBomberDefenceCriticalThreatDistance] = math.min(math.max(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.2, math.min(130, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * math.min(0.35, aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted]))))
 
         --aiBrain[refiBomberDefencePercentRange] = 0.25 --(Will decrease if in air domination mode)
         --Increase bomber defence range if enemy has a land experimental that is within 40% of the base, or we have high value buildings we want to protect (in which case base the % range on the % that would provide 120 range protection on high value buildings)
@@ -4524,7 +4524,7 @@ function DetermineBomberDefenceRange(aiBrain)
             aiBrain[refiBomberDefenceModDistance] = math.min(aiBrain[refiBomberDefenceModDistance], aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.45)
         end
 
-        aiBrain[refiBomberDefenceModDistance] = math.min(aiBrain[refiBomberDefenceModDistance] + 60, iMaxRange, aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] + 10)
+        aiBrain[refiBomberDefenceModDistance] = math.min(aiBrain[refiBomberDefenceModDistance] + 60, iMaxRange, aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted] * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] + 10)
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': Have increased defence distance to ' .. aiBrain[refiBomberDefenceModDistance] .. '; iMaxRange=' .. iMaxRange .. '; will increase further if have lots of available bombers. aiBrain[refiPreviousAvailableBombers]=' .. aiBrain[refiPreviousAvailableBombers])
         end
@@ -4597,7 +4597,7 @@ function DetermineBomberDefenceRange(aiBrain)
                 end
 
                 if iClosestDist < aiBrain[refiBomberDefenceModDistance] then
-                    aiBrain[refiBomberDefenceModDistance] = math.max(iClosestDist - iRange, 75, math.min(150, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.2, aiBrain[M27Overseer.refiMaxDefenceCoverageWanted]))
+                    aiBrain[refiBomberDefenceModDistance] = math.max(iClosestDist - iRange, 75, math.min(150, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * math.min(0.2, aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted])))
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': aiBrain[refiBomberDefenceModDistance] after updating for enemy shielded AA or SAM=' .. aiBrain[refiBomberDefenceModDistance])
                     end
@@ -8291,7 +8291,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
     --Broad idea (at time of first draft) - target locations that expect to be lightly defended, but try to dominate enemy groundAA when come across threats
     --bIsCzar - will affect some of the logic
 
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ExperimentalGunshipCoreTargetLoop'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if GetGameTimeSeconds() >= 2872 and M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 then bDebugMessages = true end
@@ -8882,11 +8882,26 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
     --LONG RANGE TARGETS
     --Do we still need a target (as dont want to run and no nearby units of interest)?
     if not (oAttackTarget) and M27Utilities.IsTableEmpty(tLocationToMoveTo) then
+        local bDefensiveExperimental = false --True if want to use experimental defensively
+        if not(aiBrain[refbHaveAirControl]) and aiBrain[refiAirAAWanted] >= 20 then bDefensiveExperimental = true end
+        local iDefensiveModDistanceThreshold = 100000
+        local iActualDistanceThreshold = 100000
+        if bDefensiveExperimental then
+            --Increase distance threshold if we have good intel
+            iDefensiveModDistanceThreshold = math.max(125, aiBrain[refiBomberDefenceCriticalThreatDistance], math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35, aiBrain[refiBomberDefenceModDistance])) --Used if we are using experimental defensively
+            iActualDistanceThreshold = iDefensiveModDistanceThreshold + 40
+            local iIntelCoverage = M27Logic.GetIntelCoverageOfPosition(aiBrain, tCurPosition, nil, true)
+            if iIntelCoverage + 60 >= iDefensiveModDistanceThreshold then
+                iDefensiveModDistanceThreshold = math.min(math.max(140, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4), iDefensiveModDistanceThreshold + 40)
+                iActualDistanceThreshold = math.max(iDefensiveModDistanceThreshold + 20, iActualDistanceThreshold + 20)
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': iDefensiveModDistanceThreshold='..iDefensiveModDistanceThreshold..'; aiBrain[refiBomberDefenceCriticalThreatDistance]='..aiBrain[refiBomberDefenceCriticalThreatDistance]..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35..'; aiBrain[refiBomberDefenceModDistance]='..aiBrain[refiBomberDefenceModDistance]..'; iActualDistanceThreshold='..iActualDistanceThreshold) end
+        end
         if bDebugMessages == true then
-            LOG(sFunctionRef .. ': No nearby targets so will consider further away targets. refiTimeWhenFirstEverRan=' .. (oUnit[refiTimeWhenFirstEverRan] or 'nil'))
+            LOG(sFunctionRef .. ': No nearby targets so will consider further away targets. bDefensiveExperimental='..tostring(bDefensiveExperimental)..'; iDefensiveModDistanceThreshold='..iDefensiveModDistanceThreshold..'; refiTimeWhenFirstEverRan=' .. (oUnit[refiTimeWhenFirstEverRan] or 'nil'))
         end
         --Is the enemy ACU on land, has minimal AA near it, and isn't under >=10k of shields?
-        if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and not (IsTargetInDeepWater(aiBrain[M27Overseer.refoLastNearestACU])) and not (M27Logic.IsTargetUnderShield(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], 14000, false, false, true)) and GetSegmentFailedAttempts(aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()) < iMaxPrevTargets then
+        if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and (not(bDefensiveExperimental) or M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.reftLastNearestACU]) <= iDefensiveModDistanceThreshold) and not (IsTargetInDeepWater(aiBrain[M27Overseer.refoLastNearestACU])) and not (M27Logic.IsTargetUnderShield(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], 14000, false, false, true)) and GetSegmentFailedAttempts(aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()) < iMaxPrevTargets then
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Can see enemy ACU and its on land and not well shielded so head towards it subject to intel')
             end
@@ -8918,7 +8933,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 for iExperimental, oExperimental in aiBrain[M27Overseer.reftEnemyLandExperimentals] do
                     if M27UnitInfo.IsUnitValid(oExperimental) and oExperimental:GetFractionComplete() >= 0.05 and M27Utilities.CanSeeUnit(aiBrain, oExperimental, true) and GetSegmentFailedAttempts(oExperimental:GetPosition()) < iMaxPrevTargets and (M27Utilities.GetDistanceBetweenPositions(oExperimental:GetPosition(), tCurPosition) <= 120 or (M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oExperimental:GetPosition(), false) <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.6 and iDistFromBase <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.55 or oUnit[refoLastUnitTarget] == oExperimental)) then
                         iDistFromBase = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oExperimental:GetPosition(), false)
-                        if not (oUnit[refiTimeWhenFirstEverRan]) or iDistFromBase <= aiBrain[refiBomberDefenceCriticalThreatDistance] + 40 or M27Logic.GetIntelCoverageOfPosition(aiBrain, oExperimental:GetPosition(), 30, true) then
+                        if (not(bDefensiveExperimental) or (iDistFromBase <= iDefensiveModDistanceThreshold and M27Utilities.GetDistanceBetweenPositions(oExperimental:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= iActualDistanceThreshold)) and not (oUnit[refiTimeWhenFirstEverRan]) or iDistFromBase <= aiBrain[refiBomberDefenceCriticalThreatDistance] + 40 or M27Logic.GetIntelCoverageOfPosition(aiBrain, oExperimental:GetPosition(), 30, true) then
                             iPotentialTargets = iPotentialTargets + 1
                             tPotentialTargets[iPotentialTargets] = oExperimental
                             if bDebugMessages == true then
@@ -8933,7 +8948,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             end
             if not (oAttackTarget) then
                 --Is the enemy base vulnerable?
-                if GetSegmentFailedAttempts(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) < iMaxPrevTargets then
+                if not(bDefensiveExperimental) and GetSegmentFailedAttempts(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) < iMaxPrevTargets then
                     local tSAMByBase = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), math.max(iSAMSearchRange + 10, 120), 'Enemy')
                     local iSAMByBase = 0
                     if M27Utilities.IsTableEmpty(tSAMByBase) == false then
@@ -8951,6 +8966,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                     if oUnit[refiTimeWhenFirstEverRan] then
                         iMinDistanceAwayFromEnemyBase = 80
                     end
+                    if bDefensiveExperimental then iMinDistanceAwayFromEnemyBase = iMinDistanceAwayFromEnemyBase + math.min(125, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5) end
                     local tVulnerableMexes = GetVulnerableMexes(aiBrain, tCurPosition, 14000, iMinDistanceAwayFromEnemyBase)
                     if M27Utilities.IsTableEmpty(tVulnerableMexes) == false then
                         if bDebugMessages == true then
@@ -8959,10 +8975,13 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                         iNearestDistance = 100000
                         for iLocation, tLocation in tVulnerableMexes do
                             iCurDistance = M27Utilities.GetDistanceBetweenPositions(tCurPosition, tLocation)
-                            if iCurDistance < iNearestDistance and GetSegmentFailedAttempts(tLocation) < iMaxPrevTargets then
-                                if not (oUnit[refiTimeWhenFirstEverRan]) or GetTimeSinceLastScoutedLocation(aiBrain, tLocation) <= 60 or M27Logic.GetIntelCoverageOfPosition(aiBrain, tLocation, 20, true) then
-                                    tLocationToMoveTo = tLocation
-                                    iNearestDistance = iCurDistance
+                            if iCurDistance < iNearestDistance and iCurDistance < iActualDistanceThreshold and GetSegmentFailedAttempts(tLocation) < iMaxPrevTargets then
+                                if not(bDefensiveExperimental) or M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tLocation) <= iDefensiveModDistanceThreshold then
+                                    if not (oUnit[refiTimeWhenFirstEverRan]) or GetTimeSinceLastScoutedLocation(aiBrain, tLocation) <= 60 or M27Logic.GetIntelCoverageOfPosition(aiBrain, tLocation, 20, true) then
+                                        tLocationToMoveTo = tLocation
+                                        iNearestDistance = iCurDistance
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Found a mex, iCurDistance='..iCurDistance..'; Distance to base='..M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tLocation)..'; Mod dist to base='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tLocation)) end
+                                    end
                                 end
                             end
                         end
@@ -8982,7 +9001,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                         for iTable, tSubtable in aiBrain[reftBomberTargetShortlist] do
                             if M27UnitInfo.IsUnitValid(tSubtable[refiShortlistUnit]) then
                                 iCurDistance = M27Utilities.GetDistanceBetweenPositions(tSubtable[refiShortlistUnit]:GetPosition(), tCurPosition)
-                                if iCurDistance < iNearestTargetDist and GetSegmentFailedAttempts(tSubtable[refiShortlistUnit]:GetPosition()) < iMaxPrevTargets then
+                                if iCurDistance < iNearestTargetDist and iCurDistance < iActualDistanceThreshold and GetSegmentFailedAttempts(tSubtable[refiShortlistUnit]:GetPosition()) < iMaxPrevTargets and (not(bDefensiveExperimental) or M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tSubtable[refiShortlistUnit]:GetPosition()) <= iDefensiveModDistanceThreshold) then
                                     bVulnerable = false
                                     --Are there T3 AA on the way to this target?
                                     iDistFromGunshipToTarget = iCurDistance
@@ -9017,7 +9036,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                     end
                     if M27Utilities.IsTableEmpty(tLocationToMoveTo) and not (oAttackTarget) then
                         --Alternative: any unit within half of distance to enemy base (vs our base)
-                        local tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryNavalSurface + M27UnitInfo.refCategoryStructure, tCurPosition, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5, 'Enemy')
+                        local tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryNavalSurface + M27UnitInfo.refCategoryStructure, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], math.min(iDefensiveModDistanceThreshold, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5), 'Enemy')
                         if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Have enemy units within 50% radius around our base so will target nearest one')

@@ -84,7 +84,7 @@ refoNearestThreat = 'M27overseerNearestLandThreat' --Unit of nearest land threat
 refiPercentageOutstandingThreat = 'M27PercentageOutstandingThreat' --% of moddistance
 refiPercentageClosestFriendlyFromOurBaseToEnemy = 'M27OverseerPercentageClosestFriendly'
 refiPercentageClosestFriendlyLandFromOurBaseToEnemy = 'M27OverseerClosestLandFromOurBaseToEnemy' --as above, but not limited to combat units, e.g. includes mexes
-refiMaxDefenceCoverageWanted = 'M27OverseerMaxDefenceCoverageWanted'
+refiMaxDefenceCoveragePercentWanted = 'M27OverseerMaxDefenceCoverageWanted'
 refiHighestEnemyGroundUnitHealth = 'M27OverseerHighestEnemyGroundUnitHealth' --Against aiBrain, used to track how much we want to deal in damage via overcharge
 refiHighestMobileLandEnemyRange = 'M27overseerHighestMobileEnemyRange' --Against aiBrain, used to track the longest range unit the enemy has had
 
@@ -7457,20 +7457,20 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             --Max target defence coverage for strategy
             if aiBrain[refiAIBrainCurrentStrategy] == refStrategyEcoAndTech then
                 if bChokepointsAreProtected then
-                    aiBrain[refiMaxDefenceCoverageWanted] = math.min(0.65, (30 + GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, aiBrain[M27MapInfo.reftClosestChokepoint]) / aiBrain[refiDistanceToNearestEnemyBase]))
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have chokepoint and are ecoing so will set defence coverage to '..aiBrain[refiMaxDefenceCoverageWanted]) end
+                    aiBrain[refiMaxDefenceCoveragePercentWanted] = math.min(0.65, (30 + GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, aiBrain[M27MapInfo.reftClosestChokepoint]) / aiBrain[refiDistanceToNearestEnemyBase]))
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have chokepoint and are ecoing so will set defence coverage to '..aiBrain[refiMaxDefenceCoveragePercentWanted]) end
                 else
-                    aiBrain[refiMaxDefenceCoverageWanted] = 0.65
+                    aiBrain[refiMaxDefenceCoveragePercentWanted] = 0.65
                 end
             elseif aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance then
-                aiBrain[refiMaxDefenceCoverageWanted] = 0.4
+                aiBrain[refiMaxDefenceCoveragePercentWanted] = 0.4
             elseif aiBrain[refiAIBrainCurrentStrategy] == refStrategyTurtle then
-                aiBrain[refiMaxDefenceCoverageWanted] = (30 + M27Utilities.GetDistanceBetweenPositions(aiBrain[M27MapInfo.reftChokepointBuildLocation], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) / aiBrain[refiDistanceToNearestEnemyBase]
+                aiBrain[refiMaxDefenceCoveragePercentWanted] = (30 + M27Utilities.GetDistanceBetweenPositions(aiBrain[M27MapInfo.reftChokepointBuildLocation], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) / aiBrain[refiDistanceToNearestEnemyBase]
             else
-                aiBrain[refiMaxDefenceCoverageWanted] = 0.9
+                aiBrain[refiMaxDefenceCoveragePercentWanted] = 0.9
             end
             --Reduce defence coverage if are temporarily turtling
-            if bTemporaryTurtleMode then aiBrain[refiMaxDefenceCoverageWanted] = math.min(aiBrain[refiMaxDefenceCoverageWanted], (iTemporaryTurtleDefenceRange or aiBrain[refiMaxDefenceCoverageWanted])) end
+            if bTemporaryTurtleMode then aiBrain[refiMaxDefenceCoveragePercentWanted] = math.min(aiBrain[refiMaxDefenceCoveragePercentWanted], (iTemporaryTurtleDefenceRange / aiBrain[refiDistanceToNearestEnemyBase] or aiBrain[refiMaxDefenceCoveragePercentWanted])) end
 
 
             --Reduce air scouting threshold for enemy base if likely to be considering whether to build a nuke or not

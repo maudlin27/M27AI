@@ -924,14 +924,14 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     end
                                     --if aiBrain[M27Overseer.refbNeedScoutsBuilt] == true then iCategoryToBuild = refCategoryLandScout end
                                 elseif iCurrentConditionToTry == 8 then --Emergency defence - enemies are within 27% of our base and we dont think we can beat them
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering if need emergency defence. aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]..'; aiBrain[M27Overseer.refiMaxDefenceCoverageWanted]='..aiBrain[M27Overseer.refiMaxDefenceCoverageWanted]..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]) end
-                                    if (aiBrain[M27Overseer.refiPercentageOutstandingThreat] < math.min(aiBrain[M27Overseer.refiMaxDefenceCoverageWanted], 0.275) and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) or (aiBrain:GetCurrentUnits(refCategoryDFTank) <= aiBrain[refiMinimumTanksWanted] and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech) and not(aiBrain[M27Overseer.refbNeedIndirect])) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering if need emergency defence. aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]..'; aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted]='..aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted]..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]) end
+                                    if (aiBrain[M27Overseer.refiPercentageOutstandingThreat] < math.min(aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted], 0.275) and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) or (aiBrain:GetCurrentUnits(refCategoryDFTank) <= aiBrain[refiMinimumTanksWanted] and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech) and not(aiBrain[M27Overseer.refbNeedIndirect])) then
                                         if aiBrain[M27Overseer.refbNeedIndirect] == true then
                                             iCategoryToBuild = refCategoryIndirect
                                         else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true) end
                                     end
                                 elseif iCurrentConditionToTry == 9 then --Emergency defence where enemy near our base, even if we think we can beat them
-                                    local iImmediateRange = math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * aiBrain[M27Overseer.refiMaxDefenceCoverageWanted], math.max(math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35, 180), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25))
+                                    local iImmediateRange = math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted], math.max(math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35, 180), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25))
                                     if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= iImmediateRange and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
                                         if aiBrain[M27Overseer.refbNeedIndirect] == true then
                                             iCategoryToBuild = refCategoryIndirect
@@ -1107,7 +1107,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         elseif iCurrentConditionToTry == 20 then --Emergency defence - enemies are within 32.5% of our base
                                             if bDebugMessages == true then LOG(sFunctionRef..': Considering if need emergency defence') end
-                                            local iImmediateRange = math.min(0.325, aiBrain[M27Overseer.refiMaxDefenceCoverageWanted])
+                                            local iImmediateRange = math.min(0.325, aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted])
                                             if aiBrain[M27Overseer.refiPercentageOutstandingThreat] < iImmediateRange and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
                                                 if aiBrain[M27Overseer.refbNeedIndirect] == true then
                                                     iCategoryToBuild = refCategoryIndirect
@@ -1288,7 +1288,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                     iTotalWanted = aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted]
                                                 end
                                             elseif iCurrentConditionToTry == 35 then --Threat range
-                                                if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= math.min(0.5, aiBrain[M27Overseer.refiMaxDefenceCoverageWanted]) then
+                                                if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= math.min(0.5, aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted]) then
                                                     if aiBrain[M27Overseer.refbNeedIndirect] == true then
                                                         iCategoryToBuild = refCategoryIndirect
 
@@ -1348,8 +1348,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                     end
                                                 elseif iCurrentConditionToTry == 40 then --Lots of mass or arent building an experimental
                                                     if aiBrain:GetEconomyStored('MASS') >= 3000 or M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) then
-                                                        if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refiMaxDefenceCoverageWanted]='..aiBrain[M27Overseer.refiMaxDefenceCoverageWanted]..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]) end
-                                                        if aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted]='..aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted]..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]) end
+                                                        if aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted] and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
                                                             if aiBrain[M27Overseer.refbNeedIndirect] == true and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
                                                                 iCategoryToBuild = refCategoryIndirect
 

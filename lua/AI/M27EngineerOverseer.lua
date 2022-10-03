@@ -9923,7 +9923,7 @@ end--]]
                                         iThreatRatio = math.max(0.25, iThreatRatio * 0.75)
                                     end
 
-                                    if iSearchRange >= 80 then iSearchRange = math.min(iSearchRange, aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
+                                    if iSearchRange >= 80 then iSearchRange = math.min(iSearchRange, aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted] * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
 
                                     if bDebugMessages == true then LOG(sFunctionRef..': Can path by land to closest enemy. Mod distance from start of threat='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; SearchRange='..iSearchRange..'; iThreatRatio='..iThreatRatio..'; aiBrain[M27AirOverseer.refiBomberDefenceModDistance]='..aiBrain[M27AirOverseer.refiBomberDefenceModDistance]..'; aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]='..aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]..'; iMinPDWanted='..iMinPDWanted..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]) end
 
