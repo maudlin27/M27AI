@@ -3267,7 +3267,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             elseif EntityCategoryContains(categories.TECH2, sBPIDToBuild) and (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirAA - categories.TECH1) >= 10 or (aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 and M27Conditions.HaveLowMass(aiBrain) and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAirAA - categories.TECH1) >= 8)) then
                                 sBPIDToBuild = nil
                             end
-
+                        --Cap asf numbers if we already have a decent number and have low mass and low general mass
+                        elseif iFactoryTechLevel == 3 and EntityCategoryContains(M27UnitInfo.refCategoryAirAA * categories.TECH3, sBPIDToBuild) and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] <= 10 and M27Conditions.HaveLowMass(aiBrain) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirAA * categories.TECH3) >= 30 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) < math.min(4, table.getn(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1])) then
+                            sBPIDToBuild = nil
                         end
                     end
                     if bReachedLastOption then
