@@ -2408,7 +2408,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 30 then bDebugMessages = true end
-    if oPlatoon[refbACUInPlatoon] == true and aiBrain:GetArmyIndex() == 7 and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and aiBrain:GetArmyIndex() == 7 and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 950 then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) then bDebugMessages = true end
@@ -5968,7 +5968,7 @@ function DetermineActionForNearbyReclaim(oPlatoon, bIgnoreNearbyEnemies)
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
-    if oPlatoon[refbACUInPlatoon] == true and aiBrain:GetArmyIndex() == 7 and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and aiBrain:GetArmyIndex() == 7 and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oPlatoon[refiReclaimers]='..oPlatoon[refiReclaimers]..'; bIgnoreNearbyEnemies='..tostring((bIgnoreNearbyEnemies or false))) end
     if oPlatoon[refiReclaimers] > 0 and (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 0.8 or GetGameTimeSeconds() >= 180) then --Have 3 mexes already
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code for '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]) end
@@ -6007,20 +6007,32 @@ function DetermineActionForNearbyReclaim(oPlatoon, bIgnoreNearbyEnemies)
                     --If ACU then will ahve called this before checking for nearby enemies, so check if any within 30
                     local bHaveNearbyEnemies = false
                     if not(bIgnoreNearbyEnemies) then
-                        if oPlatoon[refiEnemyStructuresInRange] > 0 and (M27Conditions.DoesACUHaveGun(aiBrain, false) or M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryT2PlusPD, oPlatoon[reftEnemyStructuresInRange])) == false) then bHaveNearbyEnemies = true
+                        local iHealthLossPerSec = 0
+                        local iCurTime = math.floor(GetGameTimeSeconds())
+                        local bHaveT2OrT3 = false
+                        local iEnemyRangeThreshold = 30
+                        if M27Conditions.DoesACUHaveGun(aiBrain, false) then iEnemyRangeThreshold = 40 end
+                        if oFirstReclaimer:HasEnhancement('AdvancedEngineering') or oFirstReclaimer:HasEnhancement('T3Engineering') then bHaveT2OrT3 = true end
+
+                        if oPlatoon[refbACUInPlatoon] and EntityCategoryContains(categories.COMMAND, oFirstReclaimer.UnitId) and M27Utilities.IsTableEmpty(oFirstReclaimer[M27Overseer.reftACURecentHealth]) == false then iHealthLossPerSec = ((oFirstReclaimer[M27Overseer.reftACURecentHealth][iCurTime - 10] or oFirstReclaimer[M27Overseer.reftACURecentHealth][iCurTime - 11]) - (oFirstReclaimer[M27Overseer.reftACURecentHealth][iCurTime] or oFirstReclaimer[M27Overseer.reftACURecentHealth][iCurTime-1] or oFirstReclaimer[M27Overseer.reftACURecentHealth][iCurTime-2])) / 10 end
+                        if iHealthLossPerSec >= 10 and (iHealthLossPerSec >= 50 or (not(bHaveT2OrT3))) then
+                            bHaveNearbyEnemies = true
                         else
-                            if oPlatoon[refbACUInPlatoon] and oPlatoon[refiEnemiesInRange] > 0 then
-                                local oNearestMobileEnemy = M27Utilities.GetNearestUnit(oPlatoon[reftEnemiesInRange], GetPlatoonFrontPosition(oPlatoon), aiBrain, nil)
-                                if oNearestMobileEnemy and M27Utilities.GetDistanceBetweenPositions(oNearestMobileEnemy:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= 30 then bHaveNearbyEnemies = true end
-                            end
-                            if not(bHaveNearbyEnemies) and oPlatoon[refiEnemyStructuresInRange] > 0 then
-                                local oNearestStructure = M27Utilities.GetNearestUnit(oPlatoon[reftEnemyStructuresInRange], GetPlatoonFrontPosition(oPlatoon), aiBrain, nil)
-                                if oNearestStructure and M27Utilities.GetDistanceBetweenPositions(oNearestStructure:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= 35 then
-                                    bHaveNearbyEnemies = true
+                            if oPlatoon[refiEnemyStructuresInRange] > 0 and ((not(bHaveT2OrT3) and M27Conditions.DoesACUHaveGun(aiBrain, false)) or M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryT2PlusPD, oPlatoon[reftEnemyStructuresInRange])) == false) then bHaveNearbyEnemies = true
+                            else
+                                if oPlatoon[refbACUInPlatoon] and oPlatoon[refiEnemiesInRange] > 0 then
+                                    local oNearestMobileEnemy = M27Utilities.GetNearestUnit(oPlatoon[reftEnemiesInRange], GetPlatoonFrontPosition(oPlatoon), aiBrain, nil)
+                                    if oNearestMobileEnemy and M27Utilities.GetDistanceBetweenPositions(oNearestMobileEnemy:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= iEnemyRangeThreshold then bHaveNearbyEnemies = true end
+                                end
+                                if not(bHaveNearbyEnemies) and oPlatoon[refiEnemyStructuresInRange] > 0 then
+                                    local oNearestStructure = M27Utilities.GetNearestUnit(oPlatoon[reftEnemyStructuresInRange], GetPlatoonFrontPosition(oPlatoon), aiBrain, nil)
+                                    if oNearestStructure and M27Utilities.GetDistanceBetweenPositions(oNearestStructure:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= iEnemyRangeThreshold + 5 then
+                                        bHaveNearbyEnemies = true
+                                    end
                                 end
                             end
+                            if bDebugMessages == true then LOG(sFunctionRef..': bHaveNearbyEnemies after checking if any mobile enemies within 30 of us and structures within 35='..tostring(bHaveNearbyEnemies)) end
                         end
-                        if bDebugMessages == true then LOG(sFunctionRef..': bHaveNearbyEnemies after checking if any mobile enemies within 30 of us and structures within 35='..tostring(bHaveNearbyEnemies)) end
                     end
                     if bHaveNearbyEnemies == false then
                         --New approach for v14
@@ -7166,7 +7178,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
-            if oPlatoon[refbACUInPlatoon] == true and aiBrain:GetArmyIndex() == 7 and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and aiBrain:GetArmyIndex() == 7 and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refiPlatoonMaxRange] >= 60 then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end

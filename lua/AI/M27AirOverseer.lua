@@ -1329,7 +1329,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 3 and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 then bDebugMessages = true end
-    if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea02041' and GetGameTimeSeconds() >= 600 then bDebugMessages = true else bDebugMessages = false end
+    --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea02041' and GetGameTimeSeconds() >= 600 then bDebugMessages = true else bDebugMessages = false end
     local bRemoveCurTarget
     local bHaveMoveCommand = false
     local tTargetPos
@@ -2329,7 +2329,6 @@ function AirThreatChecker(aiBrain)
 
     --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo, bBlueprintThreat)
     aiBrain[refiEnemyAirToGroundThreat] = math.max((aiBrain[refiEnemyAirToGroundThreat] or 0), M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirGroundUnits, true, false, false, true, bEnemyUsingGhettos, nil, 0, 0, 0))
-    if aiBrain:GetArmyIndex() == 7 then bDebugMessages = true end
     if not(aiBrain[refbEnemyHasBuiltTorpedoBombers]) and aiBrain[refiEnemyAirToGroundThreat] >= 200 and M27Utilities.IsTableEmpty(tEnemyAirGroundUnits) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(refCategoryTorpBomber, tEnemyAirUnits)) == false then
         aiBrain[refbEnemyHasBuiltTorpedoBombers] = true
     end
@@ -2611,7 +2610,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
             for iUnit, oUnit in tAllAirOfType do
                 --if M27UnitInfo.GetUnitTechLevel(oUnit) == 4 then bDebugMessages = true else bDebugMessages = false end
                 --if M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 then bDebugMessages = true else bDebugMessages = false end
-                if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uea02041' and GetGameTimeSeconds() >= 600 then bDebugMessages = true else bDebugMessages = false end
+                --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uea02041' and GetGameTimeSeconds() >= 600 then bDebugMessages = true else bDebugMessages = false end
                 bUnitIsUnassigned = false
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. '; iUnitType=' .. iUnitType .. '; iUnit=' .. iUnit .. '; ID and LC=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; checking if unit is dead and has fuel and whether its on assignment; oUnit[refbSentRefuelCommand]=' .. tostring(oUnit[refbSentRefuelCommand] or false))

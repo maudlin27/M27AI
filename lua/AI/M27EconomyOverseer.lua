@@ -956,6 +956,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideWhatToUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if aiBrain:GetArmyIndex() == 1 and aiBrain:GetCurrentUnits(refCategoryT2Mex) >= 1 then bDebugMessages = true end
     --if GetGameTimeSeconds() >= 600 then bDebugMessages = true end
 
 
@@ -1187,6 +1188,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
 
                     function DecideOnFirstHQ()
                         --Assumes ahve already checked we have factories available to upgrade and arent upgrading an HQ already
+                        if aiBrain:GetArmyIndex() == 1 then bDebugMessages = true end
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Deciding on first HQ and if want it to be land or air')
                         end
@@ -1242,7 +1244,11 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                                         end
                                         iFactoryToUpgrade = M27UnitInfo.refCategoryAirFactory * categories.TECH1 + M27UnitInfo.refCategoryAirFactory * categories.TECH2
                                     else
-                                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and (aiBrain[refiGrossEnergyBaseIncome] <= (46 + iEnergyIncomeAdjustForReclaim) or aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes] > 1 or aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] <= math.min(300, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4) or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= math.min(200, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.32)) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Can path to enemy with land='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; Dist to nearest enemy base='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]..'; Highest factory tech='..aiBrain[M27Overseer.refiOurHighestLandFactoryTech]) end
+                                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 400 and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 1 then
+                                            iFactoryToUpgrade = M27UnitInfo.refCategoryLandFactory * categories.TECH1
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Want T2 land as enemy base is relatively close') end
+                                        elseif aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and (aiBrain[refiGrossEnergyBaseIncome] <= (46 + iEnergyIncomeAdjustForReclaim) or aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes] > 1 or aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] <= math.min(300, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4) or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= math.min(200, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.32)) then
                                             if bDebugMessages == true then
                                                 LOG(sFunctionRef .. ': Want to upgrade land factory as no T1 factories available to upgrade')
                                             end
@@ -1369,7 +1375,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                     else
                         if iMaxToBeUpgrading > (iLandFactoryUpgrading + aiBrain[refiMexesUpgrading] + iAirFactoryUpgrading) then
                             if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Arent already upgrading the max amount wanted; iMaxToBeUpgrading=' .. iMaxToBeUpgrading .. '; iLandFactoryUpgrading=' .. iLandFactoryUpgrading .. '; aiBrain[refiMexesUpgrading]=' .. aiBrain[refiMexesUpgrading] .. '; iAirFactoryUpgrading=' .. iAirFactoryUpgrading .. '; will check if want to prioritise HQ upggrades; M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades])=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades])) .. '; aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]=' .. aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] .. '; iLandFactoryUpgrading=' .. iLandFactoryUpgrading .. '; iAirFactoryUpgrading=' .. iAirFactoryUpgrading .. '; iT1AirFactories=' .. iT1AirFactories .. '; iT2AirFactories=' .. iT2AirFactories .. '; iT1LandFactories=' .. iT1LandFactories .. '; iT2LandFactories=' .. iT2LandFactories .. '; iT2Mexes=' .. iT2Mexes .. '; iT3Mexes=' .. iT3Mexes .. '; aiBrain[refiGrossMassBaseIncome]=' .. aiBrain[refiGrossMassBaseIncome] .. '; aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes]=' .. aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes])
+                                LOG(sFunctionRef .. ': Arent already upgrading the max amount wanted; iMaxToBeUpgrading=' .. iMaxToBeUpgrading .. '; iLandFactoryUpgrading=' .. iLandFactoryUpgrading .. '; aiBrain[refiMexesUpgrading]=' .. aiBrain[refiMexesUpgrading] .. '; iAirFactoryUpgrading=' .. iAirFactoryUpgrading .. '; will check if want to prioritise HQ upggrades; M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades])=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades])) .. '; aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]=' .. aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] .. '; iLandFactoryUpgrading=' .. iLandFactoryUpgrading .. '; iAirFactoryUpgrading=' .. iAirFactoryUpgrading .. '; iT1AirFactories=' .. iT1AirFactories .. '; iT2AirFactories=' .. iT2AirFactories .. '; iT1LandFactories=' .. iT1LandFactories .. '; iT2LandFactories=' .. iT2LandFactories .. '; iT2Mexes=' .. iT2Mexes .. '; iT3Mexes=' .. iT3Mexes .. '; aiBrain[refiGrossMassBaseIncome]=' .. aiBrain[refiGrossMassBaseIncome] .. '; aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes]=' .. aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes]..'; Faction index='..aiBrain:GetFactionIndex()..'; Gross mass inc='..aiBrain[refiGrossMassBaseIncome]..'; Highest land fac tech='..aiBrain[M27Overseer.refiOurHighestLandFactoryTech]..'; Dist to enemy='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase])
                             end
                             --Get T2 HQ so can get T2 as soon as start having significant mass income, regardless of strategy
                             if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 1 and (aiBrain[refiGrossMassBaseIncome] >= 4 or iT2Mexes + iT3Mexes >= 2) and iAirFactoryAvailable + iLandFactoryAvailable > 0 and M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) == true and iT2AirFactories + iT3AirFactories + iT2LandFactories + iT3LandFactories == 0 then
@@ -1383,6 +1389,11 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                                     LOG(sFunctionRef .. ': Want to get T3 factory upgrade, will decide if want ot get land or air factory')
                                 end
                                 iCategoryToUpgrade = DecideOnFirstHQ()
+                                --Prioritise T2 land upgrade for Cybran and UEF on land maps where enemy base relatively close
+                            elseif aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 400 and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 1 and iLandFactoryUpgrading == 0 and iT1LandFactories >= 2 and (aiBrain[refiGrossMassBaseIncome] >= 3.5 or (aiBrain[refiGrossMassBaseIncome] >= 2 and (iT2Mexes + iT3Mexes) > 0)) and (aiBrain:GetFactionIndex() == M27UnitInfo.refFactionUEF or aiBrain:GetFactionIndex() == M27UnitInfo.refFactionCybran) then
+                                bDebugMessages = true
+                                if bDebugMessages == true then LOG(sFunctionRef..': Are UEF or Cybran so want to rush T2 land') end
+                                iCategoryToUpgrade = M27UnitInfo.refCategoryLandFactory * categories.TECH1
                             else
                                 if aiBrain[refiMexesAvailableForUpgrade] > 0 then
                                     if bDebugMessages == true then
@@ -2472,7 +2483,7 @@ function UpgradeMainLoop(aiBrain)
                             LOG(sFunctionRef .. ': Couldnt find unit to upgrade, will revert to default categories, starting with T1 mex')
                         end
                         oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryT1Mex, tStartPosition)
-                        if oUnitToUpgrade == nil and (aiBrain[refiFailedUpgradeUnitSearchCount] >= 30 or (not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and not(aiBrain[refbStallingEnergy]) and aiBrain[refiGrossMassBaseIncome] >= 4)) then
+                        if oUnitToUpgrade == nil and (aiBrain[refiFailedUpgradeUnitSearchCount] >= 30 or (not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and not(aiBrain[refbStallingEnergy]) and (aiBrain[refiGrossMassBaseIncome] >= 4 or aiBrain:GetEconomyStoredRatio('MASS') >= 0.9))) then
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Will look for T2 mex if our failure count is high')
                             end
