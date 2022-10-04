@@ -87,6 +87,7 @@ refiRearUnitRefreshCount = 'M27PlatoonRearRefreshCount'
 refoPathingUnit = 'M27PlatoonPathingUnit'
 
 reftDestinationCount = 'M27PlatoonDestinationCount' --[a] = location ref X1Z1, returns number of times we have been told to move to this location (using math.floor of the x and z)
+refiMultiPathReissueCount = 'M27PlatoonMultiPathReissueCount' --against platoon, returns number of times we have actions reissue move order where platoon has more than 1 move order
 
 --3) Unit related
 reftCurrentUnits = 'M27CurrentUnitsTable'
@@ -8368,7 +8369,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
     M27Utilities.FunctionProfiler(sFunctionRef..': Total', M27Utilities.refProfilerStart)
     local aiBrain = oPlatoon:GetBrain()
     if not(aiBrain[M27Logic.refbAllEnemiesDead]) then
-
+        oPlatoon[refiMultiPathReissueCount] = 0 --used to run backup pathing check
         oPlatoon[refiThreatWhenRetreatToRallyOrBase] = nil
 
         if oPlatoon[M27Transport.refiAssignedPlateau] and not(oPlatoon[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
@@ -9031,6 +9032,7 @@ function ReissueMovementPath(oPlatoon, bDontClearActions, bCalledFromNewMovement
                     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
                     if iPossibleMovementPaths <= oPlatoon[refiCurrentPathTarget] then
                         --Only 1 movement path point left - if are ACU then get a new movement path unless are in defender platoon or prev action was movement related, or are running
+                        oPlatoon[refiMultiPathReissueCount] = 0
                         if oPlatoon[refbACUInPlatoon] == true and not(sPlatoonName==M27Overseer.sDefenderPlatoonRef) and not(oPlatoon[refbHavePreviouslyRun]) then
                             if bDebugMessages == true then
                                 local iCount = oPlatoon[refiPlatoonCount]
@@ -9052,7 +9054,7 @@ function ReissueMovementPath(oPlatoon, bDontClearActions, bCalledFromNewMovement
                         --Have more than 1 movement path left, check we dont have any pathing issues if have a high value platoon
                         --i.e. one issue is that the first movement path can be cancelled by the game if it cant be pathed to, and we cause a perpetual loop by trying to remove back to it after it was cancelled
                         --Only want to do this check in limited circumstances though, and only for certain platoons; will ignore for first 3m as CanPathTo is less reliable the earlier that its used
-                        if GetGameTimeSeconds() >= 180 and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]]) <= 20 and (oPlatoon[refiPlatoonMassValue] >= 700 or oPlatoon[refiCurrentUnits] >= 4) and not(oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow] or oPlatoon[M27PlatoonTemplates.refbIgnoreStuckAction] or oPlatoon[M27PlatoonTemplates.refbRequiresSingleLocationToGuard]) then
+                        if GetGameTimeSeconds() >= 180 and (oPlatoon[refiMultiPathReissueCount] or 0) > 5 and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]]) <= 20 and (oPlatoon[refiPlatoonMassValue] >= 700 or oPlatoon[refiCurrentUnits] >= 4) and not(oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow] or oPlatoon[M27PlatoonTemplates.refbIgnoreStuckAction] or oPlatoon[M27PlatoonTemplates.refbRequiresSingleLocationToGuard]) then
                             --Are ok to run a pathing check
                             if bDebugMessages == true then LOG(sFunctionRef..': Running manual canpathto check') end
                             if M27MapInfo.RecheckPathingOfLocation(M27UnitInfo.GetUnitPathingType(oPlatoon[refoPathingUnit]), oPlatoon[refoPathingUnit], oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], nil) then
@@ -9060,9 +9062,14 @@ function ReissueMovementPath(oPlatoon, bDontClearActions, bCalledFromNewMovement
                                 if bDebugMessages == true then LOG(sFunctionRef..': Pathing error so will get a new movement path') end
                                 bGetNewPathInstead = true
                             end
+                            --Reset the pathing count to negative amount so less likely to call for a while
+                            oPlatoon[refiMultiPathReissueCount] = -5
                         end
                         if not(bGetNewPathInstead) then
                             tPlatoonCurPos = GetPlatoonFrontPosition(oPlatoon)
+                            if M27Utilities.GetDistanceBetweenPositions(tPlatoonCurPos, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]]) <= 20 then
+                                oPlatoon[refiMultiPathReissueCount] = (oPlatoon[refiMultiPathReissueCount] or 0) + 1
+                            end
                             --If we check the next point in the movement path, is it closer than the current point?
                             while iPossibleMovementPaths > oPlatoon[refiCurrentPathTarget] do
                                 iLoopCount = iLoopCount + 1
@@ -9087,6 +9094,7 @@ function ReissueMovementPath(oPlatoon, bDontClearActions, bCalledFromNewMovement
                         end
                     end
                     if bGetNewPathInstead == true then
+                        oPlatoon[refiMultiPathReissueCount] = 0
                         if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..':'..sFunctionRef..': Are getting new movement path instead') end
                         if not(bCalledFromNewMovementPath) then GetNewMovementPath(oPlatoon, bDontClearActions) end
                     else
