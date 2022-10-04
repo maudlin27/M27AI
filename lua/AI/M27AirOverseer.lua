@@ -2270,10 +2270,29 @@ function AirThreatChecker(aiBrain)
     local tEnemyAirAAUnits, tEnemyAirGroundUnits
 
     aiBrain[reftNearestEnemyAirThreat] = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain) --Will update below if are any detected threats
-
+    local bEnemyUsingGhettos = false
     if M27Utilities.IsTableEmpty(tEnemyAirUnits) == false then
+        local tEnemyTransports = EntityCategoryFilterDown(M27UnitInfo.refCategoryTransport, tEnemyAirUnits)
+        if M27Utilities.IsTableEmpty(tEnemyTransports) == false then
+            local tCargo
+            for iTransport, oTransport in tEnemyTransports do
+                if oTransport.GetCargo then
+                    tCargo = oTransport:GetCargo()
+                    if M27Utilities.IsTableEmpty(tCargo) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryAttackBot, tCargo)) == false then
+                        bEnemyUsingGhettos = true
+                        break
+                    end
+                end
+            end
+        end
+
         tEnemyAirAAUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAirAA, tEnemyAirUnits)
-        tEnemyAirGroundUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAirNonScout - M27UnitInfo.refCategoryAirAA, tEnemyAirUnits)
+        if bEnemyUsingGhettos then
+            tEnemyAirGroundUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAirNonScout - M27UnitInfo.refCategoryAirAA, tEnemyAirUnits)
+        else
+            tEnemyAirGroundUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAirNonScout - M27UnitInfo.refCategoryAirAA - M27UnitInfo.refCategoryTransport, tEnemyAirUnits)
+        end
+
 
         local oNearestAirUnit, oAltNearestUnit
         if M27Utilities.IsTableEmpty(tEnemyAirAAUnits) == false then
@@ -2306,14 +2325,27 @@ function AirThreatChecker(aiBrain)
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': aiBrain[refiEnemyAirAAThreat] after update=' .. aiBrain[refiEnemyAirAAThreat])
     end
-    --local iAllAirThreat =
-    --iAllAirThreat = iAllAirThreat + M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirGroundUnits, true, true, false, true, true, nil, 0, 0, 0) * 0.4
-    aiBrain[refiEnemyAirToGroundThreat] = math.max((aiBrain[refiEnemyAirToGroundThreat] or 0), M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirUnits, true, false, false, true, true, nil, 0, 0, 0))
-    if not(aiBrain[refbEnemyHasBuiltTorpedoBombers]) and aiBrain[refiEnemyAirToGroundThreat] >= 200 and M27Utilities.IsTableEmpty(tEnemyAirUnits) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(refCategoryTorpBomber, tEnemyAirUnits)) == false then
+
+
+    --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo, bBlueprintThreat)
+    aiBrain[refiEnemyAirToGroundThreat] = math.max((aiBrain[refiEnemyAirToGroundThreat] or 0), M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirGroundUnits, true, false, false, true, bEnemyUsingGhettos, nil, 0, 0, 0))
+    if aiBrain:GetArmyIndex() == 7 then bDebugMessages = true end
+    if not(aiBrain[refbEnemyHasBuiltTorpedoBombers]) and aiBrain[refiEnemyAirToGroundThreat] >= 200 and M27Utilities.IsTableEmpty(tEnemyAirGroundUnits) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(refCategoryTorpBomber, tEnemyAirUnits)) == false then
         aiBrain[refbEnemyHasBuiltTorpedoBombers] = true
     end
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': EnemyAAThreat=' .. aiBrain[refiEnemyAirAAThreat] .. '; Enemy Air to ground threat=' .. aiBrain[refiEnemyAirToGroundThreat])
+        if M27Utilities.IsTableEmpty(tEnemyAirUnits) == false then
+            LOG(sFunctionRef..': Size of tEnemyAirUnits='..table.getn(tEnemyAirUnits)..'; bEnemyUsingGhettos='..tostring(bEnemyUsingGhettos))
+            if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.BOMBER + categories.GROUNDATTACK, tEnemyAirUnits)) == false then
+                LOG(sFunctionRef..': Size of bomber nad ground attack air units='..table.getn(EntityCategoryFilterDown(categories.BOMBER + categories.GROUNDATTACK, tEnemyAirUnits))..'; Is table of tEnemyAirGroundUnits empty='..tostring(M27Utilities.IsTableEmpty(tEnemyAirGroundUnits)))
+                if table.getn(tEnemyAirGroundUnits) >= 4 then
+                    for iAirUnit, oAirUnit in tEnemyAirGroundUnits do
+                        LOG(sFunctionRef..': Threat given by enemy air to ground unit '..oAirUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAirUnit)..'='..M27Logic.GetAirThreatLevel(aiBrain, { oAirUnit }, true, false, false, true, true, nil, 0, 0, 0))
+                    end
+                end
+            end
+        end
     end
     local iAllAirThreat = aiBrain[refiEnemyAirAAThreat] + aiBrain[refiEnemyAirToGroundThreat] * 0.4
     if iAllAirThreat >= 200 then
