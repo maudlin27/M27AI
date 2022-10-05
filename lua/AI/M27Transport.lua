@@ -9,7 +9,7 @@ local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 
 --reftTimeOfTransportLastLocationAttempt = 'M27TransportPrevTargetTime' --[x] = Location ref of previous target, returns gametime that we attempted it as a target
-reftTransportsWaitingForEngi = 'M27TransportsWaitingForENgi' --each entry is a transport unit
+reftTransportsWaitingForEngi = 'M27TransportsWaitingForENgi' --against aibrain, each entry is a transport unit
 refiEngineersWantedForTransports = 'M27TransportsEngineersWanted'
 reftTransportsAssignedByPlateauGroup = 'M27TransportAssignedByPlateauGroup' --[x] = plateau segment group; [y] = cycles through each entry, returns transport unit assigned
 reftEngineersWaitingForTransport = 'M27TransportEngineersWaiting' --key is the unique engineer count; returns engineer object; engineer will have the transport it wants assigned as a variable to the engineer
@@ -20,9 +20,10 @@ reftPlateauNearestMex = 'M27TransportNearestMexTarget' --Assigned to transport
 refoTransportToLoadOnto = 'M27TransportWanted' --local variable assigned to an engineer object
 reftUnitsToldToLoadOntoTransport = 'M27TransportUnitsToldToLoad' --Recorded on a transport to keep track of units told to load onto it
 reftUnitsLoadedOntoTransport = 'M27TransportUnitsLoadedOntoTransport' --Engineers successfully loaded onto a transport
-refiEngisLoaded = 'M27TransportEngisLoaded' --Number of engineers successfully loaded onto transport
+refiUnitsLoaded = 'M27TransportEngisLoaded' --Number of engineers successfully loaded onto transport
 refiMaxEngisWanted = 'M27TransportEngisWanted' --max number of engineers a transport wants
 refiWaitingForEngiCount = 'M27TransportWaitingForEngiCount' --Will increase by 1 for each cycle that transport is near base and engi and waiting to be loaded
+refbMoreUnitsWanted = 'M27TransportMoreUnitsWanted' --against transport, true if when we last loaded a unit we wanted more units before leaving (used to stop the transport unloading its units)
 
 refiTimeSinceFirstInactive = 'M27TransportTimeSincFirstInactive' --Against transport; gives gametimeseconds; if unit state suggests not idle then this gets reset
 reftLocationWhenFirstInactive = 'M27TransportLocationWhenFirstInactive' --against transport
@@ -33,14 +34,15 @@ function UpdateTransportForLoadedUnit(oUnitJustLoaded, oTransport)
     local sFunctionRef = 'UpdateTransportForLoadedUnit'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if oTransport:GetAIBrain():GetArmyIndex() == 2 then bDebugMessages = true end
+
+    --if oTransport:GetAIBrain():GetArmyIndex() == 3 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': oUnitJustLoaded='..oUnitJustLoaded.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitJustLoaded)..'; Is unit valid='..tostring(M27UnitInfo.IsUnitValid(oUnitJustLoaded))) end
 
     oUnitJustLoaded[refoTransportToLoadOnto] = nil
     oUnitJustLoaded[M27UnitInfo.refbSpecialMicroActive] = false
     if M27UnitInfo.IsUnitValid(oTransport) then
         oTransport[reftUnitsToldToLoadOntoTransport][oUnitJustLoaded.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitJustLoaded)] = nil
-        oTransport[refiEngisLoaded] = (oTransport[refiEngisLoaded] or 0) + 1
+        oTransport[refiUnitsLoaded] = (oTransport[refiUnitsLoaded] or 0) + 1
         if M27Utilities.IsTableEmpty(oTransport[reftUnitsToldToLoadOntoTransport]) then
             oTransport[M27UnitInfo.refbSpecialMicroActive] = false
         end
@@ -86,13 +88,15 @@ function UpdateTransportForLoadedUnit(oUnitJustLoaded, oTransport)
         oTransport[reftUnitsLoadedOntoTransport][oUnitJustLoaded.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitJustLoaded)] = oUnitJustLoaded
 
         local iTransportCapacity = M27UnitInfo.GetTransportMaxCapacity(oTransport, iMaxTechLevel)
-        if bDebugMessages == true then LOG(sFunctionRef..': iMaxTechLevel='..iMaxTechLevel..'; iTransportCapacity='..iTransportCapacity..'; oTransport[refiEngisLoaded]='..(oTransport[refiEngisLoaded] or 'nil')..'; oTransport[refiMaxEngisWanted]='..(oTransport[refiMaxEngisWanted] or 'nil')) end
-        if iTransportCapacity <= oTransport[refiEngisLoaded] or oTransport[refiEngisLoaded] >= oTransport[refiMaxEngisWanted] or (oTransport[refiEngisLoaded] >= oTransport[refiMaxEngisWanted] * 0.7 and iEngisToBeLoaded == 0) then
+        if bDebugMessages == true then LOG(sFunctionRef..': iMaxTechLevel='..iMaxTechLevel..'; iTransportCapacity='..iTransportCapacity..'; oTransport[refiUnitsLoaded]='..(oTransport[refiUnitsLoaded] or 'nil')..'; oTransport[refiMaxEngisWanted]='..(oTransport[refiMaxEngisWanted] or 'nil')) end
+        if iTransportCapacity <= oTransport[refiUnitsLoaded] or oTransport[refiUnitsLoaded] >= oTransport[refiMaxEngisWanted] or (oTransport[refiUnitsLoaded] >= oTransport[refiMaxEngisWanted] * 0.7 and iEngisToBeLoaded == 0) then
             bSendTransportToTarget = true
         end
 
         if bSendTransportToTarget then
             ForkThread(SendTransportToPlateau, aiBrain, oTransport)
+        else
+            oTransport[refbMoreUnitsWanted] = true
         end
 
         oTransport[reftLocationWhenFirstInactive] = nil
@@ -142,7 +146,7 @@ function AssignTransportToPlateau(aiBrain, oTransport, iPlateauGroup, iMaxEngisW
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if aiBrain:GetArmyIndex() == 2 or aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
+    --if aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code for ai '..aiBrain.Nickname..', assigning transport '..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)..' to iPlateauGroup '..iPlateauGroup..'; iMaxEngisWanted='..iMaxEngisWanted) end
 
@@ -161,8 +165,10 @@ function ClearTransportTrackers(aiBrain, oTransport)
     local sFunctionRef = 'ClearTransportTrackers'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
 
-    --if aiBrain:GetArmyIndex() == 2 or aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
+    --if bDebugMessages == true then M27Utilities.ErrorHandler('Audit trail for transport') end
+
 
     if aiBrain[reftTransportsAssignedByPlateauGroup][oTransport[refiAssignedPlateau]] then
         if bDebugMessages == true then LOG(sFunctionRef..': ai='..aiBrain.Nickname..'; About to clear any tracking for the transport '..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)) end
@@ -171,6 +177,9 @@ function ClearTransportTrackers(aiBrain, oTransport)
     aiBrain[reftTransportsWaitingForEngi][oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)] = nil
     oTransport[refiAssignedPlateau] = nil
     oTransport[refiMaxEngisWanted] = 0
+    oTransport[refbMoreUnitsWanted] = false
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Cleared tracking for oTransport '..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)) end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -179,7 +188,7 @@ function SendTransportToPlateau(aiBrain, oTransport)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SendTransportToPlateau'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if oTransport:GetAIBrain():GetArmyIndex() == 2 then bDebugMessages = true end
+    --if oTransport:GetAIBrain():GetArmyIndex() == 3 then bDebugMessages = true end
     --Check if target still safe and if not switches to an alternative target if there's a better one
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, will update plateaus that we want to expand to. oTransport='..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)) end
     M27MapInfo.UpdatePlateausToExpandTo(aiBrain, true)
@@ -192,6 +201,7 @@ function SendTransportToPlateau(aiBrain, oTransport)
         local iNearestPathingGroup
         for iPathingGroup, tNearestMex in aiBrain[M27MapInfo.reftPlateausOfInterest] do
             iCurDist = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tNearestMex)
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering plateaus of interest, iPathingGroup='..iPathingGroup..'; iNearestDist='..iNearestDist..'; iCurDist='..iCurDist) end
             if iCurDist < iNearestDist then
                 iNearestDist = iCurDist
                 iNearestPathingGroup = iPathingGroup
@@ -215,6 +225,17 @@ function SendTransportToPlateau(aiBrain, oTransport)
 
     oTransport[reftLocationWhenFirstInactive] = nil
     oTransport[refiTimeSinceFirstInactive] = nil
+    oTransport[refbMoreUnitsWanted] = false
+
+    --Remove transport from list of available transports if it is in such a list
+    if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTransports]) == false then
+        for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableTransports] do
+            if oUnit == oTransport then
+                table.remove(aiBrain[M27AirOverseer.reftAvailableTransports], iUnit)
+                break
+            end
+        end
+    end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -223,6 +244,7 @@ function TransportManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'TransportManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if aiBrain:GetArmyIndex() == 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTransport) > 0 then bDebugMessages = true end
     --if aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
 
     --Called via forkthread from airoverseer after identifying available transports
@@ -237,6 +259,7 @@ function TransportManager(aiBrain)
             iAvailableTransports = iAvailableTransports + 1
         end
     end
+    local iEngineersInWaitingTransports = 0
     if M27Utilities.IsTableEmpty(aiBrain[reftTransportsWaitingForEngi]) == false then
         for iUnit, oUnit in aiBrain[reftTransportsWaitingForEngi] do
             if M27Utilities.IsTableEmpty(oUnit[reftUnitsToldToLoadOntoTransport]) then
@@ -246,6 +269,8 @@ function TransportManager(aiBrain)
             if M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]) == false then
 
                 iTransportsWaitingForEngis = iTransportsWaitingForEngis + 1
+                iEngineersInWaitingTransports = iEngineersInWaitingTransports + (oUnit[refiUnitsLoaded] or 0)
+                if bDebugMessages == true then LOG(sFunctionRef..': Recording transports waiting for negis, transport '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' has '..(oUnit[refiUnitsLoaded] or 'nil')..' Engineers loaded') end
             else
                 --Remove from table and abort (will come back to for next cycle)
                 aiBrain[reftTransportsWaitingForEngi][iUnit] = nil
@@ -265,10 +290,10 @@ function TransportManager(aiBrain)
 
     if bDebugMessages == true then LOG(sFunctionRef..': iAvailableTransports='..iAvailableTransports..'; iTransportsWaitingForEngis='..iTransportsWaitingForEngis..'; Is table of plateaus of interest empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]))) end
     if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]) == false then
-    
+
         --Decide on the plateau to expand to - factor in both distance and number of mexes
-        
-        
+
+
         --Get the closest plateau to our base
         local iBestPlateauGroup
         --local iClosestPlateauDistance = 100000
@@ -283,9 +308,9 @@ function TransportManager(aiBrain)
         for iPathingGroup, tNearestMex in aiBrain[M27MapInfo.reftPlateausOfInterest] do
             iPlateauCount = iPlateauCount + 1
             iCurDist = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tNearestMex)
-            iCurPriority = M27MapInfo.tAllPlateausWithMexes[iPathingGroup][M27MapInfo.subrefPlateauTotalMexCount] - iCurDist * iDistancePriorityFactor
+            iCurPriority = M27MapInfo.tAllPlateausWithMexes[iPathingGroup][M27MapInfo.subrefPlateauTotalMexCount] + iCurDist * iDistancePriorityFactor
             if M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tNearestMex, false) <= iDistToMid then iCurPriority = iCurPriority + 3 end
-
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering plateau priority for plateau group '..iPathingGroup..'; iCurDist='..iCurDist..'; Total mex count='..M27MapInfo.tAllPlateausWithMexes[iPathingGroup][M27MapInfo.subrefPlateauTotalMexCount]..'; iDistancePriorityFactor='..iDistancePriorityFactor..'; iDistToMid='..iDistToMid..'; Mod distance from start='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tNearestMex, false)..'; iCurPriority='..iCurPriority) end
             if iCurPriority > iBestPriority then
                 iBestPlateauGroup = iPathingGroup
                 iBestPriority = iCurPriority
@@ -321,11 +346,15 @@ function TransportManager(aiBrain)
         --Dont have air fac yet so no point trying to get engis for transports
         aiBrain[refiEngineersWantedForTransports] = 0
     else
-        aiBrain[refiEngineersWantedForTransports] = iMaxEngisWantedForPlateau + math.max(0, math.min(iPlateauCount - 1, iAvailableTransports + iTransportsWaitingForEngis)) * 2
+        aiBrain[refiEngineersWantedForTransports] = iMaxEngisWantedForPlateau + math.max(0, math.min(iPlateauCount - 1, iAvailableTransports + iTransportsWaitingForEngis)) * 2 - iEngineersInWaitingTransports
     end
     --Exception - if we already have a transport waiting
-    if iTransportsWaitingForEngis > 0 then aiBrain[refiEngineersWantedForTransports] = math.min(iTransportsWaitingForEngis * 2, 4) end
-    if bDebugMessages == true then LOG(sFunctionRef..': iTransportsWaitingForEngis='..iTransportsWaitingForEngis..'; aiBrain[refiEngineersWantedForTransports]='..aiBrain[refiEngineersWantedForTransports]..'; iAvailableTransports='..iAvailableTransports) end
+
+    if iTransportsWaitingForEngis > 0 then
+
+        aiBrain[refiEngineersWantedForTransports] = math.max(iTransportsWaitingForEngis * 2, aiBrain[refiEngineersWantedForTransports])
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': iTransportsWaitingForEngis='..iTransportsWaitingForEngis..'; aiBrain[refiEngineersWantedForTransports]='..aiBrain[refiEngineersWantedForTransports]..'; iAvailableTransports='..iAvailableTransports..'; iEngineersInWaitingTransports='..iEngineersInWaitingTransports) end
 
 
     --Send idle transports back to base (dont want to use air rally point since want them close to where engineers are liekly to be built)
@@ -338,10 +367,12 @@ function TransportManager(aiBrain)
         for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableTransports] do
             --Does the transport have any units loaded? If so then unload them
             bUnloadFirst = false
-            if oUnit.GetCargo and M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(oUnit:GetCargo()) == false then
-                bUnloadFirst = true
+            if not(oUnit[refbMoreUnitsWanted]) then
+                if oUnit.GetCargo and M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(oUnit:GetCargo()) == false then
+                    bUnloadFirst = true
+                end
             end
-            --[[if oUnit[refiEngisLoaded] > 0 then
+            --[[if oUnit[refiUnitsLoaded] > 0 then
                 for iEngi, oEngi in oUnit[reftUnitsToldToLoadOntoTransport] do
                     if M27UnitInfo.IsUnitValid(oEngi) and oEngi:IsUnitState('Attached') then
                         bUnloadFirst = true
@@ -349,7 +380,7 @@ function TransportManager(aiBrain)
                     end
                 end
             end--]]
-            if bDebugMessages == true then LOG(sFunctionRef..': Considering available transport '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oUnit[refiEngisLoaded]='..(oUnit[refiEngisLoaded] or 0)..'; bUnloadFirst='..tostring(bUnloadFirst)) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering available transport '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oUnit[refiUnitsLoaded]='..(oUnit[refiUnitsLoaded] or 0)..'; bUnloadFirst='..tostring(bUnloadFirst)) end
 
             if bUnloadFirst then
                 M27Utilities.IssueTrackedClearCommands({oUnit})
@@ -358,23 +389,43 @@ function TransportManager(aiBrain)
                 IssueTransportUnload({oUnit}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                 if bDebugMessages == true then LOG(sFunctionRef..': Told transport to unload at the start position') end
             else
+                --Check if want to send the transport - e.g. in case we have changed the plateau we want to go to
+                local bSendTransportToPlateau = false
+                if (oUnit[refiUnitsLoaded] or 0) >= math.max(1, iMaxEngisWantedForPlateau) then
+                    bSendTransportToPlateau = true
+                    SendTransportToPlateau(aiBrain, oUnit)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have sent transport '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to go to a plateau') end
+                end
+                if not(bSendTransportToPlateau) then
 
-                bSendToRallyPoint = false
-                if oUnit.GetNavigator then
-                    oNavigator = oUnit:GetNavigator()
-                    if oNavigator and oNavigator.GetCurrentTargetPos then
-                        tCurTarget = oNavigator:GetCurrentTargetPos()
-                        if M27Utilities.GetDistanceBetweenPositions(tCurTarget, tRallyPoint) >= 30 then
-                            bSendToRallyPoint = true
+
+                    bSendToRallyPoint = false
+                    if oUnit.GetNavigator then
+                        oNavigator = oUnit:GetNavigator()
+                        if oNavigator and oNavigator.GetCurrentTargetPos then
+                            tCurTarget = oNavigator:GetCurrentTargetPos()
+                            if M27Utilities.GetDistanceBetweenPositions(tCurTarget, tRallyPoint) >= 30 then
+                                bSendToRallyPoint = true
+                            end
                         end
                     end
-                end
 
-                if bSendToRallyPoint then
-                    M27Utilities.IssueTrackedClearCommands({oUnit})
-                    M27AirOverseer.ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
-                    IssueMove({oUnit}, tRallyPoint)
-                    if bDebugMessages == true then LOG(sFunctionRef..': Telling transport to return to rally point '..repru(tRallyPoint)) end
+                    if bSendToRallyPoint then
+                        M27Utilities.IssueTrackedClearCommands({oUnit})
+                        M27AirOverseer.ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
+                        IssueMove({oUnit}, tRallyPoint)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Telling transport to return to rally point '..repru(tRallyPoint)) end
+                    else
+                        --Low fuel or health transport with no units?
+                        if (oUnit[refiUnitsLoaded] or 0) == 0 and (M27UnitInfo.GetUnitHealthPercent(oUnit) <= 0.35 or oUnit:GetFuelRatio() <= 0.2) then
+                            if not(oUnit.GetCargo) or M27Utilities.IsTableEmpty(oUnit:GetCargo()) then
+                                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tRallyPoint) <= 30 or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPosition]) <= 60 then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will kill transport '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' as it has low fuel or health') end
+                                    oUnit:Kill()
+                                end
+                            end
+                        end
+                    end
                 end
             end
         end
@@ -405,7 +456,8 @@ function TransportManager(aiBrain)
 
             --Is the transport already at capacity? If so then clear the engineers
             local iTransportCapacity = M27UnitInfo.GetTransportMaxCapacity(oTransportWanted, M27UnitInfo.GetUnitTechLevel(tEngiGroup[1]))
-            if oTransportWanted[refiEngisLoaded] >= math.min(iTransportCapacity, oTransportWanted[refiMaxEngisWanted]) then
+            if bDebugMessages == true then LOG(sFunctionRef..': oTransportWanted='..oTransportWanted.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransportWanted)..'; iTransportCapacity='..iTransportCapacity..'; refiUnitsLoaded='..(oTransportWanted[refiUnitsLoaded] or 0)) end
+            if oTransportWanted[refiUnitsLoaded] >= math.min(iTransportCapacity, oTransportWanted[refiMaxEngisWanted]) then
                 if bDebugMessages == true then
                     LOG(sFunctionRef..': Transport is already full so will clear all engineers wanting to load into the transport')
                     for iEngi, oEngi in tEngiGroup do
@@ -429,6 +481,7 @@ function TransportManager(aiBrain)
                     for iEngi, oEngi in tEngiGroup do
                         oEngi[M27UnitInfo.refbSpecialMicroActive] = true
                         RecordUnitLoadingOntoTransport(oEngi, oTransportWanted)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Sent order for oEngi '..oEngi.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngi)..' to load onto transport '..oTransportWanted.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransportWanted)) end
                     end
                 else
                     --Engineers have been told to load onto transport, however if we have been waiting for them to load for some time and the transport is near base, then want to retry

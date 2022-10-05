@@ -45,6 +45,7 @@ refiFactoryNextID = 'M27FactoryNextID'
 refiUnitCategoryToBuild = 'M27FactoryUnit'
 refoFactory = 'M27FactoryObject'
 refoLastUnitBuilt = 'M27FactoryLastUnitBuilt'
+refiFactoryBuildCount = 'M27FactoryBuildCount' --Every time issuebuild order given to a factory this is increased by 1
 local refFactoryIdleCount = 'M27FactoryIdleCount' --Used to check how long the factory has been idle for (so can implement override to fix)
 
 local refiFactoryDistanceToStart = 'M27FactoryDistanceToStart'
@@ -498,7 +499,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
     --if oFactory.UnitId == 'ueb0201' then bDebugMessages = true end
 
     --if EntityCategoryContains(M27UnitInfo.refCategoryAirFactory, oFactory.UnitId) and GetGameTimeSeconds() >= 300 and aiBrain:GetArmyIndex() == 2 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber) >= 50 then bDebugMessages = true end
-    --if oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory) == 'ueb02011' then bDebugMessages = true end
+    --if oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory) == 'urb01013' then bDebugMessages = true end
 
 
 
@@ -528,7 +529,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                     if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer - M27UnitInfo.refCategoryEngineer * categories.TECH1) == 0 then bNeedEngiOfTechLevel = true end
                 end
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': iFactoryTechLevel='..iFactoryTechLevel..'; FactoryID='..sFactoryBP..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; Brain owner='..aiBrain.Nickname..'; Position='..repru(oFactory:GetPosition())..'; bNeedEngiOfTechLevel='..tostring(bNeedEngiOfTechLevel)) end
+            if bDebugMessages == true then LOG(sFunctionRef..': iFactoryTechLevel='..iFactoryTechLevel..'; FactoryID='..sFactoryBP..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; Brain owner='..aiBrain.Nickname..'; Position='..repru(oFactory:GetPosition())..'; bNeedEngiOfTechLevel='..tostring(bNeedEngiOfTechLevel)..'; Plateau group if any='..(oFactory[M27Transport.refiAssignedPlateau] or 'nil')) end
 
 
             --local iBlueprintFactionNumber = M27UnitInfo.GetFactionFromBP(oFactoryBlueprint)
@@ -677,7 +678,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                         if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.99 and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] < 1 then bHaveLowPower = true end
                         if bDebugMessages == true then LOG(sFunctionRef..': bHaveLowMass='..tostring(bHaveLowMass)..'; bHaveLowPower='..tostring(bHaveLowPower)..'; iStrategy='..iStrategy) end
-                        if not(bHaveLowPower) and not(aiBrain[M27Overseer.refbCloseToUnitCap]) and (not(bHaveLowMass) or iStrategy == aiBrain[M27Overseer.refiDefaultStrategy]) then
+                        if (oFactory[refiFactoryBuildCount] or 0) <= 4 or (not(bHaveLowPower) and not(aiBrain[M27Overseer.refbCloseToUnitCap]) and (not(bHaveLowMass)) or iStrategy == aiBrain[M27Overseer.refiDefaultStrategy] or (aiBrain:GetEconomyStored('MASS') > 10 and (oFactory[refiFactoryBuildCount] or 0) <= 7 and not(aiBrain[M27EconomyOverseer.refbStallingEnergy]))) then
                             if iCurrentConditionToTry == 1 then
                                 --Emergency defence
                                 local tNearbyLandAndAir = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, oFactory:GetPosition(), 60, 'Enemy')
@@ -3547,6 +3548,7 @@ function FactoryMainOverseerLoop(aiBrain, tAllFactories, iTicksWaited)
                                         IssueBuildFactory({ oFactory }, sUnitToBuild, 1)
                                         oFactory[refFactoryIdleCount] = 0
                                         oFactory[refbUpdatedFactoryUnitTracker] = false
+                                        oFactory[refiFactoryBuildCount] = (oFactory[refiFactoryBuildCount] or 0) + 1
                                         --Update factory rally point
                                         M27Logic.SetFactoryRallyPoint(oFactory)
                                     end

@@ -9595,12 +9595,14 @@ end--]]
                 if bDebugMessages == true then LOG(sFunctionRef..': Start of loop to assign engineer action; iEngineersToConsider='..iEngineersToConsider..'; iCurrentConditionToTry='..iCurrentConditionToTry..'; iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable..'; iAbsolutePowerBufferWanted='..iAbsolutePowerBufferWanted) end
                 tExistingLocationsToPickFrom = {}
                 iMaxEngisWanted = 1 --default; NOTE: This should be the cumulative value for that action (not that condition)
+                local bMaxEngisIsAdditionNotTotal = false --If set to true, then maxengis means the number in addition to any we currently have assigned
                 iActionToAssign = nil
 
                 oEngineerToAssign = nil
                 bGetInitialEngineer = false
                 iMinEngiTechLevelWanted = nil --Default - will consider later in the code
                 iSearchRangeForNearestEngi = 100 --Default
+                bMaxEngisIsAdditionNotTotal = false --default
 
 
 
@@ -10120,11 +10122,11 @@ end--]]
                         if iActionToAssign and bHaveLowPower and aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.9 and M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildPower]) then
                             iMaxEngisWanted = math.min(iMaxEngisWanted, 3)
                         end
-                    elseif iCurrentConditionToTry == 6 then --First ever transport waiting for engineers
+                    elseif iCurrentConditionToTry == 6 then --First ever transport waiting for engineers, or have a transport with engineers loaded on it
                         if bDebugMessages == true then LOG(sFunctionRef..': Is table of transports waiting for engineers empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Transport.reftTransportsWaitingForEngi]))) end
                         if M27Utilities.IsTableEmpty(aiBrain[M27Transport.reftTransportsWaitingForEngi]) == false then
                             for iUnit, oUnit in aiBrain[M27Transport.reftTransportsWaitingForEngi] do
-                                if M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 then
+                                if M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 or (oUnit.GetCargo and M27Utilities.IsTableEmpty(oUnit:GetCargo()) == false) then
                                     iActionToAssign = refActionLoadOnTransport
                                     iMaxEngisWanted = aiBrain[M27Transport.refiEngineersWantedForTransports]
                                     if bDebugMessages == true then LOG(sFunctionRef..': Are dealing with first lifetime count transport.  Want action to load on transport, with iMaxEngisWanted='..iMaxEngisWanted) end
@@ -12506,7 +12508,9 @@ end--]]
                             --If are building T3 arti power then dont build normal power as well unless we have enough gross energy income to likely support both being built (as late game can have big power fluctuations so might need primary power built at same time; can also sometimes have situations where t3 arti wont get built for ages due to something blocking it)
                             if iActionToAssign == refActionBuildPower and M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildT3ArtiPower]) == false and (aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] <= 1200 or bHaveLowMass) then iActionToAssign = nil
                             else
-                                iMaxEngisWanted = iMaxEngisWanted + iExtraEngisForPowerBasedOnTech
+                                if not(bMaxEngisIsAdditionNotTotal) then
+                                    iMaxEngisWanted = iMaxEngisWanted + iExtraEngisForPowerBasedOnTech
+                                end
                                 --Clear existing engineers if the primary engineer is a lower tech level and doesnt have a building unit state
                                 if bDebugMessages == true then LOG(sFunctionRef..': Have an action to build power. iMaxEngisWanted='..iMaxEngisWanted..'; iHighestTechLevelEngi='..iHighestTechLevelEngi..';  M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][iActionToAssign])='..tostring( M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][iActionToAssign]))) end
                                 if iHighestTechLevelEngi > 1 then
@@ -12533,8 +12537,8 @@ end--]]
                                 if bDebugMessages == true then LOG(sFunctionRef..': Engineer assigned='..tEngSubtable[refEngineerAssignmentEngineerRef].UnitId..M27UnitInfo.GetUnitLifetimeCount(tEngSubtable[refEngineerAssignmentEngineerRef])..'; UC='..GetEngineerUniqueCount(tEngSubtable[refEngineerAssignmentEngineerRef])..'; Engineer action='..(tEngSubtable[refEngineerAssignmentEngineerRef][refiEngineerCurrentAction] or 'nil')) end
                             end
                         end
-                        if bDebugMessages == true then LOG(sFunctionRef..': iExistingEngineersAssigned='..iExistingEngineersAssigned..'; iMaxEngisWanted='..iMaxEngisWanted) end
-                        if iActionToAssign and iExistingEngineersAssigned <= iMaxEngisWanted then
+                        if bDebugMessages == true then LOG(sFunctionRef..': iExistingEngineersAssigned='..iExistingEngineersAssigned..'; iMaxEngisWanted='..iMaxEngisWanted..'; bMaxEngisIsAdditionNotTotal='..tostring(bMaxEngisIsAdditionNotTotal)) end
+                        if iActionToAssign and (iExistingEngineersAssigned <= iMaxEngisWanted or (bMaxEngisIsAdditionNotTotal and iMaxEngisWanted > 0)) then
                             if iExistingEngineersAssigned == iMaxEngisWanted then
                                 --Check if ACU is one of the units assigned to this action
                                 if M27Utilities.GetACU(aiBrain)[refiEngineerCurrentAction] == iActionToAssign then
@@ -12542,9 +12546,9 @@ end--]]
                                     iExistingEngineersAssigned = iExistingEngineersAssigned - 1
                                 end
                             end
-                            if iExistingEngineersAssigned < iMaxEngisWanted then
+                            if iExistingEngineersAssigned < iMaxEngisWanted or (bMaxEngisIsAdditionNotTotal and iMaxEngisWanted > 0) then
 
-                                if bDebugMessages == true then LOG(sFunctionRef..': iActionToAssign='..iActionToAssign..'; iMaxEngisWanted='..iMaxEngisWanted..'; iCurrentConditionToTry='..iCurrentConditionToTry) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iActionToAssign='..iActionToAssign..'; iMaxEngisWanted='..iMaxEngisWanted..'; bMaxEngisIsAdditionNotTotal='..tostring(bMaxEngisIsAdditionNotTotal)..'; iCurrentConditionToTry='..iCurrentConditionToTry) end
                                 --Need to get the location first so can search for engineers nearest to it
                                 if iSearchRangeForNearestEngi == nil then iSearchRangeForNearestEngi = 100 end
                                 if M27MapInfo.bNoRushActive then iSearchRangeForNearestEngi = math.min(iSearchRangeForNearestEngi, M27MapInfo.iNoRushRange * 2) end
@@ -12616,9 +12620,13 @@ end--]]
                                 --GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentActionPriority, tCurrentActionTarget, iActionRefToGetExistingCount, tsUnitStatesToIgnore)
                                 if M27Utilities.IsTableEmpty(tActionTargetLocation) == true and oActionTargetObject == nil then
                                     if bHaveEngisOfCurrentOrHigherTech and not(iActionToAssign == refActionReclaimUnit) then
-                                        M27Utilities.ErrorHandler('Couldnt find valid target or object for the action so wont proceed with it, review if this happens repeatedly for unexpected actions (examples where this triggers in line with expectations are if want to assist a building but all of them have nearby enemies (or are factories that are idle), or if try to reclaim a unit that no longer has a position (this warning is hidden if the action was to reclaim a unit as a result though). iActionToAssign='..iActionToAssign..'; iCurrentConditionToTry='..iCurrentConditionToTry, true)
+                                        M27Utilities.ErrorHandler('Couldnt find valid target or object for the action so wont proceed with it, review if this happens repeatedly for unexpected actions (examples where this triggers in line with expectations are if want to assist a building but all of them have nearby enemies (or are factories that are idle), or if try to reclaim a unit that no longer has a position (this warning is hidden if the action was to reclaim a unit as a result though). iActionToAssign='..iActionToAssign..'; iCurrentConditionToTry='..iCurrentConditionToTry..'; bMaxEngisIsAdditionNotTotal='..tostring(bMaxEngisIsAdditionNotTotal), true)
                                     end
-                                    iCurConditionEngiShortfall = iMaxEngisWanted - iExistingEngineersAssigned
+                                    if bMaxEngisIsAdditionNotTotal then
+                                        iCurConditionEngiShortfall = iMaxEngisWanted
+                                    else
+                                        iCurConditionEngiShortfall = iMaxEngisWanted - iExistingEngineersAssigned
+                                    end
                                     if bDebugMessages == true then LOG(sFunctionRef..': Have no action target or object target, so unless anErrormessage has appeared we are just calculating how many engis we want to build; Total available T3 engis='..tiAvailableEngineersByTech[3]..'; repr of table of available engis by tech level='..repru(tiAvailableEngineersByTech)) end
                                 else
                                     if bDebugMessages == true then LOG(sFunctionRef..': iExistingEngineersAssigned='..iExistingEngineersAssigned..'; iMinEngiTechLevelWanted='..iMinEngiTechLevelWanted) end
@@ -12632,8 +12640,11 @@ end--]]
                                         end
                                         bWillBeAssigning = true
                                     else
-                                        if bDebugMessages == true then LOG(sFunctionRef..' condition:'..iCurrentConditionToTry..': oEngineerToAssign is nil, assuming its because available engineer is too far away so wont abort. bHaveEngisOfCurrentOrHigherTech='..tostring(bHaveEngisOfCurrentOrHigherTech)..'; bOnlyReassignIdle='..tostring(bOnlyReassignIdle)) end
-                                        iCurConditionEngiShortfall = iMaxEngisWanted - iExistingEngineersAssigned
+                                        if bDebugMessages == true then LOG(sFunctionRef..' condition:'..iCurrentConditionToTry..': oEngineerToAssign is nil, assuming its because available engineer is too far away so wont abort. bHaveEngisOfCurrentOrHigherTech='..tostring(bHaveEngisOfCurrentOrHigherTech)..'; bOnlyReassignIdle='..tostring(bOnlyReassignIdle)..'; bMaxEngisIsAdditionNotTotal='..tostring(bMaxEngisIsAdditionNotTotal)) end
+                                        if bMaxEngisIsAdditionNotTotal then iCurConditionEngiShortfall = iMaxEngisWanted
+                                        else
+                                            iCurConditionEngiShortfall = iMaxEngisWanted - iExistingEngineersAssigned
+                                        end
 
                                         --Strange issue where somehow will pick an engineer that isn't part of the original idle engineers in the above to try and assign an order, spent a while and couldnt figure out why so will just try and have it only trigger once per cycle
                                         for iTech = iMinEngiTechLevelWanted, 3 do
@@ -12649,7 +12660,7 @@ end--]]
                             end
                         else
                             if bDebugMessages == true then
-                                LOG(sFunctionRef..': iActionToAssign='..(iActionToAssign or 'nil')..'; Already assigned '..iExistingEngineersAssigned..'  engis and only wanted '..iMaxEngisWanted..'; will list out all engineers assigned')
+                                LOG(sFunctionRef..': iActionToAssign='..(iActionToAssign or 'nil')..'; Already assigned '..iExistingEngineersAssigned..'  engis and only wanted '..iMaxEngisWanted..'; will list out all engineers assigned. bMaxEngisIsAdditionNotTotal='..tostring(bMaxEngisIsAdditionNotTotal))
                                 --reftEngineerAssignmentsByActionRef = 'M27EngineerAssignmentsByAction' --Records all engineers. [x][y]{1,2} - x is the action ref; y is the engineer unique ref, 1 is the location ref, 2 is the engineer object (use the subtable ref keys instead of numbers to refer to these)
                                 if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][iActionToAssign]) == false then
                                     for iRef, tRef in aiBrain[reftEngineerAssignmentsByActionRef][iActionToAssign] do

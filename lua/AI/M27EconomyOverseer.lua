@@ -774,12 +774,26 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker, bDontUpdateHQTracker
 
         if not(oUnitToUpgrade:IsUnitState('Upgrading')) then
 
+
+
             --Factory specific - if work progress is <=5% then cancel so can do the upgrade
             if EntityCategoryContains(M27UnitInfo.refCategoryAllFactories, oUnitToUpgrade.UnitId) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Are upgrading a factory '..oUnitToUpgrade.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)..'; work progress='..oUnitToUpgrade:GetWorkProgress()) end
                 if oUnitToUpgrade.GetWorkProgress and oUnitToUpgrade:GetWorkProgress() <= 0.05 then
                     M27Utilities.IssueTrackedClearCommands({ oUnitToUpgrade })
                     if bDebugMessages == true then LOG(sFunctionRef..': Have barely started with current construction so will cancel so can get upgrade sooner') end
+                end
+            end
+
+            --Air factory upgrades - if we are upgrading from T1 to T2 and havent build a transport, and have plateaus, then want to get a transport first
+            if EntityCategoryContains(M27UnitInfo.refCategoryAirFactory * categories.TECH1, oUnitToUpgrade.UnitId) and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 1 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory * categories.TECH1) == 1 then
+                M27MapInfo.UpdatePlateausToExpandTo(aiBrain)
+                if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]) == false and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryTransport) == 0 then
+                    --Havent built any transports yet so build a T1 transport before we upgrade to T2 air
+                    local sTransportID = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, M27UnitInfo.refCategoryTransport, oUnitToUpgrade)
+                    if sTransportID then
+                        IssueBuildFactory({ oUnitToUpgrade }, sTransportID, 1)
+                    end
                 end
             end
 
@@ -956,7 +970,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideWhatToUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if aiBrain:GetArmyIndex() == 1 and aiBrain:GetCurrentUnits(refCategoryT2Mex) >= 1 then bDebugMessages = true end
+    --if aiBrain:GetArmyIndex() == 1 and aiBrain:GetCurrentUnits(refCategoryT2Mex) >= 1 then bDebugMessages = true end
     --if GetGameTimeSeconds() >= 600 then bDebugMessages = true end
 
 
@@ -1188,7 +1202,6 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
 
                     function DecideOnFirstHQ()
                         --Assumes ahve already checked we have factories available to upgrade and arent upgrading an HQ already
-                        if aiBrain:GetArmyIndex() == 1 then bDebugMessages = true end
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Deciding on first HQ and if want it to be land or air')
                         end
@@ -1391,7 +1404,6 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                                 iCategoryToUpgrade = DecideOnFirstHQ()
                                 --Prioritise T2 land upgrade for Cybran and UEF on land maps where enemy base relatively close
                             elseif aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 400 and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 1 and iLandFactoryUpgrading == 0 and iT1LandFactories >= 2 and (aiBrain[refiGrossMassBaseIncome] >= 3.5 or (aiBrain[refiGrossMassBaseIncome] >= 2 and (iT2Mexes + iT3Mexes) > 0)) and (aiBrain:GetFactionIndex() == M27UnitInfo.refFactionUEF or aiBrain:GetFactionIndex() == M27UnitInfo.refFactionCybran) then
-                                bDebugMessages = true
                                 if bDebugMessages == true then LOG(sFunctionRef..': Are UEF or Cybran so want to rush T2 land') end
                                 iCategoryToUpgrade = M27UnitInfo.refCategoryLandFactory * categories.TECH1
                             else
@@ -2551,7 +2563,6 @@ function UpgradeMainLoop(aiBrain)
                                 end
                             end
                         else
-                            bDebugMessages = true
                             if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find a unit to upgrade of desired category, failure count='..aiBrain[refiFailedUpgradeUnitSearchCount]) end
                         end
                     end

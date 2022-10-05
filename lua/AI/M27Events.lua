@@ -1553,6 +1553,11 @@ function OnTransportUnload(oUnit, oTransport, bone)
                     oUnit[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
                 end
             end
+
+            if not(oTransport.GetCargo) or M27Utilities.IsTableEmpty(oTransport:GetCargo()) then oTransport[M27Transport.refiUnitsLoaded] = 0
+            else
+                oTransport[M27Transport.refiUnitsLoaded] = math.max(0, (oTransport[M27Transport.refiUnitsLoaded] or 0) - 1)
+            end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         end
     end

@@ -666,7 +666,7 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
     --tOptionalComparisonKnownCorrectPoint is optional
     --bPlateauCheckActive - called within this function if doing a check of all plateau mexes as a result - to avoid infinite loop
 
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecheckPathingOfLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if M27UnitInfo.IsUnitValid(oPathingUnit) and EntityCategoryContains(categories.MOBILE, oPathingUnit.UnitId) then --Hard crash of game if do :CanPathTo on a structure, which could happen given structures use some of the platoon logic e.g. for mobile shield assistance then
@@ -5258,7 +5258,7 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
     local sFunctionRef = 'UpdatePlateausToExpandTo'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if bForceRefresh and (aiBrain:GetArmyIndex() == 2 or aiBrain:GetArmyIndex() == 3) then bDebugMessages = true end
+    --if bForceRefresh and aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
 
     --Records table with the amphibious pathing group of plateaus that we are interested in expanding to
     --tAllPlateausWithMexes = 'M27PlateausWithMexes' --[x] = AmphibiousPathingGroup
