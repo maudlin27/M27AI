@@ -1276,6 +1276,23 @@ function OnConstructed(oEngineer, oJustBuilt)
                 end
             end
 
+            --All mexes - on construction check if we have allied M27 mass storage nearby (e.g. we have rebuilt on a mex that they used to have) and if so then have that M27 gift over their mass storage
+            if EntityCategoryContains(M27UnitInfo.refCategoryMex, oJustBuilt.UnitId) and aiBrain.M27AI then
+                local tMexLocation = oJustBuilt:GetPosition()
+                local tNearbyUnits = GetUnitsInRect(Rect(tMexLocation[1] - 2.1, tMexLocation[3] - 2.1, tMexLocation[1] + 2.1, tMexLocation[3] + 2.1)) --at 1.5 end up with storage thats not adjacent being gifted in some cases but not in others; at 1 none of it gets gifted; therefore added extra check for 1.5; the mass storage should be exactly 2 from the mex
+                if M27Utilities.IsTableEmpty(tNearbyUnits) == false then
+                    for iUnit, oUnit in tNearbyUnits do
+                        if EntityCategoryContains(M27UnitInfo.refCategoryMassStorage, oUnit.UnitId) and oUnit:GetAIBrain().M27AI and not(oUnit:GetAIBrain() == aiBrain) then
+                            bDebugMessages = true
+                            if bDebugMessages == true then LOG(sFunctionRef..': About to transfer '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' from brain '..oUnit:GetAIBrain().Nickname..' to '..aiBrain.Nickname..'; Dist from unit to tMexLocation='..M27Utilities.GetDistanceBetweenPositions(tMexLocation, oUnit:GetPosition())) end
+                            if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tMexLocation) <= 2.1 then
+                                M27Team.TransferUnitsToPlayer({oUnit}, aiBrain:GetArmyIndex(), false)
+                            end
+                        end
+                    end
+                end
+            end
+
             --Initial categories below are for if not protecting from TML
             --Mexes built by spare engineers - want to clear already assigned engineers
             if EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oJustBuilt.UnitId) then
@@ -1441,8 +1458,17 @@ function OnReclaimStarted(oEngineer, oReclaim)
             end
         elseif M27UnitInfo.IsUnitValid(oReclaim) and oReclaim:GetAIBrain().M27AI and oReclaim:GetFractionComplete() == 1 then
             local oReclaimingBrain = oEngineer:GetAIBrain()
-            if not(oReclaimingBrain == oReclaim:GetAIBrain()) and IsAlly(oReclaimingBrain:GetArmyIndex(), oReclaim:GetAIBrain():GetArmyIndex()) then
-                M27Chat.SendMessage(oReclaim:GetAIBrain(), 'Ally reclaiming', 'Hey, stop reclaiming my units '..oEngineer:GetAIBrain().Nickname, 0, 60)
+            if not(oReclaimingBrain == oReclaim:GetAIBrain()) then
+                if IsAlly(oReclaimingBrain:GetArmyIndex(), oReclaim:GetAIBrain():GetArmyIndex()) then
+                    M27Chat.SendMessage(oReclaim:GetAIBrain(), 'Ally reclaiming', 'Hey, stop reclaiming my units '..oEngineer:GetAIBrain().Nickname, 0, 60)
+                else
+                    if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oReclaim.UnitId) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer.UnitId) and IsEnemy(oReclaimingBrain:GetArmyIndex(), oReclaim:GetAIBrain():GetArmyIndex()) then
+                        --Tell engineer to reclaim the target if it isnt already
+                        bDebugMessages = true
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to get engineer check for nearby enemies now as it has just started being reclaimed by an enemy engineer') end
+                        M27EngineerOverseer.ProcessingEngineerActionForNearbyEnemies(oReclaim:GetAIBrain(), oReclaim)
+                    end
+                end
             end
         end
 

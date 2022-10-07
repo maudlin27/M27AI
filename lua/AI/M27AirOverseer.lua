@@ -4809,7 +4809,7 @@ function AirBomberManager(aiBrain)
 
     --if aiBrain[refiPreviousAvailableBombers] >= 10 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and GetGameTimeSeconds() >= 780 then bDebugMessages = true end
 
-    --if GetGameTimeSeconds() >= 600 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 960 then bDebugMessages = true end
 
     DetermineBomberDefenceRange(aiBrain) --Updates aiBrain[refiBomberDefenceModDistance]
     if bDebugMessages == true then
@@ -5117,12 +5117,15 @@ function AirBomberManager(aiBrain)
                         iCurPriority = 1
 
                         --First target enemies that can hurt mexes and are near mexes we own, regardless of whether hteyre shielded or protected by AA
+                        if bDebugMessages == true then LOG(sFunctionRef..': Checking if any enemies threatening our mexes that have a threat group for. aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding]='..tostring(aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding])) end
                         if aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding] then
                             for iThreatGroupCount, sThreatGroupRef in aiBrain[M27Overseer.reftEnemyGroupsThreateningBuildings] do
-                                if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyThreatGroup][aiBrain[M27Overseer.reftEnemyGroupsThreateningBuildings]]) == false then
-                                    for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyThreatGroup][aiBrain[M27Overseer.reftEnemyGroupsThreateningBuildings]][refoEnemyGroupUnits] do
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering threat group '..iThreatGroupCount..'-'..sThreatGroupRef..'; Is table of details for this threat group empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyThreatGroup][sThreatGroupRef]))) end
+                                if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyThreatGroup][sThreatGroupRef]) == false then
+                                    for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyThreatGroup][sThreatGroupRef][M27Overseer.refoEnemyGroupUnits] do
                                         if M27UnitInfo.IsUnitValid(oUnit) then
                                             iCurModDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Unit threatening mex='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurModDistance='..iCurModDistance) end
                                             if iCurModDistance < (aiBrain[refiBomberDefenceModDistance] + 30) or not (IsTargetCoveredByAA(oUnit, tAllEnemyAA, 1, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], false)) then
                                                 if not (M27Logic.IsTargetUnderShield(aiBrain, oUnit, 0, false, false, true)) then
                                                     if EntityCategoryContains(M27UnitInfo.refCategoryMAA, oUnit.UnitId) then

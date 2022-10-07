@@ -3642,7 +3642,8 @@ function ThreatAssessAndRespond(aiBrain)
                                 if tEnemyThreatGroup[refiModDistanceFromOurStart] <= aiBrain[M27AirOverseer.refiBomberDefenceModDistance] or M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryStructure - categories.TECH1, tNearbyBuildings)) == false then
                                     --Include if within max bomber range, or we own the first building
                                     if tNearbyBuildings[1]:GetAIBrain():GetArmyIndex() == aiBrain:GetArmyIndex() or tEnemyThreatGroup[refiDistanceFromOurBase] <= aiBrain[M27AirOverseer.refiBomberDefenceDistanceCap] then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Threat group is threatening our buildings') end
+                                        --if GetGameTimeSeconds() >= 960 then bDebugMessages = true end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Threat group '..iEnemyGroup..' is threatening our buildings. Is table of untis in this threat group empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEnemyThreatGroup][iEnemyGroup]))) end
                                         table.insert(aiBrain[reftEnemyGroupsThreateningBuildings], iEnemyGroup)
                                         aiBrain[refbGroundCombatEnemyNearBuilding] = true
                                     end
@@ -6561,6 +6562,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
     --local bDebugMessages = M27Config.M27StrategicLog
     local sFunctionRef = 'StrategicOverseer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if GetGameTimeSeconds() >= 960 then bDebugMessages = true end
 
     if not(aiBrain[M27Logic.refbAllEnemiesDead]) then
         --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
@@ -7320,7 +7322,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
 
                                         --Dont eco if enemy ACU near ours as likely will need backup, unless we are on a chokepoint map and our ACU hasnt taken any damage recently (or if it has, it's less than 5 per sec)
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Start of logic for checking if should eco. aiBrain[refbEnemyACUNearOurs]='..tostring((aiBrain[refbEnemyACUNearOurs] or false))..'; bChokepointsAreProtected='..tostring((bChokepointsAreProtected or false))..'; Our ACU health='..M27Utilities.GetACU(aiBrain):GetHealth()..'; M27UnitInfo.GetUnitHealthPercent(oACU)='..M27UnitInfo.GetUnitHealthPercent(oACU)..'; ACU most recent recorded health='..((oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 2] or oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 3] or 0) + 50)..'; ACU health 11s ago='..oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11]..'; bAlliesAreCloserToEnemy='..tostring(bAlliesAreCloserToEnemy or false)..'; bTemporaryTurtleMode='..tostring(bTemporaryTurtleMode or false)) end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Start of logic for checking if should eco. aiBrain[refbEnemyACUNearOurs]='..tostring((aiBrain[refbEnemyACUNearOurs] or false))..'; bChokepointsAreProtected='..tostring((bChokepointsAreProtected or false))..'; Our ACU health='..(M27Utilities.GetACU(aiBrain):GetHealth() or 'nil')..'; M27UnitInfo.GetUnitHealthPercent(oACU)='..(M27UnitInfo.GetUnitHealthPercent(oACU) or 'nil')..'; ACU most recent recorded health='..((oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 2] or oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 3] or 0) + 50)..'; ACU health 11s ago='..(oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11] or 'nil')..'; bAlliesAreCloserToEnemy='..tostring(bAlliesAreCloserToEnemy or false)..'; bTemporaryTurtleMode='..tostring(bTemporaryTurtleMode or false)) end
                                         if aiBrain[refbEnemyACUNearOurs] == false or (bChokepointsAreProtected and M27Utilities.GetACU(aiBrain):GetHealth() >= 7000 and (M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.8 or (oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 2] or oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 3] or 0) + 50 >= oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11]))  then
                                             if bChokepointsAreProtected then
                                                 bWantToEco = true

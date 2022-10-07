@@ -1390,6 +1390,22 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                             bDontClearCommands = true
                         end
                     end
+                    if not(bDontClearCommands) and oEngineer:IsUnitState('Reclaiming') then
+                        bDebugMessages = true
+                        if oEngineer.GetFocusUnit then
+                            local oCurTarget = oEngineer:GetFocusUnit()
+                            if bDebugMessages == true then LOG(sFunctionRef..': Engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' has a cur target, is this valid='..tostring(M27UnitInfo.IsUnitValid(oCurTarget)))
+                                if M27UnitInfo.IsUnitValid(oCurTarget) then LOG(sFunctionRef..': Cur target valid='..oCurTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCurTarget)..'; oReclaimTarget='..oReclaimTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oReclaimTarget)) end
+                            end
+                            if M27UnitInfo.IsUnitValid(oCurTarget) and oCurTarget == oReclaimTarget then
+                                --Already reclaiming the target and it must be within build range since we already checked the distasnce just above, so dont clear orders
+                                bDontClearCommands = true
+                                if bDebugMessages == true then LOG(sFunctionRef..': Are already targeting the unit in question') end
+                            end
+                        end
+
+                        bDebugMessages = false
+                    end
                 end
                 --if oEngineer:IsUnitState('Building') or oEngineer:IsUnitState('Repairing') then bDebugMessages = true M27Utilities.ErrorHandler('Clearing an engineer whose unit state is building or repairing due to nearby enemies') end
                 if bDebugMessages == true then LOG(sFunctionRef..': Clearing commands for engi with count='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' and unique ref='..GetEngineerUniqueCount(oEngineer)..' unless it is already t argeting the enemy.  Engineer unit state='..M27Logic.GetUnitState(oEngineer)..'; Distance to target='..M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), oReclaimTarget:GetPosition())..'; bDontClearCOmmands='..tostring(bDontClearCommands)) end
