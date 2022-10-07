@@ -7175,7 +7175,6 @@ function DeterminePlatoonAction(oPlatoon)
         --if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then --Removed this check as we do it already as part of the parent function
 
             local sPlatoonName = oPlatoon:GetPlan()
-            if oPlatoon[refiPlatoonCount] == 833 then bDebugMessages = true end
             --if sPlatoonName == 'M27Defender' and oPlatoon[refiPlatoonCount] == 7 and GetGameTimeSeconds() >= 570 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
@@ -8181,7 +8180,6 @@ function GetPlateauMovementPath(oPlatoon, bDontClearActions)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetPlateauMovementPath'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if oPlatoon[refiPlatoonCount] == 833 then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27PlateauIndirect' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27PlateauScout' then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Start of code') end

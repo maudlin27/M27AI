@@ -107,7 +107,7 @@ iMinWaterDepth = 1.5 --Ships cant move right up to shore, this is a guess at how
 iWaterPathingIntervalSize = 1
 tWaterAreaAroundTargetAdjustments = {} --Defined in map initialisation
 iWaterMinArea = 3 --Square with x/z of this size must be underwater for the target position to be considered pathable; with value of 2 ships cant get as close to shore as expect them to
-iBaseLevelSegmentCap = 1024 --Max size of segments to use for 1 axis 20km map is 1024x1024 (i.e. 1024 means will only take shortcuts if map larger than 20km)
+iBaseLevelSegmentCap = 512 --Max size of segments to use for 1 axis 20km map is 1024x1024 (i.e. 1024 means will only take shortcuts if map larger than 20km); at 1024 end up with really noticeable freezing on some maps (e.g. dark liver, pelagial) - not from any function profiling but more generlaly so presumably to do with the garbage handler/similar
 iMapOutsideBoundSize = 3 --will treat positions within this size of map radius as being unpathable for pathing purposes
 iSizeOfBaseLevelSegment = 1 --Is updated by pathfinding code
 tPathingSegmentGroupBySegment = {} --[a][b][c]: a = pathing type; b = segment x, c = segment z

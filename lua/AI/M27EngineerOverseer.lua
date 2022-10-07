@@ -1391,7 +1391,6 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                         end
                     end
                     if not(bDontClearCommands) and oEngineer:IsUnitState('Reclaiming') then
-                        bDebugMessages = true
                         if oEngineer.GetFocusUnit then
                             local oCurTarget = oEngineer:GetFocusUnit()
                             if bDebugMessages == true then LOG(sFunctionRef..': Engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' has a cur target, is this valid='..tostring(M27UnitInfo.IsUnitValid(oCurTarget)))
@@ -1403,8 +1402,6 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Are already targeting the unit in question') end
                             end
                         end
-
-                        bDebugMessages = false
                     end
                 end
                 --if oEngineer:IsUnitState('Building') or oEngineer:IsUnitState('Repairing') then bDebugMessages = true M27Utilities.ErrorHandler('Clearing an engineer whose unit state is building or repairing due to nearby enemies') end
@@ -6757,8 +6754,9 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                 else
                                     --Build the first structure (including for queueupmultiple where not using special logic
                                     --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild,                iMaxAreaToSearch, iCatToBuildBy, tAlternativePositionToLookFrom, bLookForPartCompleteBuildings, bLookForQueuedBuildings, oUnitToBuildBy, bNeverBuildRandom, iOptionalCategoryForStructureToBuild, bBuildCheapestStructure, iOptionalEngiActionRef)
+                                    if oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer) == 'uel02081' and GetGameTimeSeconds() >= 956 and GetGameTimeSeconds() <= 958 then bDebugMessages = true end
                                     if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': About to tell engineer to build the category using the location ' .. repru(tTargetLocation) .. ' as a starting point')
+                                        LOG(sFunctionRef .. ': About to tell engineer to build the category using the location ' .. repru(tTargetLocation) .. ' as a starting pointl, iActionToAssign='..(iActionToAssign or 'nil'))
                                     end
                                     tTargetLocation = BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCatToBuildBy, tTargetLocation, nil, nil, oUnitToBuildBy, nil, nil, bBuildCheapest, iActionToAssign)
                                     if M27Utilities.IsTableEmpty(tTargetLocation) == true and (iActionToAssign == refActionBuildShield or iActionToAssign == refActionBuildSecondShield) then

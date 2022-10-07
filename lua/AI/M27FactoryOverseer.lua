@@ -709,7 +709,6 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                     --=============Determine the next unit that want depending on factory type and  general strategy------
                     if bPlateauFactory and not(bIsLandFactory) then M27Utilities.ErrorHandler('Not expecting air or naval factory in plateau group. will use normal logic for them') end
                     if bPlateauFactory and bIsLandFactory then
-                        bDebugMessages = true
                         if bDebugMessages == true then LOG(sFunctionRef..': Considering factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..' assigned to plateau '..oFactory[M27Transport.refiAssignedPlateau]..'; bIsLandFactory='..tostring(bIsLandFactory)..'; Our start point plateau='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
                         local bHaveLowMass = M27Conditions.HaveLowMass(aiBrain)
                         local bHaveLowPower = false

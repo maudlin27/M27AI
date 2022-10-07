@@ -1283,7 +1283,6 @@ function OnConstructed(oEngineer, oJustBuilt)
                 if M27Utilities.IsTableEmpty(tNearbyUnits) == false then
                     for iUnit, oUnit in tNearbyUnits do
                         if EntityCategoryContains(M27UnitInfo.refCategoryMassStorage, oUnit.UnitId) and oUnit:GetAIBrain().M27AI and not(oUnit:GetAIBrain() == aiBrain) then
-                            bDebugMessages = true
                             if bDebugMessages == true then LOG(sFunctionRef..': About to transfer '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' from brain '..oUnit:GetAIBrain().Nickname..' to '..aiBrain.Nickname..'; Dist from unit to tMexLocation='..M27Utilities.GetDistanceBetweenPositions(tMexLocation, oUnit:GetPosition())) end
                             if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tMexLocation) <= 2.1 then
                                 M27Team.TransferUnitsToPlayer({oUnit}, aiBrain:GetArmyIndex(), false)
@@ -1464,7 +1463,6 @@ function OnReclaimStarted(oEngineer, oReclaim)
                 else
                     if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oReclaim.UnitId) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer.UnitId) and IsEnemy(oReclaimingBrain:GetArmyIndex(), oReclaim:GetAIBrain():GetArmyIndex()) then
                         --Tell engineer to reclaim the target if it isnt already
-                        bDebugMessages = true
                         if bDebugMessages == true then LOG(sFunctionRef..': About to get engineer check for nearby enemies now as it has just started being reclaimed by an enemy engineer') end
                         M27EngineerOverseer.ProcessingEngineerActionForNearbyEnemies(oReclaim:GetAIBrain(), oReclaim)
                     end
