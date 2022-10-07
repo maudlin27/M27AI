@@ -6754,7 +6754,6 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                 else
                                     --Build the first structure (including for queueupmultiple where not using special logic
                                     --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild,                iMaxAreaToSearch, iCatToBuildBy, tAlternativePositionToLookFrom, bLookForPartCompleteBuildings, bLookForQueuedBuildings, oUnitToBuildBy, bNeverBuildRandom, iOptionalCategoryForStructureToBuild, bBuildCheapestStructure, iOptionalEngiActionRef)
-                                    if oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer) == 'uel02081' and GetGameTimeSeconds() >= 956 and GetGameTimeSeconds() <= 958 then bDebugMessages = true end
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': About to tell engineer to build the category using the location ' .. repru(tTargetLocation) .. ' as a starting pointl, iActionToAssign='..(iActionToAssign or 'nil'))
                                     end
