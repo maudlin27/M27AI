@@ -9357,6 +9357,97 @@ function GunshipManager(aiBrain)
         function SendGunshipMoveOrder(tUnits, tTarget)
             local iGunshipMoveTolerance = 3 --If last move target was within 2.5 of current move target then wont move
 
+
+            local tDistanceAdjustXZ = {{0,0},{-5,-5},{5,5},{-5,5},{5,-5},{0,-5},{0,5},{-5,0},{5,0},{-10,-10},{10,10},{-10,10},{10,-10},{0,-10},{0,10},{-10,0},{10,0},{-15,-15},{15,15},{-15,15},{15,-15},{0,-15},{0,15},{-15,0},{15,0}}
+            --Find the first placement that we dont have assigned
+            local tiValidPlacements = {}
+            local iTotalUnits = table.getn(tUnits)
+            local refiGunshipPlacement = 'M27AirGunshipPlacementNumber'
+            for iUnit, oUnit in tUnits do
+                if oUnit[refiGunshipPlacement] then tiValidPlacements[oUnit[refiGunshipPlacement]] = true end
+            end
+            local iFirstMissingPlacement
+            for iCurPlacement = 1, iTotalUnits do
+                if not(tiValidPlacements[iCurPlacement]) then
+                    iFirstMissingPlacement = iCurPlacement
+                    break
+                end
+            end
+
+            local tAdjustedMovePosition
+            local iCurPlacement
+            local iPlacementSize = table.getn(tDistanceAdjustXZ)
+            if iFirstMissingPlacement then
+                local toUnitsToPlace = {}
+                for iUnit, oUnit in tUnits do
+                    if (oUnit[refiGunshipPlacement] or 10000) >= iFirstMissingPlacement then
+                        table.insert(toUnitsToPlace, oUnit)
+                    end
+                end
+
+                local iClosestDist
+                local iCurDist
+                local iClosestUnitRef
+
+                for iBasePlacement = iFirstMissingPlacement, iTotalUnits do
+                    --Adjust placement value to reflect we have only defined a limited number of options
+                    if M27Utilities.IsTableEmpty(toUnitsToPlace) then break end --redundancy
+                    iCurPlacement = iBasePlacement
+                    while iCurPlacement  > iPlacementSize do
+                        iCurPlacement = iCurPlacement - iPlacementSize
+                    end
+                    --Identify which gunship is closest to each placement point
+                    tAdjustedMovePosition = {tTarget[1] + tDistanceAdjustXZ[iCurPlacement][1], tTarget[2], tTarget[3] + tDistanceAdjustXZ[iCurPlacement][2]}
+                    iClosestDist = 10000
+                    iClosestUnitRef = nil
+                    for iUnit, oUnit in toUnitsToPlace do
+                        iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tAdjustedMovePosition)
+                        if iCurDist < iClosestDist then
+                            iClosestDist = iCurDist
+                            iClosestUnitRef = iUnit
+                        end
+                    end
+                    --Assign this position to this gunship
+                    toUnitsToPlace[iClosestUnitRef][refiGunshipPlacement] = iBasePlacement
+                    table.remove(toUnitsToPlace, iClosestUnitRef)
+                end
+            end
+
+            --Issue move orders
+            local toUnitsByBasePlacementRef = {}
+            for iUnit, oUnit in tUnits do
+                toUnitsByBasePlacementRef[oUnit[refiGunshipPlacement]] = oUnit
+            end
+
+            function MoveIndividualGunship(oClosestUnit, tUnitDestination)
+                if not(oClosestUnit[M27PlatoonUtilities.refiLastOrderType] == M27PlatoonUtilities.refiOrderIssueMove) or M27Utilities.GetDistanceBetweenPositions(oClosestUnit[M27UnitInfo.reftLastOrderTarget], tTarget) > iGunshipMoveTolerance then
+                    M27Utilities.IssueTrackedClearCommands({oClosestUnit})
+                    IssueMove({oClosestUnit}, tUnitDestination)
+                    oClosestUnit[M27PlatoonUtilities.refiLastOrderType] = M27PlatoonUtilities.refiOrderIssueMove
+                    oClosestUnit[M27UnitInfo.reftLastOrderTarget] = {tUnitDestination[1], tUnitDestination[2], tUnitDestination[3]}
+                end
+            end
+
+
+            for iBasePlacement = 1, iTotalUnits do
+                iCurPlacement = iBasePlacement
+                while iCurPlacement  > iPlacementSize do
+                    iCurPlacement = iCurPlacement - iPlacementSize
+                end
+
+                tAdjustedMovePosition = {tTarget[1] + tDistanceAdjustXZ[iCurPlacement][1], tTarget[2], tTarget[3] + tDistanceAdjustXZ[iCurPlacement][2]}
+                tAdjustedMovePosition[2] = GetSurfaceHeight(tAdjustedMovePosition[1], tAdjustedMovePosition[3])
+                if not(toUnitsByBasePlacementRef[iBasePlacement]) then
+                    M27Utilities.ErrorHandler('Missing gunship for iBasePlacement='..iBasePlacement)
+                else
+                    MoveIndividualGunship(toUnitsByBasePlacementRef[iBasePlacement], tAdjustedMovePosition)
+                end
+            end
+
+
+
+
+            --[[ OLD APPROACH below - would calculate angle and distance each time
             local iAngleToBase = M27Utilities.GetAngleFromAToB(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
             local iAngleFurtherAdjust = 0
             local tiDistanceAndAngleAdjustments = {[0] = {0},
@@ -9407,7 +9498,7 @@ function GunshipManager(aiBrain)
                 for iUnit, oUnit in tRemainingUnits do
                     MoveIndividualGunship(oClosestUnit, tUnitDestination)
                 end
-            end
+            end--]]
         end
 
         --Special targeting depending on strategy:
@@ -9457,15 +9548,11 @@ function GunshipManager(aiBrain)
         end
 
         if oClosestEnemy then
-            --TODO - Decide how to move the gunships so they are spread out
-            --For now will just send gunships to the same point
             SendGunshipMoveOrder(aiBrain[reftAvailableGunships], oClosestEnemy:GetPosition())
-
         else
             --Return to air rally point
             local tDestination = GetAirRallyPoint(aiBrain)
             SendGunshipMoveOrder(aiBrain[reftAvailableGunships], tDestination)
-
         end
     end
 end
