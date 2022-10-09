@@ -137,6 +137,14 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                 OnACUKilled(oUnitKilled)
             end
             local oKilledBrain = oUnitKilled:GetAIBrain()
+            if instigator and instigator.GetAIBrain and instigator.UnitId and oUnitKilled.UnitId and EntityCategoryContains(M27UnitInfo.refCategoryGunship, instigator.UnitId) then
+                local oKillerBrain = instigator:GetAIBrain()
+                if oKillerBrain.M27AI then
+                    --Gunship effectiveness
+
+                    oKillerBrain[M27AirOverseer.refiGunshipMassKilled] = oKillerBrain[M27AirOverseer.refiGunshipMassKilled] + (oUnitKilled:GetBlueprint().Economy.BuildCostMass or 0)
+                end
+            end
 
 
             if oKilledBrain.M27AI then
@@ -193,6 +201,14 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                                 end
                             end
                         end
+                    end
+                end
+
+                --Gunship effectiveness
+                if EntityCategoryContains(M27UnitInfo.refCategoryGunship, oUnitKilled.UnitId) then
+                    oKilledBrain[M27AirOverseer.refiGunshipMassLost] = oKilledBrain[M27AirOverseer.refiGunshipMassLost] + math.min(2000, (oUnitKilled:GetBlueprint().Economy.BuildCostMass or 0), oKillerUnit.Sync.totalMassKilled)
+                    if oKilledBrain[M27AirOverseer.refiGunshipMassKilled] < 2000 then
+                        oKilledBrain[M27AirOverseer.refiGunshipMassKilled] = math.max(oKilledBrain[M27AirOverseer.refiGunshipMassKilled], oUnitKilled:GetBlueprint().Economy.BuildCostMass)
                     end
                 end
 

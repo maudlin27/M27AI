@@ -193,6 +193,7 @@ refiOrderIssueRepair = 8
 refiOrderIssueBuild = 9
 refiOrderOvercharge = 10
 refiOrderUpgrade = 11
+refiOrderTransportLoad = 12
 
 function UpdateUnitNames(tUnits, sNewName, bAddLifetimeCount)
     local sUnitNewName = sNewName

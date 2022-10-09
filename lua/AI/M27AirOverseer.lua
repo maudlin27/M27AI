@@ -141,10 +141,14 @@ refbBombersAreReallyEffective = 'M27AirBombersAreReallyEffective' -- [x] = tech 
 refiLargeBomberAttackThreshold = 'M27AirLargeBomberAttackThreshold' --How many bombers are needed before launching a large attack
 refiTimesThatHaveMetLargeAttackThreshold = 'M27AirLargeBomberTimesMetThreshold' --Increases by 1 each time we meet the threshold
 
+refiGunshipMassKilled = 'M27AirGunshipMassKilled' --Against aiBrain, mass that our gunships have killed
+refiGunshipMassLost = 'M27AirGunshipMassLost' --against brain, mass in gunships that we have lost
+
 --Bomber effectiveness (used to decide whether to keep building bombers)
 reftBomberEffectiveness = 'M27AirBomberEffectiveness' --[x][y]: x = unit tech level, y = nth entry; returns subtable {MassCost}{MassKilled}
 refiBomberMassCost = 'M27AirBomberMassCost' --Subtable ref
 refiBomberMassKilled = 'M27AirBomberMassKilled' --Subtable ref
+
 subrefoBomber = 'M27AirBomberUnit' --Stores the unit ref of the bomber that the table entry relates to, so can check if it is still alive
 
 local iBombersToTrackEffectiveness = 3 --Will track the last n bombers killed
@@ -178,6 +182,7 @@ refiPreviousAvailableBombers = 'M27AirPreviousAvailableBombers' --Number of idle
 reftAvailableTorpBombers = 'M27AirAvailableTorpBombers' --Determined by threat overseer
 reftAvailableAirAA = 'M27AirAvailableAirAA'
 reftAvailableTransports = 'M27AirAvailableTransports'
+reftAvailableGunships = 'M27AirAvailableGunships' --For T1-T3 gunships (T4 are handled via their own logic)
 --local reftLowFuelAir = 'M27AirScoutsWithLowFuel'
 local reftLowFuelAir = 'M27AirLowFuelAir'
 
@@ -2408,7 +2413,7 @@ function AirThreatChecker(aiBrain)
 
 
     --air AA wanted:
-    local tAirAAUnits = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAirAA, false, true)
+    local tAirAAUnits = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAirAA + M27UnitInfo.refCategoryRestorer + M27UnitInfo.refCategoryCzar, false, true)
     local tiAirAAThreatByTech = { 50, 235, 350 }
     local iFriendlyM27AirAA = 0
     local iFriendlyAirFactor
@@ -2510,15 +2515,17 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
     local tAllAirAA = aiBrain:GetListOfUnits(refCategoryAirAA, false, true)
     local tTorpBombers = aiBrain:GetListOfUnits(refCategoryTorpBomber, false, true)
     local tTransports = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryTransport, false, true)
+    local tGunships = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryGunship - categories.EXPERIMENTAL, false, true)
 
     local iCurUnitsWithFuel, iCurUnitsWithLowFuel
-    local tAllAirUnits = { tAllScouts, tAllBombers, tAllAirAA, tTorpBombers, tTransports }
-    local tAvailableUnitRef = { reftAvailableScouts, reftAvailableBombers, reftAvailableAirAA, reftAvailableTorpBombers, reftAvailableTransports }
+    local tAllAirUnits = { tAllScouts, tAllBombers, tAllAirAA, tTorpBombers, tTransports, tGunships }
+    local tAvailableUnitRef = { reftAvailableScouts, reftAvailableBombers, reftAvailableAirAA, reftAvailableTorpBombers, reftAvailableTransports, reftAvailableGunships }
     local iTypeScout = 1
     local iTypeBomber = 2
     local iTypeAirAA = 3
     local iTypeTorpBomber = 4
     local iTypeTransport = 5
+    local iTypeGunship = 6
     local sAvailableUnitRef
     local bUnitIsUnassigned
     local iTimeStamp = GetGameTimeSeconds()
@@ -2797,6 +2804,12 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                             if bDebugMessages == true then
                                                 LOG(sFunctionRef .. ': Unit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; refbOnAssignment post check=' .. tostring(oUnit[refbOnAssignment]))
                                             end
+                                        elseif iUnitType == iTypeGunship then
+                                            --Stop if gunship low health and send it back to our base
+                                            if M27UnitInfo.GetUnitHealthPercent() <= iLowHealthPercent then
+                                                ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
+                                                bUnitIsUnassigned = true
+                                            end
                                         elseif iUnitType == iTypeAirAA then
                                             bClearAirAATargets = false
                                             bReturnToRallyPoint = false
@@ -2922,7 +2935,11 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                                 if bReturnToRallyPoint == true then
                                                     --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                                                     M27Utilities.IssueTrackedClearCommands({ oUnit })
-                                                    IssueMove({ oUnit }, GetAirRallyPoint(aiBrain))
+
+                                                    local tAirRally = GetAirRallyPoint(aiBrain)
+                                                    oUnit[M27PlatoonUtilities.refiLastOrderType] = M27PlatoonUtilities.refiOrderIssueMove
+                                                    oUnit[M27UnitInfo.reftLastOrderTarget] = {tAirRally[1], tAirRally[2], tAirRally[3]}
+                                                    IssueMove({ oUnit }, tAirRally)
                                                     if bDebugMessages == true then
                                                         LOG(sFunctionRef .. ': Cleared commants for unit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit))
                                                     end
@@ -3001,7 +3018,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                     LOG(sFunctionRef .. ': Unit is unassigned, will treat as available unless it is a low health bomber or t3 air and we have air staging. iAirStaging=' .. iAirStaging .. '; M27UnitInfo.GetUnitHealthPercent(oUnit)=' .. M27UnitInfo.GetUnitHealthPercent(oUnit) .. '; Tech level=' .. M27UnitInfo.GetUnitTechLevel(oUnit) .. '; iUnitType=' .. iUnitType .. '; ')
                                 end
                                 --Send low health bombers and T3 air to heal up provided no T2+ airAA units nearby
-                                if iCurTechLevel < 4 and iAirStaging > 0 and M27UnitInfo.GetUnitHealthPercent(oUnit) <= iLowHealthPercent and (iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber or iCurTechLevel == 3) and
+                                if iCurTechLevel < 4 and iAirStaging > 0 and M27UnitInfo.GetUnitHealthPercent(oUnit) <= iLowHealthPercent and (iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber or iUnitType == iTypeGunship or iCurTechLevel == 3) and
                                         ((M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA - categories.TECH1, oUnit:GetPosition(), 100, 'Enemy'))) or (M27UnitInfo.GetUnitTechLevel(oUnit) <= 2 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA, oUnit:GetPosition(), 100, 'Enemy')))) and
                                         (oUnit[refiBombsDropped] >= 2 or not (iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber)) then
                                     iCurUnitsWithLowFuel = iCurUnitsWithLowFuel + 1
@@ -3212,6 +3229,8 @@ function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
                                             --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                                             ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
                                             M27Utilities.IssueTrackedClearCommands({ oUnit })
+                                            oUnit[M27PlatoonUtilities.refiLastOrderType] = M27PlatoonUtilities.refiOrderTransportLoad
+                                            oUnit[M27UnitInfo.reftLastOrderTarget] = oStaging:GetPosition()
                                             IssueTransportLoad({ oUnit }, oStaging)
                                             oUnit[refbSentRefuelCommand] = true
                                             oUnit[refoAirStagingAssigned] = oStaging
@@ -7496,6 +7515,7 @@ function AirLogicMainLoop(aiBrain, iCycleCount)
     ForkThread(AirBomberManager, aiBrain)
     ForkThread(AirAAManager, aiBrain)
     ForkThread(M27Transport.TransportManager, aiBrain)
+    ForkThread(GunshipManager, aiBrain)
 
     if iCycleCount == iLongCycleThreshold then
         if M27Utilities.IsTableEmpty(aiBrain[reftLowFuelAir]) == false then
@@ -7596,6 +7616,8 @@ function SetupAirOverseer(aiBrain)
     aiBrain[refiEnemyAirAAThreat] = 0
     aiBrain[refiHighestEverEnemyAirAAThreat] = 0
     aiBrain[refiEnemyAirToGroundThreat] = 0
+    aiBrain[refiGunshipMassLost] = 0
+    aiBrain[refiGunshipMassKilled] = 0
 
     aiBrain[refiBomberIneffectivenessByDefenceModRange] = {}
 
@@ -9300,4 +9322,105 @@ function ExperimentalAirManager(oUnit)
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function GunshipManager(aiBrain)
+    --Handles logic for available T1-T3 gunship units; Gunship logic will treat every gunship as being available unless it's gone for refueling, so is different to the concept for bombers where they get assigned an individual unit to target.  Instead gunship targeting is reassessed every cycle
+    --Will use gunships as a group - i.e. 1 large group of gunships, rather than splitting them up into separate groups
+
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GunshipManager'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+
+    if M27Utilities.IsTableEmpty(aiBrain[reftAvailableGunships]) == false then
+        --First get the nearest threat that we want to focus on, then decide how we will approach it
+
+        local iClosestEnemyDist = 100000
+        local iCurEnemyDist
+        local oClosestEnemy
+        local iGunshipOperationalRange = math.max(aiBrain[refiBomberDefenceModDistance] + 30, 150)
+
+        function ConsiderTargetingUnit(oUnit)
+            if not(oUnit:IsUnitState('Attached')) and not(M27UnitInfo.IsUnitUnderwater(oUnit)) then
+                iCurEnemyDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                if bDebugMessages == true then LOG(sFunctionRef..': Unit threatening mex='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurEnemyDist='..iCurEnemyDist) end
+                if iCurEnemyDist < iClosestEnemyDist then
+                    iClosestEnemyDist = iCurEnemyDist
+                    oClosestEnemy = oUnit
+                end
+            end
+        end
+
+        local iGunshipMoveTolerance = 3 --If last move target was within 5 of current move target then wont move
+
+        function SendGunshipMoveOrder(oUnit, tTarget)
+            if not(oUnit[M27PlatoonUtilities.refiLastOrderType] == M27PlatoonUtilities.refiOrderIssueMove) or M27Utilities.GetDistanceBetweenPositions(oUnit[M27UnitInfo.reftLastOrderTarget], tTarget) > iGunshipMoveTolerance then
+                M27Utilities.IssueTrackedClearCommands({oUnit})
+                IssueMove({oUnit}, tTarget)
+                oUnit[M27PlatoonUtilities.refiLastOrderType] = M27PlatoonUtilities.refiOrderIssueMove
+                oUnit[M27UnitInfo.reftLastOrderTarget] = {tTarget[1], tTarget[2], tTarget[3]}
+            end
+        end
+
+        --Special targeting depending on strategy:
+        local oTargetUnitsAroundThisOne
+        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then iGunshipOperationalRange = 1000
+        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and EntityCategoryContains(categories.COMMAND, aiBrain[refoACUKillTarget].UnitId) then
+            oTargetUnitsAroundThisOne = aiBrain[refoACUKillTarget]
+        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU then
+            oTargetUnitsAroundThisOne = M27Utilities.GetACU(aiBrain)
+            if not(EntityCategoryContains(categories.COMMAND, oTargetUnitsAroundThisOne.UnitId)) then
+                oTargetUnitsAroundThisOne = nil
+            end
+        end
+        if oTargetUnitsAroundThisOne then
+            if not(oTargetUnitsAroundThisOne:IsUnitState('Attached')) and not(M27UnitInfo.IsUnitUnderwater(oTargetUnitsAroundThisOne)) then
+                oClosestEnemy = oTargetUnitsAroundThisOne --Simplification so gunships travel to this unit even if it is our ACU
+            end
+        end
+
+        --Prioritise closest enemies threatening mexes
+        if not(oClosestEnemy) then
+            if aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding] then
+                for iThreatGroupCount, sThreatGroupRef in aiBrain[M27Overseer.reftEnemyGroupsThreateningBuildings] do
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering threat group '..iThreatGroupCount..'-'..sThreatGroupRef..'; Is table of details for this threat group empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyThreatGroup][sThreatGroupRef]))) end
+                    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyThreatGroup][sThreatGroupRef]) == false then
+                        for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyThreatGroup][sThreatGroupRef][M27Overseer.refoEnemyGroupUnits] do
+                            ConsiderTargetingUnit(oUnit)
+                        end
+                    end
+                end
+            end
+        end
+        --if iClosestEnemyDist > iGunshipOperationalRange then oClosestEnemy = nil end --Dont want this for enemies threatening a mex
+        if not(oClosestEnemy) then
+            --Get nearest enemy unit within defensive range
+            local tEnemiesInGunshipRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryNavalSurface, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iGunshipOperationalRange, 'Enemy')
+            if M27Utilities.IsTableEmpty(tEnemiesInGunshipRange) == false then
+                for iUnit, oUnit in tEnemiesInGunshipRange do
+                    ConsiderTargetingUnit(oUnit)
+                end
+            end
+            if iClosestEnemyDist > iGunshipOperationalRange then oClosestEnemy = nil end --(Redundancy)
+        end
+        if oClosestEnemy then
+            --Factor in enemy AA around the target and dont engage if it's too much to try and attack attritionally
+            --Also retreat if enemy AirAA detected within range of our gunship that is closest to the target
+        end
+
+        if oClosestEnemy then
+            --TODO - Decide how to move the gunships so they are spread out
+            --For now will just send gunships to the same point
+            for iUnit, oUnit in aiBrain[reftAvailableGunships] do
+                SendGunshipMoveOrder(oUnit, oClosestEnemy:GetPosition())
+            end
+        else
+            --Return to air rally point
+            local tDestination = GetAirRallyPoint(aiBrain)
+            for iUnit, oUnit in aiBrain[reftAvailableGunships] do
+                SendGunshipMoveOrder(oUnit, tDestination)
+            end
+        end
+    end
 end

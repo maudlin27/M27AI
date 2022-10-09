@@ -7155,9 +7155,9 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                     LOG(sFunctionRef .. ': Dont want to go for air dominance due to enemy highest ever air threat being >75% of ours')
                                 end
                                 bEnemyHasEnoughAA = true
-                            elseif not (aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then
+                            elseif not (aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and aiBrain[M27AirOverseer.refiAirAANeeded] > 0 and (aiBrain[M27AirOverseer.refiAirAANeeded] >= 5 or not(aiBrain[M27AirOverseer.refbHaveAirControl]) or aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] / 0.7 > aiBrain[M27AirOverseer.refiOurMassInAirAA]) then
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Dont want air dominance as still need airAA')
+                                    LOG(sFunctionRef .. ': Dont want air dominance as still need airAA, aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded])
                                 end
                                 bEnemyHasEnoughAA = true
                             end
@@ -7168,7 +7168,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Enemy doesnt have enough AA, will check we have some bombers alive')
                             end
-                            if M27Utilities.IsTableEmpty(tBombers) == true then
+                            if M27Utilities.IsTableEmpty(tBombers) == true and M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableGunships]) then
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': We dont have any bombers, so dont switch to air dominance yet')
                                 end
@@ -7178,7 +7178,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                     LOG(sFunctionRef .. ': Enemy mass in ground AA=' .. (aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] or 'nil') .. '; table size of bombers=' .. table.getn(tBombers) .. '; Threat of bombers=' .. M27Logic.GetAirThreatLevel(aiBrain, tBombers, false, false, false, true, false, nil, nil, nil, nil, false))
                                 end
                                 --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo)
-                                if aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] > 0 and aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] * 10 > M27Logic.GetAirThreatLevel(aiBrain, tBombers, false, false, false, true, false, nil, nil, nil, nil, false) then
+                                if aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] > 0 and aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] * 10 > (M27Logic.GetAirThreatLevel(aiBrain, tBombers, false, false, false, true, false, nil, nil, nil, nil, false) + M27Logic.GetAirThreatLevel(aiBrain, aiBrain[M27AirOverseer.reftAvailableGunships], false, false, false, true, false, nil, nil, nil, nil, false)) then
                                     --Further override - if have 3+ strats, and enemy has no cruisers or T3+ AA, then do air dom mode
                                     bEnemyHasEnoughAA = true
                                     if bDebugMessages == true then

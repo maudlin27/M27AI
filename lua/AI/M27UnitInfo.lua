@@ -202,6 +202,8 @@ refCategoryAllNonExpAir = categories.MOBILE * categories.AIR * categories.TECH1 
 refCategoryAirNonScout = refCategoryAllAir - categories.SCOUT
 refCategoryMercy = categories.HIGHPRIAIR * categories.AEON * categories.BOMBER * categories.TECH2
 refCategoryTransport = categories.AIR * categories.TRANSPORTATION - categories.UEF * categories.GROUNDATTACK
+refCategoryRestorer = refCategoryGunship * categories.ANTIAIR
+refCategoryCzar = categories.AIR * categories.EXPERIMENTAL * categories.ANTIAIR * categories.AEON
 
 --Naval units
 refCategoryFrigate = categories.NAVAL * categories.FRIGATE
