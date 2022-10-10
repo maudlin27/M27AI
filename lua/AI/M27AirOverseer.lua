@@ -120,6 +120,7 @@ refiModDefenceRangeAtTimeTargetAssigned = 'M27AirBomberModDefenceRangeAtTimeTarg
 refoAssignedAirScout = 'M27HaveAssignedAirScout' --Assigned to a unit that wants a dedicated air scout (e.g. experimental) - the unit air scout assigned to it; also attached to air scout to indicate the unit it is assisting
 refbEngiHunterMode = 'M27AirBomberEngiHunterLogic' --set to true for t1 bombers with low lifetime count who are in engi hunter mode
 refbHaveDelayedTargeting = 'M27AirBomberHaveDelayedTargeting' --set to true against a bomber if it has already delayed targeting to give another engi a chance - currently used for engihunter bombers
+local refiGunshipPlacement = 'M27AirGunshipPlacementNumber' --Against unit (gunship) for the placement number
 
 
 refiLastCoveredByAAByTech = 'M27AirLastTimeUnitHadAA' --[x] is the tech level of AA we are concerned about (e.g. 1 = 1+; 2 = 2+ 3 = 3+)
@@ -438,6 +439,7 @@ function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit, bDontIssueCommands)
     oAirUnit[reftTargetList] = {}
     oAirUnit[refiCurTargetNumber] = 0
     oAirUnit[reftGroundAttackLocation] = nil
+    oAirUnit[refiGunshipPlacement] = nil
 
     if not (bDontIssueCommands) then
         M27Utilities.IssueTrackedClearCommands({ oAirUnit })
@@ -3193,6 +3195,7 @@ function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
                                         oRefuelingUnit[refbSentRefuelCommand] = false
                                         oStaging[reftAssignedRefuelingUnits][iRefuelingUnit] = nil
                                         oRefuelingUnit[refoAirStagingAssigned] = nil
+                                        oRefuelingUnit[refiGunshipPlacement] = nil --Redundancy for gunship logic
                                     else
                                         if EntityCategoryContains(M27UnitInfo.refCategoryBomber * categories.TECH3, oRefuelingUnit.UnitId) then
                                             iAssignedUnits = iAssignedUnits + 4
@@ -9408,7 +9411,6 @@ function GunshipManager(aiBrain)
 
     if M27Utilities.IsTableEmpty(aiBrain[reftAvailableGunships]) == false then
         --First get the nearest threat that we want to focus on, then decide how we will approach it
-        local refiGunshipPlacement = 'M27AirGunshipPlacementNumber'
         local iClosestEnemyDist = 100000
         local iCurEnemyDist
         local oClosestEnemy
