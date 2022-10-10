@@ -2326,12 +2326,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             if aiBrain[M27AirOverseer.refiGunshipMassKilled] > aiBrain[M27AirOverseer.refiGunshipMassLost] then
                                                 iMinLevel = 2
                                                 if aiBrain[M27AirOverseer.refiGunshipMassKilled] > 500 and aiBrain[M27AirOverseer.refiGunshipMassKilled] * 0.7 > aiBrain[M27AirOverseer.refiGunshipMassLost] then
-                                                    iMinLevel = math.max(4, math.min(aiBrain[M27AirOverseer.refiGunshipMassKilled] / 200 * M27Overseer.refiOurHighestAirFactoryTech, 3 * aiBrain[M27AirOverseer.refiGunshipMassKilled] / math.max(1, aiBrain[M27AirOverseer.refiGunshipMassLost])))
+                                                    iMinLevel = math.max(4, math.min(aiBrain[M27AirOverseer.refiGunshipMassKilled] / 200 * aiBrain[M27Overseer.refiOurHighestAirFactoryTech], 3 * aiBrain[M27AirOverseer.refiGunshipMassKilled] / math.max(1, aiBrain[M27AirOverseer.refiGunshipMassLost])))
                                                 end
 
                                             end
                                             if iMinLevel > 0 then
-                                                local iCurGunships = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship * ConvertTechLevelToCategory(iFactoryTechLevel))
+                                                local iCurGunships = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel))
                                                 if iCurGunships < math.min(12, iMinLevel) then
                                                     iCategoryToBuild = M27UnitInfo.refCategoryGunship
                                                     iTotalWanted = 1
@@ -2432,12 +2432,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                     if aiBrain[M27AirOverseer.refiGunshipMassKilled] > aiBrain[M27AirOverseer.refiGunshipMassLost] then
                                                         iMinLevel = 2
                                                         if aiBrain[M27AirOverseer.refiGunshipMassKilled] > 500 then
-                                                            iMinLevel = math.max(3, math.min(aiBrain[M27AirOverseer.refiGunshipMassKilled] / 200 * M27Overseer.refiOurHighestAirFactoryTech, 4 * aiBrain[M27AirOverseer.refiGunshipMassKilled] / math.max(1, aiBrain[M27AirOverseer.refiGunshipMassLost])))
+                                                            iMinLevel = math.max(3, math.min(aiBrain[M27AirOverseer.refiGunshipMassKilled] / 200 * aiBrain[M27Overseer.refiOurHighestAirFactoryTech], 4 * aiBrain[M27AirOverseer.refiGunshipMassKilled] / math.max(1, aiBrain[M27AirOverseer.refiGunshipMassLost])))
                                                         end
                                                     end
 
                                                     if iMinLevel > 0 then
-                                                        local iCurGunships = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship * ConvertTechLevelToCategory(iFactoryTechLevel))
+                                                        local iCurGunships = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel))
                                                         if iCurGunships < math.min(15, iMinLevel) then
                                                             iCategoryToBuild = M27UnitInfo.refCategoryGunship
                                                             iTotalWanted = 1
