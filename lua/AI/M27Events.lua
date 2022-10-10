@@ -164,6 +164,11 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                     end
                     if oKillerUnit and oKillerUnit.GetAIBrain then
                         M27AirOverseer.CheckForUnseenKiller(oKilledBrain, oUnitKilled, oKillerUnit)
+                        --Platoons - track when unit last died to ground attack
+                        if EntityCategoryContains(categories.LAND + categories.STRUCTURE + M27UnitInfo.refCategoryNavalSurface, oKillerUnit.UnitId) and oUnitKilled.PlatoonHandle and not(oUnitKilled.PlatoonHandle[M27PlatoonTemplates.refbIdlePlatoon]) then
+                            oUnitKilled.PlatoonHandle[M27PlatoonUtilities.refiTimeOfLastDeathToSurfaceUnit] = GetGameTimeSeconds()
+                        end
+
                         if EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oKillerUnit.UnitId) then
                             if oKillerUnit.Sync.totalMassKilled >= 250 and IsEnemy(oKilledBrain:GetArmyIndex(), oKillerUnit:GetAIBrain():GetArmyIndex()) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to add oKillerUnit='..oKillerUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oKillerUnit)..' to list of T2 arti to avoid') end

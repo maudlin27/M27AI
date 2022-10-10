@@ -2325,7 +2325,11 @@ function AirThreatChecker(aiBrain)
         LOG(sFunctionRef .. ': About to calcualte threat level of enemy antiair units.  Threat before this=' .. aiBrain[refiEnemyAirAAThreat])
     end
 
-    aiBrain[refiEnemyAirAAThreat] = math.max(aiBrain[refiEnemyAirAAThreat], M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirUnits, true, true, false, false, false, nil, 0, 0, 0) * 1.1)
+    --Reduce value of enemy air threat in team game since unlikely 1 team will have all the airaa
+    local iCurAirAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirUnits, true, true, false, false, false, nil, 0, 0, 0) * 1.1
+    if M27Team.iTotalTeamCount >= 3 then iCurAirAAThreat = iCurAirAAThreat / math.min(1.75, (M27Team.iTotalTeamCount - 1.5)) end
+
+    aiBrain[refiEnemyAirAAThreat] = math.max(aiBrain[refiEnemyAirAAThreat], iCurAirAAThreat)
     aiBrain[refiHighestEverEnemyAirAAThreat] = math.max(aiBrain[refiHighestEverEnemyAirAAThreat], aiBrain[refiEnemyAirAAThreat]) --Unlike airaathreat it doesnt get reduced when enemy airaa dies
 
     if bDebugMessages == true then
@@ -2334,7 +2338,10 @@ function AirThreatChecker(aiBrain)
 
 
     --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo, bBlueprintThreat)
-    aiBrain[refiEnemyAirToGroundThreat] = math.max((aiBrain[refiEnemyAirToGroundThreat] or 0), M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirGroundUnits, true, false, false, true, bEnemyUsingGhettos, nil, 0, 0, 0))
+    local iCurAirToGroundThreat = M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirGroundUnits, true, false, false, true, bEnemyUsingGhettos, nil, 0, 0, 0)
+    --Reduce enemy air threat if multiple teams
+    if M27Team.iTotalTeamCount >= 3 then iCurAirToGroundThreat = iCurAirToGroundThreat / math.min(2, (M27Team.iTotalTeamCount - 1)) end
+    aiBrain[refiEnemyAirToGroundThreat] = math.max((aiBrain[refiEnemyAirToGroundThreat] or 0), iCurAirToGroundThreat)
     if not(aiBrain[refbEnemyHasBuiltTorpedoBombers]) and aiBrain[refiEnemyAirToGroundThreat] >= 200 and M27Utilities.IsTableEmpty(tEnemyAirGroundUnits) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(refCategoryTorpBomber, tEnemyAirUnits)) == false then
         aiBrain[refbEnemyHasBuiltTorpedoBombers] = true
     end
@@ -7447,9 +7454,26 @@ function AirAAManager(aiBrain)
             end
             local tAltRallyPoint = M27Utilities.GetACU(aiBrain):GetPosition()
             local iAirUnitsWantAtAltRallyPoint = 0
-            if aiBrain[refbMercySightedRecently] and M27Utilities.GetDistanceBetweenPositions(tAltRallyPoint, tAirRallyPoint) >= 30 then
-                iAirUnitsWantAtAltRallyPoint = 2
+            if aiBrain[refbMercySightedRecently] then
+                if M27Utilities.GetDistanceBetweenPositions(tAltRallyPoint, tAirRallyPoint) >= 30 then
+                    iAirUnitsWantAtAltRallyPoint = 2
+                end
+            elseif aiBrain[M27Overseer.refbACUVulnerableToAirSnipe] then
+                local tNearbyAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, tAltRallyPoint, 80, 'Enemy')
+                if M27Utilities.IsTableEmpty(tNearbyAA) then
+                    iAirUnitsWantAtAltRallyPoint = 2
+                    --Are there enemy AA units near the ACU/on the way to the ACU? If not, then send our full air force nearby
+                    local iACUIntelCoverage = M27Logic.GetIntelCoverageOfPosition(aiBrain, tAltRallyPoint)
+                    if iACUIntelCoverage >= 40 then
+                        iAirUnitsWantAtAltRallyPoint = 10
+                        --Increase slightly if we wont have asfs yet or enemy has large air to ground threat
+                        if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] < 3 or aiBrain[refiEnemyAirToGroundThreat] >= 2500 then iAirUnitsWantAtAltRallyPoint = 13 end
+                    end
+                end
             end
+
+
+
 
             if iAirUnitsWantAtAltRallyPoint > 0 then
                 --Create table containing air units and their distance to the alt rally

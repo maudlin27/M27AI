@@ -248,87 +248,97 @@ end
 
 function ForkedMoveInCircle(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontClearCommandsFirst, iCircleSizeOverride, iTickWaitOverride)
     --More intensive version of MoveAwayFromTargetTemporarily, intended e.g. for ACUs
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ForkedMoveInCircle'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --KEY CONFIG SETTINGS: (these will work sometimes but not always against an aeon strat)
-    local iInitialAngleAdj = 15
-    local iInitialDistanceAdj = -1
-    local iDistanceAwayToMove = (iCircleSizeOverride or 2)
-    local iAngleMaxSingleAdj = 45
-    local iTicksBetweenOrders = (iTickWaitOverride or 4)
+    local refbActiveCircleMicro = 'M27MicroActiveCircleMicro'
 
-    if iDistanceAwayToMove > oUnit:GetBlueprint().Physics.MaxSpeed * 1.5 then
-        iAngleMaxSingleAdj = math.max(25, iAngleMaxSingleAdj * 2.5 / iDistanceAwayToMove)
-    end
+    if bDebugMessages == true then LOG(sFunctionRef..': GameTime='..GetGameTimeSeconds()..'; Unit has active circle micro='..tostring(oUnit[refbActiveCircleMicro] or false)) end
+    if not(oUnit[refbActiveCircleMicro]) then
 
+        --KEY CONFIG SETTINGS: (these will work sometimes but not always against an aeon strat)
+        local iInitialAngleAdj = 15
+        local iInitialDistanceAdj = -1
+        local iDistanceAwayToMove = (iCircleSizeOverride or 2)
+        local iAngleMaxSingleAdj = 45
+        local iTicksBetweenOrders = (iTickWaitOverride or 4)
 
-
-    local iStartTime = GetGameTimeSeconds()
-    oUnit[M27UnitInfo.refiGameTimeMicroStarted] = iStartTime
-    local iLoopCount = 0
-    local iMaxLoop = iTimeToRun * 10 + 1
-    --Distance from point A to point B will be much less than distanceaway to move, since that is the distance from the centre (radius) rather than the distance between 1 points on the circle edge; for simplicity will assume that distance is 0.25 of the distance from the centre
-    if bDontTreatAsMicroAction then iMaxLoop = math.ceil(iTimeToRun / (iDistanceAwayToMove / oUnit:GetBlueprint().Physics.MaxSpeed)) * 4 end
-    local tUnitStartPosition = oUnit:GetPosition()
-    --local iAngleToTargetToEscape = M27Utilities.GetAngleFromAToB(tUnitStartPosition, tPositionToRunFrom)
-    local iCurFacingDirection = M27UnitInfo.GetUnitFacingAngle(oUnit)
-    local iAngleAdjFactor = 1
-    --local iFacingAngleWanted = iAngleToTargetToEscape + 180
-    --if iFacingAngleWanted >= 360 then iFacingAngleWanted = iFacingAngleWanted - 360 end
-
-    --Do we turn clockwise or anti-clockwise?
-    --if math.abs(iCurFacingDirection - iFacingAngleWanted) > 180 then iAngleAdjFactor = 1 --Clockwise
-    --else iAngleAdjFactor = -1 end --Anticlockwise
-
-
-    local iCurAngleDif
-
-    local tTempLocationToMove
-
-
-    if not(bDontTreatAsMicroAction) then
-        TrackTemporaryUnitMicro(oUnit, iTimeToRun)
-        --[[oUnit[M27UnitInfo.refbSpecialMicroActive] = true
-        if oUnit.PlatoonHandle then
-            oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
+        if iDistanceAwayToMove > oUnit:GetBlueprint().Physics.MaxSpeed * 1.5 then
+            iAngleMaxSingleAdj = math.max(25, iAngleMaxSingleAdj * 2.5 / iDistanceAwayToMove)
         end
-        M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)--]]
-    end
-    local bRecentMicro = false
-    local iRecentMicroThreshold = 1
-    local iGameTime = GetGameTimeSeconds()
-    if oUnit[M27UnitInfo.refbSpecialMicroActive] and iGameTime - oUnit[M27UnitInfo.refiGameTimeMicroStarted] < iRecentMicroThreshold then bRecentMicro = true end
 
-    if bRecentMicro == false and not(bDontClearCommandsFirst) then M27Utilities.IssueTrackedClearCommands({oUnit}) end
-    if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for move commands; iTimeToRun='..iTimeToRun..'; iStartTime='..iStartTime..'; iCurFacingDirection='..iCurFacingDirection..'; tUnitStartPosition='..repru(tUnitStartPosition)) end
-    local iTempAngleDirectionToMove = iCurFacingDirection + iInitialAngleAdj * iAngleAdjFactor
-    local iTempDistanceAwayToMove
-    local bTimeToStop = false
-    if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; refbSpecialMicroActive='..tostring((oUnit[M27UnitInfo.refbSpecialMicroActive] or false))..'; iMaxLoop='..iMaxLoop) end
-    while bTimeToStop == false do
-    --while not(iTempAngleDirectionToMove == iFacingAngleWanted) do
-        iLoopCount = iLoopCount + 1
-        if iLoopCount > iMaxLoop then break
-        elseif M27UnitInfo.IsUnitValid(oUnit) == false then break end --No longer give error message as may be calling this for intel scouts now
+
+
+        local iStartTime = GetGameTimeSeconds()
+        oUnit[M27UnitInfo.refiGameTimeMicroStarted] = iStartTime
+        local iLoopCount = 0
+        local iMaxLoop = iTimeToRun * 10 + 1
+        --Distance from point A to point B will be much less than distanceaway to move, since that is the distance from the centre (radius) rather than the distance between 1 points on the circle edge; for simplicity will assume that distance is 0.25 of the distance from the centre
+        if bDontTreatAsMicroAction then iMaxLoop = math.ceil(iTimeToRun / (iDistanceAwayToMove / oUnit:GetBlueprint().Physics.MaxSpeed)) * 4 end
+        local tUnitStartPosition = oUnit:GetPosition()
+        --local iAngleToTargetToEscape = M27Utilities.GetAngleFromAToB(tUnitStartPosition, tPositionToRunFrom)
+        local iCurFacingDirection = M27UnitInfo.GetUnitFacingAngle(oUnit)
+        local iAngleAdjFactor = 1
+        --local iFacingAngleWanted = iAngleToTargetToEscape + 180
+        --if iFacingAngleWanted >= 360 then iFacingAngleWanted = iFacingAngleWanted - 360 end
+
+        --Do we turn clockwise or anti-clockwise?
+        --if math.abs(iCurFacingDirection - iFacingAngleWanted) > 180 then iAngleAdjFactor = 1 --Clockwise
+        --else iAngleAdjFactor = -1 end --Anticlockwise
+
+
+        local iCurAngleDif
+
+        local tTempLocationToMove
+
+        local bRecentMicro = false
+        local iRecentMicroThreshold = 1
+        local iGameTime = GetGameTimeSeconds()
+        if oUnit[M27UnitInfo.refbSpecialMicroActive] and iGameTime - oUnit[M27UnitInfo.refiGameTimeMicroStarted] < iRecentMicroThreshold then bRecentMicro = true end
+        if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for move commands for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iTimeToRun='..iTimeToRun..'; iStartTime='..iStartTime..'; iCurFacingDirection='..iCurFacingDirection..'; tUnitStartPosition='..repru(tUnitStartPosition)..'; bRecentMicro='..tostring((bRecentMicro or false))..'; bDontClearCommandsFirst='..tostring(bDontClearCommandsFirst or false)..'; oUnit[M27UnitInfo.refbSpecialMicroActive]='..tostring(oUnit[M27UnitInfo.refbSpecialMicroActive])..'; oUnit[M27UnitInfo.refiGameTimeMicroStarted]='..(oUnit[M27UnitInfo.refiGameTimeMicroStarted] or 'nil')..'; GameTime='..iGameTime..'; Dif='..iGameTime-(oUnit[M27UnitInfo.refiGameTimeMicroStarted] or 0)..'; bDontTreatAsMicroAction='..tostring((bDontTreatAsMicroAction or false))) end
+        if bRecentMicro == false and not(bDontClearCommandsFirst) then
+            M27Utilities.IssueTrackedClearCommands({oUnit})
+            if bDebugMessages == true then LOG(sFunctionRef..': Issued clear commands order to the unit') end
+        end
+        if not(bDontTreatAsMicroAction) then
+            TrackTemporaryUnitMicro(oUnit, iTimeToRun, refbActiveCircleMicro)
+            if bDebugMessages == true then LOG(sFunctionRef..': Will temporarily track the unit micro. iTimeToRun='..(iTimeToRun or 'nil')) end
+            --[[oUnit[M27UnitInfo.refbSpecialMicroActive] = true
+            if oUnit.PlatoonHandle then
+                oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
+            end
+            M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)--]]
+        end
+
+        local iTempAngleDirectionToMove = iCurFacingDirection + iInitialAngleAdj * iAngleAdjFactor
+        local iTempDistanceAwayToMove
+        local bTimeToStop = false
+        if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; refbSpecialMicroActive='..tostring((oUnit[M27UnitInfo.refbSpecialMicroActive] or false))..'; iMaxLoop='..iMaxLoop) end
+        while bTimeToStop == false do
+            --while not(iTempAngleDirectionToMove == iFacingAngleWanted) do
+            iLoopCount = iLoopCount + 1
+            if iLoopCount > iMaxLoop then break
+            elseif M27UnitInfo.IsUnitValid(oUnit) == false then break end --No longer give error message as may be calling this for intel scouts now
             --M27Utilities.ErrorHandler('Loop has gone on for too long, likely infinite') break end
 
-        --iCurAngleDif = math.abs(iTempAngleDirectionToMove - iFacingAngleWanted)
-        --if iCurAngleDif < iAngleMaxSingleAdj then iTempAngleDirectionToMove = iFacingAngleWanted
-        --else
+            --iCurAngleDif = math.abs(iTempAngleDirectionToMove - iFacingAngleWanted)
+            --if iCurAngleDif < iAngleMaxSingleAdj then iTempAngleDirectionToMove = iFacingAngleWanted
+            --else
             iTempAngleDirectionToMove = iTempAngleDirectionToMove + iAngleMaxSingleAdj * iAngleAdjFactor
             if iTempAngleDirectionToMove > 360 then iTempAngleDirectionToMove = iTempAngleDirectionToMove - 360 end
-        --end
-        iTempDistanceAwayToMove = iDistanceAwayToMove
-        if iLoopCount == 1 then iTempDistanceAwayToMove = iDistanceAwayToMove + iInitialDistanceAdj end
-        tTempLocationToMove = M27Utilities.MoveInDirection(tUnitStartPosition, iTempAngleDirectionToMove, iTempDistanceAwayToMove)
-        IssueMove({oUnit}, tTempLocationToMove)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        WaitTicks(iTicksBetweenOrders)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-        if not(bDontTreatAsMicroAction) and not((oUnit[M27UnitInfo.refiGameTimeMicroStarted] == iStartTime and GetGameTimeSeconds() - iStartTime < iTimeToRun)) then bTimeToStop = true end
+            --end
+            iTempDistanceAwayToMove = iDistanceAwayToMove
+            if iLoopCount == 1 then iTempDistanceAwayToMove = iDistanceAwayToMove + iInitialDistanceAdj end
+            tTempLocationToMove = M27Utilities.MoveInDirection(tUnitStartPosition, iTempAngleDirectionToMove, iTempDistanceAwayToMove)
+            IssueMove({oUnit}, tTempLocationToMove)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            WaitTicks(iTicksBetweenOrders)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+            if not(bDontTreatAsMicroAction) and not((oUnit[M27UnitInfo.refiGameTimeMicroStarted] == iStartTime and GetGameTimeSeconds() - iStartTime < iTimeToRun)) then bTimeToStop = true end
+        end
     end
+
 
     --[[while (oUnit[M27UnitInfo.refiGameTimeMicroStarted] == iStartTime and GetGameTimeSeconds() - iStartTime < iTimeToRun) do
         iLoopCount = iLoopCount + 1
@@ -440,7 +450,7 @@ function GetBombTarget(weapon, projectile)
     return nil
 end
 
-function TrackTemporaryUnitMicro(oUnit, iTimeActiveFor)
+function TrackTemporaryUnitMicro(oUnit, iTimeActiveFor, sAdditionalTrackingVar)
     --Where we are doing all actions upfront can call this to enable micro and then turn the flag off after set period of time
     --Note that air logic currently doesnt make use of this
 
@@ -455,6 +465,11 @@ function TrackTemporaryUnitMicro(oUnit, iTimeActiveFor)
     if oUnit.PlatoonHandle then
         oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
         M27Utilities.DelayChangeVariable(oUnit.PlatoonHandle, M27UnitInfo.refbSpecialMicroActive, false, iTimeActiveFor - 0.01)
+    end
+
+    if sAdditionalTrackingVar then
+        oUnit[sAdditionalTrackingVar] = true
+        M27Utilities.DelayChangeVariable(oUnit, sAdditionalTrackingVar, false, iTimeActiveFor - 0.01)
     end
 end
 

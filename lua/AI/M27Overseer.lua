@@ -1245,13 +1245,24 @@ function AssignMAAToPreferredPlatoons(aiBrain)
                 end
             end
         end
+        local oExistingMAAPlatoon = oACU[refoUnitsMAAHelper]
+
+        --Increase MAA threat wanted if vulnerable to air snipe and we have T2+ land factory
+        if aiBrain[refbACUVulnerableToAirSnipe] and aiBrain[refiOurHighestLandFactoryTech] >= 2 then
+            iMAAThreatWanted = iMAAThreatWanted + 200
+            iMinACUMAAThreatWanted = iMinACUMAAThreatWanted + 200
+            if  oExistingMAAPlatoon and oExistingMAAPlatoon[M27PlatoonUtilities.reftCurrentUnits] and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryMAA * categories.TECH2,oExistingMAAPlatoon[M27PlatoonUtilities.reftCurrentUnits])) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryMAA * categories.TECH2) > 0 then
+                iMAAThreatWanted = iMAAThreatWanted + 200
+                iMinACUMAAThreatWanted = iMinACUMAAThreatWanted + 200
+            end
+        end
 
 
         local sMAAPlatoonName = 'M27MAAAssister'
         local bNeedMoreMAA = false
         local bACUNeedsMAAHelper = true
         local oNewMAAPlatoon
-        local oExistingMAAPlatoon = oACU[refoUnitsMAAHelper]
+
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': About to check if ACU needs MAA; iMAAWanted=' .. iMAAThreatWanted..'; iMinACUMAAThreatWanted='..iMinACUMAAThreatWanted..'; Enemy air to ground threat='..(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 0)..'; Enemy air factories='..repru(aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech]))
             if oExistingMAAPlatoon then LOG(sFunctionRef..': oExistingMAAPlatoon mass value='..oExistingMAAPlatoon[M27PlatoonUtilities.refiPlatoonMassValue]..'; current units='..oExistingMAAPlatoon[M27PlatoonUtilities.refiCurrentUnits]) end
@@ -7835,8 +7846,16 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
             --Flag we need AirAA as an emergency and set ACU health to run equal to max health if we fear an air snipe
             if bDebugMessages == true then LOG(sFunctionRef..': Considering if vulnerable to air snipe. iDistToOurBase='..iDistToOurBase..'; have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl])..'; aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]..'; aiBrain[M27AirOverseer.refiOurMassInAirAA]='..aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; Enemy AirAA threat='..aiBrain[M27AirOverseer.refiEnemyAirAAThreat]) end
-            if iDistToOurBase >= 200 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1500 and not(oACU:HasEnhancement('CloakingGenerator')) then
+            if iDistToOurBase >= 200 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1800 and not(oACU:HasEnhancement('CloakingGenerator')) then
+                --(1500 threshold as have seen replays where Gun+T2 ACU with mobile shield and T2 MAA escort dies to T1 bombers
+                local tNearbyEnemyAir = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllAir * categories.EXPERIMENTAL + M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryGunship, oACU:GetPosition(), 130, 'Enemy')
                 aiBrain[refbACUVulnerableToAirSnipe] = true
+                if bDebugMessages == true then LOG(sFunctionRef..': Set ACU as being vulnerable to an air snipe. Is table of nearby enemy air to ground empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyAir))) end
+
+                --Also retreat if nearby enemy air threat nearby and ACU not close to base
+                if M27Utilities.IsTableEmpty(tNearbyEnemyAir) == false then
+                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
+                end
                 --Potential air threat; will distinguish between the following scenarios:
                 --High risk of air snipe requiring emergency AA production
                 --Risk of air snipe due to being far away from AirAA support
@@ -7844,7 +7863,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 if not(aiBrain[M27AirOverseer.refbHaveAirControl]) and aiBrain[M27AirOverseer.refiOurMassInAirAA] <= math.max(2000, aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] * 0.5) then
                     --High risk of air snipe.  Set health to run equal to 75% normally, or 100% if we have weak MAA nearby
 
-                    aiBrain[refbACUVulnerableToAirSnipe] = true
+                    --aiBrain[refbACUVulnerableToAirSnipe] = true
                     aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.75)
                     local tNearbyMAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, oACU:GetPosition(), 60, 'Ally')
                     local iNearbyMAAThreat = 0
@@ -7854,7 +7873,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                     if iNearbyMAAThreat <= 400 then
                         aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
                         if bDebugMessages == true then LOG(sFunctionRef..': ACU very vulnerable to Air snipe, will retreat even if on full health') end
-                    elseif iNearbyMAAThreat <= 750 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 4000 then
+                    elseif iNearbyMAAThreat <= 750 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 2500 then
                         if bDebugMessages == true then LOG(sFunctionRef..': ACU vulnerable to air snipe, but not massively, so will just retreat if not quite full health') end
                         aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.9)
                     end
@@ -7875,7 +7894,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                     aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
                                     if bDebugMessages == true then LOG(sFunctionRef..': Have little MAA nearby and AirAA is a long way away so will run even if on full health') end
                                 else
-                                    local tNearbyEnemyAir = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, oACU:GetPosition(), 70, 'Enemy')
                                     if bDebugMessages == true then LOG(sFunctionRef..': Is table of nearby enemy air empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyAir))) end
                                     if M27Utilities.IsTableEmpty(tNearbyEnemyAir) == false then
                                         aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
@@ -7890,11 +7908,14 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                     end
 
                 end
+
+
             else
                 aiBrain[refbACUVulnerableToAirSnipe] = false
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': aiBrain='..aiBrain.Nickname..'; iDistToOurBase='..iDistToOurBase..'; Has enemy built torpedo bombers='..tostring(aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] or false)..'; iUpgradeCount='..iUpgradeCount..'; Enemy air to ground threat='..(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 'nil')..'; Can path to enemy with land='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; can path to enemy with amphib='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; Is ACU underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oACU))) end
 
+
+            if bDebugMessages == true then LOG(sFunctionRef..': aiBrain='..aiBrain.Nickname..'; iDistToOurBase='..iDistToOurBase..'; End of deciding if vulnerable to air snipe, is ACU vulnerable='..tostring(aiBrain[refbACUVulnerableToAirSnipe])..'; Current ACU health to run on before further adjustment='..aiBrain[refiACUHealthToRunOn]..'; Has enemy built torpedo bombers='..tostring(aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] or false)..'; iUpgradeCount='..iUpgradeCount..'; Enemy air to ground threat='..(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 'nil')..'; Can path to enemy with land='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; can path to enemy with amphib='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; Is ACU underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oACU))) end
             --If ACU far from base and is amphibious map and ACU is in big pond, without many upgrades, and enemy has built at least 1 torpedo bomber this game, then have it run if the enemy has torp bombers
             if iDistToOurBase > 175 and (aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] or aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0) and iUpgradeCount < 3 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 200 and not(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and M27UnitInfo.IsUnitUnderwater(oACU) then
                 --is the ACU in a large pond (10k+ in size)?
