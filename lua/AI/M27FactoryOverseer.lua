@@ -78,6 +78,7 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetBlueprintsThatCanBuildOfCategory'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bGetCheapest and bIgnoreTechDifferences then bDebugMessages = true end
     --if GetGameTimeSeconds() >= 738 then bDebugMessages = true end
 
     local tBlueprints = EntityCategoryGetUnitList(iCategoryCondition)
@@ -152,9 +153,12 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
                     --if EntityCategoryContains(iCategoryCondition, sBlueprint) then --tBlueprints is already filtered to just those that meet the categories
                     iValidBlueprints = iValidBlueprints + 1
                     tValidBlueprints[iValidBlueprints] = sBlueprint
-                    if EntityCategoryContains(categories.TECH3 + categories.EXPERIMENTAL, sBlueprint) then iCurrentTech = 3
-                    elseif EntityCategoryContains(categories.TECH2, sBlueprint) then iCurrentTech = 2
-                    else iCurrentTech = 1
+                    if bIgnoreTechDifferences then iCurrentTech = 1
+                    else
+                        if EntityCategoryContains(categories.TECH3 + categories.EXPERIMENTAL, sBlueprint) then iCurrentTech = 3
+                        elseif EntityCategoryContains(categories.TECH2, sBlueprint) then iCurrentTech = 2
+                        else iCurrentTech = 1
+                        end
                     end
                     if bDebugMessages == true then LOG(sFunctionRef..': '..sBlueprint..': iCurrentTech='..iCurrentTech..'; iHighestTech='..iHighestTech) end
                     if iCurrentTech > iHighestTech then
@@ -523,6 +527,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
         local sFactoryBP = oFactory.UnitId
         local iStrategy = aiBrain[M27Overseer.refiAIBrainCurrentStrategy]
         --local bGetSlowest, bGetFastest
+        local bGetCheapest, bIgnoreTechDifferences
 
         if iStrategy == nil then
             iStrategy = aiBrain[M27Overseer.refiDefaultStrategy] or M27Overseer.refStrategyLandMain
@@ -699,6 +704,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                     iCount = iCount + 1 if iCount > 100 then M27Utilities.ErrorHandler('Infinite loop') break end
                     local bGetFastest = false
                     local bGetSlowest = false
+                    bGetCheapest = false
+                    bIgnoreTechDifferences = false
+
                     bReachedLastOption = false
                     iCategoryToBuild = nil
                     bConsiderUnderConstruction = true
@@ -1512,12 +1520,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 elseif iCurrentConditionToTry == 3 then --Antinavy because enemy ACU/our ACU is underwater
                                     if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoACUKillTarget])) or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27UnitInfo.IsUnitUnderwater(M27Utilities.GetACU(aiBrain))) then
                                         iCategoryToBuild = M27UnitInfo.refCategoryAntiNavy
-                                        iTotalWanted = 1000
+                                        iTotalWanted = 5
                                     end
                                 elseif iCurrentConditionToTry == 4 then --Amphibious if cant path with land to enemy base or ACU
                                     if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true then
                                         iCategoryToBuild = M27UnitInfo.refCategoryAmphibiousCombat
-                                        iTotalWanted = 1000
+                                        iTotalWanted = 5
                                     else
                                         --Can we path to ACU with amphib but not with land?
                                         --GetSegmentGroupOfLocation(sPathing, tLocation)
@@ -1539,17 +1547,22 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         if not(iOurBaseLandGroup == iACULandGroup) and iOurBaseAmphibGroup == iACUAmphibGroup then
                                             --Cant path with alnd but can with amphibious
                                             iCategoryToBuild = M27UnitInfo.refCategoryAmphibiousCombat
-                                            iTotalWanted = 1000
+                                            iTotalWanted = 5
                                         elseif iOurBaseLandGroup == iACULandGroup then
                                             --Can path with land
                                             iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false)
-                                            iTotalWanted = 1000
+                                            iTotalWanted = 5
                                         end
+                                    end
+                                elseif iCurrentConditionToTry == 5 then --1 engineer if we are overflowing mass (in case our attack isnt successful)
+                                    if aiBrain:GetEconomyStoredRatio('MASS') >= 0.4 then
+                                        iCategoryToBuild = M27UnitInfo.refCategoryEngineer
+                                        iTotalWanted = 1
                                     end
                                 elseif iCurrentConditionToTry == 5 then --Land combat if protecting our ACU and its near our base, even if cant path to it yet
                                     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), M27Utilities.GetACU(aiBrain):GetPosition()) <= 150 then
                                         iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false)
-                                        iTotalWanted = 1000
+                                        iTotalWanted = 5
                                     end
                                 elseif iCurrentConditionToTry == 6 then --Antiair
                                     if aiBrain[M27Overseer.refbNeedMAABuilt] or aiBrain[M27Overseer.refiMAAShortfallBase] + aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] + aiBrain[M27Overseer.refiMAAShortfallACUCore] + aiBrain[M27Overseer.refiMAAShortfallACUPrecaution] > 0 then
@@ -1565,7 +1578,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 elseif iCurrentConditionToTry == 8 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
                                     --Even if cant path to ACU, can path to enemy base, so build land combat as ACU may just be in water near land
                                     iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false)
-                                    iTotalWanted = 10000
+                                    iTotalWanted = 1000
                                 else
                                     bReachedLastOption = true
                                     if not(M27Conditions.HaveLowMass(aiBrain)) then
@@ -1654,6 +1667,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             LOG(sFunctionRef .. ': ACU is underwater so will get torp bombers')
                                         end
                                         iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
+                                        bGetCheapest = true
+                                        bIgnoreTechDifferences = true
                                     else
                                         if bDebugMessages == true then
                                             LOG(sFunctionRef .. ': No air units near acu so build bombers')
@@ -1727,6 +1742,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                     --Build torp bombers, unless we have more torp bombers than AirAA units and need AirAA units
 
                                                     iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
+                                                    bGetCheapest = true
+                                        bIgnoreTechDifferences = true
                                                     if bDebugMessages == true then
                                                         LOG(sFunctionRef .. ': Will build emergency torp bomber')
                                                     end
@@ -1790,6 +1807,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 if iFactoryTechLevel >= 2 and aiBrain[M27AirOverseer.refiTorpBombersWanted] > 0 then
                                                     if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iEmergencyRange - 15, 'Enemy')) == false then
                                                         iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
+                                                        bGetCheapest = true
+                                        bIgnoreTechDifferences = true
                                                         if bDebugMessages == true then
                                                             LOG(sFunctionRef .. ': Will build torp bomber')
                                                         end
@@ -1871,6 +1890,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 elseif iCurrentConditionToTry == 4 then --Torp bombers if enemy navy near base
                                     if aiBrain[M27Overseer.refbT2NavyNearOurBase] and (aiBrain[M27AirOverseer.refiTorpBombersWanted] > 0 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTorpBomber) < 80) then
                                         iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
+                                        bGetCheapest = true
+                                        bIgnoreTechDifferences = true
                                         iTotalWanted = 10
                                     end
                                 elseif iCurrentConditionToTry == 5 then
@@ -1907,6 +1928,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 end
                                                 if bWantTorpBomber then
                                                     iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
+                                                    bGetCheapest = true
+                                        bIgnoreTechDifferences = true
                                                 else
                                                     if iCurT1Bombers < 80 then
                                                         iCategoryToBuild = M27UnitInfo.refCategoryBomber * categories.TECH1
@@ -1942,6 +1965,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             LOG(sFunctionRef .. ': Lifetime torp bomber count is <2 so will build torp bomber as want torp bombers or have navy near our base')
                                         end
                                         iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
+                                        bGetCheapest = true
+                                        bIgnoreTechDifferences = true
                                         iTotalWanted = 2
                                     else
                                         --Torp bombers on standby if not built before and ACU in large body of water (so are prepared for e.g. enemy subs)
@@ -1957,6 +1982,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         end
                                         if bWantTorpBomber then
                                             iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
+                                            bGetCheapest = true
+                                        bIgnoreTechDifferences = true
                                             iTotalWanted = 2
                                         else
                                             if M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryBomber, 1) == true then
@@ -2225,6 +2252,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 elseif iCurrentConditionToTry == 18 then
                                     if aiBrain[M27Navy.refbEnemyNavyPreventingBuildingNavy] and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTorpBomber) <= 10 then
                                         iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
+                                        bGetCheapest = true
+                                        bIgnoreTechDifferences = true
                                         iTotalWanted = 2
                                     end
                                 elseif iCurrentConditionToTry == 19 then
@@ -2250,10 +2279,14 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 iTotalWanted = aiBrain[M27AirOverseer.refiAirAANeeded]
                                             else
                                                 iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
+                                                bGetCheapest = true
+                                        bIgnoreTechDifferences = true
                                             end
                                         else
                                             iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
                                             iTotalWanted = aiBrain[M27AirOverseer.refiTorpBombersWanted]
+                                            bGetCheapest = true
+                                        bIgnoreTechDifferences = true
                                         end
                                     end
                                 elseif iCurrentConditionToTry == 21 then --Bombers for air domination
@@ -3236,7 +3269,10 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             LOG(sFunctionRef .. ': iAlreadyBuilding=' .. (iAlreadyBuilding or 0) .. '; iTotalWanted=' .. (iTotalWanted or 0) .. '; bAlreadyBuildingEnough=' .. tostring(bAlreadyBuildingEnough))
                         end
                         if bAlreadyBuildingEnough == false then
-                            sBPIDToBuild = GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryToBuild, oFactory, bGetSlowest, bGetFastest)
+                            --GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFactory, bGetSlowest, bGetFastest, iOptionalCategoryThatMustBeAbleToBuild, bGetCheapest, bIgnoreTechDifferences)
+                            if iFactoryTechLevel == 3 then bDebugMessages = true end
+                            sBPIDToBuild = GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryToBuild, oFactory, bGetSlowest, bGetFastest, nil, bGetCheapest, bIgnoreTechDifferences)
+                            if bDebugMessages == true then LOG(sFunctionRef..': sBPIDToBuild for iCurrentConditionToTry='..iCurrentConditionToTry..' before adjustments='..(sBPIDToBuild or 'nil')..'; bGetSlowest='..tostring(bGetSlowest)..'; bGetFastest='..tostring(bGetFastest)..'; bGetCheapest='..tostring(bGetCheapest)..'; bIgnoreTechDifferences='..tostring(bIgnoreTechDifferences)) end
 
                             --Basic backup for unlikely unit restriction scenarios:
                             if sBPIDToBuild == nil and M27Utilities.IsTableEmpty(ScenarioInfo.Options.RestrictedCategories) == false then

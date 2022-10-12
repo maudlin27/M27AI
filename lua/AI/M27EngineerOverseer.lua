@@ -9585,6 +9585,10 @@ end--]]
 
             --if GetGameTimeSeconds() >= 2580 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.75 then bDebugMessages = true end
 
+            local bUseNormalAssignments = true
+            if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] then bUseNormalAssignments = false end
+
+
             while iEngineersToConsider >= 0 do --want >= rather than > so get correct calculation of engineers needed
 
                 --if iEngineersToConsider > 0 then bDebugMessages = true else bDebugMessages = false end
@@ -9620,7 +9624,7 @@ end--]]
 
 
                 --Special logic if in ACU attack mode
-                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] then
+                if not(bUseNormalAssignments) and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] then
                     --ACU in attack - want energy storage if we dont already have it so can overcharge
                     if iCurrentConditionToTry == 1 then
                         if iEnergyStoredRatio == nil then iEnergyStoredRatio = aiBrain:GetEconomyStoredRatio('ENERGY') end
@@ -9640,9 +9644,14 @@ end--]]
                             iMaxEngisWanted = 5
                         end
                     else
-                        iActionToAssign = refActionSpare
-                        iSearchRangeForNearestEngi = 10000
-                        iMaxEngisWanted = 1000
+                        if aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 or (aiBrain:GetEconomyStoredRatio('MASS') >= 0.4 and not(bHaveVeryLowPower)) then
+                            bUseNormalAssignments = false
+                            iCurrentConditionToTry = 1
+                        else
+                            iActionToAssign = refActionSpare
+                            iSearchRangeForNearestEngi = 10000
+                            iMaxEngisWanted = 1000
+                        end
                     end
                 else
 

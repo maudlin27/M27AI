@@ -4700,7 +4700,7 @@ function ACUManager(aiBrain)
     local sFunctionRef = 'ACUManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 60 and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
 
     if not (aiBrain.M27IsDefeated) and M27Logic.iTimeOfLastBrainAllDefeated < 10 then
         local oACU = M27Utilities.GetACU(aiBrain)
@@ -6573,7 +6573,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
     --local bDebugMessages = M27Config.M27StrategicLog
     local sFunctionRef = 'StrategicOverseer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if GetGameTimeSeconds() >= 960 then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 60 then bDebugMessages = true end
 
     if not(aiBrain[M27Logic.refbAllEnemiesDead]) then
         --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
@@ -7026,7 +7026,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             local iTemporaryTurtleDefenceRange --Limit defence range based on this
 
             --Only consider temporary turtle if we have a firebase, provided the firebase itself isnt too far from us (to avoid risk e.g. of inheriting ally base that contains firebase)
-            if bDebugMessages == true then LOG(sFunctionRef..': About to check if we should temporarily turtle. Is table of firebases empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]))..'; are there big threats='..tostring(aiBrain[refbAreBigThreats])..'; GameTime='..GetGameTimeSeconds()..'; Nearest threat from start mod='..aiBrain[refiModDistFromStartNearestThreat]..'; Mexes available for upgrade='..aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade]..'; Furthest valuable building mod dist='..aiBrain[refiFurthestValuableBuildingModDist]..'; Enemy best mobile range='..aiBrain[refiHighestMobileLandEnemyRange]..'; Is table of planned chokepoints empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart]))..'; Enemy highest tech level='..aiBrain[refiEnemyHighestTechLevel]) end
+            if bDebugMessages == true then LOG(sFunctionRef..': About to check if we should temporarily turtle. Is table of firebases empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]))..'; are there big threats='..tostring(aiBrain[refbAreBigThreats] or false)..'; GameTime='..GetGameTimeSeconds()..'; Nearest threat from start mod='..(aiBrain[refiModDistFromStartNearestThreat] or 'nil')..'; Mexes available for upgrade='..(aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] or 'nil')..'; Furthest valuable building mod dist='..(aiBrain[refiFurthestValuableBuildingModDist] or 'nil')..'; Enemy best mobile range='..(aiBrain[refiHighestMobileLandEnemyRange] or 'nil')..'; Is table of planned chokepoints empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart]))..'; Enemy highest tech level='..(aiBrain[refiEnemyHighestTechLevel] or 'nil')) end
             if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]) == false then
                 --Are we a non-chokepoint map, with enemies more than 80 from our base, and multiple mexes available to upgrade, and it's not the first 10m of the game (when we want to focus more on map control), and havent got to experimental stage of game yet?
                 if GetGameTimeSeconds() >= 600 and aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] >= 2 and aiBrain[refiModDistFromStartNearestThreat] >= 80 and not(bChokepointsAreProtected) and M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart]) then

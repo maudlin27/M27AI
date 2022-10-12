@@ -7358,7 +7358,7 @@ function DeterminePlatoonAction(oPlatoon)
                                             bAttackACULogic = true
                                         end
                                     end
-                                    if bAttackACULogic == true and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) then oPlatoon[refiCurrentAction] = refActionKillACU end
+                                    if bAttackACULogic == true and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) then oPlatoon[refiCurrentAction] = refActionKillACU end
                                 end
                                 if bAttackACULogic == false then
                                     --Escort platoons - if escorting an individual unit as a 'platoon' such as an engineer, then need to update the tracker for that as well
@@ -8529,8 +8529,8 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                     if bDebugMessages == true then LOG(sFunctionRef..': Are more than 40 from target base so will go to target base') end
                                 else
                                     if bDebugMessages == true then LOG(sFunctionRef..': Are within 40 of the enemy target base; will target the last known enemy ACU position if there is one') end
-                                    if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) then
-                                        oPlatoon[reftMovementPath][1] = aiBrain[M27Overseer.reftLastNearestACU]
+                                    if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) then
+                                        oPlatoon[reftMovementPath][1] = aiBrain[M27Overseer.reftACUKillTarget]
                                     else
                                         if bDebugMessages == true then LOG(sFunctionRef..': No enemy ACUs, will still target current position if it has structures or we are more than 10 from it') end
                                         if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tTargetBase) <= 10 then
@@ -12771,6 +12771,7 @@ function ProcessPlatoonAction(oPlatoon)
                         end
                     end
                 elseif oPlatoon[refiCurrentAction] == refActionKillACU then
+                    if oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount] == 'M27DefenderAI3' then bDebugMessages = true end
                     if bDebugMessages == true then LOG(sFunctionRef..': About to send orders to attack enemy ACU') end
                     if bDontClearActions == false then
                         if bDebugMessages == true then LOG(sFunctionRef..': '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Clearing commands; Gametime='..GetGameTimeSeconds()) end
@@ -12782,15 +12783,17 @@ function ProcessPlatoonAction(oPlatoon)
                     local iOffsetToNotBlockACUDistance = 5
                     local iDistanceFromACUForUnitMicro = 40 --If platoon front unit is this close to ACU then will do micro on a unit by unit basis
                     local bPerUnitMicro = false
+                    local bEnemyACUUnderwater = M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoACUKillTarget])
+                    if bEnemyACUUnderwater then iDistanceBehindACUWanted = aiBrain[M27Overseer.refoACUKillTarget]:GetBlueprint().Economy.MaxBuildDistance or 10 end
 
                     --Pick a location that means we're less likely to block the ACU if its in the attack
                     --ACU direction from our base
-                    local iACULikelyFleeAngle = M27Utilities.GetAngleFromAToB(aiBrain[M27Overseer.reftLastNearestACU], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                    local tPositionBehindEnemyACU = M27Utilities.MoveInDirection(aiBrain[M27Overseer.reftLastNearestACU], iACULikelyFleeAngle, iDistanceBehindACUWanted)
+                    local iACULikelyFleeAngle = M27Utilities.GetAngleFromAToB(aiBrain[M27Overseer.reftACUKillTarget], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                    local tPositionBehindEnemyACU = M27Utilities.MoveInDirection(aiBrain[M27Overseer.reftACUKillTarget], iACULikelyFleeAngle, iDistanceBehindACUWanted)
                     local tTargetMoveLocation
                     local iOurACUAngleToTarget
                     local tACUPos = M27Utilities.GetACU(aiBrain):GetPosition()
-                    local iACUDistanceToTarget = M27Utilities.GetDistanceBetweenPositions(tACUPos, aiBrain[M27Overseer.reftLastNearestACU])
+                    local iACUDistanceToTarget = M27Utilities.GetDistanceBetweenPositions(tACUPos, aiBrain[M27Overseer.reftACUKillTarget])
                     if aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] and not(oPlatoon[refbACUInPlatoon]) then
                         if M27Utilities.IsTableEmpty(tDFUnits) == false and M27Utilities.GetDistanceBetweenPositions(tACUPos, GetPlatoonFrontPosition(oPlatoon)) <= iDistanceFromACUForUnitMicro then
                             bPerUnitMicro = true
@@ -12819,10 +12822,10 @@ function ProcessPlatoonAction(oPlatoon)
                                         M27UnitInfo.SetUnitTargetPriorities(oDFUnit, oPlatoon[reftPlatoonDFTargettingCategories])
                                     end
                                     --Are we further from target than our ACU and our ACU is in the attack?
-                                    if bDebugMessages == true then LOG(sFunctionRef..': oDFUnit='..oDFUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oDFUnit)..'; Position to enemy ACU='..M27Utilities.GetDistanceBetweenPositions(oDFUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU])..'; iACUDistanceToTarget='..iACUDistanceToTarget..'; iOffsetToNotBlockACUDistance='..iOffsetToNotBlockACUDistance) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': oDFUnit='..oDFUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oDFUnit)..'; Position to enemy ACU='..M27Utilities.GetDistanceBetweenPositions(oDFUnit:GetPosition(), aiBrain[M27Overseer.reftACUKillTarget])..'; iACUDistanceToTarget='..iACUDistanceToTarget..'; iOffsetToNotBlockACUDistance='..iOffsetToNotBlockACUDistance) end
                                     --Check if we're further away from target than ACU (ignore if within a bit of ACU distance to avoid us dobuling back)
                                     if aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] and not(oPlatoon[refbACUInPlatoon]) then
-                                        local iDFDistToTarget = M27Utilities.GetDistanceBetweenPositions(oDFUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU])
+                                        local iDFDistToTarget = M27Utilities.GetDistanceBetweenPositions(oDFUnit:GetPosition(), aiBrain[M27Overseer.reftACUKillTarget])
                                         if (iDFDistToTarget - iOffsetToNotBlockACUDistance * 0.6 + 1) >=  iACUDistanceToTarget or (iDFDistToTarget > iACUDistanceToTarget and M27Utilities.GetDistanceBetweenPositions(tACUPos, oDFUnit:GetPosition()) <= 2) then
                                             --We're further away than ACU so take detour
                                             if bDebugMessages == true then LOG(sFunctionRef..': tACUPos before getting position to side of target='..repru(tACUPos)) end
@@ -12833,15 +12836,25 @@ function ProcessPlatoonAction(oPlatoon)
                                     end
                                     --Check how close we are to the target (are doing per unit micro so consider each unit range individually)
                                     local iPlatoonRange = M27Logic.GetUnitMaxGroundRange({ oDFUnit})
-                                    local iDistToTarget = M27Utilities.GetDistanceBetweenPositions(oDFUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU])
+                                    local iDistToTarget = M27Utilities.GetDistanceBetweenPositions(oDFUnit:GetPosition(), aiBrain[M27Overseer.reftACUKillTarget])
                                     if iDistToTarget < iPlatoonRange - iDistanceWithinAttackRange then
-                                        if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], true) then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Sending order to attack the ACU') end
-                                            IssueAttack({oDFUnit}, aiBrain[M27Overseer.refoLastNearestACU])
-                                            oPlatoon[refiLastOrderType] = refiOrderIssueAttack
+                                        if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoACUKillTarget], true) then
+                                            if bEnemyACUUnderwater and not(EntityCategoryFilterDown(categories.ANTINAVY + categories.OVERLAYANTINAVY, oDFUnit.UnitId)) then
+                                                oPlatoon[refiLastOrderType] = refiOrderIssueAggressiveMove
+                                                IssueAggressiveMove({oDFUnit}, tPositionBehindEnemyACU)
+                                                if bDebugMessages == true then LOG(sFunctionRef..': ACU underwater so sending attack move order to unit '..oDFUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oDFUnit)..' to go to '..repru(tPositionBehindEnemyACU)..'; Dist from unit cur position='..M27Utilities.GetDistanceBetweenPositions(tPositionBehindEnemyACU, oDFUnit:GetPosition())) end
+                                            else
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Sending order to attack the ACU to unit '..oDFUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oDFUnit)) end
+                                                IssueAttack({oDFUnit}, aiBrain[M27Overseer.refoACUKillTarget])
+                                                oPlatoon[refiLastOrderType] = refiOrderIssueAttack
+                                            end
                                         else
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Cant see enemy ACU so will move to its last known position instead') end
-                                            IssueMove({oDFUnit}, aiBrain[M27Overseer.reftLastNearestACU])
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Cant see enemy ACU so will move to its last known position instead. bEnemyACUUnderwater='..tostring(bEnemyACUUnderwater)) end
+                                            if bEnemyACUUnderwater then
+                                                IssueMove({oDFUnit}, tPositionBehindEnemyACU)
+                                            else
+                                                IssueMove({oDFUnit}, aiBrain[M27Overseer.reftACUKillTarget])
+                                            end
                                             oPlatoon[refiLastOrderType] = refiOrderIssueMove
                                         end
                                     else
@@ -12863,14 +12876,22 @@ function ProcessPlatoonAction(oPlatoon)
                             if bDebugMessages == true then LOG(sFunctionRef..': No per unit micro for DF units so can apply logic to all DF units') end
                             --Apply logic based on entire platoon
                             local iPlatoonRange = M27Logic.GetUnitMaxGroundRange(tDFUnits)
-                            local iDistToTarget = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), aiBrain[M27Overseer.reftLastNearestACU])
+                            local iDistToTarget = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), aiBrain[M27Overseer.reftACUKillTarget])
                             if iDistToTarget < iPlatoonRange - iDistanceWithinAttackRange then
-                                if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) then
-                                    IssueAttack(tDFUnits, aiBrain[M27Overseer.refoLastNearestACU])
-                                    oPlatoon[refiLastOrderType] = refiOrderIssueAttack
+                                if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) then
+                                    if bEnemyACUUnderwater and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.ANTINAVY + categories.OVERLAYANTINAVY, tDFUnits)) then
+                                        oPlatoon[refiLastOrderType] = refiOrderIssueAggressiveMove
+                                        IssueAggressiveMove(tDFUnits, tPositionBehindEnemyACU)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': ACU underwater so sending attack move order to all DF units to go to '..repru(tPositionBehindEnemyACU)..'; Dist from unit cur position='..M27Utilities.GetDistanceBetweenPositions(tPositionBehindEnemyACU, GetPlatoonFrontPosition(oPlatoon))) end
+                                    else
+                                        IssueAttack(tDFUnits, aiBrain[M27Overseer.refoACUKillTarget])
+                                        oPlatoon[refiLastOrderType] = refiOrderIssueAttack
+                                        if bDebugMessages == true then LOG(sFunctionRef..': ACU underwater so sending attack  order to all DF units to attack ACU') end
+                                    end
                                 else
-                                    IssueMove(tDFUnits, aiBrain[M27Overseer.reftLastNearestACU])
+                                    IssueMove(tDFUnits, aiBrain[M27Overseer.reftACUKillTarget])
                                     oPlatoon[refiLastOrderType] = refiOrderIssueMove
+                                    if bDebugMessages == true then LOG(sFunctionRef..': No valid ACU to target') end
                                 end
                             else
                                 if M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) then
@@ -12899,13 +12920,18 @@ function ProcessPlatoonAction(oPlatoon)
 
                         if M27Utilities.IsTableEmpty(tNearbyPD) == true then
                             if bDebugMessages == true then LOG(sFunctionRef..': No nearby PD, if have sight of ACU will issueattack on it') end
-                            if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], true) then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Can see enemy ACU so will attack it directly') end
-                                IssueAttack(tIndirectUnits, aiBrain[M27Overseer.refoLastNearestACU])
-                                oPlatoon[refiLastOrderType] = refiOrderIssueAttack
+                            if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoACUKillTarget], true) then
+                                if bEnemyACUUnderwater and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.ANTINAVY + categories.OVERLAYANTINAVY, tIndirectUnits)) then
+                                    oPlatoon[refiLastOrderType] = refiOrderIssueAggressiveMove
+                                    IssueAggressiveMove(tIndirectUnits, tPositionBehindEnemyACU)
+                                else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Can see enemy ACU so will attack it directly') end
+                                    IssueAttack(tIndirectUnits, aiBrain[M27Overseer.refoACUKillTarget])
+                                    oPlatoon[refiLastOrderType] = refiOrderIssueAttack
+                                end
                             else
-                                if bDebugMessages == true then LOG(sFunctionRef..': Cant see enemy ACU so will attack-move to its last known position='..repru(aiBrain[M27Overseer.reftLastNearestACU])) end
-                                IssueAggressiveMove(tIndirectUnits, aiBrain[M27Overseer.reftLastNearestACU])
+                                if bDebugMessages == true then LOG(sFunctionRef..': Cant see enemy ACU so will attack-move to its last known position='..repru(aiBrain[M27Overseer.reftACUKillTarget])) end
+                                IssueAggressiveMove(tIndirectUnits, aiBrain[M27Overseer.reftACUKillTarget])
                                 oPlatoon[refiLastOrderType] = refiOrderIssueAggressiveMove
                             end
                         else
