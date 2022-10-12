@@ -2062,7 +2062,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                             elseif EntityCategoryContains(categories.ANTIMISSILE, oUnit.UnitId) then iMassMod = 2 --Doubled for structures ontop of this, i.e. want 4xmass of TMD in indirect fire so can overwhelm it
                             elseif EntityCategoryContains(categories.SHIELD, oUnit.UnitId) then iMassMod = 1
                             elseif EntityCategoryContains(M27UnitInfo.refCategoryLongRangeDFLand, oUnit.UnitId) then iMassMod = 0.5
-                            end
+                           end
                         end
                         if EntityCategoryContains(M27UnitInfo.refCategoryStructure, oUnit.UnitId) then
                             iMassMod = iMassMod * 2

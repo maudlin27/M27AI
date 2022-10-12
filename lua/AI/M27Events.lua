@@ -87,7 +87,14 @@ function OnACUKilled(oUnit)
                     if GetGameTimeSeconds() >= 3600 and M27Conditions.GetLifetimeBuildCount(oACUBrain, M27UnitInfo.refCategoryExperimentalLevel) >= 3 then
                         M27Chat.SendMessage(oACUBrain, 'Epic game', 'That was an epic game!', 3, 10000)
                     else
-                        M27Chat.SendMessage(oACUBrain, 'Our ACU Died', 'gg', 3, 60)
+                        local iRandom = math.random(1,3)
+                        if iRandom == 1 and M27Conditions.GetLifetimeBuildCount(oACUBrain, M27UnitInfo.refCategoryExperimentalLevel) >= 2 then
+                            M27Chat.SendMessage(oACUBrain, 'Our ACU Died', 'gg, closer than I thought it would be', 3, 60)
+                        elseif iRandom == 2 then
+                            M27Chat.SendMessage(oACUBrain, 'Our ACU Died', 'gg wp', 3, 60)
+                        else
+                            M27Chat.SendMessage(oACUBrain, 'Our ACU Died', 'gg', 3, 60)
+                        end
                     end
 
                 end
@@ -277,11 +284,17 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                         if iMassKilled >= 1000 and M27UnitInfo.IsUnitValid(instigator) and not(M27Chat.tiM27VoiceTauntByType['Killed deadly unit']) and not(EntityCategoryContains(categories.COMMAND, oUnitKilled.UnitId)) and oUnitKilled.Sync.VeteranLevel >= 5 and oUnitKilled.GetAIBrain and not(M27Logic.IsCivilianBrain(oUnitKilled:GetAIBrain())) then
                             --local oBP = oUnitKilled:GetBlueprint()
                             --if iMassKilled >= oBP.Economy.BuildCostMass * 7 then
-                            local sMessage = 'FINALLY killed that annoying '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)
-                            if math.random(1,2) == 1 then
-                                sMessage = 'About time I killed that '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)
+                            if not(EntityCategoryContains(categories.COMMAND, instigator.UnitId)) or M27UnitInfo.GetUnitHealthPercent(instigator) >= 0.9 then
+
+                                local sMessage = 'FINALLY killed that annoying '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)
+                                local iRandom = math.random(1,3)
+                                if iRandom == 1 then
+                                    sMessage = 'About time I killed that '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)
+                                elseif iRandom == 2 then
+                                    sMessage = 'That '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)..' did way too much damage'
+                                end
+                                M27Chat.SendMessage(oKillerBrain, 'Killed deadly unit', sMessage, 2, 10000)
                             end
-                            M27Chat.SendMessage(oKillerBrain, 'Killed deadly unit', sMessage, 2, 10000)
                             --end
                         end
                     end
@@ -1263,6 +1276,22 @@ function OnConstructed(oEngineer, oJustBuilt)
                 end
             end
 
+            --All mexes - on construction check if we have allied M27 mass storage nearby (e.g. we have rebuilt on a mex that they used to have) and if so then have that M27 gift over their mass storage
+            if EntityCategoryContains(M27UnitInfo.refCategoryMex, oJustBuilt.UnitId) and aiBrain.M27AI then
+                local tMexLocation = oJustBuilt:GetPosition()
+                local tNearbyUnits = GetUnitsInRect(Rect(tMexLocation[1] - 2.1, tMexLocation[3] - 2.1, tMexLocation[1] + 2.1, tMexLocation[3] + 2.1)) --at 1.5 end up with storage thats not adjacent being gifted in some cases but not in others; at 1 none of it gets gifted; therefore added extra check for 1.5; the mass storage should be exactly 2 from the mex
+                if M27Utilities.IsTableEmpty(tNearbyUnits) == false then
+                    for iUnit, oUnit in tNearbyUnits do
+                        if EntityCategoryContains(M27UnitInfo.refCategoryMassStorage, oUnit.UnitId) and oUnit:GetAIBrain().M27AI and not(oUnit:GetAIBrain() == aiBrain) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': About to transfer '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' from brain '..oUnit:GetAIBrain().Nickname..' to '..aiBrain.Nickname..'; Dist from unit to tMexLocation='..M27Utilities.GetDistanceBetweenPositions(tMexLocation, oUnit:GetPosition())) end
+                            if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tMexLocation) <= 2.1 then
+                                M27Team.TransferUnitsToPlayer({oUnit}, aiBrain:GetArmyIndex(), false)
+                            end
+                        end
+                    end
+                end
+            end
+
             --Initial categories below are for if not protecting from TML
             --Mexes built by spare engineers - want to clear already assigned engineers
             if EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oJustBuilt.UnitId) then
@@ -1428,8 +1457,16 @@ function OnReclaimStarted(oEngineer, oReclaim)
             end
         elseif M27UnitInfo.IsUnitValid(oReclaim) and oReclaim:GetAIBrain().M27AI and oReclaim:GetFractionComplete() == 1 then
             local oReclaimingBrain = oEngineer:GetAIBrain()
-            if not(oReclaimingBrain == oReclaim:GetAIBrain()) and IsAlly(oReclaimingBrain:GetArmyIndex(), oReclaim:GetAIBrain():GetArmyIndex()) then
-                M27Chat.SendMessage(oReclaim:GetAIBrain(), 'Ally reclaiming', 'Hey, stop reclaiming my units '..oEngineer:GetAIBrain().Nickname, 0, 60)
+            if not(oReclaimingBrain == oReclaim:GetAIBrain()) then
+                if IsAlly(oReclaimingBrain:GetArmyIndex(), oReclaim:GetAIBrain():GetArmyIndex()) then
+                    M27Chat.SendMessage(oReclaim:GetAIBrain(), 'Ally reclaiming', 'Hey, stop reclaiming my units '..oEngineer:GetAIBrain().Nickname, 0, 60)
+                else
+                    if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oReclaim.UnitId) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer.UnitId) and IsEnemy(oReclaimingBrain:GetArmyIndex(), oReclaim:GetAIBrain():GetArmyIndex()) then
+                        --Tell engineer to reclaim the target if it isnt already
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to get engineer check for nearby enemies now as it has just started being reclaimed by an enemy engineer') end
+                        M27EngineerOverseer.ProcessingEngineerActionForNearbyEnemies(oReclaim:GetAIBrain(), oReclaim)
+                    end
+                end
             end
         end
 
@@ -1539,6 +1576,11 @@ function OnTransportUnload(oUnit, oTransport, bone)
                 if M27MapInfo.RecheckPathingOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit, oUnit:GetPosition()) then
                     oUnit[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
                 end
+            end
+
+            if not(oTransport.GetCargo) or M27Utilities.IsTableEmpty(oTransport:GetCargo()) then oTransport[M27Transport.refiUnitsLoaded] = 0
+            else
+                oTransport[M27Transport.refiUnitsLoaded] = math.max(0, (oTransport[M27Transport.refiUnitsLoaded] or 0) - 1)
             end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         end

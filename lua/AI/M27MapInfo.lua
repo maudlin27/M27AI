@@ -107,7 +107,7 @@ iMinWaterDepth = 1.5 --Ships cant move right up to shore, this is a guess at how
 iWaterPathingIntervalSize = 1
 tWaterAreaAroundTargetAdjustments = {} --Defined in map initialisation
 iWaterMinArea = 3 --Square with x/z of this size must be underwater for the target position to be considered pathable; with value of 2 ships cant get as close to shore as expect them to
-iBaseLevelSegmentCap = 1024 --Max size of segments to use for 1 axis 20km map is 1024x1024 (i.e. 1024 means will only take shortcuts if map larger than 20km)
+iBaseLevelSegmentCap = 512 --Max size of segments to use for 1 axis 20km map is 1024x1024 (i.e. 1024 means will only take shortcuts if map larger than 20km); at 1024 end up with really noticeable freezing on some maps (e.g. dark liver, pelagial) - not from any function profiling but more generlaly so presumably to do with the garbage handler/similar
 iMapOutsideBoundSize = 3 --will treat positions within this size of map radius as being unpathable for pathing purposes
 iSizeOfBaseLevelSegment = 1 --Is updated by pathfinding code
 tPathingSegmentGroupBySegment = {} --[a][b][c]: a = pathing type; b = segment x, c = segment z
@@ -2920,6 +2920,8 @@ function RecordBaseLevelPathability()
 
 
     function IsAmphibiousPathableAlongLine(xStartInteger, xEndInteger, zStartInteger, zEndInteger)--, bForceDebug)
+        --Thanks to Balthazar for figuring out a more accurate test for pathability (look in whole integer intervals of 1 and compare height dif to see if it's >0.75)  - have used this idea to update my previous code
+
         --This is mostly a copy of land pathing but with changes for water
         --local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         --local sFunctionRef = 'IsAmphibiousPathableAlongLine'
@@ -3066,6 +3068,8 @@ function RecordBaseLevelPathability()
     end
 
     function IsLandPathableAlongLine(xStartInteger, xEndInteger, zStartInteger, zEndInteger)
+        --Thanks to Balthazar for figuring out a more accurate test for pathability (look in whole integer intervals of 1 and compare height dif to see if it's >0.75) - have used this idea to update my previous code
+
         --Assumes will call for positions in a straight line from each other
         --Can handle diagonals, but x and z differences must be identical (error handler re this can be uncommented out if come across issues)
         --local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -5254,7 +5258,7 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
     local sFunctionRef = 'UpdatePlateausToExpandTo'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if bForceRefresh and (aiBrain:GetArmyIndex() == 2 or aiBrain:GetArmyIndex() == 3) then bDebugMessages = true end
+    --if bForceRefresh and aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
 
     --Records table with the amphibious pathing group of plateaus that we are interested in expanding to
     --tAllPlateausWithMexes = 'M27PlateausWithMexes' --[x] = AmphibiousPathingGroup

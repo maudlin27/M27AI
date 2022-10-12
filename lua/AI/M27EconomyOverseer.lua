@@ -32,8 +32,9 @@ refbReclaimNukes = 'M27EconomyReclaimNukes' --true if want to add nuke silos to 
 reftoTMLToReclaim = 'M27EconomyTMLToReclaim' --any TML flagged to be reclaimed
 refbWillReclaimUnit = 'M27EconomyWillReclaimUnit' --Set against a unit, true if will reclaim it
 
-local reftUpgrading = 'M27UpgraderUpgrading' --[x] is the nth building upgrading, returns the object upgrading
+reftUpgrading = 'M27UpgraderUpgrading' --[x] is the nth building upgrading, returns the object upgrading
 refiPausedUpgradeCount = 'M27UpgraderPausedCount' --Number of units where have paused the upgrade
+refiFailedUpgradeUnitSearchCount = 'M27FailedUpgradeUnitSearchCount' --against aiBrain, tracks number of times in a row we have fialed to find our desired category to upgrade
 local refbUpgradePaused = 'M27UpgraderUpgradePaused' --flags on particular unit if upgrade has been paused or not
 
 local refiEnergyStoredLastCycle = 'M27EnergyStoredLastCycle'
@@ -773,12 +774,26 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker, bDontUpdateHQTracker
 
         if not(oUnitToUpgrade:IsUnitState('Upgrading')) then
 
+
+
             --Factory specific - if work progress is <=5% then cancel so can do the upgrade
             if EntityCategoryContains(M27UnitInfo.refCategoryAllFactories, oUnitToUpgrade.UnitId) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Are upgrading a factory '..oUnitToUpgrade.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)..'; work progress='..oUnitToUpgrade:GetWorkProgress()) end
                 if oUnitToUpgrade.GetWorkProgress and oUnitToUpgrade:GetWorkProgress() <= 0.05 then
                     M27Utilities.IssueTrackedClearCommands({ oUnitToUpgrade })
                     if bDebugMessages == true then LOG(sFunctionRef..': Have barely started with current construction so will cancel so can get upgrade sooner') end
+                end
+            end
+
+            --Air factory upgrades - if we are upgrading from T1 to T2 and havent build a transport, and have plateaus, then want to get a transport first
+            if EntityCategoryContains(M27UnitInfo.refCategoryAirFactory * categories.TECH1, oUnitToUpgrade.UnitId) and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 1 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory * categories.TECH1) == 1 then
+                M27MapInfo.UpdatePlateausToExpandTo(aiBrain)
+                if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]) == false and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryTransport) == 0 then
+                    --Havent built any transports yet so build a T1 transport before we upgrade to T2 air
+                    local sTransportID = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, M27UnitInfo.refCategoryTransport, oUnitToUpgrade)
+                    if sTransportID then
+                        IssueBuildFactory({ oUnitToUpgrade }, sTransportID, 1)
+                    end
                 end
             end
 
@@ -955,6 +970,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideWhatToUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if aiBrain:GetArmyIndex() == 1 and aiBrain:GetCurrentUnits(refCategoryT2Mex) >= 1 then bDebugMessages = true end
     --if GetGameTimeSeconds() >= 600 then bDebugMessages = true end
 
 
@@ -1127,10 +1143,15 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                             break
                         end
                     end
-                    if not (bAirFacUpgrading) and aiBrain[refiGrossEnergyBaseIncome] >= 500 and aiBrain[refiNetEnergyBaseIncome] >= 100 and aiBrain[refiGrossMassBaseIncome] >= 15 and aiBrain[refiNetMassBaseIncome] >= 1 and ((aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 1 and (iT1AirFactories >= 2 or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 75)) or (aiBrain:GetEconomyStored('MASS') >= 2000 and (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 150 or (iT1AirFactories + iT2AirFactories >= 4 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 75)))) then
-                        if iT2AirFactories > 0 then
-                            iCategoryToUpgrade = refCategoryAirFactory * categories.TECH2
-                        else
+                    if not (bAirFacUpgrading) then
+                        --Enough resources to support T3 air?
+                        if aiBrain[refiGrossEnergyBaseIncome] >= 500 and aiBrain[refiNetEnergyBaseIncome] >= 100 and aiBrain[refiGrossMassBaseIncome] >= 15 and aiBrain[refiNetMassBaseIncome] >= 1 and ((aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 1 and (iT1AirFactories >= 2 or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 75)) or (aiBrain:GetEconomyStored('MASS') >= 2000 and (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 150 or (iT1AirFactories + iT2AirFactories >= 4 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 75)))) then
+                            if iT2AirFactories > 0 then
+                                iCategoryToUpgrade = refCategoryAirFactory * categories.TECH2
+                            else
+                                iCategoryToUpgrade = refCategoryAirFactory * categories.TECH1
+                            end
+                        elseif iT2AirFactories == 0 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 2 and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 1 and iT1AirFactories >= 2 and aiBrain[refiNetEnergyBaseIncome] >= 25 and aiBrain[refiGrossMassBaseIncome] >= 6 and aiBrain[refiNetMassBaseIncome] >= 0.3 and aiBrain[refiGrossEnergyBaseIncome] >= 125 then
                             iCategoryToUpgrade = refCategoryAirFactory * categories.TECH1
                         end
                     end
@@ -1236,7 +1257,11 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                                         end
                                         iFactoryToUpgrade = M27UnitInfo.refCategoryAirFactory * categories.TECH1 + M27UnitInfo.refCategoryAirFactory * categories.TECH2
                                     else
-                                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and (aiBrain[refiGrossEnergyBaseIncome] <= (46 + iEnergyIncomeAdjustForReclaim) or aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes] > 1 or aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] <= math.min(300, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4) or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= math.min(200, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.32)) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Can path to enemy with land='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; Dist to nearest enemy base='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]..'; Highest factory tech='..aiBrain[M27Overseer.refiOurHighestLandFactoryTech]) end
+                                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 400 and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 1 then
+                                            iFactoryToUpgrade = M27UnitInfo.refCategoryLandFactory * categories.TECH1
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Want T2 land as enemy base is relatively close') end
+                                        elseif aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and (aiBrain[refiGrossEnergyBaseIncome] <= (46 + iEnergyIncomeAdjustForReclaim) or aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes] > 1 or aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] <= math.min(300, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4) or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= math.min(200, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.32)) then
                                             if bDebugMessages == true then
                                                 LOG(sFunctionRef .. ': Want to upgrade land factory as no T1 factories available to upgrade')
                                             end
@@ -1363,7 +1388,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                     else
                         if iMaxToBeUpgrading > (iLandFactoryUpgrading + aiBrain[refiMexesUpgrading] + iAirFactoryUpgrading) then
                             if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Arent already upgrading the max amount wanted; iMaxToBeUpgrading=' .. iMaxToBeUpgrading .. '; iLandFactoryUpgrading=' .. iLandFactoryUpgrading .. '; aiBrain[refiMexesUpgrading]=' .. aiBrain[refiMexesUpgrading] .. '; iAirFactoryUpgrading=' .. iAirFactoryUpgrading .. '; will check if want to prioritise HQ upggrades; M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades])=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades])) .. '; aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]=' .. aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] .. '; iLandFactoryUpgrading=' .. iLandFactoryUpgrading .. '; iAirFactoryUpgrading=' .. iAirFactoryUpgrading .. '; iT1AirFactories=' .. iT1AirFactories .. '; iT2AirFactories=' .. iT2AirFactories .. '; iT1LandFactories=' .. iT1LandFactories .. '; iT2LandFactories=' .. iT2LandFactories .. '; iT2Mexes=' .. iT2Mexes .. '; iT3Mexes=' .. iT3Mexes .. '; aiBrain[refiGrossMassBaseIncome]=' .. aiBrain[refiGrossMassBaseIncome] .. '; aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes]=' .. aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes])
+                                LOG(sFunctionRef .. ': Arent already upgrading the max amount wanted; iMaxToBeUpgrading=' .. iMaxToBeUpgrading .. '; iLandFactoryUpgrading=' .. iLandFactoryUpgrading .. '; aiBrain[refiMexesUpgrading]=' .. aiBrain[refiMexesUpgrading] .. '; iAirFactoryUpgrading=' .. iAirFactoryUpgrading .. '; will check if want to prioritise HQ upggrades; M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades])=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades])) .. '; aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]=' .. aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] .. '; iLandFactoryUpgrading=' .. iLandFactoryUpgrading .. '; iAirFactoryUpgrading=' .. iAirFactoryUpgrading .. '; iT1AirFactories=' .. iT1AirFactories .. '; iT2AirFactories=' .. iT2AirFactories .. '; iT1LandFactories=' .. iT1LandFactories .. '; iT2LandFactories=' .. iT2LandFactories .. '; iT2Mexes=' .. iT2Mexes .. '; iT3Mexes=' .. iT3Mexes .. '; aiBrain[refiGrossMassBaseIncome]=' .. aiBrain[refiGrossMassBaseIncome] .. '; aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes]=' .. aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes]..'; Faction index='..aiBrain:GetFactionIndex()..'; Gross mass inc='..aiBrain[refiGrossMassBaseIncome]..'; Highest land fac tech='..aiBrain[M27Overseer.refiOurHighestLandFactoryTech]..'; Dist to enemy='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase])
                             end
                             --Get T2 HQ so can get T2 as soon as start having significant mass income, regardless of strategy
                             if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 1 and (aiBrain[refiGrossMassBaseIncome] >= 4 or iT2Mexes + iT3Mexes >= 2) and iAirFactoryAvailable + iLandFactoryAvailable > 0 and M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) == true and iT2AirFactories + iT3AirFactories + iT2LandFactories + iT3LandFactories == 0 then
@@ -1377,6 +1402,10 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                                     LOG(sFunctionRef .. ': Want to get T3 factory upgrade, will decide if want ot get land or air factory')
                                 end
                                 iCategoryToUpgrade = DecideOnFirstHQ()
+                                --Prioritise T2 land upgrade for Cybran and UEF on land maps where enemy base relatively close
+                            elseif aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 400 and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 1 and iLandFactoryUpgrading == 0 and iT1LandFactories >= 2 and (aiBrain[refiGrossMassBaseIncome] >= 3.5 or (aiBrain[refiGrossMassBaseIncome] >= 2 and (iT2Mexes + iT3Mexes) > 0)) and (aiBrain:GetFactionIndex() == M27UnitInfo.refFactionUEF or aiBrain:GetFactionIndex() == M27UnitInfo.refFactionCybran) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Are UEF or Cybran so want to rush T2 land') end
+                                iCategoryToUpgrade = M27UnitInfo.refCategoryLandFactory * categories.TECH1
                             else
                                 if aiBrain[refiMexesAvailableForUpgrade] > 0 then
                                     if bDebugMessages == true then
@@ -1435,16 +1464,16 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                                                     end
                                                     --Want to upgrade build power; do we want an HQ?
 
+
                                                     if iEngisOfHighestTechLevel >= 2 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] < 2 and aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]), false, true) >= 3 and aiBrain[refiGrossEnergyBaseIncome] >= 50 then
                                                         iCategoryToUpgrade = DecideOnFirstHQ()
-                                                    elseif iEngisOfHighestTechLevel >= 2 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 and (iT2Mexes + iT3Mexes) >= math.min(8, table.getn(M27MapInfo.GetResourcesNearTargetLocation(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 30, true))) and aiBrain[refiGrossEnergyBaseIncome] >= 100 then
+                                                    elseif iEngisOfHighestTechLevel >= 2 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 and (iT3Mexes > 0 or aiBrain[refiGrossMassBaseIncome] > 5) and (iT2Mexes + iT3Mexes) >= math.min(8, table.getn(M27MapInfo.GetResourcesNearTargetLocation(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 30, true))) and aiBrain[refiGrossEnergyBaseIncome] >= 100 then
                                                         iCategoryToUpgrade = DecideOnFirstHQ()
-                                                    elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 then
-                                                        --Dont want to upgrade an HQ, consider upgrading a support factory as well providing it wont be upgraded to an HQ
+                                                    elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 and (aiBrain[refiGrossMassBaseIncome] >= 5 or (aiBrain[refiGrossMassBaseIncome] >= 3 and iAirFactoryUpgrading == 0 and iLandFactoryUpgrading == 0)) then
+                                                        --Dont want to upgrade an HQ, consider upgrading a support factory as well providing it wont be upgraded to a HQ
                                                         if bDebugMessages == true then
                                                             LOG(sFunctionRef .. ': Dont want to upgrade an HQ yet, want more engineers or power first')
                                                         end
-                                                        --Are at T2 going to T3, so can upgrade T1 factories (cap number based on how many t2 factories we have of the same type)
 
                                                         if iT2LandFactories > 0 and iT2AirFactories == 0 and iLandFactoryUpgrading <= iT2LandFactories then
                                                             iCategoryToUpgrade = refCategoryLandFactory * categories.TECH1
@@ -1459,7 +1488,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                                                         elseif iT2AirFactories > 0 and iAirFactoryUpgrading <= iT2AirFactories then
                                                             iCategoryToUpgrade = refCategoryAirFactory * categories.TECH1
                                                         end
-                                                    else
+                                                    elseif aiBrain[refiGrossMassBaseIncome] >= 5 then
                                                         --Already at tech 3
                                                         if iAirFactoryAvailable == 0 then
                                                             iCategoryToUpgrade = refCategoryLandFactory * categories.TECH1 + refCategoryLandFactory * categories.TECH2
@@ -2457,15 +2486,18 @@ function UpgradeMainLoop(aiBrain)
                         LOG(sFunctionRef .. ': Got category to upgrade')
                     end
                     oUnitToUpgrade = GetUnitToUpgrade(aiBrain, iCategoryToUpgrade, tStartPosition)
-                    if oUnitToUpgrade == nil then
-                        --One likely explanation for htis is that there are enemies near the units of the category wanted
+                    if oUnitToUpgrade then
+                        aiBrain[refiFailedUpgradeUnitSearchCount] = 0
+                    else --Unit to upgrade is nil
+                        aiBrain[refiFailedUpgradeUnitSearchCount] = aiBrain[refiFailedUpgradeUnitSearchCount] + 1
+                        --One possible explanation for htis is that there are enemies near the units of the category wanted
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Couldnt find unit to upgrade, will revert to default categories, starting with T1 mex')
                         end
                         oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryT1Mex, tStartPosition)
-                        if oUnitToUpgrade == nil then
+                        if oUnitToUpgrade == nil and (aiBrain[refiFailedUpgradeUnitSearchCount] >= 30 or (not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and not(aiBrain[refbStallingEnergy]) and (aiBrain[refiGrossMassBaseIncome] >= 4 or aiBrain:GetEconomyStoredRatio('MASS') >= 0.9))) then
                             if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Will look for T2 mex')
+                                LOG(sFunctionRef .. ': Will look for T2 mex if our failure count is high')
                             end
                             oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryT2Mex, tStartPosition)
                             if oUnitToUpgrade == nil then
@@ -2530,6 +2562,8 @@ function UpgradeMainLoop(aiBrain)
                                     end
                                 end
                             end
+                        else
+                            if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find a unit to upgrade of desired category, failure count='..aiBrain[refiFailedUpgradeUnitSearchCount]) end
                         end
                     end
                     if oUnitToUpgrade and not (oUnitToUpgrade.Dead) then
@@ -2579,7 +2613,7 @@ function GetCategoriesAndActionsToPause(aiBrain, bStallingMass)
 
 
         tEngineerActionsByPriority = { { M27EngineerOverseer.refActionBuildQuantumOptics, M27EngineerOverseer.refActionBuildHive, M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildSecondExperimental, M27EngineerOverseer.refActionNavalSpareAction, M27EngineerOverseer.refActionBuildT2Sonar, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildSecondAirFactory, M27EngineerOverseer.refActionBuildSecondLandFactory, M27EngineerOverseer.refActionBuildLandFactory, M27EngineerOverseer.refActionBuildNavalFactory, M27EngineerOverseer.refActionAssistNavalFactory, M27EngineerOverseer.refActionBuildAirFactory, M27EngineerOverseer.refActionBuildT1Sonar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildSecondPower, M27EngineerOverseer.refActionBuildTML, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionBuildShield, M27EngineerOverseer.refActionBuildSecondShield, M27EngineerOverseer.refActionBuildExperimental, M27EngineerOverseer.refActionAssistAirFactory, M27EngineerOverseer.refActionUpgradeBuilding, M27EngineerOverseer.refActionBuildPower },
-                                       { M27EngineerOverseer.refActionBuildHydro, M27EngineerOverseer.refActionFortifyFirebase, M27EngineerOverseer.refActionAssistShield, M27EngineerOverseer.refActionBuildSecondTMD, M27EngineerOverseer.refActionBuildMassStorage, M27EngineerOverseer.refActionBuildMex, M27EngineerOverseer.refActionSpare, M27EngineerOverseer.refActionBuildTMD, M27EngineerOverseer.refActionBuildSMD, M27EngineerOverseer.refActionBuildEmergencyArti, M27EngineerOverseer.refActionBuildEmergencyPD }}
+                                       { M27EngineerOverseer.refActionBuildHydro, M27EngineerOverseer.refActionFortifyFirebase, M27EngineerOverseer.refActionAssistShield, M27EngineerOverseer.refActionBuildSecondTMD, M27EngineerOverseer.refActionBuildMassStorage, M27EngineerOverseer.refActionAssistMexUpgrade, M27EngineerOverseer.refActionBuildMex, M27EngineerOverseer.refActionSpare, M27EngineerOverseer.refActionBuildTMD, M27EngineerOverseer.refActionBuildSMD, M27EngineerOverseer.refActionBuildEmergencyArti, M27EngineerOverseer.refActionBuildEmergencyPD }}
 
     else
         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
@@ -2593,7 +2627,7 @@ function GetCategoriesAndActionsToPause(aiBrain, bStallingMass)
                 tCategoriesByPriority = { M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryEngineerStation, M27UnitInfo.refCategoryQuantumOptics, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryT3Radar, categories.COMMAND, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryRASSACU, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategorySML - categories.EXPERIMENTAL, M27UnitInfo.refCategoryAirFactory, M27UnitInfo.refCategoryStealthGenerator, M27UnitInfo.refCategoryStealthAndCloakPersonal, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryPersonalShield, M27UnitInfo.refCategoryFixedShield, M27UnitInfo.refCategoryMobileLandShield, iSpecialHQCategory, M27UnitInfo.refCategoryEngineer }
             end
 
-            tEngineerActionsByPriority = { { M27EngineerOverseer.refActionBuildQuantumOptics, M27EngineerOverseer.refActionBuildHive,  M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildSecondExperimental, M27EngineerOverseer.refActionNavalSpareAction, M27EngineerOverseer.refActionBuildT2Sonar, M27EngineerOverseer.refActionBuildT1Sonar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildTML, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionBuildShield, M27EngineerOverseer.refActionBuildSecondShield, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildExperimental, M27EngineerOverseer.refActionAssistAirFactory, M27EngineerOverseer.refActionBuildSecondAirFactory, M27EngineerOverseer.refActionBuildAirFactory, M27EngineerOverseer.refActionBuildSecondLandFactory, M27EngineerOverseer.refActionBuildLandFactory, M27EngineerOverseer.refActionBuildNavalFactory, M27EngineerOverseer.refActionAssistNavalFactory, M27EngineerOverseer.refActionBuildMassStorage, M27EngineerOverseer.refActionUpgradeBuilding, M27EngineerOverseer.refActionBuildMex, M27EngineerOverseer.refActionSpare, M27EngineerOverseer.refActionBuildSecondPower, M27EngineerOverseer.refActionFortifyFirebase },
+            tEngineerActionsByPriority = { { M27EngineerOverseer.refActionBuildQuantumOptics, M27EngineerOverseer.refActionBuildHive,  M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildSecondExperimental, M27EngineerOverseer.refActionNavalSpareAction, M27EngineerOverseer.refActionBuildT2Sonar, M27EngineerOverseer.refActionBuildT1Sonar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildTML, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionBuildShield, M27EngineerOverseer.refActionBuildSecondShield, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildExperimental, M27EngineerOverseer.refActionAssistAirFactory, M27EngineerOverseer.refActionBuildSecondAirFactory, M27EngineerOverseer.refActionBuildAirFactory, M27EngineerOverseer.refActionBuildSecondLandFactory, M27EngineerOverseer.refActionBuildLandFactory, M27EngineerOverseer.refActionBuildNavalFactory, M27EngineerOverseer.refActionAssistNavalFactory, M27EngineerOverseer.refActionBuildMassStorage, M27EngineerOverseer.refActionAssistMexUpgrade, M27EngineerOverseer.refActionUpgradeBuilding, M27EngineerOverseer.refActionBuildMex, M27EngineerOverseer.refActionSpare, M27EngineerOverseer.refActionBuildSecondPower, M27EngineerOverseer.refActionFortifyFirebase },
                                            { M27EngineerOverseer.refActionBuildSMD, M27EngineerOverseer.refActionBuildTMD, M27EngineerOverseer.refActionBuildEmergencyArti, M27EngineerOverseer.refActionBuildEmergencyPD, M27EngineerOverseer.refActionAssistShield, M27EngineerOverseer.refActionBuildSecondTMD, M27EngineerOverseer.refActionBuildPower, M27EngineerOverseer.refActionBuildHydro } }
         elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle then
             if aiBrain[M27AirOverseer.refiAirAANeeded] <= 0 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > aiBrain[M27AirOverseer.refiBomberDefenceModDistance] then
@@ -2603,16 +2637,16 @@ function GetCategoriesAndActionsToPause(aiBrain, bStallingMass)
                 tCategoriesByPriority = { M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryEngineerStation, M27UnitInfo.refCategoryQuantumOptics, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryT3Radar, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryRASSACU, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryAirFactory, categories.COMMAND, M27UnitInfo.refCategorySML - categories.EXPERIMENTAL, M27UnitInfo.refCategoryStealthGenerator, M27UnitInfo.refCategoryStealthAndCloakPersonal, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryPersonalShield, M27UnitInfo.refCategoryFixedShield, M27UnitInfo.refCategoryMobileLandShield, iSpecialHQCategory, M27UnitInfo.refCategoryEngineer }
             end
 
-            tEngineerActionsByPriority = { { M27EngineerOverseer.refActionBuildQuantumOptics, M27EngineerOverseer.refActionBuildHive, M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildSecondExperimental, M27EngineerOverseer.refActionNavalSpareAction, M27EngineerOverseer.refActionBuildT2Sonar, M27EngineerOverseer.refActionBuildT1Sonar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildTML, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionBuildShield, M27EngineerOverseer.refActionBuildSecondShield, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildExperimental, M27EngineerOverseer.refActionAssistAirFactory, M27EngineerOverseer.refActionBuildSecondAirFactory, M27EngineerOverseer.refActionBuildAirFactory, M27EngineerOverseer.refActionBuildSecondLandFactory, M27EngineerOverseer.refActionBuildLandFactory, M27EngineerOverseer.refActionBuildNavalFactory, M27EngineerOverseer.refActionAssistNavalFactory, M27EngineerOverseer.refActionBuildMassStorage, M27EngineerOverseer.refActionUpgradeBuilding, M27EngineerOverseer.refActionSpare, M27EngineerOverseer.refActionBuildSecondPower, M27EngineerOverseer.refActionFortifyFirebase, M27EngineerOverseer.refActionBuildMex },
+            tEngineerActionsByPriority = { { M27EngineerOverseer.refActionBuildQuantumOptics, M27EngineerOverseer.refActionBuildHive, M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildSecondExperimental, M27EngineerOverseer.refActionNavalSpareAction, M27EngineerOverseer.refActionBuildT2Sonar, M27EngineerOverseer.refActionBuildT1Sonar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildTML, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionBuildShield, M27EngineerOverseer.refActionBuildSecondShield, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildExperimental, M27EngineerOverseer.refActionAssistAirFactory, M27EngineerOverseer.refActionBuildSecondAirFactory, M27EngineerOverseer.refActionBuildAirFactory, M27EngineerOverseer.refActionBuildSecondLandFactory, M27EngineerOverseer.refActionBuildLandFactory, M27EngineerOverseer.refActionBuildNavalFactory, M27EngineerOverseer.refActionAssistNavalFactory, M27EngineerOverseer.refActionBuildMassStorage, M27EngineerOverseer.refActionAssistMexUpgrade, M27EngineerOverseer.refActionUpgradeBuilding, M27EngineerOverseer.refActionSpare, M27EngineerOverseer.refActionBuildSecondPower, M27EngineerOverseer.refActionFortifyFirebase, M27EngineerOverseer.refActionBuildMex },
                                            { M27EngineerOverseer.refActionBuildTMD, M27EngineerOverseer.refActionBuildSMD, M27EngineerOverseer.refActionBuildEmergencyArti, M27EngineerOverseer.refActionBuildEmergencyPD, M27EngineerOverseer.refActionAssistShield, M27EngineerOverseer.refActionBuildSecondTMD, M27EngineerOverseer.refActionBuildPower, M27EngineerOverseer.refActionBuildHydro } }
         elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
             tCategoriesByPriority = { M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryEngineerStation, M27UnitInfo.refCategoryQuantumOptics, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryRASSACU, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryAirFactory, M27UnitInfo.refCategoryT3Radar, categories.COMMAND, M27UnitInfo.refCategorySML - categories.EXPERIMENTAL, M27UnitInfo.refCategoryLandFactory, iSpecialHQCategory, M27UnitInfo.refCategoryStealthGenerator, M27UnitInfo.refCategoryStealthAndCloakPersonal, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryPersonalShield, M27UnitInfo.refCategoryFixedShield, M27UnitInfo.refCategoryMobileLandShield, M27UnitInfo.refCategoryEngineer }
-            tEngineerActionsByPriority = { { M27EngineerOverseer.refActionBuildQuantumOptics, M27EngineerOverseer.refActionBuildHive, M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildSecondExperimental, M27EngineerOverseer.refActionNavalSpareAction, M27EngineerOverseer.refActionBuildT2Sonar, M27EngineerOverseer.refActionBuildT1Sonar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildTML, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionBuildShield, M27EngineerOverseer.refActionBuildSecondShield, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildExperimental, M27EngineerOverseer.refActionBuildMassStorage, M27EngineerOverseer.refActionUpgradeBuilding, M27EngineerOverseer.refActionBuildTMD, M27EngineerOverseer.refActionBuildSMD, M27EngineerOverseer.refActionBuildSecondLandFactory, M27EngineerOverseer.refActionBuildLandFactory, M27EngineerOverseer.refActionBuildNavalFactory, M27EngineerOverseer.refActionAssistNavalFactory, M27EngineerOverseer.refActionFortifyFirebase },
+            tEngineerActionsByPriority = { { M27EngineerOverseer.refActionBuildQuantumOptics, M27EngineerOverseer.refActionBuildHive, M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildSecondExperimental, M27EngineerOverseer.refActionNavalSpareAction, M27EngineerOverseer.refActionBuildT2Sonar, M27EngineerOverseer.refActionBuildT1Sonar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildTML, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionBuildShield, M27EngineerOverseer.refActionBuildSecondShield, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildExperimental, M27EngineerOverseer.refActionBuildMassStorage,M27EngineerOverseer.refActionAssistMexUpgrade, M27EngineerOverseer.refActionUpgradeBuilding, M27EngineerOverseer.refActionBuildTMD, M27EngineerOverseer.refActionBuildSMD, M27EngineerOverseer.refActionBuildSecondLandFactory, M27EngineerOverseer.refActionBuildLandFactory, M27EngineerOverseer.refActionBuildNavalFactory, M27EngineerOverseer.refActionAssistNavalFactory, M27EngineerOverseer.refActionFortifyFirebase },
                                            { M27EngineerOverseer.refActionAssistSMD, M27EngineerOverseer.refActionSpare, M27EngineerOverseer.refActionBuildMex, M27EngineerOverseer.refActionBuildSecondPower },
                                            { M27EngineerOverseer.refActionBuildEmergencyArti, M27EngineerOverseer.refActionBuildEmergencyPD, M27EngineerOverseer.refActionAssistShield, M27EngineerOverseer.refActionBuildSecondTMD, M27EngineerOverseer.refActionAssistAirFactory, M27EngineerOverseer.refActionBuildPower, M27EngineerOverseer.refActionBuildHydro } }
         elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
             tCategoriesByPriority = { M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryEngineerStation, M27UnitInfo.refCategoryQuantumOptics, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryRASSACU, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryT3Radar, categories.COMMAND, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategorySML - categories.EXPERIMENTAL, iSpecialHQCategory, M27UnitInfo.refCategoryStealthGenerator, M27UnitInfo.refCategoryStealthAndCloakPersonal, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryPersonalShield, M27UnitInfo.refCategoryFixedShield, M27UnitInfo.refCategoryMobileLandShield, M27UnitInfo.refCategoryAirFactory, M27UnitInfo.refCategoryEngineer }
-            tEngineerActionsByPriority = { { M27EngineerOverseer.refActionBuildQuantumOptics, M27EngineerOverseer.refActionBuildHive, M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildSecondExperimental, M27EngineerOverseer.refActionNavalSpareAction, M27EngineerOverseer.refActionBuildT2Sonar, M27EngineerOverseer.refActionBuildT1Sonar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildTML, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildShield, M27EngineerOverseer.refActionBuildSecondShield, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildExperimental, M27EngineerOverseer.refActionBuildMassStorage, M27EngineerOverseer.refActionFortifyFirebase },
+            tEngineerActionsByPriority = { { M27EngineerOverseer.refActionBuildQuantumOptics, M27EngineerOverseer.refActionBuildHive, M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildSecondExperimental, M27EngineerOverseer.refActionNavalSpareAction, M27EngineerOverseer.refActionBuildT2Sonar, M27EngineerOverseer.refActionBuildT1Sonar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildTML, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildShield, M27EngineerOverseer.refActionBuildSecondShield, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildExperimental, M27EngineerOverseer.refActionBuildMassStorage,M27EngineerOverseer.refActionAssistMexUpgrade, M27EngineerOverseer.refActionFortifyFirebase },
                                            { M27EngineerOverseer.refActionUpgradeBuilding, M27EngineerOverseer.refActionBuildTMD, M27EngineerOverseer.refActionBuildSMD, M27EngineerOverseer.refActionBuildSecondLandFactory, M27EngineerOverseer.refActionBuildLandFactory, M27EngineerOverseer.refActionBuildNavalFactory, M27EngineerOverseer.refActionAssistNavalFactory, M27EngineerOverseer.refActionAssistSMD },
                                            { M27EngineerOverseer.refActionBuildEmergencyArti, M27EngineerOverseer.refActionBuildEmergencyPD, M27EngineerOverseer.refActionAssistShield, M27EngineerOverseer.refActionBuildSecondTMD, M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionSpare, M27EngineerOverseer.refActionBuildMex, M27EngineerOverseer.refActionBuildSecondPower, M27EngineerOverseer.refActionAssistAirFactory, M27EngineerOverseer.refActionBuildPower, M27EngineerOverseer.refActionBuildHydro } }
         else
@@ -2623,7 +2657,7 @@ function GetCategoriesAndActionsToPause(aiBrain, bStallingMass)
                 tCategoriesByPriority = { M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryEngineerStation, M27UnitInfo.refCategoryQuantumOptics, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryRASSACU, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryT3Radar, categories.COMMAND, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryAirFactory, M27UnitInfo.refCategorySML - categories.EXPERIMENTAL, iSpecialHQCategory, M27UnitInfo.refCategoryStealthGenerator, M27UnitInfo.refCategoryStealthAndCloakPersonal, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryPersonalShield, M27UnitInfo.refCategoryFixedShield, M27UnitInfo.refCategoryMobileLandShield, M27UnitInfo.refCategoryEngineer }
             end
 
-            tEngineerActionsByPriority = { { M27EngineerOverseer.refActionBuildQuantumOptics, M27EngineerOverseer.refActionBuildHive, M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildSecondExperimental, M27EngineerOverseer.refActionNavalSpareAction, M27EngineerOverseer.refActionBuildT2Sonar, M27EngineerOverseer.refActionBuildT1Sonar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildTML, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionBuildShield, M27EngineerOverseer.refActionBuildSecondShield, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildExperimental, M27EngineerOverseer.refActionBuildSecondAirFactory, M27EngineerOverseer.refActionBuildAirFactory, M27EngineerOverseer.refActionBuildSecondLandFactory, M27EngineerOverseer.refActionBuildLandFactory, M27EngineerOverseer.refActionBuildNavalFactory, M27EngineerOverseer.refActionAssistNavalFactory, M27EngineerOverseer.refActionAssistNavalFactory, M27EngineerOverseer.refActionBuildMassStorage, M27EngineerOverseer.refActionUpgradeBuilding },
+            tEngineerActionsByPriority = { { M27EngineerOverseer.refActionBuildQuantumOptics, M27EngineerOverseer.refActionBuildHive, M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildSecondExperimental, M27EngineerOverseer.refActionNavalSpareAction, M27EngineerOverseer.refActionBuildT2Sonar, M27EngineerOverseer.refActionBuildT1Sonar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildTML, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionBuildShield, M27EngineerOverseer.refActionBuildSecondShield, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildExperimental, M27EngineerOverseer.refActionBuildSecondAirFactory, M27EngineerOverseer.refActionBuildAirFactory, M27EngineerOverseer.refActionBuildSecondLandFactory, M27EngineerOverseer.refActionBuildLandFactory, M27EngineerOverseer.refActionBuildNavalFactory, M27EngineerOverseer.refActionAssistNavalFactory, M27EngineerOverseer.refActionAssistNavalFactory, M27EngineerOverseer.refActionBuildMassStorage,M27EngineerOverseer.refActionAssistMexUpgrade, M27EngineerOverseer.refActionUpgradeBuilding },
                                            { M27EngineerOverseer.refActionAssistAirFactory, M27EngineerOverseer.refActionBuildMex, M27EngineerOverseer.refActionSpare, M27EngineerOverseer.refActionBuildSecondPower, M27EngineerOverseer.refActionFortifyFirebase },
                                            { M27EngineerOverseer.refActionBuildTMD, M27EngineerOverseer.refActionBuildSMD, M27EngineerOverseer.refActionBuildEmergencyArti, M27EngineerOverseer.refActionBuildEmergencyPD, M27EngineerOverseer.refActionAssistShield, M27EngineerOverseer.refActionBuildSecondTMD, M27EngineerOverseer.refActionBuildPower, M27EngineerOverseer.refActionBuildHydro } }
         end
@@ -2770,8 +2804,11 @@ function ManageMassStalls(aiBrain)
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': UnitState=' .. M27Logic.GetUnitState(oUnit) .. '; Is ActiveHQUpgrades Empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades])))
                             end
-                            --SMD LOGIC - Check if already have 1 missile loaded before pausing
-                            if iCategoryRef == M27UnitInfo.refCategorySMD and oUnit.GetTacticalSiloAmmoCount and oUnit:GetTacticalSiloAmmoCount() >= 1 then
+                            --Factories, ACU and engineers - dont pause if >=85% done
+                            if bPauseNotUnpause and oUnit.GetWorkProgress and EntityCategoryContains(M27UnitInfo.refCategoryEngineer + categories.COMMAND + M27UnitInfo.refCategoryAllFactories, oUnit.UnitId) and (oUnit:GetWorkProgress() or 0) >= 0.85 then
+                                bApplyActionToUnit = false
+                                --SMD LOGIC - Check if already have 1 missile loaded before pausing
+                            elseif iCategoryRef == M27UnitInfo.refCategorySMD and oUnit.GetTacticalSiloAmmoCount and oUnit:GetTacticalSiloAmmoCount() >= 1 then
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Have SMD with at least 1 missile so will pause it')
                                 end
@@ -2849,10 +2886,10 @@ function ManageMassStalls(aiBrain)
                                     if oUnit:IsUnitState('Upgrading') then
                                         bApplyActionToUnit = false
                                     elseif oUnit.GetWorkProgress then
-                                        if oUnit:GetWorkProgress() >= 0.85 then
+                                        --if oUnit:GetWorkProgress() >= 0.85 then
                                             bApplyActionToUnit = false
                                             --dont pause t1 mex construction
-                                        elseif oUnit.GetFocusUnit and oUnit:GetFocusUnit() and oUnit:GetFocusUnit().UnitId and EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnit:GetFocusUnit().UnitId) then
+                                        if oUnit.GetFocusUnit and oUnit:GetFocusUnit() and oUnit:GetFocusUnit().UnitId and EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnit:GetFocusUnit().UnitId) then
                                             bApplyActionToUnit = false
                                         elseif aiBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and not(M27Conditions.DoesACUHaveUpgrade(aiBrain, oUnit)) then
                                             bApplyActionToUnit = false
@@ -3562,6 +3599,7 @@ function UpgradeManager(aiBrain)
     aiBrain[reftT2MexesNearBase] = {}
     aiBrain[refoNearestT2MexToBase] = nil
     aiBrain[reftActiveHQUpgrades] = {}
+    aiBrain[refiFailedUpgradeUnitSearchCount] = 0
 
     --Economy - placeholder
     aiBrain[refiGrossEnergyBaseIncome] = 2

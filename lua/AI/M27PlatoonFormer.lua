@@ -427,7 +427,7 @@ function CombatPlatoonFormer(aiBrain)
                 elseif iCurrentConditionToTry == 7 then
                     if iRaiders < 3 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) then sPlatoonToForm = 'M27MexLargerRaiderAI' end
                 elseif iCurrentConditionToTry == 8 then
-                    if iDefenceCoverage < aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
+                    if iDefenceCoverage < aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted] and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
                 elseif iCurrentConditionToTry == 9 then
                     if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) and M27PlatoonUtilities.GetActivePlatoonCount(aiBrain, 'M27LargeAttackForce') < 1 and (aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 3 or aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= M27Overseer.iDistanceToEnemyEcoThreshold) then
                         --Does the ACU need help? If not, then can form a large platoon
@@ -487,7 +487,7 @@ function CombatPlatoonFormer(aiBrain)
                         if iRaiders < 1 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) then sPlatoonToForm = 'M27MexLargerRaiderAI' end
                     end
                 elseif iCurrentConditionToTry == 6 then
-                    if iDefenceCoverage < aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
+                    if iDefenceCoverage < aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted] and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..': Dont meet any other conditions so will form attackenarestunit platoon') end
                     sPlatoonToForm = 'M27CombatPatrolAI'

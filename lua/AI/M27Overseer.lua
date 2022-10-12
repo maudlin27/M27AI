@@ -84,7 +84,7 @@ refoNearestThreat = 'M27overseerNearestLandThreat' --Unit of nearest land threat
 refiPercentageOutstandingThreat = 'M27PercentageOutstandingThreat' --% of moddistance
 refiPercentageClosestFriendlyFromOurBaseToEnemy = 'M27OverseerPercentageClosestFriendly'
 refiPercentageClosestFriendlyLandFromOurBaseToEnemy = 'M27OverseerClosestLandFromOurBaseToEnemy' --as above, but not limited to combat units, e.g. includes mexes
-refiMaxDefenceCoverageWanted = 'M27OverseerMaxDefenceCoverageWanted'
+refiMaxDefenceCoveragePercentWanted = 'M27OverseerMaxDefenceCoverageWanted'
 refiHighestEnemyGroundUnitHealth = 'M27OverseerHighestEnemyGroundUnitHealth' --Against aiBrain, used to track how much we want to deal in damage via overcharge
 refiHighestMobileLandEnemyRange = 'M27overseerHighestMobileEnemyRange' --Against aiBrain, used to track the longest range unit the enemy has had
 
@@ -3642,7 +3642,8 @@ function ThreatAssessAndRespond(aiBrain)
                                 if tEnemyThreatGroup[refiModDistanceFromOurStart] <= aiBrain[M27AirOverseer.refiBomberDefenceModDistance] or M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryStructure - categories.TECH1, tNearbyBuildings)) == false then
                                     --Include if within max bomber range, or we own the first building
                                     if tNearbyBuildings[1]:GetAIBrain():GetArmyIndex() == aiBrain:GetArmyIndex() or tEnemyThreatGroup[refiDistanceFromOurBase] <= aiBrain[M27AirOverseer.refiBomberDefenceDistanceCap] then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Threat group is threatening our buildings') end
+                                        --if GetGameTimeSeconds() >= 960 then bDebugMessages = true end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Threat group '..iEnemyGroup..' is threatening our buildings. Is table of untis in this threat group empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEnemyThreatGroup][iEnemyGroup]))) end
                                         table.insert(aiBrain[reftEnemyGroupsThreateningBuildings], iEnemyGroup)
                                         aiBrain[refbGroundCombatEnemyNearBuilding] = true
                                     end
@@ -6177,13 +6178,19 @@ function SetMaximumFactoryLevels(aiBrain)
             if bDebugMessages == true then LOG(sFunctionRef..': Have factories temporarily paused so only want 1 factory max') end
         end
 
-        --Reduce air factories wanted based on gross energy.  Air fac uses 90 energy for intercepter (T1)
+        --Reduce air factories wanted based on gross energy and mass.  Air fac uses 90 energy for intercepter (T1); Mass usage by air fac and tehc: T1: 2; T2: 5.2; T3: 14
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]=' .. (aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] or 'nil'))
             LOG(sFunctionRef .. ': aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]=' .. (aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] or 'nil'))
             LOG(sFunctionRef .. ': aiBrain[refiOurHighestAirFactoryTech]=' .. (aiBrain[refiOurHighestAirFactoryTech] or 'nil'))
         end
-        aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(1, math.min((aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] or 1), math.floor(aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] / (13 * aiBrain[refiOurHighestAirFactoryTech] * aiBrain[refiOurHighestAirFactoryTech]))))
+        local iAirFactoriesPerMass
+        if aiBrain[refiOurHighestAirFactoryTech] >= 3 then iAirFactoriesPerMass = 0.6 / 14
+        elseif aiBrain[refiOurHighestAirFactoryTech] == 2 then iAirFactoriesPerMass = 0.4 / 5.2
+        else iAirFactoriesPerMass = 0.25 / 2
+        end
+
+        aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(1, math.min((aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] or 1), math.floor(iAirFactoriesPerMass * aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]), math.floor(aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] / (13 * aiBrain[refiOurHighestAirFactoryTech] * aiBrain[refiOurHighestAirFactoryTech]))))
 
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': bActiveExperimental=' .. tostring(bActiveExperimental) .. '; Idle factories=' .. aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused])
@@ -6201,6 +6208,11 @@ function SetMaximumFactoryLevels(aiBrain)
         if aiBrain[refbCloseToUnitCap] then
             aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.min(10, aiBrain[reftiMaxFactoryByType][refFactoryTypeAir])
             aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(3, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand])
+        end
+
+        --Cap air factories if have 4 and low mass and dont have T3 yet
+        if aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] > 4 and aiBrain[refiOurHighestAirFactoryTech] < 3 and M27Conditions.HaveLowMass(aiBrain) then
+            aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = 4
         end
     end
 
@@ -6550,6 +6562,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
     --local bDebugMessages = M27Config.M27StrategicLog
     local sFunctionRef = 'StrategicOverseer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if GetGameTimeSeconds() >= 960 then bDebugMessages = true end
 
     if not(aiBrain[M27Logic.refbAllEnemiesDead]) then
         --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
@@ -7309,7 +7322,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
 
                                         --Dont eco if enemy ACU near ours as likely will need backup, unless we are on a chokepoint map and our ACU hasnt taken any damage recently (or if it has, it's less than 5 per sec)
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Start of logic for checking if should eco. aiBrain[refbEnemyACUNearOurs]='..tostring((aiBrain[refbEnemyACUNearOurs] or false))..'; bChokepointsAreProtected='..tostring((bChokepointsAreProtected or false))..'; Our ACU health='..M27Utilities.GetACU(aiBrain):GetHealth()..'; M27UnitInfo.GetUnitHealthPercent(oACU)='..M27UnitInfo.GetUnitHealthPercent(oACU)..'; ACU most recent recorded health='..((oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 2] or oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 3] or 0) + 50)..'; ACU health 11s ago='..oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11]..'; bAlliesAreCloserToEnemy='..tostring(bAlliesAreCloserToEnemy or false)..'; bTemporaryTurtleMode='..tostring(bTemporaryTurtleMode or false)) end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Start of logic for checking if should eco. aiBrain[refbEnemyACUNearOurs]='..tostring((aiBrain[refbEnemyACUNearOurs] or false))..'; bChokepointsAreProtected='..tostring((bChokepointsAreProtected or false))..'; Our ACU health='..(M27Utilities.GetACU(aiBrain):GetHealth() or 'nil')..'; M27UnitInfo.GetUnitHealthPercent(oACU)='..(M27UnitInfo.GetUnitHealthPercent(oACU) or 'nil')..'; ACU most recent recorded health='..((oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 2] or oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 3] or 0) + 50)..'; ACU health 11s ago='..(oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11] or 'nil')..'; bAlliesAreCloserToEnemy='..tostring(bAlliesAreCloserToEnemy or false)..'; bTemporaryTurtleMode='..tostring(bTemporaryTurtleMode or false)) end
                                         if aiBrain[refbEnemyACUNearOurs] == false or (bChokepointsAreProtected and M27Utilities.GetACU(aiBrain):GetHealth() >= 7000 and (M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.8 or (oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 2] or oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 3] or 0) + 50 >= oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11]))  then
                                             if bChokepointsAreProtected then
                                                 bWantToEco = true
@@ -7457,20 +7470,20 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             --Max target defence coverage for strategy
             if aiBrain[refiAIBrainCurrentStrategy] == refStrategyEcoAndTech then
                 if bChokepointsAreProtected then
-                    aiBrain[refiMaxDefenceCoverageWanted] = math.min(0.65, (30 + GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, aiBrain[M27MapInfo.reftClosestChokepoint]) / aiBrain[refiDistanceToNearestEnemyBase]))
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have chokepoint and are ecoing so will set defence coverage to '..aiBrain[refiMaxDefenceCoverageWanted]) end
+                    aiBrain[refiMaxDefenceCoveragePercentWanted] = math.min(0.65, (30 + GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, aiBrain[M27MapInfo.reftClosestChokepoint]) / aiBrain[refiDistanceToNearestEnemyBase]))
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have chokepoint and are ecoing so will set defence coverage to '..aiBrain[refiMaxDefenceCoveragePercentWanted]) end
                 else
-                    aiBrain[refiMaxDefenceCoverageWanted] = 0.65
+                    aiBrain[refiMaxDefenceCoveragePercentWanted] = 0.65
                 end
             elseif aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance then
-                aiBrain[refiMaxDefenceCoverageWanted] = 0.4
+                aiBrain[refiMaxDefenceCoveragePercentWanted] = 0.4
             elseif aiBrain[refiAIBrainCurrentStrategy] == refStrategyTurtle then
-                aiBrain[refiMaxDefenceCoverageWanted] = (30 + M27Utilities.GetDistanceBetweenPositions(aiBrain[M27MapInfo.reftChokepointBuildLocation], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) / aiBrain[refiDistanceToNearestEnemyBase]
+                aiBrain[refiMaxDefenceCoveragePercentWanted] = (30 + M27Utilities.GetDistanceBetweenPositions(aiBrain[M27MapInfo.reftChokepointBuildLocation], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) / aiBrain[refiDistanceToNearestEnemyBase]
             else
-                aiBrain[refiMaxDefenceCoverageWanted] = 0.9
+                aiBrain[refiMaxDefenceCoveragePercentWanted] = 0.9
             end
             --Reduce defence coverage if are temporarily turtling
-            if bTemporaryTurtleMode then aiBrain[refiMaxDefenceCoverageWanted] = math.min(aiBrain[refiMaxDefenceCoverageWanted], (iTemporaryTurtleDefenceRange or aiBrain[refiMaxDefenceCoverageWanted])) end
+            if bTemporaryTurtleMode then aiBrain[refiMaxDefenceCoveragePercentWanted] = math.min(aiBrain[refiMaxDefenceCoveragePercentWanted], (iTemporaryTurtleDefenceRange / aiBrain[refiDistanceToNearestEnemyBase] or aiBrain[refiMaxDefenceCoveragePercentWanted])) end
 
 
             --Reduce air scouting threshold for enemy base if likely to be considering whether to build a nuke or not
@@ -8842,7 +8855,7 @@ function GameSettingWarningsAndChecks(aiBrain)
     end
 
     if bIncompatible then
-        M27Chat.SendMessage(aiBrain, 'SendGameCompatibilityWarning', 'Less testing has been done with M27 on the following settings: ' .. sIncompatibleMessage .. ' If issues are encountered, report them to maudlin27 via Discord or the M27 forum thread, and include the replay ID.', 0, 10)
+        M27Chat.SendMessage(aiBrain, 'SendGameCompatibilityWarning', 'Less testing has been done with M27 on the following settings: ' .. sIncompatibleMessage .. ' report any issues to maudlin27 via Discord or the M27 forum thread, and include the replay ID.', 0, 10)
     end
     if bHaveOtherAIMod and not(bHaveOtherAI) and sUnnecessaryAIMod then
         M27Chat.SendMessage(aiBrain, 'UnnecessaryMods', 'No other AI detected, These AI mods can be disabled: '..sUnnecessaryAIMod, 1, 10)
