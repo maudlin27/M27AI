@@ -1953,6 +1953,7 @@ function ConsiderT2ArtiGroundFire(oArti)
     local iFiringRandomness
     local iAOE
     local iFiringFrequency
+    local iMinArtiRange = 0
 
     local oBP = oArti:GetBlueprint()
     if oBP.Weapon then
@@ -1963,6 +1964,7 @@ function ConsiderT2ArtiGroundFire(oArti)
                     iFiringRandomness = oCurWeapon.FiringRandomness
                     iAOE = (oCurWeapon.DamageRadius or 1)
                     iFiringFrequency = 1 / oCurWeapon.RateOfFire
+                    iMinArtiRange = (oCurWeapon.MinRadius or 0)
                 end
             end
         end
@@ -1979,28 +1981,60 @@ function ConsiderT2ArtiGroundFire(oArti)
     local tGroundFireTarget
     local bIssueAttack
     local iTimeToWait
+    local bHavePriorityVisibleInRange
+    local iNearestUnitDist
+    local iCurDist
     if bDebugMessages == true then LOG(sFunctionRef..': Pre start of main loop for oArti='..oArti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oArti)..'; iMaxSearchRange='..iMaxSearchRange..'; iEffectiveRange='..iArtiEffectiveRange..'; iMaxRange='..iMaxRange..'; iArtiDistToBase='..iArtiDistToBase) end
     while M27UnitInfo.IsUnitValid(oArti) do
         tGroundFireTarget = nil
         iTimeToWait = iFiringFrequency
+        bHavePriorityVisibleInRange = false
+        iNearestUnitDist = 10000
         if bDebugMessages == true then LOG(sFunctionRef..': iMaxSearchRange='..iMaxSearchRange..'; refiNearestEnemyT2PlusStructure='..aiBrain[M27Overseer.refiNearestEnemyT2PlusStructure]) end
+        tNearbyPriorityUnits = {}
         if aiBrain[M27Overseer.refiNearestEnemyT2PlusStructure] <= iMaxSearchRange then
             tNearbyPriorityUnits = aiBrain:GetUnitsAroundPoint(iPriorityCategories, oArti:GetPosition(), iArtiEffectiveRange, 'Enemy')
+
             if M27Utilities.IsTableEmpty(tNearbyPriorityUnits) == false then
                 oNearestPriorityUnit = M27Utilities.GetNearestUnit(tNearbyPriorityUnits, oArti:GetPosition())
+                iNearestUnitDist = M27Utilities.GetDistanceBetweenPositions(oNearestPriorityUnit:GetPosition(), oArti:GetPosition())
                 if bDebugMessages == true then LOG(sFunctionRef..': Nearest priority unit='..oNearestPriorityUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNearestPriorityUnit)..'; Distance to arti='..M27Utilities.GetDistanceBetweenPositions(oNearestPriorityUnit:GetPosition(), oArti:GetPosition())..'; iMaxRange='..iMaxRange..'; Effective range='..iArtiEffectiveRange) end
-                if M27Utilities.GetDistanceBetweenPositions(oNearestPriorityUnit:GetPosition(), oArti:GetPosition()) > iMaxRange then
+                if iNearestUnitDist > iMaxRange then
                     --No priority units within our range so want to ground fire at the closest priority unit
                     tGroundFireTarget = M27Utilities.MoveInDirection(oArti:GetPosition(), M27Utilities.GetAngleFromAToB(oArti:GetPosition(), oNearestPriorityUnit:GetPosition()), iMaxRange - 0.05)
                     bIssueAttack = true
-
-
+                else
+                    bHavePriorityVisibleInRange = true
                 end
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies so will keep checking') end
                 iTimeToWait = 1
             end
         end
+        if not(bHavePriorityVisibleInRange) then
+            function ConsiderUnitForNewTarget(oUnit)
+                iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oArti:GetPosition())
+                if iCurDist <= iMaxSearchRange and iCurDist <= iNearestUnitDist then
+                    if iNearestUnitDist > iMinArtiRange then
+                        tGroundFireTarget = oUnit:GetPosition()
+                        iNearestUnitDist = iCurDist
+                    end
+                end
+            end
+            --Do we have any units that have killed/damaged our units (so will have seen proejctiles and be able to estimate where they are)?
+            if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid]) == false then
+                for iUnit, oUnit in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid] do
+                    ConsiderUnitForNewTarget(oUnit)
+                end
+            end
+            if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftUnseenPD]) == false then
+                for iUnit, oUnit in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftUnseenPD] do
+                    ConsiderUnitForNewTarget(oUnit)
+                end
+            end
+
+        end
+
         if bDebugMessages == true then LOG(sFunctionRef..': Finished checking if want ground fire target for unit '..oArti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oArti)..'; tGroundFireTarget='..repru(tGroundFireTarget)) end
         if tGroundFireTarget then
             oArti[M27UnitInfo.refbSpecialMicroActive] = true

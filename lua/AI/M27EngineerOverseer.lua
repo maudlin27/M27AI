@@ -8199,10 +8199,10 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                         end
                     end
                 end
-                --If unit is a veteran and is damaged, flag it to request mobile shield
+                --If unit is a veteran and is damaged, or is a T2 arti and enemy has nearby T2 structures
 
                 if oUnit.Sync.VeteranLevel > 0 then
-                    if oUnit:GetHealth() / oUnit:GetMaxHealth() < 0.97 then
+                    if oUnit:GetHealth() / oUnit:GetMaxHealth() < 0.97 or (aiBrain[M27Overseer.refiNearestEnemyT2PlusStructure] <= 200 and EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oUnit.UnitId)) then
                         aiBrain[M27PlatoonFormer.reftPriorityUnitsForShielding][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
                     else
                         aiBrain[M27PlatoonFormer.reftPriorityUnitsForShielding][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = nil

@@ -631,6 +631,41 @@ function RecordUnseenPD(oPD, oUnitDamaged)
     end
 end
 
+function RecordUnseenArti(oKilledBrain, oDangerousArti)
+    local bIncludeInTable = true
+
+    if M27Utilities.IsTableEmpty(tTeamData[oKilledBrain.M27Team][reftEnemyArtiToAvoid]) == false then
+        for iArti, oArti in tTeamData[oKilledBrain.M27Team][reftEnemyArtiToAvoid] do
+            if oArti == oDangerousArti then
+                bIncludeInTable = false
+            end
+        end
+    end
+    if bIncludeInTable then
+        table.insert(tTeamData[oKilledBrain.M27Team][reftEnemyArtiToAvoid], oDangerousArti)
+        --Also check for any nearby t2 arti that are closer to the killed unit's base
+        local tNearbyT2Arti = oDangerousArti:GetAIBrain():GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, oDangerousArti:GetPosition(), 30, 'Ally')
+        local iDistToBase = M27Utilities.GetDistanceBetweenPositions(oDangerousArti:GetPosition(), M27MapInfo.PlayerStartPoints[oKilledBrain.M27StartPositionNumber])
+        if M27Utilities.IsTableEmpty(tNearbyT2Arti) == false then
+            for iUnit, oUnit in tNearbyT2Arti do
+                if not(oUnit == oDangerousArti) then
+                    if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[oKilledBrain.M27StartPositionNumber]) < iDistToBase then
+                        bIncludeInTable = true
+                        for iArti, oArti in tTeamData[oKilledBrain.M27Team][reftEnemyArtiToAvoid] do
+                            if oUnit == oArti then
+                                bIncludeInTable = false
+                            end
+                        end
+                        if bIncludeInTable then
+                            table.insert(tTeamData[oKilledBrain.M27Team][reftEnemyArtiToAvoid], oDangerousArti)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 function RecordSegmentsThatTeamHasVisualOf(aiBrain)
     if GetGameTimeSeconds() - (tTeamData[aiBrain.M27Team][refiTimeOfLastVisualUpdate] or -1) >= 0.99 then
         local iTimeStamp = GetGameTimeSeconds()

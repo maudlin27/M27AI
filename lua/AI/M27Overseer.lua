@@ -4554,8 +4554,29 @@ function ThreatAssessAndRespond(aiBrain)
     end -->0 enemy threat groups
 
     --Do we have sniper bots near our base? then will flag that we want indirect fire units
-    if not (aiBrain[refbNeedIndirect]) and aiBrain[refiOurHighestLandFactoryTech] == 3 and aiBrain[refiModDistFromStartNearestThreat] <= 160 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySniperBot, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 150, 'Enemy')) == false then
+    if not (aiBrain[refbNeedIndirect]) and aiBrain[refiOurHighestLandFactoryTech] >= 3 and aiBrain[refiModDistFromStartNearestThreat] <= 200 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySniperBot, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 200, 'Enemy')) == false then
         aiBrain[refbNeedIndirect] = true
+    end
+
+    --Expand nearest structure to include those damaging/killing our units that havent been revealed yet
+    local iCurDist
+    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid]) == false then
+        for iUnit, oUnit in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid] do
+            iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+            if iCurDist < aiBrain[refiNearestEnemyT2PlusStructure] then
+                aiBrain[refiNearestEnemyT2PlusStructure] = iCurDist
+                aiBrain[refoNearestEnemyT2PlusStructure] = oUnit
+            end
+        end
+    end
+    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftUnseenPD]) == false then
+        for iUnit, oUnit in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftUnseenPD] do
+            iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+            if iCurDist < aiBrain[refiNearestEnemyT2PlusStructure] then
+                aiBrain[refiNearestEnemyT2PlusStructure] = iCurDist
+                aiBrain[refoNearestEnemyT2PlusStructure] = oUnit
+            end
+        end
     end
 
     --Disband any indirect defenders that havent just been assigned

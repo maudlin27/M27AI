@@ -172,38 +172,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                         if EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oKillerUnit.UnitId) then
                             if oKillerUnit.Sync.totalMassKilled >= 250 and IsEnemy(oKilledBrain:GetArmyIndex(), oKillerUnit:GetAIBrain():GetArmyIndex()) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to add oKillerUnit='..oKillerUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oKillerUnit)..' to list of T2 arti to avoid') end
-                                --Is this already in the table?
-                                local bIncludeInTable = true
-                                if M27Utilities.IsTableEmpty(M27Team.tTeamData[oKilledBrain.M27Team][M27Team.reftEnemyArtiToAvoid]) == false then
-                                    for iArti, oArti in M27Team.tTeamData[oKilledBrain.M27Team][M27Team.reftEnemyArtiToAvoid] do
-                                        if oArti == oKillerUnit then
-                                            bIncludeInTable = false
-                                        end
-                                    end
-                                end
-                                if bIncludeInTable then
-                                    table.insert(M27Team.tTeamData[oKilledBrain.M27Team][M27Team.reftEnemyArtiToAvoid], oKillerUnit)
-                                    --Also check for any nearby t2 arti that are closer to the killed unit's base
-                                    local tNearbyT2Arti = oKillerUnit:GetAIBrain():GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, oKillerUnit:GetPosition(), 30, 'Ally')
-                                    local iDistToBase = M27Utilities.GetDistanceBetweenPositions(oKillerUnit:GetPosition(), M27MapInfo.PlayerStartPoints[oKilledBrain.M27StartPositionNumber])
-                                    if M27Utilities.IsTableEmpty(tNearbyT2Arti) == false then
-                                        for iUnit, oUnit in tNearbyT2Arti do
-                                            if not(oUnit == oKillerUnit) then
-                                                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[oKilledBrain.M27StartPositionNumber]) < iDistToBase then
-                                                    bIncludeInTable = true
-                                                    for iArti, oArti in M27Team.tTeamData[oKilledBrain.M27Team][M27Team.reftEnemyArtiToAvoid] do
-                                                        if oUnit == oArti then
-                                                            bIncludeInTable = false
-                                                        end
-                                                    end
-                                                    if bIncludeInTable then
-                                                        table.insert(M27Team.tTeamData[oKilledBrain.M27Team][M27Team.reftEnemyArtiToAvoid], oKillerUnit)
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
+                                M27Team.RecordUnseenArti(oKilledBrain, oKillerUnit)
                             end
                         end
                     end
@@ -805,6 +774,14 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                                 ForkThread(M27Team.RecordUnseenPD, oUnitCausingDamage, self)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Have recrded unseen PD') end
                             end
+
+                            --Unseen T2 arti and its either close to our base or damaged a high mass unit
+                            if EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oUnitCausingDamage.UnitId) then
+                                if (self.GetBlueprint and self:GetBlueprint().Economy.BuildCostMass >= 1000) or M27Utilities.GetDistanceBetweenPositions(oUnitCausingDamage:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 200 then
+                                    M27Team.RecordUnseenArti(aiBrain, oUnitCausingDamage)
+                                end
+                            end
+
 
                             --Unseen naval units - record if they have dealt us damage
                             if not(oUnitCausingDamage[M27UnitInfo.reftLastKnownPosition]) and EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitCausingDamage.UnitId) then
