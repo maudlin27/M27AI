@@ -81,6 +81,8 @@ refiModDistFromStartNearestThreat = 'M27OverseerNearestThreat' --Mod distance of
 refiModDistEmergencyRange = 'M27OverseerModDistEmergencyRange'
 reftLocationFromStartNearestThreat = 'M27OverseerLocationNearestLandThreat' --Distance of closest enemy
 refoNearestThreat = 'M27overseerNearestLandThreat' --Unit of nearest land threat
+refoNearestEnemyT2PlusStructure = 'M27OverseerNearestEnemyT2PlusStructure' --against aibrain, nearest enemy T2+ structure
+refiNearestEnemyT2PlusStructure = 'M27OverseerNearestEnemyT2PlusStructureDistance' --against aibrain, distance to our base of nearest enemy T2+ structure
 refiPercentageOutstandingThreat = 'M27PercentageOutstandingThreat' --% of moddistance
 refiPercentageClosestFriendlyFromOurBaseToEnemy = 'M27OverseerPercentageClosestFriendly'
 refiPercentageClosestFriendlyLandFromOurBaseToEnemy = 'M27OverseerClosestLandFromOurBaseToEnemy' --as above, but not limited to combat units, e.g. includes mexes
@@ -3193,10 +3195,14 @@ function ThreatAssessAndRespond(aiBrain)
     local iTMDAndShieldSearchRange = 25 --If dealing with T2+ PD will look for nearby shields and TMD
     local iT2ArtiSearchRange = 50 --Will look for nearby T2 arti within this range
     local iNavyUnitCategories = M27UnitInfo.refCategoryNavyThatCanBeTorpedoed
-    local tCategoriesToSearch = { refCategoryMobileLand, M27UnitInfo.refCategoryPD }
+    local tCategoriesToSearch = { refCategoryMobileLand, M27UnitInfo.refCategoryPD + M27UnitInfo.refCategoryStructure - categories.TECH1 }
     if M27MapInfo.bMapHasWater == true then
-        tCategoriesToSearch = { refCategoryMobileLand, M27UnitInfo.refCategoryPD, iNavyUnitCategories }
+        tCategoriesToSearch = { refCategoryMobileLand, M27UnitInfo.refCategoryPD + M27UnitInfo.refCategoryStructure - categories.TECH1, iNavyUnitCategories }
     end
+
+    local iCategoryTypeLand = 1
+    local iCategoryTypeStructure = 2
+    local iCategoryTypeNavy = 3
     ResetEnemyThreatGroups(aiBrain, math.max(iNavySearchRange, iLandThreatSearchRange), tCategoriesToSearch)
     local bConsideringNavy
     local bUnitOnWater, tEnemyUnitPos
@@ -3295,6 +3301,8 @@ function ThreatAssessAndRespond(aiBrain)
     local bCanPathToTarget
 
     aiBrain[refoNearestThreat] = nil
+    aiBrain[refoNearestEnemyT2PlusStructure] = nil
+    aiBrain[refiNearestEnemyT2PlusStructure] = 10000
 
     if aiBrain[refiEnemyHighestTechLevel] > 1 then
         iNavalBlipThreat = 2000 --Cruiser
@@ -3302,10 +3310,10 @@ function ThreatAssessAndRespond(aiBrain)
     for iEntry, iCategory in tCategoriesToSearch do
         bConsideringNavy = false
         iSearchRange = iLandThreatSearchRange
-        if iCategory == iNavyUnitCategories then
+        if iEntry == iCategoryTypeNavy then
             bConsideringNavy = true
             iSearchRange = iNavySearchRange
-        elseif iCategory == M27UnitInfo.refCategoryPD then
+        elseif iEntry == iCategoryTypeStructure then
             sPathing = M27UnitInfo.refPathingTypeLand
         else
             if aiBrain[refiOurHighestFactoryTechLevel] >= 2 or aiBrain:GetFactionIndex() == M27UnitInfo.refFactionAeon or aiBrain:GetFactionIndex() == M27UnitInfo.refFactionSeraphim then
@@ -3360,7 +3368,7 @@ function ThreatAssessAndRespond(aiBrain)
                                 bCanPathToTarget = false
                                 if bConsideringNavy or tiOurBasePathingGroup[sPathing] == M27MapInfo.GetSegmentGroupOfLocation(sPathing, oEnemyUnit:GetPosition()) then
                                     bCanPathToTarget = true
-                                elseif iCategory == M27UnitInfo.refCategoryPD then
+                                elseif iEntry == iCategoryTypeStructure then
                                     --If we travel from the target towards our base and at 45 degree angles (checking 5 points in total) can any of them path there?
                                     local iRangeToCheck = 30 + 2
                                     if aiBrain[refiMinIndirectTechLevel] == 2 then
@@ -3392,7 +3400,8 @@ function ThreatAssessAndRespond(aiBrain)
                                     end
                                     AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iThreatGroupDistance, iCategory, not (bConsideringNavy), bConsideringNavy, iNavalBlipThreat)
                                     --Add nearby structures to threat rating if dealing with structures and enemy has T2+ PD near them
-                                    if iCategory == M27UnitInfo.refCategoryPD and oEnemyUnit[iArmyIndex][refsEnemyThreatGroup][refiThreatGroupHighestTech] >= 2 then
+                                    --v59 - removed as have expanded initial threat to cover T2 structures not just T2 PD
+                                    --[[if iEntry == iCategoryTypeStructure and oEnemyUnit[iArmyIndex][refsEnemyThreatGroup][refiThreatGroupHighestTech] >= 2 then
                                         local tNearbyDefensiveStructures = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD * categories.STRUCTURE + M27UnitInfo.refCategoryFixedShield, tEnemyUnitPos, iTMDAndShieldSearchRange, 'Enemy')
                                         if M27Utilities.IsTableEmpty(tNearbyDefensiveStructures) == false then
                                             for iDefence, oDefenceUnit in tNearbyDefensiveStructures do
@@ -3411,7 +3420,7 @@ function ThreatAssessAndRespond(aiBrain)
                                                 end
                                             end
                                         end
-                                    end
+                                    end--]]
                                 elseif bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Cant path to enemy unit=' .. oEnemyUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oEnemyUnit))
                                 end
@@ -3547,6 +3556,19 @@ function ThreatAssessAndRespond(aiBrain)
             local iDefaultEnemySearchRange = math.min(105, math.max(20 + 15 * aiBrain[refiEnemyHighestTechLevel], aiBrain[refiHighestMobileLandEnemyRange]))
 
             for iEnemyGroup, tEnemyThreatGroup in M27Utilities.SortTableBySubtable(aiBrain[reftEnemyThreatGroup], refiModDistanceFromOurStart, true) do
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering threat group '..iEnemyGroup..'; Do we already have a valid refoNearestEnemyT2PlusStructure='..tostring(M27UnitInfo.IsUnitValid(aiBrain[refoNearestEnemyT2PlusStructure]))..'; Does threat group contain t2 buildings='..tostring(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryStructure - categories.TECH1, tEnemyThreatGroup[refoEnemyGroupUnits])))) end
+                if not(aiBrain[refoNearestEnemyT2PlusStructure]) then
+                    local tEnemyT2PlusBuildings = EntityCategoryFilterDown(M27UnitInfo.refCategoryStructure - categories.TECH1, tEnemyThreatGroup[refoEnemyGroupUnits])
+                    if M27Utilities.IsTableEmpty(tEnemyT2PlusBuildings) == false then
+                        aiBrain[refoNearestEnemyT2PlusStructure] = M27Utilities.GetNearestUnit(tEnemyT2PlusBuildings, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain)
+                        if not(aiBrain[refoNearestEnemyT2PlusStructure].IsCivilian) and not(M27Logic.IsCivilianBrain(aiBrain[refoNearestEnemyT2PlusStructure]:GetAIBrain())) then
+                            aiBrain[refiNearestEnemyT2PlusStructure] = M27Utilities.GetDistanceBetweenPositions(aiBrain[refoNearestEnemyT2PlusStructure]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                        else
+                            aiBrain[refoNearestEnemyT2PlusStructure] = nil --Nearest building is civilian so ignore
+                        end
+                    end
+                    --M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryStructure - categories.TECH1, tEnemyThreatGroup[
+                end
                 if bFirstThreatGroup then
                     bFirstThreatGroup = false
                     aiBrain[refiModDistFromStartNearestThreat] = tEnemyThreatGroup[refiModDistanceFromOurStart]
@@ -3557,7 +3579,7 @@ function ThreatAssessAndRespond(aiBrain)
                 end
                 bIndirectThreatOnly = false
                 bConsideringNavy = false
-                if tEnemyThreatGroup[refiThreatGroupCategory] == M27UnitInfo.refCategoryPD then
+                if tEnemyThreatGroup[refiThreatGroupCategory] == tCategoriesToSearch[iCategoryTypeStructure] then
                     bIndirectThreatOnly = true
                 elseif tEnemyThreatGroup[refiThreatGroupCategory] == iNavyUnitCategories then
                     bConsideringNavy = true
@@ -4700,7 +4722,6 @@ function ACUManager(aiBrain)
     local sFunctionRef = 'ACUManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    if GetGameTimeSeconds() >= 60 and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
 
     if not (aiBrain.M27IsDefeated) and M27Logic.iTimeOfLastBrainAllDefeated < 10 then
         local oACU = M27Utilities.GetACU(aiBrain)
@@ -6573,7 +6594,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
     --local bDebugMessages = M27Config.M27StrategicLog
     local sFunctionRef = 'StrategicOverseer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetGameTimeSeconds() >= 60 then bDebugMessages = true end
 
     if not(aiBrain[M27Logic.refbAllEnemiesDead]) then
         --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response

@@ -1939,3 +1939,82 @@ function ExperimentalSAMHitAndRun(oBomber, oTarget)
         end
     end
 end
+
+function ConsiderT2ArtiGroundFire(oArti)
+    --Periodically checks for if T2 arti should try ground-firing
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'ConsiderT2ArtiGroundFire'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local aiBrain = oArti:GetAIBrain()
+    local iArtiDistToBase = M27Utilities.GetDistanceBetweenPositions(oArti:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+
+    local iMaxRange = 0
+    local iFiringRandomness
+    local iAOE
+    local iFiringFrequency
+
+    local oBP = oArti:GetBlueprint()
+    if oBP.Weapon then
+        for iCurWeapon, oCurWeapon in oBP.Weapon do
+            if (oCurWeapon.WeaponCategory == 'Missile' and not(oCurWeapon.DamageType == 'Nuke')) or oCurWeapon.WeaponCategory == 'Artillery' or oCurWeapon.WeaponCategory == 'Indirect Fire' then
+                if oCurWeapon.MaxRadius > iMaxRange then
+                    iMaxRange = oCurWeapon.MaxRadius
+                    iFiringRandomness = oCurWeapon.FiringRandomness
+                    iAOE = (oCurWeapon.DamageRadius or 1)
+                    iFiringFrequency = 1 / oCurWeapon.RateOfFire
+                end
+            end
+        end
+    end
+    local iArtiEffectiveRange = iMaxRange
+    if iAOE >= 0.5 then
+        iArtiEffectiveRange = iMaxRange + iAOE + iFiringRandomness * 7
+    end
+
+    local tNearbyPriorityUnits
+    local iMaxSearchRange = iArtiEffectiveRange + iArtiDistToBase
+    local iPriorityCategories = M27UnitInfo.refCategoryStructure - categories.TECH1 + M27UnitInfo.refCategoryIndirectT2Plus + M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategorySniperBot + M27UnitInfo.refCategoryFatboy
+    local oNearestPriorityUnit
+    local tGroundFireTarget
+    local bIssueAttack
+    local iTimeToWait
+    if bDebugMessages == true then LOG(sFunctionRef..': Pre start of main loop for oArti='..oArti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oArti)..'; iMaxSearchRange='..iMaxSearchRange..'; iEffectiveRange='..iArtiEffectiveRange..'; iMaxRange='..iMaxRange..'; iArtiDistToBase='..iArtiDistToBase) end
+    while M27UnitInfo.IsUnitValid(oArti) do
+        tGroundFireTarget = nil
+        iTimeToWait = iFiringFrequency
+        if bDebugMessages == true then LOG(sFunctionRef..': iMaxSearchRange='..iMaxSearchRange..'; refiNearestEnemyT2PlusStructure='..aiBrain[M27Overseer.refiNearestEnemyT2PlusStructure]) end
+        if aiBrain[M27Overseer.refiNearestEnemyT2PlusStructure] <= iMaxSearchRange then
+            tNearbyPriorityUnits = aiBrain:GetUnitsAroundPoint(iPriorityCategories, oArti:GetPosition(), iArtiEffectiveRange, 'Enemy')
+            if M27Utilities.IsTableEmpty(tNearbyPriorityUnits) == false then
+                oNearestPriorityUnit = M27Utilities.GetNearestUnit(tNearbyPriorityUnits, oArti:GetPosition())
+                if bDebugMessages == true then LOG(sFunctionRef..': Nearest priority unit='..oNearestPriorityUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNearestPriorityUnit)..'; Distance to arti='..M27Utilities.GetDistanceBetweenPositions(oNearestPriorityUnit:GetPosition(), oArti:GetPosition())..'; iMaxRange='..iMaxRange..'; Effective range='..iArtiEffectiveRange) end
+                if M27Utilities.GetDistanceBetweenPositions(oNearestPriorityUnit:GetPosition(), oArti:GetPosition()) > iMaxRange then
+                    --No priority units within our range so want to ground fire at the closest priority unit
+                    tGroundFireTarget = M27Utilities.MoveInDirection(oArti:GetPosition(), M27Utilities.GetAngleFromAToB(oArti:GetPosition(), oNearestPriorityUnit:GetPosition()), iMaxRange - 0.05)
+                    bIssueAttack = true
+
+
+                end
+            else
+                if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies so will keep checking') end
+                iTimeToWait = 1
+            end
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': Finished checking if want ground fire target for unit '..oArti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oArti)..'; tGroundFireTarget='..repru(tGroundFireTarget)) end
+        if tGroundFireTarget then
+            oArti[M27UnitInfo.refbSpecialMicroActive] = true
+            M27Utilities.IssueTrackedClearCommands({oArti})
+            IssueAttack({oArti}, tGroundFireTarget)
+            if bDebugMessages == true then LOG(sFunctionRef..': Sent aggressive move order') end
+        else
+            if oArti[M27UnitInfo.refbSpecialMicroActive] == true then
+                M27Utilities.IssueTrackedClearCommands({oArti})
+                oArti[M27UnitInfo.refbSpecialMicroActive] = false
+            end
+        end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        WaitSeconds(iTimeToWait)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    end
+end

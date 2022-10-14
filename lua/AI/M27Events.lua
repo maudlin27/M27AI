@@ -1258,6 +1258,7 @@ function OnConstructed(oEngineer, oJustBuilt)
 
     --NOTE: This is called every time an engineer stops building a unit whose fractioncomplete is 100%, so can be called multiple times
     if M27Utilities.bM27AIInGame then
+        local bGivenSubsequentEngineerOrder = false
 
         if oJustBuilt:GetAIBrain().M27AI and not(oJustBuilt.M27OnConstructedCalled) then
             local sFunctionRef = 'OnConstructed'
@@ -1282,6 +1283,25 @@ function OnConstructed(oEngineer, oJustBuilt)
 
             if EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oJustBuilt.UnitId) then
                 ForkThread(M27UnitInfo.SetUnitTargetPriorities, oJustBuilt, M27UnitInfo.refWeaponPriorityT2Arti)
+                ForkThread(M27UnitMicro.ConsiderT2ArtiGroundFire, oJustBuilt)
+
+                --Do we want to build radar here?
+                if bDebugMessages == true then LOG(sFunctionRef..': Engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' just completed a T2 Arti, checking if want to build a T1 radar. Intel coverage='..M27Logic.GetIntelCoverageOfPosition(aiBrain, oJustBuilt:GetPosition(), nil, true)) end
+                if oEngineer:GetAIBrain().M27AI and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer.UnitId) and not(M27Logic.GetIntelCoverageOfPosition(aiBrain, oJustBuilt:GetPosition(), 104, true)) then
+                    --Check we dont have 2+ radar close by as backup in case we keep trying to build t1 radar in the same place and there's no space
+                    local tNearbyT1Radar = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT1Radar, oJustBuilt:GetPosition(), 25, 'Ally')
+                    if M27Utilities.IsTableEmpty(tNearbyT1Radar) or table.getn(tNearbyT1Radar) <= 1 then
+                        M27Utilities.IssueTrackedClearCommands({ oEngineer })
+                        M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngineer, true)
+
+
+                        bGivenSubsequentEngineerOrder = true
+                        --Build t1 radar nearby regardless of adjacency
+                        M27EngineerOverseer.AssignActionToEngineer(aiBrain, oEngineer, M27EngineerOverseer.refActionBuildT1Radar, M27Utilities.MoveInDirection(oJustBuilt:GetPosition(), M27Utilities.GetAngleFromAToB(oJustBuilt:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)), 5, true), nil, 1, true)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Just given order for oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to build T1 radar at location '..repru(M27Utilities.MoveInDirection(oJustBuilt:GetPosition(), M27Utilities.GetAngleFromAToB(oJustBuilt:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)), 5, true))) end
+                    end
+                end
+
             end
 
             --Firebase tracking
@@ -1441,7 +1461,7 @@ function OnConstructed(oEngineer, oJustBuilt)
 
 
         --Engineer callbacks
-        if oEngineer:GetAIBrain().M27AI and not (oEngineer.Dead) then
+        if not(bGivenSubsequentEngineerOrder) and oEngineer:GetAIBrain().M27AI and not (oEngineer.Dead) then
             if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer:GetUnitId()) then
                 --Dont do this if just built t1 pd as want it to have walls
                 if not(EntityCategoryContains(M27UnitInfo.refCategoryWall + M27UnitInfo.refCategoryPD * categories.TECH1, oJustBuilt.UnitId)) then
