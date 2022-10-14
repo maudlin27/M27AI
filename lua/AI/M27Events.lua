@@ -133,7 +133,6 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
         if not(oUnitKilled[refbAlreadyRun]) then
             oUnitKilled[refbAlreadyRun] = true
 
-            if EntityCategoryContains(M27UnitInfo.refCategoryBomber, oUnitKilled.UnitId) then bDebugMessages = true end
             if bDebugMessages == true then LOG(sFunctionRef..': oUnitKilled='..oUnitKilled.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitKilled)..'; Is unit killed an ACU='..tostring(M27Utilities.IsACU(oUnitKilled))) end
 
             if oUnitKilled.GetAIBrain then
@@ -176,7 +175,6 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                             if EntityCategoryContains(categories.LAND + categories.STRUCTURE + M27UnitInfo.refCategoryNavalSurface, oKillerUnit.UnitId) and oUnitKilled.PlatoonHandle and not(oUnitKilled.PlatoonHandle[M27PlatoonTemplates.refbIdlePlatoon]) then
                                 oUnitKilled.PlatoonHandle[M27PlatoonUtilities.refiTimeOfLastDeathToSurfaceUnit] = GetGameTimeSeconds()
                             end
-                            if EntityCategoryContains(categories.ANTIAIR * categories.TECH3 * categories.MOBILE, oKillerUnit.UnitId) then bDebugMessages = true end
 
 
                             if EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oKillerUnit.UnitId) then

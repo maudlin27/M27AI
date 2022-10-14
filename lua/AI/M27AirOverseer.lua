@@ -1355,7 +1355,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 3 and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 then bDebugMessages = true end
-    if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uaa02041' and GetGameTimeSeconds() >= 60 then bDebugMessages = true else bDebugMessages = false end
+    --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uaa02041' and GetGameTimeSeconds() >= 60 then bDebugMessages = true else bDebugMessages = false end
     local bRemoveCurTarget
     local bHaveMoveCommand = false
     local tTargetPos
@@ -2656,7 +2656,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
             for iUnit, oUnit in tAllAirOfType do
                 --if M27UnitInfo.GetUnitTechLevel(oUnit) == 4 then bDebugMessages = true else bDebugMessages = false end
                 --if M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 then bDebugMessages = true else bDebugMessages = false end
-                if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uaa02041' and GetGameTimeSeconds() >= 60 then bDebugMessages = true else bDebugMessages = false end
+                --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uaa02041' and GetGameTimeSeconds() >= 60 then bDebugMessages = true else bDebugMessages = false end
                 bUnitIsUnassigned = false
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. '; iUnitType=' .. iUnitType .. '; iUnit=' .. iUnit .. '; ID and LC=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; checking if unit is dead and has fuel and whether its on assignment; oUnit[refbSentRefuelCommand]=' .. tostring(oUnit[refbSentRefuelCommand] or false))
@@ -4998,7 +4998,6 @@ function AirBomberManager(aiBrain)
                 end--]]
             end
         end
-        if GetGameTimeSeconds() >= 600 or bCheckForDangerousAA then bDebugMessages = true end
         if bDebugMessages == true then LOG(sFunctionRef..': Finished checking for dangerous AA. bCheckForDangerousAA='..tostring(bCheckForDangerousAA)) end
 
         if M27Utilities.IsTableEmpty(tEnemyCruisers) == false then

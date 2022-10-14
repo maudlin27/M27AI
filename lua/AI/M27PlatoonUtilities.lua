@@ -12771,7 +12771,6 @@ function ProcessPlatoonAction(oPlatoon)
                         end
                     end
                 elseif oPlatoon[refiCurrentAction] == refActionKillACU then
-                    if oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount] == 'M27DefenderAI3' then bDebugMessages = true end
                     if bDebugMessages == true then LOG(sFunctionRef..': About to send orders to attack enemy ACU') end
                     if bDontClearActions == false then
                         if bDebugMessages == true then LOG(sFunctionRef..': '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Clearing commands; Gametime='..GetGameTimeSeconds()) end
