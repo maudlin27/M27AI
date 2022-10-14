@@ -3,9 +3,13 @@ local M27Events = import('/mods/M27AI/lua/AI/M27Events.lua')
 do --Per Balthazaar - encasing the code in do .... end means that you dont have to worry about using unique variables
     local M27OldUnit = Unit
     Unit = Class(M27OldUnit) {
-        OnKilled = function(self, instigator, type, overkillRatio)
+        OnKilled = function(self, instigator, type, overkillRatio) --NOTE: For some reason this doesnt run a lot of the time; onkilledunit is more reliable
             M27Events.OnKilled(self, instigator, type, overkillRatio)
             M27OldUnit.OnKilled(self, instigator, type, overkillRatio)
+        end,
+        OnKilledUnit = function(self, unitKilled, massKilled)
+            M27Events.OnKilled(unitKilled, self)
+            M27OldUnit.OnKilledUnit(self, unitKilled, massKilled)
         end,
         OnDestroy = function(self)
             M27Events.OnUnitDeath(self) --Any custom code we want to run

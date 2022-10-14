@@ -78,7 +78,6 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetBlueprintsThatCanBuildOfCategory'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if bGetCheapest and bIgnoreTechDifferences then bDebugMessages = true end
     --if GetGameTimeSeconds() >= 738 then bDebugMessages = true end
 
     local tBlueprints = EntityCategoryGetUnitList(iCategoryCondition)
@@ -3270,7 +3269,6 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                         end
                         if bAlreadyBuildingEnough == false then
                             --GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFactory, bGetSlowest, bGetFastest, iOptionalCategoryThatMustBeAbleToBuild, bGetCheapest, bIgnoreTechDifferences)
-                            if iFactoryTechLevel == 3 then bDebugMessages = true end
                             sBPIDToBuild = GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryToBuild, oFactory, bGetSlowest, bGetFastest, nil, bGetCheapest, bIgnoreTechDifferences)
                             if bDebugMessages == true then LOG(sFunctionRef..': sBPIDToBuild for iCurrentConditionToTry='..iCurrentConditionToTry..' before adjustments='..(sBPIDToBuild or 'nil')..'; bGetSlowest='..tostring(bGetSlowest)..'; bGetFastest='..tostring(bGetFastest)..'; bGetCheapest='..tostring(bGetCheapest)..'; bIgnoreTechDifferences='..tostring(bIgnoreTechDifferences)) end
 

@@ -4792,7 +4792,7 @@ function ConvertExperimentalRefToCategory(iExperimentalRef)
 end
 
 function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideOnExperimentalToBuild'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -4938,6 +4938,7 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
 
         --MAIN LOGIC FOR DECIDING EXPERIMENTAL
 
+
         --If enemy has t3 arti or novax then make building our own t3 arti a top priority
         local iEnemyArtiAndNovax = 0
         local iEnemyEarlyConstructionArti = 0
@@ -4955,10 +4956,21 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
         local iT3ArtiWeOwn = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti)
         local iLifetimeLandExperimentalCount = M27Conditions.GetLifetimeBuildCount(aiBrain, ConvertExperimentalRefToCategory(refiExperimentalLand))
 
-        if iEnemyArtiAndNovax > 0 and bTargetsForT3Arti and iT3ArtiWeOwn < 4 then
-            --Exception to prioritising T3 arti - if we already have 1 T3 arti, and enemy's only T3 arti is <30% complete
-            if iEnemyArtiAndNovax > iEnemyEarlyConstructionArti or iT3ArtiWeOwn == 0 then
-                iCategoryRef = refiExperimentalT3Arti
+        --UEF - high priority fatboy if enemy has sniper bots or land experimentals (even if enemy has T3 arti as well)
+        if bDebugMessages == true then LOG(sFunctionRef..': Fatboy priority checker: Are we UEF='..tostring(iFactionIndex == M27UnitInfo.refFactionUEF)..'; Lifetime build count='..iLifetimeLandExperimentalCount..'; Existing experimentals='..iExistingLandExperimentals..'; Is table of enemy land experi empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]))..'; has enemy built sniperbots='..tostring(aiBrain[M27Overseer.refbEnemyHasBuiltSniperbots])) end
+        if iFactionIndex == M27UnitInfo.refFactionUEF and iLifetimeLandExperimentalCount <= 1 and iExistingLandExperimentals == 0 then
+            if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false or aiBrain[M27Overseer.refbEnemyHasBuiltSniperbots] then
+                iCategoryRef = refiExperimentalLand
+                if bDebugMessages == true then LOG(sFunctionRef..': Will build land experimental as want priority fatboy') end
+            end
+        end
+
+        if not(iCategoryRef) then
+            if iEnemyArtiAndNovax > 0 and bTargetsForT3Arti and iT3ArtiWeOwn < 4 then
+                --Exception to prioritising T3 arti - if we already have 1 T3 arti, and enemy's only T3 arti is <30% complete
+                if iEnemyArtiAndNovax > iEnemyEarlyConstructionArti or iT3ArtiWeOwn == 0 then
+                    iCategoryRef = refiExperimentalT3Arti
+                end
             end
         end
         if not(iCategoryRef) then
@@ -10192,7 +10204,7 @@ end--]]
                                     end
                                 end
                             end
-                            if bEnemyHasFatboy or bEnemyHasNearbyT2StructureOrLongRange or aiBrain[M27AirOverseer.refiTorpBombersWanted] >= 4 then
+                            if bEnemyHasFatboy or bEnemyHasNearbyT2StructureOrLongRange or aiBrain[M27AirOverseer.refiTorpBombersWanted] >= 4 or aiBrain[M27Overseer.refbEnemyHasBuiltSniperbots] then
 
                                 local tNearbyEnemyNavy
                                 if not(bEnemyHasNearbyT2StructureOrLongRange or bEnemyHasFatboy) then tNearbyEnemyNavy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 140, 'Enemy') end
@@ -10228,9 +10240,9 @@ end--]]
                                     elseif iNearbyT2Arti <= 7 and (bEnemyHasFatboy or (bEnemyHasNearbyT2StructureOrLongRange and iNearbyT2Arti <= 3)) then
                                         --Enemy has a fatboy and we have a firebase - fortify the firebase if it lacks at least 8 T2 arti
 
-                                            iActionToAssign = refActionBuildEmergencyArti
-                                            iMinEngiTechLevelWanted = 2
-                                            --if bDebugMessages == true then LOG(sFunctionRef..': Dont have a firebase but will still build emergeny arti') end
+                                        iActionToAssign = refActionBuildEmergencyArti
+                                        iMinEngiTechLevelWanted = 2
+                                        --if bDebugMessages == true then LOG(sFunctionRef..': Dont have a firebase but will still build emergeny arti') end
                                         --end
                                     end
                                 end
@@ -11507,7 +11519,8 @@ end--]]
                             end
                         end
 
-                    elseif iCurrentConditionToTry == 38 then --Build T3 arti even if have low mass if enemy has one under construction
+
+                    elseif iCurrentConditionToTry == 38 then --High priority experimental builders, for if enemy has land experimental or t3 arti, or (UEF specific) sniper bots
                         if aiBrain[M27Overseer.refbDefendAgainstArti] and iHighestFactoryOrEngineerTechAvailable >= 3 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 4 and not(bHaveVeryLowPower) then
                             if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildExperimental]) or (aiBrain[refiLastExperimentalReference] == refiExperimentalArti or aiBrain[refiLastExperimentalReference] == refiExperimentalT3Arti) then
                                 iActionToAssign = refActionBuildExperimental
@@ -11516,17 +11529,25 @@ end--]]
                             else
                                 iActionToAssign = refActionBuildExperimental
                             end
-                            if iActionToAssign then
-                                --T3 engineers building t3 arti spend 18.8 per sec; want to be spending c.60% of mass on T3 arti
-                                if bHaveLowPower and aiBrain:GetEconomyStoredRatio('MASS') >= 0.01 then --If have low mass and not very low power then suggests ahve just enough power
-                                    iMaxEngisWanted = math.min(12, aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / (18.8 * 1.6))
-                                elseif aiBrain:GetEconomyStoredRatio('MASS') < 0.01 then
-                                    iMaxEngisWanted = math.min(20, aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / (18.8 * 1.6))
-                                else
-                                    iMaxEngisWanted = math.min(30, aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / (18.8 * 1.6))
-                                end
-                                iMinEngiTechLevelWanted = 3
+                        end
+                        if not(iActionToAssign) then
+                            --Get land experimental if are UEF and dont have any and enemy has some or sniper bots
+                            if bDebugMessages == true then LOG(sFunctionRef..': Are we UEF? Faction index='..aiBrain:GetFactionIndex()..'; Mass gross income='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; Can path to enemy with land='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; Is enemy land experi table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]))..'; has enemybuilt sniper bots='..tostring(aiBrain[M27Overseer.refbEnemyHasBuiltSniperbots])..'; Cur strategy='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; Cur land experimentals='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental)) end
+                            if aiBrain:GetFactionIndex() == M27UnitInfo.refFactionUEF and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 10 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and (M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) or aiBrain[M27Overseer.refbEnemyHasBuiltSniperbots]) and (not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech) or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 16) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) == 0 then
+                                iActionToAssign = refActionBuildExperimental
+                                if bDebugMessages == true then LOG(sFunctionRef..': Want to build experimental as a priority so can get fatboy') end
                             end
+                        end --M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) and
+                        if iActionToAssign then
+                            --T3 engineers building t3 arti spend 18.8 per sec; want to be spending c.60% of mass on T3 arti
+                            if bHaveLowPower and aiBrain:GetEconomyStoredRatio('MASS') >= 0.01 then --If have low mass and not very low power then suggests ahve just enough power
+                                iMaxEngisWanted = math.min(12, aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / (18.8 * 1.6))
+                            elseif aiBrain:GetEconomyStoredRatio('MASS') < 0.01 then
+                                iMaxEngisWanted = math.min(20, aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / (18.8 * 1.6))
+                            else
+                                iMaxEngisWanted = math.min(30, aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / (18.8 * 1.6))
+                            end
+                            iMinEngiTechLevelWanted = 3
                         end
 
                     elseif iCurrentConditionToTry == 39 then --Hive near firebase T3 shield that has reclaim nearby

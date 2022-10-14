@@ -23,6 +23,7 @@ subrefNukeLaunchLocations = 'M27TeamNukeTargets' --stored against tTeamData[brai
 refiEnemyWalls = 'M27TeamEnemyWallCount' --stored against tTeamData[brain.M27Team], returns the ntotal number of enemy wall units; used as threshold to enable engineers to start looking for wall segments to reclaim
 refiTimeOfLastEnemyTeamDataUpdate = 'M27TeamEnemyLastUpdate' --as above, returns the gametimeseconds of hte last update
 reftEnemyArtiToAvoid = 'M27TeamEnemyArtiToAvoid' --against tTeamData[aiBrain.M27Team], [x] is a count (so table.getn works), returns T2 arti units that has got enough mass kills to want to avoid
+reftEnemyAAToAvoid = 'M27TeamEnemyAAToAvoid' --Against tTeamData[aiBrain.M27Team], [x] is a count (so table.getn works), returns AA units that have got enough mass kills that we want to avoid them
 refiFriendlyFatboyCount = 'M27TeamFriendlyFatboys' --against tTeamData[aiBrain.M27Team], returns the number of friendly fatboys on the team
 refbActiveResourceMonitor = 'M27TeamActiveResourceMonitor' --against tTeamData[aiBrain.M27Team], true if the tema has an active resource monitor
 reftUnseenPD = 'M27TeamUnseenPD' --against tTeamData[aiBrain.M27Team], table of T2+ PD objects that have damaged an ally but havent been revealed yet
@@ -666,6 +667,22 @@ function RecordUnseenArti(oKilledBrain, oDangerousArti)
     end
 end
 
+function RecordDangerousAA(oKilledBrain, oDangerousAA)
+    local bIncludeInTable = true
+
+    if M27Utilities.IsTableEmpty(tTeamData[oKilledBrain.M27Team][reftEnemyAAToAvoid]) == false then
+        for iUnit, oUnit in tTeamData[oKilledBrain.M27Team][reftEnemyAAToAvoid] do
+            if oUnit == oDangerousAA then
+                bIncludeInTable = false
+            end
+        end
+    end
+    if bIncludeInTable then
+        table.insert(tTeamData[oKilledBrain.M27Team][reftEnemyAAToAvoid], oDangerousAA)
+        oDangerousAA[M27UnitInfo.refbIsDangerousAA] = true
+    end
+end
+
 function RecordSegmentsThatTeamHasVisualOf(aiBrain)
     if GetGameTimeSeconds() - (tTeamData[aiBrain.M27Team][refiTimeOfLastVisualUpdate] or -1) >= 0.99 then
         local iTimeStamp = GetGameTimeSeconds()
@@ -704,6 +721,7 @@ function TeamInitialisation(iTeamRef)
     --Should have already specified friendly M27 brains and recorded an empty table for tTeamData as part of RecordAllEnemiesAndAllies
     tTeamData[iTeamRef][subrefNukeLaunchLocations] = {}
     tTeamData[iTeamRef][reftEnemyArtiToAvoid] = {}
+    tTeamData[iTeamRef][reftEnemyAAToAvoid] = {}
     tTeamData[iTeamRef][reftTimeOfTransportLastLocationAttempt] = {}
     tTeamData[iTeamRef][tScoutAssignedToMexLocation] = {}
     tTeamData[iTeamRef][reftiTeamMessages] = {}

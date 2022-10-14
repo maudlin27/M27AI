@@ -121,6 +121,7 @@ refiTotalEnemyShortRangeThreat = 'M27OverseerShortRangeThreat' --as above
 refbT2NavyNearOurBase = 'M27OverseerT2NavyNearBase' --Against aiBrain, true if enemy has T2 navy near our base
 refiNearestT2PlusNavalThreat = 'M27OverseerNearestT2PlusNavalThreat' --against aibrain, returns absolute (not mod) distance of nearest enemy naval threat
 refbEnemyHasSeraDestroyers = 'M27OverseerEnemyHasT2Sera'
+refbEnemyHasBuiltSniperbots = 'M27OverseerEnemyHasSniperbots' --against aibrain, true if enemy has built sniperbots at any time
 
 
 --Platoon references
@@ -2817,8 +2818,10 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
                         for iUnit, oUnit in tMobileLand do
                             aiBrain[refiHighestMobileLandEnemyRange] = math.max(aiBrain[refiHighestMobileLandEnemyRange], M27UnitInfo.GetUnitMaxGroundRange(oUnit))
                         end
+                        if not(aiBrain[refbEnemyHasBuiltSniperbots]) and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategorySniperBot, tMobileLand)) == false then
+                            aiBrain[refbEnemyHasBuiltSniperbots] = true
+                        end
                     end
-
                 end
             end
         end

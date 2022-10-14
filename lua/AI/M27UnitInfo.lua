@@ -56,6 +56,7 @@ reftLastLocationOfPathingGroup = 'M27UnitLastLocationOfPathingGroup' --Unit's po
 --refoOriginalBrainOwner = 'M27UnitOriginalOwner' --DO NOT USE - Looks like varaibles recorded against a unit pre-transfer get wiped out post-transfer; However also looks like units have a .oldowner field which should give this info
 refbTreatAsVisible = 'M27UnitTreatAsVisible' --used for unseen T2PD that damages us - means we will calculate threat on it
 reftLastKnownPosition = 'M27UnitLastKnownPosition' --Used for naval units to try and avoid AI cheating while giving it a basic memory
+refbIsDangerousAA = 'M27UnitIsDangerousAA' --true if have added to table due to being dangeorus
 
 --Order related - used for navy (platoon uses platoon tracking)
 reftLastOrderTarget = 'M27UnitLastOrderTarget' --location of last target (e.g. for issuemove)
