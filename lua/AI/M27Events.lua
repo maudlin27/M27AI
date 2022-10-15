@@ -1298,6 +1298,8 @@ function OnConstructed(oEngineer, oJustBuilt)
                         if bDebugMessages == true then LOG(sFunctionRef..': Just given order for oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to build T1 radar at location '..repru(M27Utilities.MoveInDirection(oJustBuilt:GetPosition(), M27Utilities.GetAngleFromAToB(oJustBuilt:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)), 5, true))) end
                     end
                 end
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryPD, oJustBuilt.UnitId) then
+                ForkThread(M27UnitInfo.SetUnitTargetPriorities, oJustBuilt, M27UnitInfo.refWeaponPriorityPD)
 
             end
 

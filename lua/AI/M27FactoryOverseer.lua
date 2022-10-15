@@ -514,7 +514,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oFactory.UnitId == 'ueb0201' then bDebugMessages = true end
 
-    --if EntityCategoryContains(M27UnitInfo.refCategoryAirFactory, oFactory.UnitId) and GetGameTimeSeconds() >= 300 and aiBrain:GetArmyIndex() == 2 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber) >= 50 then bDebugMessages = true end
+    --if EntityCategoryContains(M27UnitInfo.refCategoryAirFactory * categories.TECH2, oFactory.UnitId) and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 10 then bDebugMessages = true end
     --if oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory) == 'urb01013' then bDebugMessages = true end
 
 
@@ -1742,7 +1742,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                                                     iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
                                                     bGetCheapest = true
-                                        bIgnoreTechDifferences = true
+                                                    bIgnoreTechDifferences = true
                                                     if bDebugMessages == true then
                                                         LOG(sFunctionRef .. ': Will build emergency torp bomber')
                                                     end
@@ -1807,7 +1807,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                     if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iEmergencyRange - 15, 'Enemy')) == false then
                                                         iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
                                                         bGetCheapest = true
-                                        bIgnoreTechDifferences = true
+                                                        bIgnoreTechDifferences = true
                                                         if bDebugMessages == true then
                                                             LOG(sFunctionRef .. ': Will build torp bomber')
                                                         end
@@ -1928,7 +1928,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 if bWantTorpBomber then
                                                     iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
                                                     bGetCheapest = true
-                                        bIgnoreTechDifferences = true
+                                                    bIgnoreTechDifferences = true
                                                 else
                                                     if iCurT1Bombers < 80 then
                                                         iCategoryToBuild = M27UnitInfo.refCategoryBomber * categories.TECH1
@@ -1982,7 +1982,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         if bWantTorpBomber then
                                             iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
                                             bGetCheapest = true
-                                        bIgnoreTechDifferences = true
+                                            bIgnoreTechDifferences = true
                                             iTotalWanted = 2
                                         else
                                             if M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryBomber, 1) == true then
@@ -2033,12 +2033,16 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                                 elseif iCurrentConditionToTry == 8 then
                                     --Initial engis
-                                    if M27Conditions.LifetimeBuildCountLessThan(aiBrain, refCategoryEngineer, aiBrain[refiInitialEngineersWanted] + 1) == true then
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': Lifetime engi build count too low, will build engi')
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iFactoryTech='..iFactoryTechLevel..'; Highest air or land fac='..math.max(aiBrain[M27Overseer.refiOurHighestAirFactoryTech], aiBrain[M27Overseer.refiOurHighestLandFactoryTech])..'; Cur engis of this tech='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel))..'; Lifetime engis of htis tech='..M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel))) end
+                                    if iFactoryTechLevel >= math.min(3, math.max(aiBrain[M27Overseer.refiOurHighestAirFactoryTech], aiBrain[M27Overseer.refiOurHighestLandFactoryTech])) then
+                                        local iEngisOfTechBuiltEver = M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel))
+                                        if iEngisOfTechBuiltEver <= 5 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)) < 3 then
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef .. ': Lifetime or current engi build count too low, will build engi')
+                                            end
+                                            iCategoryToBuild = refCategoryEngineer
+                                            iTotalWanted = 1
                                         end
-                                        iCategoryToBuild = refCategoryEngineer
-                                        iTotalWanted = 1
                                     end
                                 elseif iCurrentConditionToTry == 9 then
                                     if bDebugMessages == true then
@@ -2279,13 +2283,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             else
                                                 iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
                                                 bGetCheapest = true
-                                        bIgnoreTechDifferences = true
+                                                bIgnoreTechDifferences = true
                                             end
                                         else
                                             iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
                                             iTotalWanted = aiBrain[M27AirOverseer.refiTorpBombersWanted]
                                             bGetCheapest = true
-                                        bIgnoreTechDifferences = true
+                                            bIgnoreTechDifferences = true
                                         end
                                     end
                                 elseif iCurrentConditionToTry == 21 then --Bombers for air domination
