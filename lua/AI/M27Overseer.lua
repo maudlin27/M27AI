@@ -81,6 +81,8 @@ refiModDistFromStartNearestThreat = 'M27OverseerNearestThreat' --Mod distance of
 refiModDistEmergencyRange = 'M27OverseerModDistEmergencyRange'
 reftLocationFromStartNearestThreat = 'M27OverseerLocationNearestLandThreat' --Distance of closest enemy
 refoNearestThreat = 'M27overseerNearestLandThreat' --Unit of nearest land threat
+refoNearestEnemyT2PlusStructure = 'M27OverseerNearestEnemyT2PlusStructure' --against aibrain, nearest enemy T2+ structure
+refiNearestEnemyT2PlusStructure = 'M27OverseerNearestEnemyT2PlusStructureDistance' --against aibrain, distance to our base of nearest enemy T2+ structure
 refiPercentageOutstandingThreat = 'M27PercentageOutstandingThreat' --% of moddistance
 refiPercentageClosestFriendlyFromOurBaseToEnemy = 'M27OverseerPercentageClosestFriendly'
 refiPercentageClosestFriendlyLandFromOurBaseToEnemy = 'M27OverseerClosestLandFromOurBaseToEnemy' --as above, but not limited to combat units, e.g. includes mexes
@@ -119,6 +121,7 @@ refiTotalEnemyShortRangeThreat = 'M27OverseerShortRangeThreat' --as above
 refbT2NavyNearOurBase = 'M27OverseerT2NavyNearBase' --Against aiBrain, true if enemy has T2 navy near our base
 refiNearestT2PlusNavalThreat = 'M27OverseerNearestT2PlusNavalThreat' --against aibrain, returns absolute (not mod) distance of nearest enemy naval threat
 refbEnemyHasSeraDestroyers = 'M27OverseerEnemyHasT2Sera'
+refbEnemyHasBuiltSniperbots = 'M27OverseerEnemyHasSniperbots' --against aibrain, true if enemy has built sniperbots at any time
 
 
 --Platoon references
@@ -1245,13 +1248,24 @@ function AssignMAAToPreferredPlatoons(aiBrain)
                 end
             end
         end
+        local oExistingMAAPlatoon = oACU[refoUnitsMAAHelper]
+
+        --Increase MAA threat wanted if vulnerable to air snipe and we have T2+ land factory
+        if aiBrain[refbACUVulnerableToAirSnipe] and aiBrain[refiOurHighestLandFactoryTech] >= 2 then
+            iMAAThreatWanted = iMAAThreatWanted + 200
+            iMinACUMAAThreatWanted = iMinACUMAAThreatWanted + 200
+            if  oExistingMAAPlatoon and oExistingMAAPlatoon[M27PlatoonUtilities.reftCurrentUnits] and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryMAA * categories.TECH2,oExistingMAAPlatoon[M27PlatoonUtilities.reftCurrentUnits])) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryMAA * categories.TECH2) > 0 then
+                iMAAThreatWanted = iMAAThreatWanted + 200
+                iMinACUMAAThreatWanted = iMinACUMAAThreatWanted + 200
+            end
+        end
 
 
         local sMAAPlatoonName = 'M27MAAAssister'
         local bNeedMoreMAA = false
         local bACUNeedsMAAHelper = true
         local oNewMAAPlatoon
-        local oExistingMAAPlatoon = oACU[refoUnitsMAAHelper]
+
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': About to check if ACU needs MAA; iMAAWanted=' .. iMAAThreatWanted..'; iMinACUMAAThreatWanted='..iMinACUMAAThreatWanted..'; Enemy air to ground threat='..(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 0)..'; Enemy air factories='..repru(aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech]))
             if oExistingMAAPlatoon then LOG(sFunctionRef..': oExistingMAAPlatoon mass value='..oExistingMAAPlatoon[M27PlatoonUtilities.refiPlatoonMassValue]..'; current units='..oExistingMAAPlatoon[M27PlatoonUtilities.refiCurrentUnits]) end
@@ -2804,8 +2818,10 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
                         for iUnit, oUnit in tMobileLand do
                             aiBrain[refiHighestMobileLandEnemyRange] = math.max(aiBrain[refiHighestMobileLandEnemyRange], M27UnitInfo.GetUnitMaxGroundRange(oUnit))
                         end
+                        if not(aiBrain[refbEnemyHasBuiltSniperbots]) and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategorySniperBot, tMobileLand)) == false then
+                            aiBrain[refbEnemyHasBuiltSniperbots] = true
+                        end
                     end
-
                 end
             end
         end
@@ -3182,10 +3198,14 @@ function ThreatAssessAndRespond(aiBrain)
     local iTMDAndShieldSearchRange = 25 --If dealing with T2+ PD will look for nearby shields and TMD
     local iT2ArtiSearchRange = 50 --Will look for nearby T2 arti within this range
     local iNavyUnitCategories = M27UnitInfo.refCategoryNavyThatCanBeTorpedoed
-    local tCategoriesToSearch = { refCategoryMobileLand, M27UnitInfo.refCategoryPD }
+    local tCategoriesToSearch = { refCategoryMobileLand, M27UnitInfo.refCategoryPD + M27UnitInfo.refCategoryStructure - categories.TECH1 }
     if M27MapInfo.bMapHasWater == true then
-        tCategoriesToSearch = { refCategoryMobileLand, M27UnitInfo.refCategoryPD, iNavyUnitCategories }
+        tCategoriesToSearch = { refCategoryMobileLand, M27UnitInfo.refCategoryPD + M27UnitInfo.refCategoryStructure - categories.TECH1, iNavyUnitCategories }
     end
+
+    local iCategoryTypeLand = 1
+    local iCategoryTypeStructure = 2
+    local iCategoryTypeNavy = 3
     ResetEnemyThreatGroups(aiBrain, math.max(iNavySearchRange, iLandThreatSearchRange), tCategoriesToSearch)
     local bConsideringNavy
     local bUnitOnWater, tEnemyUnitPos
@@ -3284,6 +3304,8 @@ function ThreatAssessAndRespond(aiBrain)
     local bCanPathToTarget
 
     aiBrain[refoNearestThreat] = nil
+    aiBrain[refoNearestEnemyT2PlusStructure] = nil
+    aiBrain[refiNearestEnemyT2PlusStructure] = 10000
 
     if aiBrain[refiEnemyHighestTechLevel] > 1 then
         iNavalBlipThreat = 2000 --Cruiser
@@ -3291,10 +3313,10 @@ function ThreatAssessAndRespond(aiBrain)
     for iEntry, iCategory in tCategoriesToSearch do
         bConsideringNavy = false
         iSearchRange = iLandThreatSearchRange
-        if iCategory == iNavyUnitCategories then
+        if iEntry == iCategoryTypeNavy then
             bConsideringNavy = true
             iSearchRange = iNavySearchRange
-        elseif iCategory == M27UnitInfo.refCategoryPD then
+        elseif iEntry == iCategoryTypeStructure then
             sPathing = M27UnitInfo.refPathingTypeLand
         else
             if aiBrain[refiOurHighestFactoryTechLevel] >= 2 or aiBrain:GetFactionIndex() == M27UnitInfo.refFactionAeon or aiBrain:GetFactionIndex() == M27UnitInfo.refFactionSeraphim then
@@ -3349,7 +3371,7 @@ function ThreatAssessAndRespond(aiBrain)
                                 bCanPathToTarget = false
                                 if bConsideringNavy or tiOurBasePathingGroup[sPathing] == M27MapInfo.GetSegmentGroupOfLocation(sPathing, oEnemyUnit:GetPosition()) then
                                     bCanPathToTarget = true
-                                elseif iCategory == M27UnitInfo.refCategoryPD then
+                                elseif iEntry == iCategoryTypeStructure then
                                     --If we travel from the target towards our base and at 45 degree angles (checking 5 points in total) can any of them path there?
                                     local iRangeToCheck = 30 + 2
                                     if aiBrain[refiMinIndirectTechLevel] == 2 then
@@ -3381,7 +3403,8 @@ function ThreatAssessAndRespond(aiBrain)
                                     end
                                     AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iThreatGroupDistance, iCategory, not (bConsideringNavy), bConsideringNavy, iNavalBlipThreat)
                                     --Add nearby structures to threat rating if dealing with structures and enemy has T2+ PD near them
-                                    if iCategory == M27UnitInfo.refCategoryPD and oEnemyUnit[iArmyIndex][refsEnemyThreatGroup][refiThreatGroupHighestTech] >= 2 then
+                                    --v59 - removed as have expanded initial threat to cover T2 structures not just T2 PD
+                                    --[[if iEntry == iCategoryTypeStructure and oEnemyUnit[iArmyIndex][refsEnemyThreatGroup][refiThreatGroupHighestTech] >= 2 then
                                         local tNearbyDefensiveStructures = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD * categories.STRUCTURE + M27UnitInfo.refCategoryFixedShield, tEnemyUnitPos, iTMDAndShieldSearchRange, 'Enemy')
                                         if M27Utilities.IsTableEmpty(tNearbyDefensiveStructures) == false then
                                             for iDefence, oDefenceUnit in tNearbyDefensiveStructures do
@@ -3400,7 +3423,7 @@ function ThreatAssessAndRespond(aiBrain)
                                                 end
                                             end
                                         end
-                                    end
+                                    end--]]
                                 elseif bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Cant path to enemy unit=' .. oEnemyUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oEnemyUnit))
                                 end
@@ -3536,6 +3559,19 @@ function ThreatAssessAndRespond(aiBrain)
             local iDefaultEnemySearchRange = math.min(105, math.max(20 + 15 * aiBrain[refiEnemyHighestTechLevel], aiBrain[refiHighestMobileLandEnemyRange]))
 
             for iEnemyGroup, tEnemyThreatGroup in M27Utilities.SortTableBySubtable(aiBrain[reftEnemyThreatGroup], refiModDistanceFromOurStart, true) do
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering threat group '..iEnemyGroup..'; Do we already have a valid refoNearestEnemyT2PlusStructure='..tostring(M27UnitInfo.IsUnitValid(aiBrain[refoNearestEnemyT2PlusStructure]))..'; Does threat group contain t2 buildings='..tostring(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryStructure - categories.TECH1, tEnemyThreatGroup[refoEnemyGroupUnits])))) end
+                if not(aiBrain[refoNearestEnemyT2PlusStructure]) then
+                    local tEnemyT2PlusBuildings = EntityCategoryFilterDown(M27UnitInfo.refCategoryStructure - categories.TECH1, tEnemyThreatGroup[refoEnemyGroupUnits])
+                    if M27Utilities.IsTableEmpty(tEnemyT2PlusBuildings) == false then
+                        aiBrain[refoNearestEnemyT2PlusStructure] = M27Utilities.GetNearestUnit(tEnemyT2PlusBuildings, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain)
+                        if not(aiBrain[refoNearestEnemyT2PlusStructure].IsCivilian) and not(M27Logic.IsCivilianBrain(aiBrain[refoNearestEnemyT2PlusStructure]:GetAIBrain())) then
+                            aiBrain[refiNearestEnemyT2PlusStructure] = M27Utilities.GetDistanceBetweenPositions(aiBrain[refoNearestEnemyT2PlusStructure]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                        else
+                            aiBrain[refoNearestEnemyT2PlusStructure] = nil --Nearest building is civilian so ignore
+                        end
+                    end
+                    --M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryStructure - categories.TECH1, tEnemyThreatGroup[
+                end
                 if bFirstThreatGroup then
                     bFirstThreatGroup = false
                     aiBrain[refiModDistFromStartNearestThreat] = tEnemyThreatGroup[refiModDistanceFromOurStart]
@@ -3546,7 +3582,7 @@ function ThreatAssessAndRespond(aiBrain)
                 end
                 bIndirectThreatOnly = false
                 bConsideringNavy = false
-                if tEnemyThreatGroup[refiThreatGroupCategory] == M27UnitInfo.refCategoryPD then
+                if tEnemyThreatGroup[refiThreatGroupCategory] == tCategoriesToSearch[iCategoryTypeStructure] then
                     bIndirectThreatOnly = true
                 elseif tEnemyThreatGroup[refiThreatGroupCategory] == iNavyUnitCategories then
                     bConsideringNavy = true
@@ -4521,8 +4557,29 @@ function ThreatAssessAndRespond(aiBrain)
     end -->0 enemy threat groups
 
     --Do we have sniper bots near our base? then will flag that we want indirect fire units
-    if not (aiBrain[refbNeedIndirect]) and aiBrain[refiOurHighestLandFactoryTech] == 3 and aiBrain[refiModDistFromStartNearestThreat] <= 160 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySniperBot, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 150, 'Enemy')) == false then
+    if not (aiBrain[refbNeedIndirect]) and aiBrain[refiOurHighestLandFactoryTech] >= 3 and aiBrain[refiModDistFromStartNearestThreat] <= 200 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySniperBot, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 200, 'Enemy')) == false then
         aiBrain[refbNeedIndirect] = true
+    end
+
+    --Expand nearest structure to include those damaging/killing our units that havent been revealed yet
+    local iCurDist
+    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid]) == false then
+        for iUnit, oUnit in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid] do
+            iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+            if iCurDist < aiBrain[refiNearestEnemyT2PlusStructure] then
+                aiBrain[refiNearestEnemyT2PlusStructure] = iCurDist
+                aiBrain[refoNearestEnemyT2PlusStructure] = oUnit
+            end
+        end
+    end
+    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftUnseenPD]) == false then
+        for iUnit, oUnit in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftUnseenPD] do
+            iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+            if iCurDist < aiBrain[refiNearestEnemyT2PlusStructure] then
+                aiBrain[refiNearestEnemyT2PlusStructure] = iCurDist
+                aiBrain[refoNearestEnemyT2PlusStructure] = oUnit
+            end
+        end
     end
 
     --Disband any indirect defenders that havent just been assigned
@@ -4689,7 +4746,6 @@ function ACUManager(aiBrain)
     local sFunctionRef = 'ACUManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
 
     if not (aiBrain.M27IsDefeated) and M27Logic.iTimeOfLastBrainAllDefeated < 10 then
         local oACU = M27Utilities.GetACU(aiBrain)
@@ -6562,7 +6618,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
     --local bDebugMessages = M27Config.M27StrategicLog
     local sFunctionRef = 'StrategicOverseer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if GetGameTimeSeconds() >= 960 then bDebugMessages = true end
 
     if not(aiBrain[M27Logic.refbAllEnemiesDead]) then
         --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
@@ -7015,7 +7070,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             local iTemporaryTurtleDefenceRange --Limit defence range based on this
 
             --Only consider temporary turtle if we have a firebase, provided the firebase itself isnt too far from us (to avoid risk e.g. of inheriting ally base that contains firebase)
-            if bDebugMessages == true then LOG(sFunctionRef..': About to check if we should temporarily turtle. Is table of firebases empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]))..'; are there big threats='..tostring(aiBrain[refbAreBigThreats])..'; GameTime='..GetGameTimeSeconds()..'; Nearest threat from start mod='..aiBrain[refiModDistFromStartNearestThreat]..'; Mexes available for upgrade='..aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade]..'; Furthest valuable building mod dist='..aiBrain[refiFurthestValuableBuildingModDist]..'; Enemy best mobile range='..aiBrain[refiHighestMobileLandEnemyRange]..'; Is table of planned chokepoints empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart]))..'; Enemy highest tech level='..aiBrain[refiEnemyHighestTechLevel]) end
+            if bDebugMessages == true then LOG(sFunctionRef..': About to check if we should temporarily turtle. Is table of firebases empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]))..'; are there big threats='..tostring(aiBrain[refbAreBigThreats] or false)..'; GameTime='..GetGameTimeSeconds()..'; Nearest threat from start mod='..(aiBrain[refiModDistFromStartNearestThreat] or 'nil')..'; Mexes available for upgrade='..(aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] or 'nil')..'; Furthest valuable building mod dist='..(aiBrain[refiFurthestValuableBuildingModDist] or 'nil')..'; Enemy best mobile range='..(aiBrain[refiHighestMobileLandEnemyRange] or 'nil')..'; Is table of planned chokepoints empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart]))..'; Enemy highest tech level='..(aiBrain[refiEnemyHighestTechLevel] or 'nil')) end
             if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]) == false then
                 --Are we a non-chokepoint map, with enemies more than 80 from our base, and multiple mexes available to upgrade, and it's not the first 10m of the game (when we want to focus more on map control), and havent got to experimental stage of game yet?
                 if GetGameTimeSeconds() >= 600 and aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] >= 2 and aiBrain[refiModDistFromStartNearestThreat] >= 80 and not(bChokepointsAreProtected) and M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart]) then
@@ -7155,9 +7210,9 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                     LOG(sFunctionRef .. ': Dont want to go for air dominance due to enemy highest ever air threat being >75% of ours')
                                 end
                                 bEnemyHasEnoughAA = true
-                            elseif not (aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then
+                            elseif not (aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and aiBrain[M27AirOverseer.refiAirAANeeded] > 0 and (aiBrain[M27AirOverseer.refiAirAANeeded] >= 5 or not(aiBrain[M27AirOverseer.refbHaveAirControl]) or aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] / 0.7 > aiBrain[M27AirOverseer.refiOurMassInAirAA]) then
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Dont want air dominance as still need airAA')
+                                    LOG(sFunctionRef .. ': Dont want air dominance as still need airAA, aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded])
                                 end
                                 bEnemyHasEnoughAA = true
                             end
@@ -7168,7 +7223,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Enemy doesnt have enough AA, will check we have some bombers alive')
                             end
-                            if M27Utilities.IsTableEmpty(tBombers) == true then
+                            if M27Utilities.IsTableEmpty(tBombers) == true and M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableGunships]) then
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': We dont have any bombers, so dont switch to air dominance yet')
                                 end
@@ -7178,7 +7233,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                     LOG(sFunctionRef .. ': Enemy mass in ground AA=' .. (aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] or 'nil') .. '; table size of bombers=' .. table.getn(tBombers) .. '; Threat of bombers=' .. M27Logic.GetAirThreatLevel(aiBrain, tBombers, false, false, false, true, false, nil, nil, nil, nil, false))
                                 end
                                 --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo)
-                                if aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] > 0 and aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] * 10 > M27Logic.GetAirThreatLevel(aiBrain, tBombers, false, false, false, true, false, nil, nil, nil, nil, false) then
+                                if aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] > 0 and aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] * 10 > (M27Logic.GetAirThreatLevel(aiBrain, tBombers, false, false, false, true, false, nil, nil, nil, nil, false) + M27Logic.GetAirThreatLevel(aiBrain, aiBrain[M27AirOverseer.reftAvailableGunships], false, false, false, true, false, nil, nil, nil, nil, false)) then
                                     --Further override - if have 3+ strats, and enemy has no cruisers or T3+ AA, then do air dom mode
                                     bEnemyHasEnoughAA = true
                                     if bDebugMessages == true then
@@ -7835,8 +7890,16 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
             --Flag we need AirAA as an emergency and set ACU health to run equal to max health if we fear an air snipe
             if bDebugMessages == true then LOG(sFunctionRef..': Considering if vulnerable to air snipe. iDistToOurBase='..iDistToOurBase..'; have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl])..'; aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]..'; aiBrain[M27AirOverseer.refiOurMassInAirAA]='..aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; Enemy AirAA threat='..aiBrain[M27AirOverseer.refiEnemyAirAAThreat]) end
-            if iDistToOurBase >= 200 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1500 and not(oACU:HasEnhancement('CloakingGenerator')) then
+            if iDistToOurBase >= 200 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1800 and not(oACU:HasEnhancement('CloakingGenerator')) then
+                --(1500 threshold as have seen replays where Gun+T2 ACU with mobile shield and T2 MAA escort dies to T1 bombers
+                local tNearbyEnemyAir = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllAir * categories.EXPERIMENTAL + M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryGunship, oACU:GetPosition(), 130, 'Enemy')
                 aiBrain[refbACUVulnerableToAirSnipe] = true
+                if bDebugMessages == true then LOG(sFunctionRef..': Set ACU as being vulnerable to an air snipe. Is table of nearby enemy air to ground empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyAir))) end
+
+                --Also retreat if nearby enemy air threat nearby and ACU not close to base
+                if M27Utilities.IsTableEmpty(tNearbyEnemyAir) == false then
+                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
+                end
                 --Potential air threat; will distinguish between the following scenarios:
                 --High risk of air snipe requiring emergency AA production
                 --Risk of air snipe due to being far away from AirAA support
@@ -7844,7 +7907,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 if not(aiBrain[M27AirOverseer.refbHaveAirControl]) and aiBrain[M27AirOverseer.refiOurMassInAirAA] <= math.max(2000, aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] * 0.5) then
                     --High risk of air snipe.  Set health to run equal to 75% normally, or 100% if we have weak MAA nearby
 
-                    aiBrain[refbACUVulnerableToAirSnipe] = true
+                    --aiBrain[refbACUVulnerableToAirSnipe] = true
                     aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.75)
                     local tNearbyMAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, oACU:GetPosition(), 60, 'Ally')
                     local iNearbyMAAThreat = 0
@@ -7854,7 +7917,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                     if iNearbyMAAThreat <= 400 then
                         aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
                         if bDebugMessages == true then LOG(sFunctionRef..': ACU very vulnerable to Air snipe, will retreat even if on full health') end
-                    elseif iNearbyMAAThreat <= 750 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 4000 then
+                    elseif iNearbyMAAThreat <= 750 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 2500 then
                         if bDebugMessages == true then LOG(sFunctionRef..': ACU vulnerable to air snipe, but not massively, so will just retreat if not quite full health') end
                         aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.9)
                     end
@@ -7875,7 +7938,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                     aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
                                     if bDebugMessages == true then LOG(sFunctionRef..': Have little MAA nearby and AirAA is a long way away so will run even if on full health') end
                                 else
-                                    local tNearbyEnemyAir = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, oACU:GetPosition(), 70, 'Enemy')
                                     if bDebugMessages == true then LOG(sFunctionRef..': Is table of nearby enemy air empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyAir))) end
                                     if M27Utilities.IsTableEmpty(tNearbyEnemyAir) == false then
                                         aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
@@ -7890,11 +7952,14 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                     end
 
                 end
+
+
             else
                 aiBrain[refbACUVulnerableToAirSnipe] = false
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': aiBrain='..aiBrain.Nickname..'; iDistToOurBase='..iDistToOurBase..'; Has enemy built torpedo bombers='..tostring(aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] or false)..'; iUpgradeCount='..iUpgradeCount..'; Enemy air to ground threat='..(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 'nil')..'; Can path to enemy with land='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; can path to enemy with amphib='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; Is ACU underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oACU))) end
 
+
+            if bDebugMessages == true then LOG(sFunctionRef..': aiBrain='..aiBrain.Nickname..'; iDistToOurBase='..iDistToOurBase..'; End of deciding if vulnerable to air snipe, is ACU vulnerable='..tostring(aiBrain[refbACUVulnerableToAirSnipe])..'; Current ACU health to run on before further adjustment='..aiBrain[refiACUHealthToRunOn]..'; Has enemy built torpedo bombers='..tostring(aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] or false)..'; iUpgradeCount='..iUpgradeCount..'; Enemy air to ground threat='..(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 'nil')..'; Can path to enemy with land='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; can path to enemy with amphib='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; Is ACU underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oACU))) end
             --If ACU far from base and is amphibious map and ACU is in big pond, without many upgrades, and enemy has built at least 1 torpedo bomber this game, then have it run if the enemy has torp bombers
             if iDistToOurBase > 175 and (aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] or aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0) and iUpgradeCount < 3 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 200 and not(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and M27UnitInfo.IsUnitUnderwater(oACU) then
                 --is the ACU in a large pond (10k+ in size)?

@@ -82,7 +82,7 @@ AIBrain = Class(M27AIBrainClass) {
 
     end,
 
-    InitializeSkirmishSystems = function(self)
+    --[[InitializeSkirmishSystems = function(self)
         if not(self.M27AI) then M27AIBrainClass.InitializeSkirmishSystems(self)
         else
             local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -143,11 +143,13 @@ AIBrain = Class(M27AIBrainClass) {
             end
 
             local plat = self:GetPlatoonUniquelyNamed('ArmyPool')
+            --]]
             --[[if self.Sorian then
                 plat:ForkThread(plat.BaseManagersDistressAISorian)
             else
                 plat:ForkThread(plat.BaseManagersDistressAI)
             end]]--
+            --[[
 
 
             self.DeadBaseThread = self:ForkThread(self.DeadBaseMonitor)
@@ -157,7 +159,7 @@ AIBrain = Class(M27AIBrainClass) {
                 self.EnemyPickerThread = self:ForkThread(self.PickEnemy)
             end
         end
-    end,
+    end,--]]
 
 
 

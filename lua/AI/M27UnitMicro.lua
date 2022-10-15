@@ -252,83 +252,93 @@ function ForkedMoveInCircle(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontCle
     local sFunctionRef = 'ForkedMoveInCircle'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --KEY CONFIG SETTINGS: (these will work sometimes but not always against an aeon strat)
-    local iInitialAngleAdj = 15
-    local iInitialDistanceAdj = -1
-    local iDistanceAwayToMove = (iCircleSizeOverride or 2)
-    local iAngleMaxSingleAdj = 45
-    local iTicksBetweenOrders = (iTickWaitOverride or 4)
+    local refbActiveCircleMicro = 'M27MicroActiveCircleMicro'
 
-    if iDistanceAwayToMove > oUnit:GetBlueprint().Physics.MaxSpeed * 1.5 then
-        iAngleMaxSingleAdj = math.max(25, iAngleMaxSingleAdj * 2.5 / iDistanceAwayToMove)
-    end
+    if bDebugMessages == true then LOG(sFunctionRef..': GameTime='..GetGameTimeSeconds()..'; Unit has active circle micro='..tostring(oUnit[refbActiveCircleMicro] or false)) end
+    if not(oUnit[refbActiveCircleMicro]) then
 
+        --KEY CONFIG SETTINGS: (these will work sometimes but not always against an aeon strat)
+        local iInitialAngleAdj = 15
+        local iInitialDistanceAdj = -1
+        local iDistanceAwayToMove = (iCircleSizeOverride or 2)
+        local iAngleMaxSingleAdj = 45
+        local iTicksBetweenOrders = (iTickWaitOverride or 4)
 
-
-    local iStartTime = GetGameTimeSeconds()
-    oUnit[M27UnitInfo.refiGameTimeMicroStarted] = iStartTime
-    local iLoopCount = 0
-    local iMaxLoop = iTimeToRun * 10 + 1
-    --Distance from point A to point B will be much less than distanceaway to move, since that is the distance from the centre (radius) rather than the distance between 1 points on the circle edge; for simplicity will assume that distance is 0.25 of the distance from the centre
-    if bDontTreatAsMicroAction then iMaxLoop = math.ceil(iTimeToRun / (iDistanceAwayToMove / oUnit:GetBlueprint().Physics.MaxSpeed)) * 4 end
-    local tUnitStartPosition = oUnit:GetPosition()
-    --local iAngleToTargetToEscape = M27Utilities.GetAngleFromAToB(tUnitStartPosition, tPositionToRunFrom)
-    local iCurFacingDirection = M27UnitInfo.GetUnitFacingAngle(oUnit)
-    local iAngleAdjFactor = 1
-    --local iFacingAngleWanted = iAngleToTargetToEscape + 180
-    --if iFacingAngleWanted >= 360 then iFacingAngleWanted = iFacingAngleWanted - 360 end
-
-    --Do we turn clockwise or anti-clockwise?
-    --if math.abs(iCurFacingDirection - iFacingAngleWanted) > 180 then iAngleAdjFactor = 1 --Clockwise
-    --else iAngleAdjFactor = -1 end --Anticlockwise
-
-
-    local iCurAngleDif
-
-    local tTempLocationToMove
-
-
-    if not(bDontTreatAsMicroAction) then
-        TrackTemporaryUnitMicro(oUnit, iTimeToRun)
-        --[[oUnit[M27UnitInfo.refbSpecialMicroActive] = true
-        if oUnit.PlatoonHandle then
-            oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
+        if iDistanceAwayToMove > oUnit:GetBlueprint().Physics.MaxSpeed * 1.5 then
+            iAngleMaxSingleAdj = math.max(25, iAngleMaxSingleAdj * 2.5 / iDistanceAwayToMove)
         end
-        M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)--]]
-    end
-    local bRecentMicro = false
-    local iRecentMicroThreshold = 1
-    local iGameTime = GetGameTimeSeconds()
-    if oUnit[M27UnitInfo.refbSpecialMicroActive] and iGameTime - oUnit[M27UnitInfo.refiGameTimeMicroStarted] < iRecentMicroThreshold then bRecentMicro = true end
 
-    if bRecentMicro == false and not(bDontClearCommandsFirst) then M27Utilities.IssueTrackedClearCommands({oUnit}) end
-    if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for move commands; iTimeToRun='..iTimeToRun..'; iStartTime='..iStartTime..'; iCurFacingDirection='..iCurFacingDirection..'; tUnitStartPosition='..repru(tUnitStartPosition)) end
-    local iTempAngleDirectionToMove = iCurFacingDirection + iInitialAngleAdj * iAngleAdjFactor
-    local iTempDistanceAwayToMove
-    local bTimeToStop = false
-    if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; refbSpecialMicroActive='..tostring((oUnit[M27UnitInfo.refbSpecialMicroActive] or false))..'; iMaxLoop='..iMaxLoop) end
-    while bTimeToStop == false do
-    --while not(iTempAngleDirectionToMove == iFacingAngleWanted) do
-        iLoopCount = iLoopCount + 1
-        if iLoopCount > iMaxLoop then break
-        elseif M27UnitInfo.IsUnitValid(oUnit) == false then break end --No longer give error message as may be calling this for intel scouts now
+
+
+        local iStartTime = GetGameTimeSeconds()
+        oUnit[M27UnitInfo.refiGameTimeMicroStarted] = iStartTime
+        local iLoopCount = 0
+        local iMaxLoop = iTimeToRun * 10 + 1
+        --Distance from point A to point B will be much less than distanceaway to move, since that is the distance from the centre (radius) rather than the distance between 1 points on the circle edge; for simplicity will assume that distance is 0.25 of the distance from the centre
+        if bDontTreatAsMicroAction then iMaxLoop = math.ceil(iTimeToRun / (iDistanceAwayToMove / oUnit:GetBlueprint().Physics.MaxSpeed)) * 4 end
+        local tUnitStartPosition = oUnit:GetPosition()
+        --local iAngleToTargetToEscape = M27Utilities.GetAngleFromAToB(tUnitStartPosition, tPositionToRunFrom)
+        local iCurFacingDirection = M27UnitInfo.GetUnitFacingAngle(oUnit)
+        local iAngleAdjFactor = 1
+        --local iFacingAngleWanted = iAngleToTargetToEscape + 180
+        --if iFacingAngleWanted >= 360 then iFacingAngleWanted = iFacingAngleWanted - 360 end
+
+        --Do we turn clockwise or anti-clockwise?
+        --if math.abs(iCurFacingDirection - iFacingAngleWanted) > 180 then iAngleAdjFactor = 1 --Clockwise
+        --else iAngleAdjFactor = -1 end --Anticlockwise
+
+
+        local iCurAngleDif
+
+        local tTempLocationToMove
+
+        local bRecentMicro = false
+        local iRecentMicroThreshold = 1
+        local iGameTime = GetGameTimeSeconds()
+        if oUnit[M27UnitInfo.refbSpecialMicroActive] and iGameTime - oUnit[M27UnitInfo.refiGameTimeMicroStarted] < iRecentMicroThreshold then bRecentMicro = true end
+        if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for move commands for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iTimeToRun='..iTimeToRun..'; iStartTime='..iStartTime..'; iCurFacingDirection='..iCurFacingDirection..'; tUnitStartPosition='..repru(tUnitStartPosition)..'; bRecentMicro='..tostring((bRecentMicro or false))..'; bDontClearCommandsFirst='..tostring(bDontClearCommandsFirst or false)..'; oUnit[M27UnitInfo.refbSpecialMicroActive]='..tostring(oUnit[M27UnitInfo.refbSpecialMicroActive])..'; oUnit[M27UnitInfo.refiGameTimeMicroStarted]='..(oUnit[M27UnitInfo.refiGameTimeMicroStarted] or 'nil')..'; GameTime='..iGameTime..'; Dif='..iGameTime-(oUnit[M27UnitInfo.refiGameTimeMicroStarted] or 0)..'; bDontTreatAsMicroAction='..tostring((bDontTreatAsMicroAction or false))) end
+        if bRecentMicro == false and not(bDontClearCommandsFirst) then
+            M27Utilities.IssueTrackedClearCommands({oUnit})
+            if bDebugMessages == true then LOG(sFunctionRef..': Issued clear commands order to the unit') end
+        end
+        if not(bDontTreatAsMicroAction) then
+            TrackTemporaryUnitMicro(oUnit, iTimeToRun, refbActiveCircleMicro)
+            if bDebugMessages == true then LOG(sFunctionRef..': Will temporarily track the unit micro. iTimeToRun='..(iTimeToRun or 'nil')) end
+            --[[oUnit[M27UnitInfo.refbSpecialMicroActive] = true
+            if oUnit.PlatoonHandle then
+                oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
+            end
+            M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)--]]
+        end
+
+        local iTempAngleDirectionToMove = iCurFacingDirection + iInitialAngleAdj * iAngleAdjFactor
+        local iTempDistanceAwayToMove
+        local bTimeToStop = false
+        if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; refbSpecialMicroActive='..tostring((oUnit[M27UnitInfo.refbSpecialMicroActive] or false))..'; iMaxLoop='..iMaxLoop) end
+        while bTimeToStop == false do
+            --while not(iTempAngleDirectionToMove == iFacingAngleWanted) do
+            iLoopCount = iLoopCount + 1
+            if iLoopCount > iMaxLoop then break
+            elseif M27UnitInfo.IsUnitValid(oUnit) == false then break end --No longer give error message as may be calling this for intel scouts now
             --M27Utilities.ErrorHandler('Loop has gone on for too long, likely infinite') break end
 
-        --iCurAngleDif = math.abs(iTempAngleDirectionToMove - iFacingAngleWanted)
-        --if iCurAngleDif < iAngleMaxSingleAdj then iTempAngleDirectionToMove = iFacingAngleWanted
-        --else
+            --iCurAngleDif = math.abs(iTempAngleDirectionToMove - iFacingAngleWanted)
+            --if iCurAngleDif < iAngleMaxSingleAdj then iTempAngleDirectionToMove = iFacingAngleWanted
+            --else
             iTempAngleDirectionToMove = iTempAngleDirectionToMove + iAngleMaxSingleAdj * iAngleAdjFactor
             if iTempAngleDirectionToMove > 360 then iTempAngleDirectionToMove = iTempAngleDirectionToMove - 360 end
-        --end
-        iTempDistanceAwayToMove = iDistanceAwayToMove
-        if iLoopCount == 1 then iTempDistanceAwayToMove = iDistanceAwayToMove + iInitialDistanceAdj end
-        tTempLocationToMove = M27Utilities.MoveInDirection(tUnitStartPosition, iTempAngleDirectionToMove, iTempDistanceAwayToMove)
-        IssueMove({oUnit}, tTempLocationToMove)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        WaitTicks(iTicksBetweenOrders)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-        if not(bDontTreatAsMicroAction) and not((oUnit[M27UnitInfo.refiGameTimeMicroStarted] == iStartTime and GetGameTimeSeconds() - iStartTime < iTimeToRun)) then bTimeToStop = true end
+            --end
+            iTempDistanceAwayToMove = iDistanceAwayToMove
+            if iLoopCount == 1 then iTempDistanceAwayToMove = iDistanceAwayToMove + iInitialDistanceAdj end
+            tTempLocationToMove = M27Utilities.MoveInDirection(tUnitStartPosition, iTempAngleDirectionToMove, iTempDistanceAwayToMove)
+            IssueMove({oUnit}, tTempLocationToMove)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            WaitTicks(iTicksBetweenOrders)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+            if not(bDontTreatAsMicroAction) and not((oUnit[M27UnitInfo.refiGameTimeMicroStarted] == iStartTime and GetGameTimeSeconds() - iStartTime < iTimeToRun)) then bTimeToStop = true end
+        end
     end
+
 
     --[[while (oUnit[M27UnitInfo.refiGameTimeMicroStarted] == iStartTime and GetGameTimeSeconds() - iStartTime < iTimeToRun) do
         iLoopCount = iLoopCount + 1
@@ -440,7 +450,7 @@ function GetBombTarget(weapon, projectile)
     return nil
 end
 
-function TrackTemporaryUnitMicro(oUnit, iTimeActiveFor)
+function TrackTemporaryUnitMicro(oUnit, iTimeActiveFor, sAdditionalTrackingVar)
     --Where we are doing all actions upfront can call this to enable micro and then turn the flag off after set period of time
     --Note that air logic currently doesnt make use of this
 
@@ -455,6 +465,11 @@ function TrackTemporaryUnitMicro(oUnit, iTimeActiveFor)
     if oUnit.PlatoonHandle then
         oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
         M27Utilities.DelayChangeVariable(oUnit.PlatoonHandle, M27UnitInfo.refbSpecialMicroActive, false, iTimeActiveFor - 0.01)
+    end
+
+    if sAdditionalTrackingVar then
+        oUnit[sAdditionalTrackingVar] = true
+        M27Utilities.DelayChangeVariable(oUnit, sAdditionalTrackingVar, false, iTimeActiveFor - 0.01)
     end
 end
 
@@ -1922,5 +1937,118 @@ function ExperimentalSAMHitAndRun(oBomber, oTarget)
                 end
             end
         end
+    end
+end
+
+function ConsiderT2ArtiGroundFire(oArti)
+    --Periodically checks for if T2 arti should try ground-firing
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'ConsiderT2ArtiGroundFire'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local aiBrain = oArti:GetAIBrain()
+    local iArtiDistToBase = M27Utilities.GetDistanceBetweenPositions(oArti:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+
+    local iMaxRange = 0
+    local iFiringRandomness
+    local iAOE
+    local iFiringFrequency
+    local iMinArtiRange = 0
+
+    local oBP = oArti:GetBlueprint()
+    if oBP.Weapon then
+        for iCurWeapon, oCurWeapon in oBP.Weapon do
+            if (oCurWeapon.WeaponCategory == 'Missile' and not(oCurWeapon.DamageType == 'Nuke')) or oCurWeapon.WeaponCategory == 'Artillery' or oCurWeapon.WeaponCategory == 'Indirect Fire' then
+                if oCurWeapon.MaxRadius > iMaxRange then
+                    iMaxRange = oCurWeapon.MaxRadius
+                    iFiringRandomness = oCurWeapon.FiringRandomness
+                    iAOE = (oCurWeapon.DamageRadius or 1)
+                    iFiringFrequency = 1 / oCurWeapon.RateOfFire
+                    iMinArtiRange = (oCurWeapon.MinRadius or 0)
+                end
+            end
+        end
+    end
+    local iArtiEffectiveRange = iMaxRange
+    if iAOE >= 0.5 then
+        iArtiEffectiveRange = iMaxRange + iAOE + iFiringRandomness * 7
+    end
+
+    local tNearbyPriorityUnits
+    local iMaxSearchRange = iArtiEffectiveRange + iArtiDistToBase
+    local iPriorityCategories = M27UnitInfo.refCategoryStructure - categories.TECH1 + M27UnitInfo.refCategoryIndirectT2Plus + M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategorySniperBot + M27UnitInfo.refCategoryFatboy
+    local oNearestPriorityUnit
+    local tGroundFireTarget
+    local bIssueAttack
+    local iTimeToWait
+    local bHavePriorityVisibleInRange
+    local iNearestUnitDist
+    local iCurDist
+    if bDebugMessages == true then LOG(sFunctionRef..': Pre start of main loop for oArti='..oArti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oArti)..'; iMaxSearchRange='..iMaxSearchRange..'; iEffectiveRange='..iArtiEffectiveRange..'; iMaxRange='..iMaxRange..'; iArtiDistToBase='..iArtiDistToBase) end
+    while M27UnitInfo.IsUnitValid(oArti) do
+        tGroundFireTarget = nil
+        iTimeToWait = iFiringFrequency
+        bHavePriorityVisibleInRange = false
+        iNearestUnitDist = 10000
+        if bDebugMessages == true then LOG(sFunctionRef..': iMaxSearchRange='..iMaxSearchRange..'; refiNearestEnemyT2PlusStructure='..aiBrain[M27Overseer.refiNearestEnemyT2PlusStructure]) end
+        tNearbyPriorityUnits = {}
+        if aiBrain[M27Overseer.refiNearestEnemyT2PlusStructure] <= iMaxSearchRange then
+            tNearbyPriorityUnits = aiBrain:GetUnitsAroundPoint(iPriorityCategories, oArti:GetPosition(), iArtiEffectiveRange, 'Enemy')
+
+            if M27Utilities.IsTableEmpty(tNearbyPriorityUnits) == false then
+                oNearestPriorityUnit = M27Utilities.GetNearestUnit(tNearbyPriorityUnits, oArti:GetPosition())
+                iNearestUnitDist = M27Utilities.GetDistanceBetweenPositions(oNearestPriorityUnit:GetPosition(), oArti:GetPosition())
+                if bDebugMessages == true then LOG(sFunctionRef..': Nearest priority unit='..oNearestPriorityUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNearestPriorityUnit)..'; Distance to arti='..M27Utilities.GetDistanceBetweenPositions(oNearestPriorityUnit:GetPosition(), oArti:GetPosition())..'; iMaxRange='..iMaxRange..'; Effective range='..iArtiEffectiveRange) end
+                if iNearestUnitDist > iMaxRange then
+                    --No priority units within our range so want to ground fire at the closest priority unit
+                    tGroundFireTarget = M27Utilities.MoveInDirection(oArti:GetPosition(), M27Utilities.GetAngleFromAToB(oArti:GetPosition(), oNearestPriorityUnit:GetPosition()), iMaxRange - 0.05)
+                    bIssueAttack = true
+                else
+                    bHavePriorityVisibleInRange = true
+                end
+            else
+                if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies so will keep checking') end
+                iTimeToWait = 1
+            end
+        end
+        if not(bHavePriorityVisibleInRange) then
+            function ConsiderUnitForNewTarget(oUnit)
+                iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oArti:GetPosition())
+                if iCurDist <= iMaxSearchRange and iCurDist <= iNearestUnitDist then
+                    if iNearestUnitDist > iMinArtiRange then
+                        tGroundFireTarget = oUnit:GetPosition()
+                        iNearestUnitDist = iCurDist
+                    end
+                end
+            end
+            --Do we have any units that have killed/damaged our units (so will have seen proejctiles and be able to estimate where they are)?
+            if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid]) == false then
+                for iUnit, oUnit in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid] do
+                    ConsiderUnitForNewTarget(oUnit)
+                end
+            end
+            if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftUnseenPD]) == false then
+                for iUnit, oUnit in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftUnseenPD] do
+                    ConsiderUnitForNewTarget(oUnit)
+                end
+            end
+
+        end
+
+        if bDebugMessages == true then LOG(sFunctionRef..': Finished checking if want ground fire target for unit '..oArti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oArti)..'; tGroundFireTarget='..repru(tGroundFireTarget)) end
+        if tGroundFireTarget then
+            oArti[M27UnitInfo.refbSpecialMicroActive] = true
+            M27Utilities.IssueTrackedClearCommands({oArti})
+            IssueAttack({oArti}, tGroundFireTarget)
+            if bDebugMessages == true then LOG(sFunctionRef..': Sent aggressive move order') end
+        else
+            if oArti[M27UnitInfo.refbSpecialMicroActive] == true then
+                M27Utilities.IssueTrackedClearCommands({oArti})
+                oArti[M27UnitInfo.refbSpecialMicroActive] = false
+            end
+        end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        WaitSeconds(iTimeToWait)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
 end

@@ -56,6 +56,7 @@ reftLastLocationOfPathingGroup = 'M27UnitLastLocationOfPathingGroup' --Unit's po
 --refoOriginalBrainOwner = 'M27UnitOriginalOwner' --DO NOT USE - Looks like varaibles recorded against a unit pre-transfer get wiped out post-transfer; However also looks like units have a .oldowner field which should give this info
 refbTreatAsVisible = 'M27UnitTreatAsVisible' --used for unseen T2PD that damages us - means we will calculate threat on it
 reftLastKnownPosition = 'M27UnitLastKnownPosition' --Used for naval units to try and avoid AI cheating while giving it a basic memory
+refbIsDangerousAA = 'M27UnitIsDangerousAA' --true if have added to table due to being dangeorus
 
 --Order related - used for navy (platoon uses platoon tracking)
 reftLastOrderTarget = 'M27UnitLastOrderTarget' --location of last target (e.g. for issuemove)
@@ -202,6 +203,8 @@ refCategoryAllNonExpAir = categories.MOBILE * categories.AIR * categories.TECH1 
 refCategoryAirNonScout = refCategoryAllAir - categories.SCOUT
 refCategoryMercy = categories.HIGHPRIAIR * categories.AEON * categories.BOMBER * categories.TECH2
 refCategoryTransport = categories.AIR * categories.TRANSPORTATION - categories.UEF * categories.GROUNDATTACK
+refCategoryRestorer = refCategoryGunship * categories.ANTIAIR
+refCategoryCzar = categories.AIR * categories.EXPERIMENTAL * categories.ANTIAIR * categories.AEON
 
 --Naval units
 refCategoryFrigate = categories.NAVAL * categories.FRIGATE
@@ -247,7 +250,8 @@ refCategoryReclaimable = categories.RECLAIMABLE - refCategoryAllAir
 
 --Weapon target priorities
 refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
-refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat - categories.COMMAND, refCategoryEngineer, categories.LAND * categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategorySkirmisher, refCategoryLandCombat - categories.COMMAND, refCategoryEngineer, categories.LAND * categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityPD = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryIndirect, refCategorySkirmisher, refCategoryLandCombat - categories.COMMAND, refCategoryEngineer, categories.LAND * categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
 refWeaponPriorityShieldDisruptor = {refCategoryFixedShield, refCategoryMobileLandShield, refCategoryPersonalShield + refCategoryFatboy, refCategoryRadar, categories.ALLUNITS - categories.BENIGN}
 refWeaponPriorityOurGroundExperimental = {categories.COMMAND, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryFixedT2Arti, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
 refWeaponPriorityOurFatboy = {refCategoryFixedShield, refCategoryFixedT2Arti, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryT3PD, refCategoryPD, categories.COMMAND, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
