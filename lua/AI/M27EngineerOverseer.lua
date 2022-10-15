@@ -4792,7 +4792,7 @@ function ConvertExperimentalRefToCategory(iExperimentalRef)
 end
 
 function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideOnExperimentalToBuild'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -9415,7 +9415,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         elseif bEngineerIsBusy and (M27Logic.IsUnitIdle(oEngineer, false, false, false) or oEngineer[M27Logic.refiIdleCount] > 10) then
                             --Have issue where sometimes an engineer can just stay motionless doing nothing if nearby enemies, so this way it will start moving
                             --if bDebugMessages == true then LOG(sFunctionRef..': Issuing aggressive move to engineer UC='..GetEngineerUniqueCount(oEngineer)..' to nearest rally point') end
-                            if oEngineer[M27Transport.refiAssignedPlateau] and not (oEngineer[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
+                            if oEngineer[M27Transport.refiAssignedPlateau] and not (oEngineer[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) and not(oEngineer[refiEngineerCurrentAction] == refActionHasNearbyEnemies) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': will give plateau spare engi action') end
                                 IssuePlateauSpareEngineerAction(aiBrain, oEngineer)
                                 if M27UnitInfo.IsUnitValid(oEngineer) then UpdateEngineerActionTrackers(aiBrain, oEngineer, refActionPlateauSpareAction, nil, false, 1000) end

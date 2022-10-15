@@ -127,7 +127,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
     --Is the unit owned by M27AI?
     if M27Utilities.bM27AIInGame then
         local sFunctionRef = 'OnKilled'
-        local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         local refbAlreadyRun = 'M27EventsOnKilledRun'
         if not(oUnitKilled[refbAlreadyRun]) then
@@ -179,7 +179,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
 
                             if EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oKillerUnit.UnitId) then
                                 if oKillerUnit.Sync.totalMassKilled >= 250 and IsEnemy(oKilledBrain:GetArmyIndex(), oKillerUnit:GetAIBrain():GetArmyIndex()) then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to add oKillerUnit='..oKillerUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oKillerUnit)..' to list of T2 arti to avoid') end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to add oKillerUnit='..oKillerUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oKillerUnit)..' owned by brain '..oKillerUnit:GetAIBrain().Nickname..' that just killed '..oUnitKilled.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitKilled)..' that was owned by '..oUnitKilled:GetAIBrain().Nickname..' to list of T2 arti to avoid') end
                                     M27Team.RecordUnseenArti(oKilledBrain, oKillerUnit)
                                 end
                                 --Record dangerous AA that we may struggle to overwhelm with t1 bombers so can avoid
@@ -796,8 +796,9 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
 
                             --Unseen T2 arti and its either close to our base or damaged a high mass unit
                             if EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oUnitCausingDamage.UnitId) then
-                                if (self.GetBlueprint and self:GetBlueprint().Economy.BuildCostMass >= 1000) or M27Utilities.GetDistanceBetweenPositions(oUnitCausingDamage:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 200 then
+                                if IsEnemy(self:GetAIBrain():GetArmyIndex(), oUnitCausingDamage:GetAIBrain():GetArmyIndex()) and ((self.GetBlueprint and self:GetBlueprint().Economy.BuildCostMass >= 1000) or M27Utilities.GetDistanceBetweenPositions(oUnitCausingDamage:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 200) then
                                     M27Team.RecordUnseenArti(aiBrain, oUnitCausingDamage)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy Arti caused damage to a unit with high mass cost, self='..self.UnitId..M27UnitInfo.GetUnitLifetimeCount(self)..' owned by '..self:GetAIBrain().Nickname..'; Arit='..oUnitCausingDamage.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitCausingDamage)..' owned by '..oUnitCausingDamage:GetAIBrain().Nickname..'; these two brains are considered enemies') end
                                 end
                             end
 

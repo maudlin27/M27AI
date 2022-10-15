@@ -2410,9 +2410,8 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27Defender' and oPlatoon[refiPlatoonCount] == 7 and GetGameTimeSeconds() >= 570 then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
-    --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 30 then bDebugMessages = true end
+    if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 16 and oPlatoon:GetBrain():GetArmyIndex() == 3 and GetGameTimeSeconds() >= 1500 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and aiBrain:GetArmyIndex() == 7 and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
-    --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 950 then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 937 and aiBrain:GetArmyIndex() == 4 and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
@@ -3371,9 +3370,9 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                 local oNearbyArti
 
                 for iArti, oArti in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid] do
-                    if bDebugMessages == true and M27UnitInfo.IsUnitValid(oArti) then LOG(sFunctionRef..': Considering oArti='..oArti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oArti)..'; Distance to platoon='..M27Utilities.GetDistanceBetweenPositions(oArti:GetPosition(), GetPlatoonFrontPosition(oPlatoon))) end
+                    if bDebugMessages == true and M27UnitInfo.IsUnitValid(oArti) then LOG(sFunctionRef..': Considering oArti='..oArti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oArti)..' owned by '..oArti:GetAIBrain().Nickname..'; Distance to platoon='..M27Utilities.GetDistanceBetweenPositions(oArti:GetPosition(), GetPlatoonFrontPosition(oPlatoon))) end
                     if M27UnitInfo.IsUnitValid(oArti) and M27Utilities.GetDistanceBetweenPositions(oArti:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= 145 then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Platoon '..sPlatoonName..oPlatoon[refiPlatoonCount]..'Has nearby t2 arti so want to retreat') end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Platoon '..sPlatoonName..oPlatoon[refiPlatoonCount]..'Has nearby t2 arti '..oArti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oArti)..' owned by '..oArti:GetAIBrain().Nickname..' so want to retreat') end
                         oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
                         bProceed = false
                         oNearbyArti = oArti
@@ -7179,7 +7178,7 @@ function DeterminePlatoonAction(oPlatoon)
             local sPlatoonName = oPlatoon:GetPlan()
             --if sPlatoonName == 'M27Defender' and oPlatoon[refiPlatoonCount] == 7 and GetGameTimeSeconds() >= 570 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
-            --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
+            if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 16 and oPlatoon:GetBrain():GetArmyIndex() == 3 and GetGameTimeSeconds() >= 1500 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
             --if oPlatoon[refbACUInPlatoon] == true and aiBrain:GetArmyIndex() == 7 and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refiPlatoonMaxRange] >= 60 then bDebugMessages = true end
@@ -10681,7 +10680,7 @@ function ProcessPlatoonAction(oPlatoon)
             --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
             --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
-            --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
+            if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 16 and oPlatoon:GetBrain():GetArmyIndex() == 3 and GetGameTimeSeconds() >= 1500 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 780  then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refiPlatoonMaxRange] >= 60 then bDebugMessages = true end

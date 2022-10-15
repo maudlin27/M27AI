@@ -633,6 +633,11 @@ function RecordUnseenPD(oPD, oUnitDamaged)
 end
 
 function RecordUnseenArti(oKilledBrain, oDangerousArti)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'RecordUnseenArti'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+
     local bIncludeInTable = true
 
     if M27Utilities.IsTableEmpty(tTeamData[oKilledBrain.M27Team][reftEnemyArtiToAvoid]) == false then
@@ -642,6 +647,7 @@ function RecordUnseenArti(oKilledBrain, oDangerousArti)
             end
         end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': Considering oDangerousArti='..oDangerousArti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oDangerousArti)..' owned by brain '..oDangerousArti:GetAIBrain().Nickname..'; are considering recording for the team that the killed unit brain '..oKilledBrain.Nickname..' belongs to') end
     if bIncludeInTable then
         table.insert(tTeamData[oKilledBrain.M27Team][reftEnemyArtiToAvoid], oDangerousArti)
         --Also check for any nearby t2 arti that are closer to the killed unit's base
@@ -665,6 +671,7 @@ function RecordUnseenArti(oKilledBrain, oDangerousArti)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RecordDangerousAA(oKilledBrain, oDangerousAA)
