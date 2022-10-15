@@ -2852,7 +2852,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                                     if iFactoryTechLevel < 3 and (oFactory == M27Navy.GetPrimaryNavalFactory(aiBrain, oFactory[M27Navy.refiAssignedPond]) or aiBrain:GetEconomyStored('MASS') >= 2000 * iFactoryTechLevel or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 10 * iFactoryTechLevel) and
                                             (M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) or iCurCruisers >= 6) and
-                                            (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 8 or (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 7 and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAllNavy * categories.TECH2) >= 8)) then
+                                            (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 8 or (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 7 and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAllNavy * categories.TECH2) >= 8)) and
+                                            (iFactoryTechLevel == 1 or not(EntityCategoryContains(categories.SERAPHIM + categories.UEF, oFactory.UnitId)) or iCurCruisers >= 4 or (iCurCruisers >= 2 and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAllNavy - categories.TECH2) >= 10)) then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy has no navy or we have built lots of T2 navy, and we have lots of mass so will upgrade to T2 or T3') end
                                         bUpgradeFactoryInstead = true
                                     end
