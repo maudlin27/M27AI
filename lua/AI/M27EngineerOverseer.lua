@@ -9787,7 +9787,7 @@ end--]]
                         end
                     else
                         if aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 or (aiBrain:GetEconomyStoredRatio('MASS') >= 0.4 and not(bHaveVeryLowPower)) then
-                            bUseNormalAssignments = false
+                            bUseNormalAssignments = true
                             iCurrentConditionToTry = 1
                         else
                             iActionToAssign = refActionSpare
