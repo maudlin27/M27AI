@@ -797,13 +797,11 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker, bDontUpdateHQTracker
                 end
             elseif EntityCategoryContains(M27UnitInfo.refCategoryLandFactory * categories.TECH2 + M27UnitInfo.refCategoryAirFactory * categories.TECH2, oUnitToUpgrade.UnitId) and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] <= 2 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer - categories.TECH1) <= 5 then
                 --About to go for T3 factory but have hardl yany engineers so queue up an extra one
-                bDebugMessages = true
                 local sEngiID = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, M27UnitInfo.refCategoryEngineer, oUnitToUpgrade)
                 if sEngiID then
                     IssueBuildFactory({oUnitToUpgrade}, sEngiID, 1)
                 end
                 if bDebugMessages == true then LOG(sFunctionRef..': About to go to T3 on factory '..oUnitToUpgrade.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)..' but only have '..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer - categories.TECH1)..' T2 plus engis so will queue up another engi before the upgrade. sEngiID='..(sEngiID or 'nil')) end
-                bDebugMessages = false
             end
 
             --Issue upgrade

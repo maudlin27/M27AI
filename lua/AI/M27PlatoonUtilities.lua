@@ -12786,7 +12786,17 @@ function ProcessPlatoonAction(oPlatoon)
 
                     --Pick a location that means we're less likely to block the ACU if its in the attack
                     --ACU direction from our base
-                    local iACULikelyFleeAngle = M27Utilities.GetAngleFromAToB(aiBrain[M27Overseer.reftACUKillTarget], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftACUKillTarget]) then
+                        M27Utilities.ErrorHandler('Dont have ACU kill target set, will try setting to enemy ACU position')
+                        if M27UnitInfo.IsUnitValid( aiBrain[M27Overseer.refoACUKillTarget]) then
+                            aiBrain[M27Overseer.reftACUKillTarget] = aiBrain[M27Overseer.refoACUKillTarget]:GetPosition()
+                        elseif M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) then
+                            aiBrain[M27Overseer.reftACUKillTarget] = aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()
+                        else
+                            LOG('Dont have ACU kill target or valid lastnearestACU, will get a lua error')
+                        end
+                    end
+                    local iACULikelyFleeAngle = M27Utilities.GetAngleFromAToB((aiBrain[M27Overseer.reftACUKillTarget] or aiBrain[M27Overseer.refoACUKillTarget]:GetPosition()), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                     local tPositionBehindEnemyACU = M27Utilities.MoveInDirection(aiBrain[M27Overseer.reftACUKillTarget], iACULikelyFleeAngle, iDistanceBehindACUWanted)
                     local tTargetMoveLocation
                     local iOurACUAngleToTarget

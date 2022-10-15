@@ -9853,7 +9853,6 @@ end--]]
                                     iCurDist = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.tReclaimAreas[iSegmentX][iSegmentZ][M27MapInfo.refReclaimSegmentMidpoint], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                                     if iCurDist <= aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance] then
                                         if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer) >= 3 then
-                                            if tiAvailableEngineersByTech[1] + tiAvailableEngineersByTech[2] + tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
                                             iActionToAssign = refActionReclaimArea
                                             iMaxEngisWanted = 1
                                             if bDebugMessages == true then LOG(sFunctionRef..': Making use of high priority mass reclaim order for engineer, gametime='..GetGameTimeSeconds()) end
