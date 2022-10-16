@@ -14,6 +14,7 @@ local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 local M27Config = import('/mods/M27AI/lua/M27Config.lua')
+local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 
 
 
@@ -1430,7 +1431,7 @@ end
 function ManageTeamNavy(aiBrain, iTeam, iPond)
     --Decides what to do with our naval units, as well as recording information such as the nearest enemy naval unit
 
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ManageTeamNavy'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if GetGameTimeSeconds() >= 1440 and M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.TECH3 * M27UnitInfo.refCategoryMissileNavy, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])) == false then bDebugMessages = true end
@@ -1593,603 +1594,714 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
 
 
     local bAllOutSubAttack = false
-    if M27UnitInfo.IsUnitValid(oClosestEnemyUnit) and M27UnitInfo.IsUnitValid(oClosestFriendlyUnitToEnemyBase) then
-        --Record friendly and enemy units of relevance, then decide what action we want to take at a global level
+    local bTorpsInRangeOfFrontAA = false
+    local bTorpsCloseToFrontUnit = false
+    local bAANotNearFrontUnit = false
+    local oClosestFriendlyAA
+    local tFriendlyAA
 
-        local tNavalThreatByTypeAndRange = {} --[x] is unit type, [y] is range, then [z] is subref for surface, antinaval, split by friendly and enemy
-        --Unit type
-        local refiTypeAll = 1
-        local refiTypeMobileNavy = 2
-        local refiTypeSubmersible = 3
-        --Threat type
-        local refiFriendlyThreatSurface = 1 --if changing these then udpate code as well as have hardcoded some of these references
-        local refiFriendlyThreatAntiNavy = 2
-        local refiEnemyThreatSurface = 3
-        local refiEnemyThreatAntiNavy = 4
-
-        local tiRangesUsed = {} --all ranges used by us or enemy
-
-
-
-
-        function GetUnitTypes(oUnit)
-            if EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) then
-                return {refiTypeAll, refiTypeMobileNavy, refiTypeSubmersible}
-            elseif EntityCategoryContains(categories.MOBILE, oUnit.UnitId) then
-                return {refiTypeAll, refiTypeMobileNavy}
-            else
-                return {refiTypeAll}
-            end
-        end
-
-        local bUseIndirectRangeIfHigher = false --If nearest enemy is a torpedo launcher then this will be true
-        if EntityCategoryContains(categories.STRUCTURE - categories.SUBMERSIBLE, oClosestEnemyUnit.UnitId) or (oClosestEnemyCombatUnit and EntityCategoryContains(categories.STRUCTURE - categories.SUBMERSIBLE, oClosestEnemyCombatUnit.UnitId)) then bUseIndirectRangeIfHigher = true end
-        if bDebugMessages == true then
-            LOG(sFunctionRef..': bUseIndirectRangeIfHigher after checking if nearest enemy unit or nearest enemy combat unit is a non-submersible structure='..tostring(bUseIndirectRangeIfHigher or false)..'; oClosestEnemyUnit='..oClosestEnemyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestEnemyUnit)..'; is closets enemy combat unit valid='..tostring(M27UnitInfo.IsUnitValid(oClosestEnemyCombatUnit)))
-            if M27UnitInfo.IsUnitValid(oClosestEnemyCombatUnit) then
-                LOG(sFunctionRef..': oClosestEnemyCombatUnit='..oClosestEnemyCombatUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestEnemyCombatUnit))
-            end
-        end
-
-        function RecordUnitInNavalThreatTable(oUnit, bIsEnemy)
-
-            local tiCurUnitTypes = GetUnitTypes(oUnit)
-            local iThreatRefMod = 0
-            if bIsEnemy then iThreatRefMod = 2 end
-            local bInclude
-            local iCurUnitRange = 0
-            local iCurThreat = 0
-
-            if bDebugMessages == true then LOG(sFunctionRef..': About to record threat by range for oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; refiTypeAll='..refiTypeAll..'; tiCurUnitTypes='..repru(tiCurUnitTypes)) end
-
-            for _, iUnitType in tiCurUnitTypes do --want to record both for typeall, and for the curunittype where curunittype is dif to typeall
-                if not(tNavalThreatByTypeAndRange[iUnitType]) then tNavalThreatByTypeAndRange[iUnitType] = {} end
-                bInclude = false
-                --Do we have the right unit type?
-                if iUnitType == refiTypeAll then
-                    bInclude = true
-                elseif iUnitType == refiTypeMobileNavy then
-                    if EntityCategoryContains(categories.MOBILE, oUnit.UnitId) then
-                        bInclude = true
-                    end
-                else
-                    if EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) then
-                        bInclude = true
-                    end
+    --If torp bombers are near our front unit then want to retreat navy
+    if M27UnitInfo.IsUnitValid(oClosestFriendlyUnitToEnemyBase) and aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] then
+        --Update list of enemy torp bombers
+        local tActiveTorpBombers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTorpBomber, oClosestFriendlyUnitToEnemyBase:GetPosition(), 200, 'Enemy')
+        if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers]) then
+            M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers] = tActiveTorpBombers
+            if M27Utilities.IsTableEmpty(tActiveTorpBombers) == false then
+                local tUnitPos
+                for iUnit, oUnit in  M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers] do
+                    tUnitPos = oUnit:GetPosition()
+                    oUnit[M27UnitInfo.reftLastKnownPosition] = {tUnitPos[1], tUnitPos[2], tUnitPos[3]}
                 end
-                if bInclude then
-                    for iThreatTypeRef = 1 + iThreatRefMod, 2 + iThreatRefMod, 1 do
-                        if not(oUnit[M27UnitInfo.refiDFRange]) then iCurUnitRange = (GetNavalDirectAndSubRange(oUnit) or 0) end --Redundancy, hopefully have already calculated range before
-                        if iThreatTypeRef == refiFriendlyThreatSurface or iThreatTypeRef == refiEnemyThreatSurface then
+            end
+        else
+            local bKeepUpdating = true
+            local tUnitPos
+            while bKeepUpdating do
+                bKeepUpdating = false
 
-                            if bUseIndirectRangeIfHigher and iThreatTypeRef == refiFriendlyThreatSurface then
-                                iCurUnitRange = math.max(oUnit[M27UnitInfo.refiDFRange], oUnit[M27UnitInfo.refiAntiNavyRange], oUnit[M27UnitInfo.refiIndirectRange])
-                            else
-                                iCurUnitRange = math.max(oUnit[M27UnitInfo.refiDFRange], oUnit[M27UnitInfo.refiAntiNavyRange])
-                            end
-                            if bDebugMessages == true then LOG(sFunctionRef..': iCurUnitRange='..iCurUnitRange..'; Combat threat rating='..M27Logic.GetCombatThreatRating(aiBrain, { oUnit}, false, nil, nil, false, false, false, false, true, false, false)) end
-                            if iCurUnitRange > 0 then
-                                --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue, bBlueprintThreat, bAntiNavyOnly, bAddAntiNavy, bSubmersibleOnly, bLongRangeThreatOnly)
-                                iCurThreat = M27Logic.GetCombatThreatRating(aiBrain, { oUnit}, false, nil, nil, false, false, false, false, true, false, false)
-                            end
-
-                        else
-                            --Only want antinavy
-                            iCurUnitRange = oUnit[M27UnitInfo.refiAntiNavyRange]
-                            if bDebugMessages == true then LOG(sFunctionRef..': iCurUnitRange after checking only antinavy='..iCurUnitRange) end
-                            if iCurUnitRange > 0 then
-                                iCurThreat = M27Logic.GetCombatThreatRating(aiBrain, { oUnit }, false, nil, nil, false, false, false, true, false, false, false)
-                            end
+                for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers] do
+                    if not(M27UnitInfo.IsUnitValid(oUnit)) then
+                        table.remove(M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers], iUnit)
+                        if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers]) == false then
+                            bKeepUpdating = true
                         end
-                        if bDebugMessages == true then LOG(sFunctionRef..': iThreatTypeRef='..iThreatTypeRef..'; iThreatRefMod='..iThreatRefMod..'; iUnitType='..iUnitType..'; iCurThreat='..iCurThreat..'; iCurUnitRange='..iCurUnitRange) end
-
-                        tiRangesUsed[iCurUnitRange] = iCurUnitRange
-                        if not(tNavalThreatByTypeAndRange[iUnitType][iCurUnitRange]) then tNavalThreatByTypeAndRange[iUnitType][iCurUnitRange] = {} end
-
-                        tNavalThreatByTypeAndRange[iUnitType][iCurUnitRange][iThreatTypeRef] = (tNavalThreatByTypeAndRange[iUnitType][iCurUnitRange][iThreatTypeRef] or 0) + iCurThreat
-
+                        break
+                    elseif M27Utilities.CanSeeUnit(aiBrain, oUnit, true) then
+                        tUnitPos = oUnit:GetPosition()
+                        oUnit[M27UnitInfo.reftLastKnownPosition] = {tUnitPos[1], tUnitPos[2], tUnitPos[3]}
+                    end
+                end
+            end
+            if M27Utilities.IsTableEmpty(tActiveTorpBombers) == false then
+                local bIncludeUnit
+                for iUnit, oUnit in tActiveTorpBombers do
+                    bIncludeUnit = true
+                    for iExistingBomber, oExistingBomber in M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers] do
+                        if oExistingBomber == oUnit then bIncludeUnit = false break end
+                    end
+                    if bIncludeUnit then
+                        table.insert(M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers], oUnit)
+                        tUnitPos = oUnit:GetPosition()
+                        oUnit[M27UnitInfo.reftLastKnownPosition] = {tUnitPos[1], tUnitPos[2], tUnitPos[3]}
                     end
                 end
             end
         end
 
+        --Update AA if enemy has torp bombers
+        if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy torp bombers empty after removing old entries='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers]))) end
+        if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers]) == false then
+            tFriendlyAA = EntityCategoryFilterDown(categories.ANTIAIR, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
+            local iClosestTorpToFront = 10000
+            if M27Utilities.IsTableEmpty(tFriendlyAA) == false then
+                oClosestFriendlyAA = M27Utilities.GetNearestUnit(tFriendlyAA, oClosestFriendlyUnitToEnemyBase:GetPosition())
+                --Are enemy torps within AA range of this unit, or our front unit?
+                local iClosestTorpToAA = 10000
+                local iCurDist
+                local iTorpBomberRangeThreshold = M27UnitInfo.GetUnitAARange(oClosestFriendlyAA)
 
-        local tFriendliesNearFront = {}
-        local tFriendlyNearbyReinforcements = {}
-        local tFriendlyFurtherAwayReinforcements = {}
-        local tEnemiesBetweenUsAndBase = {}
-        local tEnemiesNearClosestEnemyUnit = {}
-        local iFriendlySearchRangeBase = 30
-        local iNavyInPond = 0
-        local tNavyInPond = EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer,  M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
-        if M27Utilities.IsTableEmpty(tNavyInPond) == false then
-            iNavyInPond = table.getn(tNavyInPond)
-        end
-
-
-        if iNavyInPond >= 10 then iFriendlySearchRangeBase = iFriendlySearchRangeBase + math.min(25, iNavyInPond) end
-        local iNearbyReinforcementSearchBase = iFriendlySearchRangeBase + 50
-        local iEnemySearchRangeBase = 60
-        local iEnemySearchRangeShort = 30
-        local iCurDist
-        local iCurRange
-        local iOurBestSurfaceRange = 0
-        local iOurBestSubmersibleRange = 0
-        local iOurBestSurfaceAntiNavyRange = 0
-        --Already have iOurBestIndirectRange defined earlier, along with our best DF range
-        local iEnemyBestSurfaceRange = 0
-        local iEnemyBestAntiNavyRange = 0
-        local iEnemyBestSubmersibleRange = 0
-        local iEnemyBestIndirectRange = 0
-        --Get friendly units
-        if bDebugMessages == true then LOG(sFunctionRef..': About to identify all units that are close to '..oClosestFriendlyUnitToEnemyBase.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestFriendlyUnitToEnemyBase)) end
-        bHaveAlreadyUpdatedRanges = true
-        for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond] do
-            if EntityCategoryContains(categories.MOBILE, oUnit.UnitId) and oUnit:GetFractionComplete() >= 1 then
-                iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oClosestFriendlyUnitToEnemyBase:GetPosition())
-                iCurRange = M27UnitInfo.GetNavalDirectAndSubRange(oUnit)
-                if bDebugMessages == true then LOG(sFunctionRef..': Distance between friendly unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to front unit='..iCurDist..'; Range='..iCurRange) end
-                if iCurDist - iCurRange <= iNearbyReinforcementSearchBase then
-                    if iCurDist - iCurRange <= iFriendlySearchRangeBase then
-                        table.insert(tFriendliesNearFront, oUnit)
-                        RecordUnitInNavalThreatTable(oUnit, false)
-                    else
-                        table.insert(tFriendlyNearbyReinforcements, oUnit)
+                for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers] do
+                    iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit[M27UnitInfo.reftLastKnownPosition], oClosestFriendlyUnitToEnemyBase:GetPosition())
+                    if iCurDist < iClosestTorpToFront then
+                        iClosestTorpToFront = iCurDist
                     end
-                    iOurBestSurfaceRange = math.max(iOurBestSurfaceRange, iCurRange)
-                    if EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) then
-                        iOurBestSubmersibleRange = math.max(iOurBestSubmersibleRange, oUnit[M27UnitInfo.refiAntiNavyRange])
+                    if oClosestFriendlyUnitToEnemyBase == oClosestFriendlyAA then iClosestTorpToAA = iClosestTorpToFront
                     else
-                        iOurBestSurfaceAntiNavyRange = math.max(iOurBestSurfaceAntiNavyRange, oUnit[M27UnitInfo.refiAntiNavyRange])
+                        iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit[M27UnitInfo.reftLastKnownPosition], oClosestFriendlyAA:GetPosition())
+                        if iCurDist < iClosestTorpToAA then
+                            iClosestTorpToAA = iCurDist
+                            if iClosestTorpToAA <= iTorpBomberRangeThreshold then break end
+                        end
                     end
+                end
+                if iClosestTorpToAA <= iTorpBomberRangeThreshold then
+                    bTorpsInRangeOfFrontAA = true
+                    bTorpsCloseToFrontUnit = true
+                elseif iClosestTorpToFront <= 100 then
+                    bTorpsCloseToFrontUnit = true
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': oClosestFriendlyAA='..oClosestFriendlyAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestFriendlyAA)..'; iTorpBomberRangeThreshold='..iTorpBomberRangeThreshold..'; iClosestTorpToAA='..iClosestTorpToAA..'; iClosestTorpToFront='..iClosestTorpToFront..'; bTorpsInRangeOfFrontAA='..tostring(bTorpsInRangeOfFrontAA)..'; bTorpsCloseToFrontUnit='..tostring(bTorpsCloseToFrontUnit)) end
+            else
+                bTorpsCloseToFrontUnit = true
+            end
+
+            if bTorpsCloseToFrontUnit and not(bTorpsInRangeOfFrontAA) then
+                --Is our AA close to our front unit?
+                if not(oClosestFriendlyAA) then
+                    bAANotNearFrontUnit = true
                 else
-                    table.insert(tFriendlyFurtherAwayReinforcements, oUnit)
-                end
-                iOurBestIndirectRange = math.max(iOurBestIndirectRange, oUnit[M27UnitInfo.refiIndirectRange])
-                iOurBestDFRange = math.max(iOurBestDFRange, oUnit[M27UnitInfo.refiDFRange])
-
-
-            end
-        end
-        if bDebugMessages == true then
-            LOG(sFunctionRef .. ': Is table of nearby friendly reinforcements empty=' .. tostring(M27Utilities.IsTableEmpty(tFriendlyNearbyReinforcements)) .. '; Is table of friendlies near front empty=' .. tostring(M27Utilities.IsTableEmpty(tFriendliesNearFront)) .. ' tEnemyBase=' .. repru(tEnemyBase))
-        end
-
-        if M27Utilities.IsTableEmpty(tFriendlyNearbyReinforcements) == false or M27Utilities.IsTableEmpty(tFriendliesNearFront) == false or M27Utilities.IsTableEmpty(tFriendlyFurtherAwayReinforcements) == false then
-            local iDistToBase
-            if bDebugMessages == true then LOG(sFunctionRef..': About to record details of enemy units of relevance; will either consider those naval units if we are attacking base, or those around hte nearest enemy combat unit if we are attacking nearest enemy unit') end
-
-
-            for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond] do
-                iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oClosestFriendlyUnitToEnemyBase:GetPosition())
-                iDistToBase = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tEnemyBase)
-                iCurRange = M27UnitInfo.GetNavalDirectAndSubRange(oUnit)
-                if iCurDist - iCurRange - iEnemySearchRangeBase <= iFriendlyDistToEnemy or iDistToBase - iCurRange - iEnemySearchRangeShort <= iFriendlyDistToEnemy then
-                    table.insert(tEnemiesBetweenUsAndBase, oUnit)
-                    iEnemyBestSurfaceRange = math.max(iEnemyBestSurfaceRange, iCurRange)
-                    iEnemyBestAntiNavyRange = math.max(iEnemyBestAntiNavyRange, oUnit[M27UnitInfo.refiAntiNavyRange])
-                    if EntityCategoryContains(M27UnitInfo.refCategorySubmarine, oUnit.UnitId) then
-                        iEnemyBestSubmersibleRange = math.max(iEnemyBestSubmersibleRange, oUnit[M27UnitInfo.refiAntiNavyRange])
+                    local iDistFromAAToFront = M27Utilities.GetDistanceBetweenPositions(oClosestFriendlyAA:GetPosition(), oClosestFriendlyUnitToEnemyBase:GetPosition())
+                    if iDistFromAAToFront >= math.min(60, iClosestTorpToFront + 30) then
+                        bAANotNearFrontUnit = true
                     end
-                    iEnemyBestIndirectRange = math.max(iEnemyBestIndirectRange, oUnit[M27UnitInfo.refiIndirectRange])
-                end
-                --Is the enemy near the closet enemy unit
-                if oClosestEnemyCombatUnit and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oClosestEnemyCombatUnit:GetPosition()) + iCurRange <= iEnemySearchRangeBase then
-                    table.insert(tEnemiesNearClosestEnemyUnit, oUnit)
-                    RecordUnitInNavalThreatTable(oUnit, true)
-                end
-
-            end
-
-            --Can we win with an all out attack?
-            local iOurSurfaceThreat = M27Logic.GetCombatThreatRating(aiBrain, tFriendliesNearFront, false, nil, nil, false, false, false, false, true, false, false)
-            local iOurAntiNavyThreat = M27Logic.GetCombatThreatRating(aiBrain, tFriendliesNearFront, false, nil, nil, false, false, false, true, false, false, false)
-            local iEnemySurfaceThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemiesBetweenUsAndBase, false, nil, nil, false, false, false, false, true, false, false)
-            local tEnemyTorpedoLauncherThreats = EntityCategoryFilterDown(M27UnitInfo.refCategoryTorpedoLauncher, tEnemiesBetweenUsAndBase)
-
-            local iEnemySurfaceTorpedoDefenceThreat = 0
-            local iEnemyTorpedoMaxRange = 0
-            if M27Utilities.IsTableEmpty(tEnemyTorpedoLauncherThreats) == false then
-                iEnemySurfaceTorpedoDefenceThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyTorpedoLauncherThreats, false, nil, nil, false, false, false, false, true, false, false)
-                for iUnit, oUnit in tEnemyTorpedoLauncherThreats do
-                    iEnemyTorpedoMaxRange = math.max(iEnemyTorpedoMaxRange, M27UnitInfo.GetNavalDirectAndSubRange(oUnit))
-                end
-
-                if iEnemyTorpedoMaxRange < math.max(iOurBestIndirectRange, iOurBestSurfaceRange, iOurBestSubmersibleRange) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': We have units that outrange enemy torpedo threat so will ignore it for deciding if we can launch an all out attack. iEnemySurfaceTorpedoDefenceThreat='..iEnemySurfaceTorpedoDefenceThreat) end
-                    iEnemySurfaceThreat = iEnemySurfaceThreat - iEnemySurfaceTorpedoDefenceThreat
                 end
             end
+        end
+    end
+
+    --Logic when under torp attack - ignore normal appraoch and move units based on where AA is, unless we are already within 75 of our base
+
+    if (bTorpsInRangeOfFrontAA or (bTorpsCloseToFrontUnit and bAANotNearFrontUnit)) and M27Utilities.GetDistanceBetweenPositions(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase) > 75 then
+        bConsiderBombardment = false --redundancy
+        local tNonAACombatAndSupport = EntityCategoryFilterDown(M27UnitInfo.refCategoryAllAmphibiousAndNavy - categories.ANTIAIR - categories.STRUCTURE - M27UnitInfo.refCategoryEngineer, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
+        local tCombatDestination
+        local tOtherAADestination
+        if oClosestFriendlyAA then
+            --Enemy has nearby torp bombers but we have AA unit, so consolidate main forces by AA, and either move closest friendly AA unit forwards if not in range, or back if in range
+            tCombatDestination = M27Utilities.MoveInDirection(oClosestFriendlyAA:GetPosition(), M27Utilities.GetAngleFromAToB(oClosestFriendlyAA:GetPosition(), tOurBase), 15, true)
+            tOtherAADestination = M27Utilities.MoveInDirection(oClosestFriendlyAA:GetPosition(), M27Utilities.GetAngleFromAToB(oClosestFriendlyAA:GetPosition(), tOurBase), 10, true)
+            if bTorpsInRangeOfFrontAA then
+                MoveUnitTowardsTarget(oClosestFriendlyAA, tOurBase, false, 'FrontAAToBase')
+            else
+                MoveUnitTowardsTarget(oClosestFriendlyAA, oClosestFriendlyUnitToEnemyBase:GetPosition(), false, 'FrontAAToFront')
+            end
+        else
+            --Enemy has torp bombers but we have no AA unit, so retreat to base
+            tCombatDestination = tOurBase
+            tOtherAADestination = tOurBase
+        end
+
+        --Issue move orders to everything except front unit (which we already gave orders to above)
+        if M27Utilities.IsTableEmpty(tFriendlyAA) == false then
+            for iUnit, oUnit in tFriendlyAA do
+                if not(oUnit == oClosestFriendlyAA) then
+                    MoveUnitTowardsTarget(oUnit, tOtherAADestination, false, 'OtherAAMove')
+                end
+            end
+        end
+        if M27Utilities.IsTableEmpty(tNonAACombatAndSupport) == false then
+            for iUnit, oUnit in tNonAACombatAndSupport do
+                MoveUnitTowardsTarget(oUnit, tCombatDestination, false, 'RunFromBomber')
+            end
+        end
+
+
+
+    else
+
+        if bDebugMessages == true then LOG(sFunctionRef..': No torpedo bombers that are running from. Is closest enemy valid='..tostring(M27UnitInfo.IsUnitValid(oClosestEnemyUnit))..'; Is closest friendly valid='..tostring(M27UnitInfo.IsUnitValid(oClosestFriendlyUnitToEnemyBase))) end
+        bDebugMessages = false
+        if M27UnitInfo.IsUnitValid(oClosestEnemyUnit) and M27UnitInfo.IsUnitValid(oClosestFriendlyUnitToEnemyBase) then
+            --Record friendly and enemy units of relevance, then decide what action we want to take at a global level
+
+            local tNavalThreatByTypeAndRange = {} --[x] is unit type, [y] is range, then [z] is subref for surface, antinaval, split by friendly and enemy
+            --Unit type
+            local refiTypeAll = 1
+            local refiTypeMobileNavy = 2
+            local refiTypeSubmersible = 3
+            --Threat type
+            local refiFriendlyThreatSurface = 1 --if changing these then udpate code as well as have hardcoded some of these references
+            local refiFriendlyThreatAntiNavy = 2
+            local refiEnemyThreatSurface = 3
+            local refiEnemyThreatAntiNavy = 4
+
+            local tiRangesUsed = {} --all ranges used by us or enemy
 
 
 
 
-            local iEnemySubmersibleThreat = 0
-            if iEnemyBestAntiNavyRange > 0 then
-                iEnemySubmersibleThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemiesBetweenUsAndBase, false, nil, nil, false, false, false, false, false, true, false)
+            function GetUnitTypes(oUnit)
+                if EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) then
+                    return {refiTypeAll, refiTypeMobileNavy, refiTypeSubmersible}
+                elseif EntityCategoryContains(categories.MOBILE, oUnit.UnitId) then
+                    return {refiTypeAll, refiTypeMobileNavy}
+                else
+                    return {refiTypeAll}
+                end
             end
 
-            --Do we win in both theatres, and have significanlty more threat?
-            local bAllOutAttack = false
-            --bAllOutSubAttack = false --Recorded above; Set to true if we arent doing an all out at tack, but think our subs can still do an all out attack
-            local bAttackNearbyEnemies = false --If dont have enough to beat every naval unit between us and enemy base, but do have enough to take on the nearest enemies, then will use this
-            local bIgnoreEnemySubs = false
-            local bConsolidateForces = false --used to determine unit task description for now (to help with debugging)
-
-            local iMinSurfaceFactorWanted = 1.15 + math.max(-0.1, 0.01 * (iFriendlyDistToEnemy - iOurBestSurfaceRange - 25))
-            if iMinSurfaceFactorWanted > 1.3 then
-                local iFactorCap = 3 - math.min(1.7, iOurSurfaceThreat / 1000)
-                iMinSurfaceFactorWanted = math.min(iMinSurfaceFactorWanted, iFactorCap)
-            end
-
+            local bUseIndirectRangeIfHigher = false --If nearest enemy is a torpedo launcher then this will be true
+            if EntityCategoryContains(categories.STRUCTURE - categories.SUBMERSIBLE, oClosestEnemyUnit.UnitId) or (oClosestEnemyCombatUnit and EntityCategoryContains(categories.STRUCTURE - categories.SUBMERSIBLE, oClosestEnemyCombatUnit.UnitId)) then bUseIndirectRangeIfHigher = true end
             if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Considering if we want an all out attack. iMinSurfaceFactorWanted=' .. iMinSurfaceFactorWanted .. '; iOurSurfaceThreat=' .. iOurSurfaceThreat .. '; iEnemySurfaceThreat=' .. iEnemySurfaceThreat .. '; iEnemySurfaceThreat*factor=' .. iEnemySurfaceThreat * iMinSurfaceFactorWanted..'; Size of tFriendliesNearFront='..table.getn(tFriendliesNearFront))
-                if iOurAntiNavyThreat > 0 then
-                    LOG(sFunctionRef..': Will list out every unit with antinavy threat')
-                    local iCurAntiNavy
-                    for iUnit, oUnit in tFriendliesNearFront do
-                        iCurAntiNavy = M27Logic.GetCombatThreatRating(aiBrain, { oUnit}, false, nil, nil, false, false, false, true, false, false, false)
-                        if iCurAntiNavy > 0 then
-                            LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' with fraction complete '..oUnit:GetFractionComplete()..' has antinavy threat of '..iCurAntiNavy)
+                LOG(sFunctionRef..': bUseIndirectRangeIfHigher after checking if nearest enemy unit or nearest enemy combat unit is a non-submersible structure='..tostring(bUseIndirectRangeIfHigher or false)..'; oClosestEnemyUnit='..oClosestEnemyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestEnemyUnit)..'; is closets enemy combat unit valid='..tostring(M27UnitInfo.IsUnitValid(oClosestEnemyCombatUnit)))
+                if M27UnitInfo.IsUnitValid(oClosestEnemyCombatUnit) then
+                    LOG(sFunctionRef..': oClosestEnemyCombatUnit='..oClosestEnemyCombatUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestEnemyCombatUnit))
+                end
+            end
+
+            function RecordUnitInNavalThreatTable(oUnit, bIsEnemy)
+
+                local tiCurUnitTypes = GetUnitTypes(oUnit)
+                local iThreatRefMod = 0
+                if bIsEnemy then iThreatRefMod = 2 end
+                local bInclude
+                local iCurUnitRange = 0
+                local iCurThreat = 0
+
+                if bDebugMessages == true then LOG(sFunctionRef..': About to record threat by range for oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; refiTypeAll='..refiTypeAll..'; tiCurUnitTypes='..repru(tiCurUnitTypes)) end
+
+                for _, iUnitType in tiCurUnitTypes do --want to record both for typeall, and for the curunittype where curunittype is dif to typeall
+                    if not(tNavalThreatByTypeAndRange[iUnitType]) then tNavalThreatByTypeAndRange[iUnitType] = {} end
+                    bInclude = false
+                    --Do we have the right unit type?
+                    if iUnitType == refiTypeAll then
+                        bInclude = true
+                    elseif iUnitType == refiTypeMobileNavy then
+                        if EntityCategoryContains(categories.MOBILE, oUnit.UnitId) then
+                            bInclude = true
                         end
-                    end
-                end
-            end
-            if iOurSurfaceThreat > iEnemySurfaceThreat * iMinSurfaceFactorWanted then
-                --Do we have enough antinavy?
-                if iEnemySubmersibleThreat == 0 or iOurAntiNavyThreat > iEnemySubmersibleThreat then
-                    bAllOutAttack = true
-                else
-                    --Can we ignore antinavy and take out the naval fac?
-                    if iOurSurfaceThreat > iEnemySurfaceThreat * 2 then
-                        if (iFriendlyDistToEnemy <= 200 and iEnemySubmersibleThreat < 0.1 * iOurSurfaceThreat) or iEnemySubmersibleThreat < 0.05 * iOurSurfaceThreat then
-                            bIgnoreEnemySubs = true
-                            bAllOutAttack = true
-                        end
-                    end
-                end
-            end
-            if bDebugMessages == true then LOG(sFunctionRef..': Still consider all out attack if enemy has surface unit close to our base. bAllOutAttack='..tostring(bAllOutAttack)..'; Is oClosestSurfaceEnemy valid='..tostring(M27UnitInfo.IsUnitValid(oClosestSurfaceEnemy))) end
-            if not(bAllOutAttack) and oClosestSurfaceEnemy then
-                --Still do all out attack if enemy has surface unit close to being in range of us
-                if bDebugMessages == true then LOG(sFunctionRef..': oClosestSurfaceEnemy='..oClosestSurfaceEnemy.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestSurfaceEnemy)..'; Dist to our base='..M27Utilities.GetDistanceBetweenPositions(oClosestSurfaceEnemy:GetPosition(), tOurBase)..'; iEnemyBestSurfaceRange='..iEnemyBestSurfaceRange..'; iEnemyBestIndirectRange='..iEnemyBestIndirectRange) end
-                if M27Utilities.GetDistanceBetweenPositions(oClosestSurfaceEnemy:GetPosition(), tOurBase) <= 40 +  math.max(iEnemyBestSurfaceRange, iEnemyBestIndirectRange) then
-                    bAllOutAttack = true
-                    bAttackNearbyEnemies = true
-                    if bDebugMessages == true then LOG(sFunctionRef..': Will attack nearby enemies') end
-                end
-            end
-
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': iOurSurfaceThreat=' .. iOurSurfaceThreat .. '; iEnemySUrfaceThreat=' .. iEnemySurfaceThreat .. '; iOurAntiNavyThreat=' .. iOurAntiNavyThreat .. '; iEnemySubmersibleThreat=' .. iEnemySubmersibleThreat .. '; bAllOutAttack=' .. tostring(bAllOutAttack) .. '; WIll list out every unit in our main naval force and their threat value')
-                if M27Utilities.IsTableEmpty(tFriendliesNearFront) == false then
-                    for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond] do
-                        if EntityCategoryContains(categories.MOBILE, oUnit.UnitId) and M27UnitInfo.IsUnitValid(oUnit) then
-                            LOG(sFunctionRef .. ': Unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; Surface threat=' .. M27Logic.GetCombatThreatRating(aiBrain, { oUnit }, false, nil, nil, false, false, false, false, true, false, false))
-                        end
-                    end
-                end
-                LOG(sFunctionRef..': tNavalThreatByTypeAndRange repr='..repru(tNavalThreatByTypeAndRange))
-            end
-            local iOurSubmersibleThreat = 0
-            if not (bAllOutAttack) then
-                --Do we still want to attack with subs?
-                iOurSubmersibleThreat = M27Logic.GetCombatThreatRating(aiBrain, tFriendliesNearFront, false, nil, nil, false, false, false, false, false, true, false)
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering if want an all out sub attack. iOurSubmersibleThreat='..iOurSubmersibleThreat..'; iEnemySubmersibleThreat='..iEnemySubmersibleThreat) end
-                if iOurSubmersibleThreat > iEnemySubmersibleThreat * 1.5 then
-                    local iEnemyAntiNavyThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemiesBetweenUsAndBase, false, nil, nil, false, false, false, true, false, false, false)
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have stronger subs than enemy; checking their antinavy. now. iEnemyAntiNavyThreat='..iEnemyAntiNavyThreat) end
-                    if iOurSubmersibleThreat > iEnemyAntiNavyThreat * 1.5 then
-                        bAllOutSubAttack = true
-                    end
-                end
-            end
-            --If dont have enough for all out attack, consider attacking nearest enemy unit if we can attack it without leaving our naval yard vulnerable
-            if not(bAllOutSubAttack) and not(bAllOutAttack) and oClosestEnemyCombatUnit then
-                local iDistToClosestEnemyCombat =  M27Utilities.GetDistanceBetweenPositions(oClosestEnemyCombatUnit:GetPosition(), oClosestFriendlyUnitToEnemyBase:GetPosition())
-                local iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tEnemyBase, oClosestFriendlyUnitToEnemyBase:GetPosition())
-                if iDistToClosestEnemyCombat <= iDistToEnemyBase * 0.4 then
-                    local iDistToOurNavalBase = M27Utilities.GetDistanceBetweenPositions(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase)
-                    if iDistToClosestEnemyCombat + iDistToOurNavalBase < iDistToEnemyBase and iDistToClosestEnemyCombat + M27Utilities.GetDistanceBetweenPositions(oClosestEnemyCombatUnit:GetPosition(), tOurBase) <= iDistToEnemyBase * 1.45 then
-
-                        local iSurfaceThreatOfNearbyEnemies = M27Logic.GetCombatThreatRating(aiBrain, tEnemiesNearClosestEnemyUnit, false, nil, nil, false, false, false, false, true, false, false)
-                        local iAntiNavyThreatOfNearbyEnemies = M27Logic.GetCombatThreatRating(aiBrain, tEnemiesNearClosestEnemyUnit, false, nil, nil, false, false, false, true, false, false, false)
-
-                        if iOurSurfaceThreat > iSurfaceThreatOfNearbyEnemies * iMinSurfaceFactorWanted then
-                            bAllOutAttack = true
-                            bAttackNearbyEnemies = true
-                        elseif iOurSubmersibleThreat > iAntiNavyThreatOfNearbyEnemies then
-                            bAllOutSubAttack = true
-                            bAttackNearbyEnemies = true
-                        end
-                        if bDebugMessages == true then LOG(sFunctionRef..': Considering if we can take on nearest enemy unit with an all out attack. iSurfaceThreatOfNearbyEnemies='..iSurfaceThreatOfNearbyEnemies..'; iAntiNavyThreatOfNearbyEnemies='..iAntiNavyThreatOfNearbyEnemies..'; iOurSurfaceThreat='..iOurSurfaceThreat..'; iOurSubmersibleThreat='..iOurSubmersibleThreat..'; bAllOutAttack after considering='..tostring(bAllOutAttack)..'; bAllOutSubAttack='..tostring(bAllOutSubAttack)..'; bAttackNearbyEnemies='..tostring(bAttackNearbyEnemies)) end
-                    end
-                end
-            end
-
-            local tGlobalNavalDestination
-            local tDestinationForShortRangeUnits --If doing an all out attack/all out sub attack, units whose range is below the min range for engagement should instead go to this destination
-
-            local iRangeOfClosestFriendlyUnit
-            local iEnemyUnitTypeRef
-            local iOurUnitTypeRef
-            local iEnemyThreatRef
-            local iOurThreatRef
-
-            if not(oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiAntiNavyRange]) then M27UnitInfo.GetNavalDirectAndSubRange(oClosestFriendlyUnitToEnemyBase) end --redundancy
-
-            if bAllOutSubAttack and EntityCategoryContains(categories.SUBMERSIBLE, oClosestFriendlyUnitToEnemyBase.UnitId) then
-                iRangeOfClosestFriendlyUnit = oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiAntiNavyRange]
-                iEnemyUnitTypeRef = refiTypeAll
-                iOurUnitTypeRef = refiTypeSubmersible
-                iEnemyThreatRef = refiEnemyThreatAntiNavy
-                iOurThreatRef = refiFriendlyThreatAntiNavy
-
-            elseif bAllOutAttack then
-                if bUseIndirectRangeIfHigher then
-                    iRangeOfClosestFriendlyUnit = math.max(oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiAntiNavyRange], oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiDFRange], oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiIndirectRange])
-                else
-                    iRangeOfClosestFriendlyUnit = math.max(oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiAntiNavyRange], oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiDFRange])
-                end
-
-                iEnemyUnitTypeRef = refiTypeAll
-                iOurUnitTypeRef = refiTypeMobileNavy
-                iEnemyThreatRef = refiEnemyThreatSurface
-                iOurThreatRef = refiFriendlyThreatSurface
-
-            end
-            local iMinRangeForEngagement = 0
-            local iOurCumulativeThreat = 0
-            local iEnemyCumulativeThreat = 0
-            local tiOurRatioVsEnemyByRange = {}
-            --local tiOurAbsoluteThreatExcessByRange = {}
-            local iBestRangeRatio = 0
-            local iBestRangeDistance
-            if bDebugMessages == true then LOG(sFunctionRef..': If we are doing an all out attack want to check our minimum engagement range. iOurThreatRef='..(iOurThreatRef or 'nil')..'; iOurUnitTypeRef='..(iOurUnitTypeRef or 'nil')..'; iEnemyUnitTypeRef='..(iEnemyUnitTypeRef or 'nil')..'; iEnemyThreatRef='..(iEnemyThreatRef or 'nil')..'; bAllOutSubAttack='..tostring(bAllOutSubAttack)..'; bAllOutAttack='..tostring(bAllOutAttack)) end
-
-            if iOurThreatRef then --Proxy for if have set something above
-                --Calc min engagement range
-                local iRatioCap = 100
-                local iUseAbsoluteNotRatioThreshold = 10000
-                local bUseAbsoluteDifference = false
-                local iRatioCapForLowThreat = 1.3
-                local iLowThreatThreshold = 1500 --If have below this, then will cap the ratio if in ratio mode
-                --Dont want to use ratios below a certain threshold to avoid e.g. a cruiser trying to solo enemy frigates, but do want to engage at destroyer range if we have destroyers and enemy doesnt; since ceruisers have lower threat 1.5k should mean 1 cruiser is below threshold but 1 destroyer is above
-                if iOurSurfaceThreat <= iUseAbsoluteNotRatioThreshold then
-                    bUseAbsoluteDifference = true
-                    iRatioCap = iUseAbsoluteNotRatioThreshold
-                end
-                for iEntry, iRange in M27Utilities.SortTableByValue(tiRangesUsed, true) do
-                    if not(tNavalThreatByTypeAndRange[iOurUnitTypeRef]) then tNavalThreatByTypeAndRange[iOurUnitTypeRef] = {} end
-                    if not(tNavalThreatByTypeAndRange[iOurUnitTypeRef][iRange]) then tNavalThreatByTypeAndRange[iOurUnitTypeRef][iRange] = {} end
-                    if not(tNavalThreatByTypeAndRange[iEnemyUnitTypeRef]) then tNavalThreatByTypeAndRange[iEnemyUnitTypeRef] = {} end
-                    if not(tNavalThreatByTypeAndRange[iEnemyUnitTypeRef][iRange]) then tNavalThreatByTypeAndRange[iEnemyUnitTypeRef][iRange] = {} end
-
-                    iOurCumulativeThreat = iOurCumulativeThreat + (tNavalThreatByTypeAndRange[iOurUnitTypeRef][iRange][iOurThreatRef] or 0)
-                    iEnemyCumulativeThreat = iEnemyCumulativeThreat +  (tNavalThreatByTypeAndRange[iEnemyUnitTypeRef][iRange][iEnemyThreatRef] or 0)
-                    if bUseAbsoluteDifference then
-                        tiOurRatioVsEnemyByRange[iRange] = math.min(iRatioCap, iOurCumulativeThreat - iEnemyCumulativeThreat)
                     else
-                        if iOurCumulativeThreat == 0 then
-                            tiOurRatioVsEnemyByRange[iRange] = 0
-                        elseif iEnemyCumulativeThreat == 0 then
-                            tiOurRatioVsEnemyByRange[iRange] = iRatioCap
-                        else
-                            if iOurCumulativeThreat <= iLowThreatThreshold then tiOurRatioVsEnemyByRange[iRange] = math.min(iRatioCapForLowThreat, iRatioCap, iOurCumulativeThreat / iEnemyCumulativeThreat)
+                        if EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) then
+                            bInclude = true
+                        end
+                    end
+                    if bInclude then
+                        for iThreatTypeRef = 1 + iThreatRefMod, 2 + iThreatRefMod, 1 do
+                            if not(oUnit[M27UnitInfo.refiDFRange]) then iCurUnitRange = (GetNavalDirectAndSubRange(oUnit) or 0) end --Redundancy, hopefully have already calculated range before
+                            if iThreatTypeRef == refiFriendlyThreatSurface or iThreatTypeRef == refiEnemyThreatSurface then
+
+                                if bUseIndirectRangeIfHigher and iThreatTypeRef == refiFriendlyThreatSurface then
+                                    iCurUnitRange = math.max(oUnit[M27UnitInfo.refiDFRange], oUnit[M27UnitInfo.refiAntiNavyRange], oUnit[M27UnitInfo.refiIndirectRange])
+                                else
+                                    iCurUnitRange = math.max(oUnit[M27UnitInfo.refiDFRange], oUnit[M27UnitInfo.refiAntiNavyRange])
+                                end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iCurUnitRange='..iCurUnitRange..'; Combat threat rating='..M27Logic.GetCombatThreatRating(aiBrain, { oUnit}, false, nil, nil, false, false, false, false, true, false, false)) end
+                                if iCurUnitRange > 0 then
+                                    --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue, bBlueprintThreat, bAntiNavyOnly, bAddAntiNavy, bSubmersibleOnly, bLongRangeThreatOnly)
+                                    iCurThreat = M27Logic.GetCombatThreatRating(aiBrain, { oUnit}, false, nil, nil, false, false, false, false, true, false, false)
+                                end
+
                             else
-                                tiOurRatioVsEnemyByRange[iRange] = math.min(iRatioCap, iOurCumulativeThreat / iEnemyCumulativeThreat)
+                                --Only want antinavy
+                                iCurUnitRange = oUnit[M27UnitInfo.refiAntiNavyRange]
+                                if bDebugMessages == true then LOG(sFunctionRef..': iCurUnitRange after checking only antinavy='..iCurUnitRange) end
+                                if iCurUnitRange > 0 then
+                                    iCurThreat = M27Logic.GetCombatThreatRating(aiBrain, { oUnit }, false, nil, nil, false, false, false, true, false, false, false)
+                                end
                             end
+                            if bDebugMessages == true then LOG(sFunctionRef..': iThreatTypeRef='..iThreatTypeRef..'; iThreatRefMod='..iThreatRefMod..'; iUnitType='..iUnitType..'; iCurThreat='..iCurThreat..'; iCurUnitRange='..iCurUnitRange) end
+
+                            tiRangesUsed[iCurUnitRange] = iCurUnitRange
+                            if not(tNavalThreatByTypeAndRange[iUnitType][iCurUnitRange]) then tNavalThreatByTypeAndRange[iUnitType][iCurUnitRange] = {} end
+
+                            tNavalThreatByTypeAndRange[iUnitType][iCurUnitRange][iThreatTypeRef] = (tNavalThreatByTypeAndRange[iUnitType][iCurUnitRange][iThreatTypeRef] or 0) + iCurThreat
+
                         end
                     end
-                    --tiOurAbsoluteThreatExcessByRange[iRange] = iOurCumulativeThreat - iEnemyCumulativeThreat
-                    if tiOurRatioVsEnemyByRange[iRange] >= iBestRangeRatio then
-                        iBestRangeDistance = iRange
-                        iBestRangeRatio = tiOurRatioVsEnemyByRange[iRange]
-                    end
-                    if bDebugMessages == true then LOG(sFunctionRef..': iRange='..iRange..'; iOurCumulativeThreat='..iOurCumulativeThreat..'; iLowThreatThreshold='..iLowThreatThreshold..'; iRatioCap='..iRatioCap..'; iEnemyCumulativeThreat='..iEnemyCumulativeThreat..'; tiOurRatioVsEnemyByRange[iRange]='..tiOurRatioVsEnemyByRange[iRange]..'; iBestRangeRatio='..iBestRangeRatio..'; iBestRangeDistance='..(iBestRangeDistance or 'nil')) end
                 end
-
-                iMinRangeForEngagement = math.min(110, (iBestRangeDistance or 0)) --Can engagement min range based on range of Aeon battleship, so all battleships should be able to engage
-                if bDebugMessages == true then LOG(sFunctionRef..': Set min range for engagement to iBestRangeDistance='..(iBestRangeDistance or 'nil')) end
             end
 
-            --Reduce min range for engagement to 0 if enemy near our base
-            if M27UnitInfo.IsUnitValid(oClosestEnemyCombatUnit) and M27Utilities.GetDistanceBetweenPositions(oClosestEnemyCombatUnit:GetPosition(), tOurBase) <= math.max(oClosestEnemyCombatUnit[M27UnitInfo.refiDFRange], oClosestEnemyCombatUnit[M27UnitInfo.refiIndirectRange], oClosestEnemyCombatUnit[M27UnitInfo.refiAntiNavyRange]) + 30 then
-                iMinRangeForEngagement = 0
+
+            local tFriendliesNearFront = {}
+            local tFriendlyNearbyReinforcements = {}
+            local tFriendlyFurtherAwayReinforcements = {}
+            local tEnemiesBetweenUsAndBase = {}
+            local tEnemiesNearClosestEnemyUnit = {}
+            local iFriendlySearchRangeBase = 30
+            local iNavyInPond = 0
+            local tNavyInPond = EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer,  M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
+            if M27Utilities.IsTableEmpty(tNavyInPond) == false then
+                iNavyInPond = table.getn(tNavyInPond)
             end
 
-            --Get the target enemy position:
 
-            local tClosestEnemyTargetToUse
-            if M27UnitInfo.IsUnitValid(oClosestSurfaceEnemy) and M27Utilities.CanSeeUnit(aiBrain, oClosestSurfaceEnemy) then UpdateUnitPond(oClosestSurfaceEnemy, iTeam, true) end  --Redundancy to update how far away it is in case delay with central logic
-            if M27UnitInfo.IsUnitValid(oClosestEnemyUnit) and M27Utilities.CanSeeUnit(aiBrain, oClosestEnemyUnit) then
-                UpdateUnitPond(oClosestEnemyUnit, iTeam, true)
-                if bDebugMessages == true then LOG(sFunctionRef..': Have updated unit pond for closest enemy unit='..oClosestEnemyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestEnemyUnit)..'; Distance between last known position and cur position (shoudl be 0)='..M27Utilities.GetDistanceBetweenPositions(oClosestEnemyUnit[M27UnitInfo.reftLastKnownPosition], oClosestEnemyUnit:GetPosition())) end
-            end --Redundancy to update how far away it is in case delay in updating all units
-            if M27UnitInfo.IsUnitValid(oClosestEnemyCombatUnit) and M27Utilities.CanSeeUnit(aiBrain, oClosestEnemyCombatUnit) then
-                UpdateUnitPond(oClosestEnemyCombatUnit, iTeam, true)
-                if bDebugMessages == true then LOG(sFunctionRef..': Have updated unit pond for closest enemy combat unit='..oClosestEnemyCombatUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestEnemyCombatUnit)..'; Dist to last known position (shoudl be 0)='..M27Utilities.GetDistanceBetweenPositions(oClosestEnemyCombatUnit:GetPosition(), oClosestEnemyCombatUnit[M27UnitInfo.reftLastKnownPosition])) end
-            end --Redundancy to update how far away it is in case delay in updating all units
-            if bDebugMessages == true then LOG(sFunctionRef..': oClosestEnemyUnit='..oClosestEnemyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestEnemyUnit)..'; Last known position='..repru(oClosestEnemyUnit[M27UnitInfo.reftLastKnownPosition])..'; Is visible='..tostring(M27Utilities.CanSeeUnit(aiBrain, oClosestEnemyUnit, true))..'; Distance between cur position and last known position='..M27Utilities.GetDistanceBetweenPositions(oClosestEnemyUnit:GetPosition(), oClosestEnemyUnit[M27UnitInfo.reftLastKnownPosition])) end
-
-            local bChargeEnemyBase = false --true if we decide to ignore closest enemies and just go for neemy base, e.g. if have far more threat
-
-
-            if bAttackNearbyEnemies and not(bAllOutSubAttack) and oClosestEnemySurfaceCombat and (M27Utilities.CanSeeUnit(aiBrain, oClosestEnemySurfaceCombat)  or M27Utilities.GetDistanceBetweenPositions(oClosestEnemySurfaceCombat[M27UnitInfo.reftLastKnownPosition], oClosestEnemySurfaceCombat:GetPosition()) <= 50) then tClosestEnemyTargetToUse = oClosestEnemySurfaceCombat[M27UnitInfo.reftLastKnownPosition]
-            elseif bAttackNearbyEnemies and bAllOutSubAttack and oClosestEnemyCombatUnit and (M27Utilities.CanSeeUnit(aiBrain, oClosestEnemyUnit)  or M27Utilities.GetDistanceBetweenPositions(oClosestEnemyCombatUnit[M27UnitInfo.reftLastKnownPosition], oClosestEnemyCombatUnit:GetPosition()) <= 50) then tClosestEnemyTargetToUse = oClosestEnemyCombatUnit[M27UnitInfo.reftLastKnownPosition]
-            else
-                --If we massively outnumber enemy naval threat then just go for the enemy naval factories
-                if bDebugMessages == true then LOG(sFunctionRef..': If massively outnumber enemy in navy and likely have battleships then target enemy naval factory. iOurSurfaceThreat='..iOurSurfaceThreat..'; iEnemySurfaceThreat='..iEnemySurfaceThreat) end
-                if iOurSurfaceThreat > iEnemySurfaceThreat * 3.5 and iOurSurfaceThreat >= 30000 then
-                    local tEnemyFactories = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalFactory, M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond])
-                    if M27Utilities.IsTableEmpty(tEnemyFactories) == false then
-                        bChargeEnemyBase = true
-                        tClosestEnemyTargetToUse = M27Utilities.GetNearestUnit(tEnemyFactories, tOurBase):GetPosition()
-                        if bDebugMessages == true then LOG(sFunctionRef..': Will target closest enemy unit='..M27Utilities.GetNearestUnit(tEnemyFactories, tOurBase).UnitId..M27UnitInfo.GetUnitLifetimeCount(M27Utilities.GetNearestUnit(tEnemyFactories, tOurBase))) end
-                    end
-                end
-                if M27Utilities.IsTableEmpty(tClosestEnemyTargetToUse) then
-                    if M27Utilities.GetDistanceBetweenPositions(oClosestEnemyUnit[M27UnitInfo.reftLastKnownPosition], oClosestEnemyUnit:GetPosition()) > 50 then
-                        local tVisibleEnemiesAroundFrontUnit = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySurfaceAmphibiousCombat, oClosestFriendlyUnitToEnemyBase:GetPosition(), math.max(iEnemyBestSurfaceRange, iEnemyBestAntiNavyRange, 70) + 20)
-                        if M27Utilities.IsTableEmpty(tVisibleEnemiesAroundFrontUnit) then
-                            --No nearby visible neemies, target enemy base
-                            tClosestEnemyTargetToUse = { tEnemyBase[1], tEnemyBase[2], tEnemyBase[3] }
-                            if bDebugMessages == true then LOG(sFunctionRef..': No visible enemies, will target enemy base instead of closest enemy for tClosestEnemyTargetToUse') end
+            if iNavyInPond >= 10 then iFriendlySearchRangeBase = iFriendlySearchRangeBase + math.min(25, iNavyInPond) end
+            local iNearbyReinforcementSearchBase = iFriendlySearchRangeBase + 50
+            local iEnemySearchRangeBase = 60
+            local iEnemySearchRangeShort = 30
+            local iCurDist
+            local iCurRange
+            local iOurBestSurfaceRange = 0
+            local iOurBestSubmersibleRange = 0
+            local iOurBestSurfaceAntiNavyRange = 0
+            --Already have iOurBestIndirectRange defined earlier, along with our best DF range
+            local iEnemyBestSurfaceRange = 0
+            local iEnemyBestAntiNavyRange = 0
+            local iEnemyBestSubmersibleRange = 0
+            local iEnemyBestIndirectRange = 0
+            --Get friendly units
+            if bDebugMessages == true then LOG(sFunctionRef..': About to identify all units that are close to '..oClosestFriendlyUnitToEnemyBase.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestFriendlyUnitToEnemyBase)) end
+            bHaveAlreadyUpdatedRanges = true
+            for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond] do
+                if EntityCategoryContains(categories.MOBILE, oUnit.UnitId) and oUnit:GetFractionComplete() >= 1 then
+                    iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oClosestFriendlyUnitToEnemyBase:GetPosition())
+                    iCurRange = M27UnitInfo.GetNavalDirectAndSubRange(oUnit)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Distance between friendly unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to front unit='..iCurDist..'; Range='..iCurRange) end
+                    if iCurDist - iCurRange <= iNearbyReinforcementSearchBase then
+                        if iCurDist - iCurRange <= iFriendlySearchRangeBase then
+                            table.insert(tFriendliesNearFront, oUnit)
+                            RecordUnitInNavalThreatTable(oUnit, false)
                         else
-                            --Get closest visible enemy
-                            tClosestEnemyTargetToUse = M27Utilities.GetNearestUnit(tVisibleEnemiesAroundFrontUnit, oClosestFriendlyUnitToEnemyBase:GetPosition()):GetPosition()
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have visible enemies so setting tClosestEnemyTargetToUse to this') end
+                            table.insert(tFriendlyNearbyReinforcements, oUnit)
+                        end
+                        iOurBestSurfaceRange = math.max(iOurBestSurfaceRange, iCurRange)
+                        if EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) then
+                            iOurBestSubmersibleRange = math.max(iOurBestSubmersibleRange, oUnit[M27UnitInfo.refiAntiNavyRange])
+                        else
+                            iOurBestSurfaceAntiNavyRange = math.max(iOurBestSurfaceAntiNavyRange, oUnit[M27UnitInfo.refiAntiNavyRange])
                         end
                     else
-                        tClosestEnemyTargetToUse = { oClosestEnemyUnit[M27UnitInfo.reftLastKnownPosition][1], oClosestEnemyUnit[M27UnitInfo.reftLastKnownPosition][2], oClosestEnemyUnit[M27UnitInfo.reftLastKnownPosition][3] }
-                        if bDebugMessages == true then LOG(sFunctionRef..': Setting closest enemy target to its last known position') end
+                        table.insert(tFriendlyFurtherAwayReinforcements, oUnit)
                     end
+                    iOurBestIndirectRange = math.max(iOurBestIndirectRange, oUnit[M27UnitInfo.refiIndirectRange])
+                    iOurBestDFRange = math.max(iOurBestDFRange, oUnit[M27UnitInfo.refiDFRange])
+
+
                 end
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': Do we have a min engagement range of more than 0? iMinRangeForEngagement='..(iMinRangeForEngagement or 'nil')..'; tClosestEnemyTargetToUse='..repru(tClosestEnemyTargetToUse)..'; Dist between here and tenemybase='..M27Utilities.GetDistanceBetweenPositions(tEnemyBase, tClosestEnemyTargetToUse)..'; iMinRangeForEngagement='..(iMinRangeForEngagement or 'nil')..'; is table of enemy units near front empty='..tostring(M27Utilities.IsTableEmpty(tFriendliesNearFront))) end
-
-
-            --If we only want to do an all out attack for certain ranged units, then work out where units with a shorter range should go, or if they should do an all out attack as well due ot the enemy being close to our long range unit
-
-            if iMinRangeForEngagement > 0 and M27Utilities.IsTableEmpty(tFriendliesNearFront) == false then
-                local iDistanceBehindFrontUnitWanted = 12
-                local oNearestFriendlyWithSufficientRange
-                local iCurDistToEnemy
-                local iClosestDistToEnemy = 10000
-                local iCurRange
-                for iUnit, oUnit in tFriendliesNearFront do
-                    if bAllOutSubAttack then
-                        if EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) then iCurRange = oUnit[M27UnitInfo.refiAntiNavyRange] end
-                    elseif bUseIndirectRangeIfHigher then --general all out attack that can include indirect range as nearest unit is structure
-                        iCurRange = math.max(oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiAntiNavyRange], oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiDFRange], oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiIndirectRange])
-                    else --general all out attack
-                        iCurRange = math.max(oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiAntiNavyRange], oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiDFRange])
-                    end
-                    if iCurRange >= iMinRangeForEngagement then
-                        iCurDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tClosestEnemyTargetToUse)
-                        if iCurDistToEnemy < iClosestDistToEnemy then
-                            oNearestFriendlyWithSufficientRange = oUnit
-                        end
-                    end
-                end
-                if not(oNearestFriendlyWithSufficientRange) and iRangeOfClosestFriendlyUnit < iMinRangeForEngagement then
-                    --Backup for rare cases where no unit with enough range
-                    iDistanceBehindFrontUnitWanted = 30
-                    tDestinationForShortRangeUnits = M27Utilities.MoveInDirection(oClosestFriendlyUnitToEnemyBase:GetPosition(), M27Utilities.GetAngleFromAToB(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase), iDistanceBehindFrontUnitWanted, true, false)
-                    if bDebugMessages == true then LOG(sFunctionRef..': Dont have a nearest friendly unit with sufficient range, so will set the destination for short range units equal to the position of the nearest unit to enemy base') end
-                else
-                    --Is the enemy front unit almost within range?
-                    local iEnemyRange
-                    if bAllOutSubAttack then iEnemyRange = oClosestEnemyUnit[M27UnitInfo.refiAntiNavyRange]
-                    else
-                        iEnemyRange = math.max(oClosestEnemyUnit[M27UnitInfo.refiAntiNavyRange], oClosestEnemyUnit[M27UnitInfo.refiDFRange])
-                    end
-                    if M27Utilities.GetDistanceBetweenPositions(oNearestFriendlyWithSufficientRange:GetPosition(), tClosestEnemyTargetToUse) + iEnemyRange + iDistanceBehindFrontUnitWanted - 4 > iMinRangeForEngagement then
-                        iMinRangeForEngagement = 0 --Dont want a minimum range as enemy almost in range
-                        iDistanceBehindFrontUnitWanted = 30
-                        if bDebugMessages == true then LOG(sFunctionRef..': Dont want a minimum range as enemy almost in range so will set short range unit destination equal to 30 behind the front unit') end
-                    end
-                    tDestinationForShortRangeUnits = M27Utilities.MoveInDirection(oNearestFriendlyWithSufficientRange:GetPosition(), M27Utilities.GetAngleFromAToB(oNearestFriendlyWithSufficientRange:GetPosition(), tOurBase), iDistanceBehindFrontUnitWanted, true, false)
-
-                end
-            else
-                --Placehodler - dont expect to use this
-                tDestinationForShortRangeUnits = M27Utilities.MoveInDirection(oClosestFriendlyUnitToEnemyBase:GetPosition(), M27Utilities.GetAngleFromAToB(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase), 30, true, false)
-                if bDebugMessages == true then LOG(sFunctionRef..': Not doing all out attack, will just record tDestinationForShortRangeUnits as being the closest friendly unit to enemy so dont have nil value') end
+            if bDebugMessages == true then
+                LOG(sFunctionRef .. ': Is table of nearby friendly reinforcements empty=' .. tostring(M27Utilities.IsTableEmpty(tFriendlyNearbyReinforcements)) .. '; Is table of friendlies near front empty=' .. tostring(M27Utilities.IsTableEmpty(tFriendliesNearFront)) .. ' tEnemyBase=' .. repru(tEnemyBase))
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': Finished determining tDestinationForShortRangeUnits='..repru(tDestinationForShortRangeUnits)) end
 
-            if bAllOutAttack then
-                local oNearestThreatToConsider
-                local bAttackNearestThreatInstead = false
+            if M27Utilities.IsTableEmpty(tFriendlyNearbyReinforcements) == false or M27Utilities.IsTableEmpty(tFriendliesNearFront) == false or M27Utilities.IsTableEmpty(tFriendlyFurtherAwayReinforcements) == false then
+                local iDistToBase
+                if bDebugMessages == true then LOG(sFunctionRef..': About to record details of enemy units of relevance; will either consider those naval units if we are attacking base, or those around hte nearest enemy combat unit if we are attacking nearest enemy unit') end
 
-                --Do we want to attack the enemy base or the enemy naval unit?
-                if bIgnoreEnemySubs and EntityCategoryContains(categories.SUBMERSIBLE, oClosestEnemyUnit.UnitId) then
-                    --Get closest non-submersible threat
-                    oNearestThreatToConsider = oClosestSurfaceEnemy
-                else
-                    oNearestThreatToConsider = oClosestEnemyUnit
-                end
-                if oNearestThreatToConsider then
-                    if M27Utilities.GetDistanceBetweenPositions(oNearestThreatToConsider[M27UnitInfo.reftLastKnownPosition], tOurBase) + M27UnitInfo.GetNavalDirectAndSubRange(oNearestThreatToConsider) - 10 <= iFriendlyDistToEnemy + M27UnitInfo.GetNavalDirectAndSubRange(oClosestFriendlyUnitToEnemyBase) then
-                        --Special case - avoid navy all heading towards a really old position of a unit - approximate by comparing the actual position to last known position and not proceeding if it is more than 50 away
-                        if M27Utilities.GetDistanceBetweenPositions(oNearestThreatToConsider[M27UnitInfo.reftLastKnownPosition], oNearestThreatToConsider:GetPosition()) <= 50 then
-                            bAttackNearestThreatInstead = true
+
+                for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond] do
+                    iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oClosestFriendlyUnitToEnemyBase:GetPosition())
+                    iDistToBase = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tEnemyBase)
+                    iCurRange = M27UnitInfo.GetNavalDirectAndSubRange(oUnit)
+                    if iCurDist - iCurRange - iEnemySearchRangeBase <= iFriendlyDistToEnemy or iDistToBase - iCurRange - iEnemySearchRangeShort <= iFriendlyDistToEnemy then
+                        table.insert(tEnemiesBetweenUsAndBase, oUnit)
+                        iEnemyBestSurfaceRange = math.max(iEnemyBestSurfaceRange, iCurRange)
+                        iEnemyBestAntiNavyRange = math.max(iEnemyBestAntiNavyRange, oUnit[M27UnitInfo.refiAntiNavyRange])
+                        if EntityCategoryContains(M27UnitInfo.refCategorySubmarine, oUnit.UnitId) then
+                            iEnemyBestSubmersibleRange = math.max(iEnemyBestSubmersibleRange, oUnit[M27UnitInfo.refiAntiNavyRange])
                         end
+                        iEnemyBestIndirectRange = math.max(iEnemyBestIndirectRange, oUnit[M27UnitInfo.refiIndirectRange])
                     end
-                end
-
-                if bAttackNearestThreatInstead then
-                    --Attack nearest enemy unit - move to just before actual position if we have seen the unit
-                    if M27Utilities.CanSeeUnit(aiBrain, oNearestThreatToConsider, true) then
-                        tGlobalNavalDestination = M27Utilities.MoveInDirection(oNearestThreatToConsider:GetPosition(), M27Utilities.GetAngleFromAToB(oNearestThreatToConsider:GetPosition(), tOurBase), 4, true, false)
-                    else
-                        tGlobalNavalDestination = { oNearestThreatToConsider[M27UnitInfo.reftLastKnownPosition][1], oNearestThreatToConsider[M27UnitInfo.reftLastKnownPosition][2], oNearestThreatToConsider[M27UnitInfo.reftLastKnownPosition][3] }
-                    end
-                else
-                    --Attack enemy base
-                    tGlobalNavalDestination = tEnemyBase
-                    --Bombardment mode instead if enemy has no base and minimal threat vs ours
-                    if iEnemySurfaceThreat <= 1000 and iEnemySurfaceThreat * 8 <= iOurSurfaceThreat and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.STRUCTURE, M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond])) then
-                        bConsiderBombardment = true
-                    elseif iOurSurfaceThreat >= 25000 and iEnemySurfaceThreat * 8 <= iOurSurfaceThreat and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalFactory, M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond])) then
-                        bConsiderBombardment = true
+                    --Is the enemy near the closet enemy unit
+                    if oClosestEnemyCombatUnit and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oClosestEnemyCombatUnit:GetPosition()) + iCurRange <= iEnemySearchRangeBase then
+                        table.insert(tEnemiesNearClosestEnemyUnit, oUnit)
+                        RecordUnitInNavalThreatTable(oUnit, true)
                     end
 
                 end
-            else
-                --If we meet up with nearby reinforcements will we have enough surface threat?
-                local iReinforcementSurfaceThreat = M27Logic.GetCombatThreatRating(aiBrain, tFriendlyNearbyReinforcements, false, nil, nil, false, false, false, false, true, false, false)
-                local iReinforcementAntiNavyThreat = M27Logic.GetCombatThreatRating(aiBrain, tFriendlyNearbyReinforcements, false, nil, nil, false, false, false, true, false, false, false)
-                iOurSurfaceThreat = iOurSurfaceThreat + iReinforcementSurfaceThreat
-                iOurAntiNavyThreat = iOurAntiNavyThreat + iReinforcementAntiNavyThreat
+
+                --Can we win with an all out attack?
+                local iOurSurfaceThreat = M27Logic.GetCombatThreatRating(aiBrain, tFriendliesNearFront, false, nil, nil, false, false, false, false, true, false, false)
+                local iOurAntiNavyThreat = M27Logic.GetCombatThreatRating(aiBrain, tFriendliesNearFront, false, nil, nil, false, false, false, true, false, false, false)
+                local iEnemySurfaceThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemiesBetweenUsAndBase, false, nil, nil, false, false, false, false, true, false, false)
+                local tEnemyTorpedoLauncherThreats = EntityCategoryFilterDown(M27UnitInfo.refCategoryTorpedoLauncher, tEnemiesBetweenUsAndBase)
+
+                local iEnemySurfaceTorpedoDefenceThreat = 0
+                local iEnemyTorpedoMaxRange = 0
+                if M27Utilities.IsTableEmpty(tEnemyTorpedoLauncherThreats) == false then
+                    iEnemySurfaceTorpedoDefenceThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyTorpedoLauncherThreats, false, nil, nil, false, false, false, false, true, false, false)
+                    for iUnit, oUnit in tEnemyTorpedoLauncherThreats do
+                        iEnemyTorpedoMaxRange = math.max(iEnemyTorpedoMaxRange, M27UnitInfo.GetNavalDirectAndSubRange(oUnit))
+                    end
+
+                    if iEnemyTorpedoMaxRange < math.max(iOurBestIndirectRange, iOurBestSurfaceRange, iOurBestSubmersibleRange) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': We have units that outrange enemy torpedo threat so will ignore it for deciding if we can launch an all out attack. iEnemySurfaceTorpedoDefenceThreat='..iEnemySurfaceTorpedoDefenceThreat) end
+                        iEnemySurfaceThreat = iEnemySurfaceThreat - iEnemySurfaceTorpedoDefenceThreat
+                    end
+                end
+
+
+
+
+                local iEnemySubmersibleThreat = 0
+                if iEnemyBestAntiNavyRange > 0 then
+                    iEnemySubmersibleThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemiesBetweenUsAndBase, false, nil, nil, false, false, false, false, false, true, false)
+                end
+
+                --Do we win in both theatres, and have significanlty more threat?
+                local bAllOutAttack = false
+                --bAllOutSubAttack = false --Recorded above; Set to true if we arent doing an all out at tack, but think our subs can still do an all out attack
+                local bAttackNearbyEnemies = false --If dont have enough to beat every naval unit between us and enemy base, but do have enough to take on the nearest enemies, then will use this
+                local bIgnoreEnemySubs = false
+                local bConsolidateForces = false --used to determine unit task description for now (to help with debugging)
+
+                local iMinSurfaceFactorWanted = 1.15 + math.max(-0.1, 0.01 * (iFriendlyDistToEnemy - iOurBestSurfaceRange - 25))
+                if iMinSurfaceFactorWanted > 1.3 then
+                    local iFactorCap = 3 - math.min(1.7, iOurSurfaceThreat / 1000)
+                    iMinSurfaceFactorWanted = math.min(iMinSurfaceFactorWanted, iFactorCap)
+                end
+
                 if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Our threats after increasing for reinforcements: iOurSurfaceThreat=' .. iOurSurfaceThreat .. '; iOurAntiNavyThreat=' .. iOurAntiNavyThreat)
-                    if M27Utilities.IsTableEmpty(tFriendlyNearbyReinforcements) == false then
-                        LOG(sFunctionRef .. ': Size of tFriendlyNearbyReinforcements=' .. table.getn(tFriendlyNearbyReinforcements))
+                    LOG(sFunctionRef .. ': Considering if we want an all out attack. iMinSurfaceFactorWanted=' .. iMinSurfaceFactorWanted .. '; iOurSurfaceThreat=' .. iOurSurfaceThreat .. '; iEnemySurfaceThreat=' .. iEnemySurfaceThreat .. '; iEnemySurfaceThreat*factor=' .. iEnemySurfaceThreat * iMinSurfaceFactorWanted..'; Size of tFriendliesNearFront='..table.getn(tFriendliesNearFront))
+                    if iOurAntiNavyThreat > 0 then
+                        LOG(sFunctionRef..': Will list out every unit with antinavy threat')
+                        local iCurAntiNavy
+                        for iUnit, oUnit in tFriendliesNearFront do
+                            iCurAntiNavy = M27Logic.GetCombatThreatRating(aiBrain, { oUnit}, false, nil, nil, false, false, false, true, false, false, false)
+                            if iCurAntiNavy > 0 then
+                                LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' with fraction complete '..oUnit:GetFractionComplete()..' has antinavy threat of '..iCurAntiNavy)
+                            end
+                        end
+                    end
+                end
+                if iOurSurfaceThreat > iEnemySurfaceThreat * iMinSurfaceFactorWanted then
+                    --Do we have enough antinavy?
+                    if iEnemySubmersibleThreat == 0 or iOurAntiNavyThreat > iEnemySubmersibleThreat then
+                        bAllOutAttack = true
+                    else
+                        --Can we ignore antinavy and take out the naval fac?
+                        if iOurSurfaceThreat > iEnemySurfaceThreat * 2 then
+                            if (iFriendlyDistToEnemy <= 200 and iEnemySubmersibleThreat < 0.1 * iOurSurfaceThreat) or iEnemySubmersibleThreat < 0.05 * iOurSurfaceThreat then
+                                bIgnoreEnemySubs = true
+                                bAllOutAttack = true
+                            end
+                        end
+                    end
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': Still consider all out attack if enemy has surface unit close to our base. bAllOutAttack='..tostring(bAllOutAttack)..'; Is oClosestSurfaceEnemy valid='..tostring(M27UnitInfo.IsUnitValid(oClosestSurfaceEnemy))) end
+
+
+
+
+                if not(bAllOutAttack) and oClosestSurfaceEnemy then
+                    --Still do all out attack if enemy has surface unit close to being in range of us
+                    if bDebugMessages == true then LOG(sFunctionRef..': oClosestSurfaceEnemy='..oClosestSurfaceEnemy.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestSurfaceEnemy)..'; Dist to our base='..M27Utilities.GetDistanceBetweenPositions(oClosestSurfaceEnemy:GetPosition(), tOurBase)..'; iEnemyBestSurfaceRange='..iEnemyBestSurfaceRange..'; iEnemyBestIndirectRange='..iEnemyBestIndirectRange) end
+                    if M27Utilities.GetDistanceBetweenPositions(oClosestSurfaceEnemy:GetPosition(), tOurBase) <= 40 +  math.max(iEnemyBestSurfaceRange, iEnemyBestIndirectRange) then
+                        bAllOutAttack = true
+                        bAttackNearbyEnemies = true
+                        if bDebugMessages == true then LOG(sFunctionRef..': Will attack nearby enemies') end
                     end
                 end
 
-                if (iReinforcementSurfaceThreat > 0 or iReinforcementAntiNavyThreat > 0) and iOurSurfaceThreat >= iEnemySurfaceThreat * 1.1 and iOurAntiNavyThreat >= iEnemySubmersibleThreat then
-                    --Consolidate forces
-                    bConsolidateForces = true
-                    local tTablesOfUnitsToAverage = {}
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': iOurSurfaceThreat=' .. iOurSurfaceThreat .. '; iEnemySUrfaceThreat=' .. iEnemySurfaceThreat .. '; iOurAntiNavyThreat=' .. iOurAntiNavyThreat .. '; iEnemySubmersibleThreat=' .. iEnemySubmersibleThreat .. '; bAllOutAttack=' .. tostring(bAllOutAttack) .. '; WIll list out every unit in our main naval force and their threat value')
                     if M27Utilities.IsTableEmpty(tFriendliesNearFront) == false then
-                        local tMobileFriendliesNearFront = EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer, tFriendliesNearFront)
-                        if M27Utilities.IsTableEmpty(tMobileFriendliesNearFront) == false then
-                            table.insert(tTablesOfUnitsToAverage, tMobileFriendliesNearFront)
+                        for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond] do
+                            if EntityCategoryContains(categories.MOBILE, oUnit.UnitId) and M27UnitInfo.IsUnitValid(oUnit) then
+                                LOG(sFunctionRef .. ': Unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; Surface threat=' .. M27Logic.GetCombatThreatRating(aiBrain, { oUnit }, false, nil, nil, false, false, false, false, true, false, false))
+                            end
                         end
                     end
-                    if M27Utilities.IsTableEmpty(tFriendlyNearbyReinforcements) == false then
-                        local tMobileFriendliesNearFront = EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer, tFriendlyNearbyReinforcements)
-                        if M27Utilities.IsTableEmpty(tMobileFriendliesNearFront) == false then
-                            table.insert(tTablesOfUnitsToAverage, tMobileFriendliesNearFront)
+                    LOG(sFunctionRef..': tNavalThreatByTypeAndRange repr='..repru(tNavalThreatByTypeAndRange))
+                end
+                local iOurSubmersibleThreat = 0
+                if not (bAllOutAttack) then
+                    --Do we still want to attack with subs?
+                    iOurSubmersibleThreat = M27Logic.GetCombatThreatRating(aiBrain, tFriendliesNearFront, false, nil, nil, false, false, false, false, false, true, false)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering if want an all out sub attack. iOurSubmersibleThreat='..iOurSubmersibleThreat..'; iEnemySubmersibleThreat='..iEnemySubmersibleThreat) end
+                    if iOurSubmersibleThreat > iEnemySubmersibleThreat * 1.5 then
+                        local iEnemyAntiNavyThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemiesBetweenUsAndBase, false, nil, nil, false, false, false, true, false, false, false)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have stronger subs than enemy; checking their antinavy. now. iEnemyAntiNavyThreat='..iEnemyAntiNavyThreat) end
+                        if iOurSubmersibleThreat > iEnemyAntiNavyThreat * 1.5 then
+                            bAllOutSubAttack = true
                         end
                     end
-                    if M27Utilities.IsTableEmpty(tTablesOfUnitsToAverage) == false then
+                end
+                --If dont have enough for all out attack, consider attacking nearest enemy unit if we can attack it without leaving our naval yard vulnerable
+                if not(bAllOutSubAttack) and not(bAllOutAttack) and oClosestEnemyCombatUnit then
+                    local iDistToClosestEnemyCombat =  M27Utilities.GetDistanceBetweenPositions(oClosestEnemyCombatUnit:GetPosition(), oClosestFriendlyUnitToEnemyBase:GetPosition())
+                    local iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tEnemyBase, oClosestFriendlyUnitToEnemyBase:GetPosition())
+                    if iDistToClosestEnemyCombat <= iDistToEnemyBase * 0.4 then
+                        local iDistToOurNavalBase = M27Utilities.GetDistanceBetweenPositions(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase)
+                        if iDistToClosestEnemyCombat + iDistToOurNavalBase < iDistToEnemyBase and iDistToClosestEnemyCombat + M27Utilities.GetDistanceBetweenPositions(oClosestEnemyCombatUnit:GetPosition(), tOurBase) <= iDistToEnemyBase * 1.45 then
 
-                        tGlobalNavalDestination = M27Utilities.GetAveragePositionOfMultipleTablesOfUnits(tTablesOfUnitsToAverage)
+                            local iSurfaceThreatOfNearbyEnemies = M27Logic.GetCombatThreatRating(aiBrain, tEnemiesNearClosestEnemyUnit, false, nil, nil, false, false, false, false, true, false, false)
+                            local iAntiNavyThreatOfNearbyEnemies = M27Logic.GetCombatThreatRating(aiBrain, tEnemiesNearClosestEnemyUnit, false, nil, nil, false, false, false, true, false, false, false)
+
+                            if iOurSurfaceThreat > iSurfaceThreatOfNearbyEnemies * iMinSurfaceFactorWanted then
+                                bAllOutAttack = true
+                                bAttackNearbyEnemies = true
+                            elseif iOurSubmersibleThreat > iAntiNavyThreatOfNearbyEnemies then
+                                bAllOutSubAttack = true
+                                bAttackNearbyEnemies = true
+                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering if we can take on nearest enemy unit with an all out attack. iSurfaceThreatOfNearbyEnemies='..iSurfaceThreatOfNearbyEnemies..'; iAntiNavyThreatOfNearbyEnemies='..iAntiNavyThreatOfNearbyEnemies..'; iOurSurfaceThreat='..iOurSurfaceThreat..'; iOurSubmersibleThreat='..iOurSubmersibleThreat..'; bAllOutAttack after considering='..tostring(bAllOutAttack)..'; bAllOutSubAttack='..tostring(bAllOutSubAttack)..'; bAttackNearbyEnemies='..tostring(bAttackNearbyEnemies)) end
+                        end
+                    end
+                end
+
+                local tGlobalNavalDestination
+                local tDestinationForShortRangeUnits --If doing an all out attack/all out sub attack, units whose range is below the min range for engagement should instead go to this destination
+
+                local iRangeOfClosestFriendlyUnit
+                local iEnemyUnitTypeRef
+                local iOurUnitTypeRef
+                local iEnemyThreatRef
+                local iOurThreatRef
+
+                if not(oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiAntiNavyRange]) then M27UnitInfo.GetNavalDirectAndSubRange(oClosestFriendlyUnitToEnemyBase) end --redundancy
+
+                if bAllOutSubAttack and EntityCategoryContains(categories.SUBMERSIBLE, oClosestFriendlyUnitToEnemyBase.UnitId) then
+                    iRangeOfClosestFriendlyUnit = oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiAntiNavyRange]
+                    iEnemyUnitTypeRef = refiTypeAll
+                    iOurUnitTypeRef = refiTypeSubmersible
+                    iEnemyThreatRef = refiEnemyThreatAntiNavy
+                    iOurThreatRef = refiFriendlyThreatAntiNavy
+
+                elseif bAllOutAttack then
+                    if bUseIndirectRangeIfHigher then
+                        iRangeOfClosestFriendlyUnit = math.max(oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiAntiNavyRange], oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiDFRange], oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiIndirectRange])
                     else
-                        tGlobalNavalDestination = { tOurBase[1], tOurBase[2], tOurBase[3] }
+                        iRangeOfClosestFriendlyUnit = math.max(oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiAntiNavyRange], oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiDFRange])
                     end
 
-                    if bDebugMessages == true then
-                        local iUnits = 0
-                        for iUnitTable, tUnitTable in tTablesOfUnitsToAverage do
-                            iUnits = iUnits + table.getn(tUnitTable)
+                    iEnemyUnitTypeRef = refiTypeAll
+                    iOurUnitTypeRef = refiTypeMobileNavy
+                    iEnemyThreatRef = refiEnemyThreatSurface
+                    iOurThreatRef = refiFriendlyThreatSurface
+
+                end
+                local iMinRangeForEngagement = 0
+                local iOurCumulativeThreat = 0
+                local iEnemyCumulativeThreat = 0
+                local tiOurRatioVsEnemyByRange = {}
+                --local tiOurAbsoluteThreatExcessByRange = {}
+                local iBestRangeRatio = 0
+                local iBestRangeDistance
+                if bDebugMessages == true then LOG(sFunctionRef..': If we are doing an all out attack want to check our minimum engagement range. iOurThreatRef='..(iOurThreatRef or 'nil')..'; iOurUnitTypeRef='..(iOurUnitTypeRef or 'nil')..'; iEnemyUnitTypeRef='..(iEnemyUnitTypeRef or 'nil')..'; iEnemyThreatRef='..(iEnemyThreatRef or 'nil')..'; bAllOutSubAttack='..tostring(bAllOutSubAttack)..'; bAllOutAttack='..tostring(bAllOutAttack)) end
+
+                if iOurThreatRef then --Proxy for if have set something above
+                    --Calc min engagement range
+                    local iRatioCap = 100
+                    local iUseAbsoluteNotRatioThreshold = 10000
+                    local bUseAbsoluteDifference = false
+                    local iRatioCapForLowThreat = 1.3
+                    local iLowThreatThreshold = 1500 --If have below this, then will cap the ratio if in ratio mode
+                    --Dont want to use ratios below a certain threshold to avoid e.g. a cruiser trying to solo enemy frigates, but do want to engage at destroyer range if we have destroyers and enemy doesnt; since ceruisers have lower threat 1.5k should mean 1 cruiser is below threshold but 1 destroyer is above
+                    if iOurSurfaceThreat <= iUseAbsoluteNotRatioThreshold then
+                        bUseAbsoluteDifference = true
+                        iRatioCap = iUseAbsoluteNotRatioThreshold
+                    end
+                    for iEntry, iRange in M27Utilities.SortTableByValue(tiRangesUsed, true) do
+                        if not(tNavalThreatByTypeAndRange[iOurUnitTypeRef]) then tNavalThreatByTypeAndRange[iOurUnitTypeRef] = {} end
+                        if not(tNavalThreatByTypeAndRange[iOurUnitTypeRef][iRange]) then tNavalThreatByTypeAndRange[iOurUnitTypeRef][iRange] = {} end
+                        if not(tNavalThreatByTypeAndRange[iEnemyUnitTypeRef]) then tNavalThreatByTypeAndRange[iEnemyUnitTypeRef] = {} end
+                        if not(tNavalThreatByTypeAndRange[iEnemyUnitTypeRef][iRange]) then tNavalThreatByTypeAndRange[iEnemyUnitTypeRef][iRange] = {} end
+
+                        iOurCumulativeThreat = iOurCumulativeThreat + (tNavalThreatByTypeAndRange[iOurUnitTypeRef][iRange][iOurThreatRef] or 0)
+                        iEnemyCumulativeThreat = iEnemyCumulativeThreat +  (tNavalThreatByTypeAndRange[iEnemyUnitTypeRef][iRange][iEnemyThreatRef] or 0)
+                        if bUseAbsoluteDifference then
+                            tiOurRatioVsEnemyByRange[iRange] = math.min(iRatioCap, iOurCumulativeThreat - iEnemyCumulativeThreat)
+                        else
+                            if iOurCumulativeThreat == 0 then
+                                tiOurRatioVsEnemyByRange[iRange] = 0
+                            elseif iEnemyCumulativeThreat == 0 then
+                                tiOurRatioVsEnemyByRange[iRange] = iRatioCap
+                            else
+                                if iOurCumulativeThreat <= iLowThreatThreshold then tiOurRatioVsEnemyByRange[iRange] = math.min(iRatioCapForLowThreat, iRatioCap, iOurCumulativeThreat / iEnemyCumulativeThreat)
+                                else
+                                    tiOurRatioVsEnemyByRange[iRange] = math.min(iRatioCap, iOurCumulativeThreat / iEnemyCumulativeThreat)
+                                end
+                            end
                         end
-                        LOG(sFunctionRef .. ': Want to consolidate nearby reinforcement forces, will move to average location of mobile unites=' .. repru(tGlobalNavalDestination) .. '; size of UnitsToAverage=' .. iUnits)
+                        --tiOurAbsoluteThreatExcessByRange[iRange] = iOurCumulativeThreat - iEnemyCumulativeThreat
+                        if tiOurRatioVsEnemyByRange[iRange] >= iBestRangeRatio then
+                            iBestRangeDistance = iRange
+                            iBestRangeRatio = tiOurRatioVsEnemyByRange[iRange]
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iRange='..iRange..'; iOurCumulativeThreat='..iOurCumulativeThreat..'; iLowThreatThreshold='..iLowThreatThreshold..'; iRatioCap='..iRatioCap..'; iEnemyCumulativeThreat='..iEnemyCumulativeThreat..'; tiOurRatioVsEnemyByRange[iRange]='..tiOurRatioVsEnemyByRange[iRange]..'; iBestRangeRatio='..iBestRangeRatio..'; iBestRangeDistance='..(iBestRangeDistance or 'nil')) end
+                    end
+
+                    iMinRangeForEngagement = math.min(110, (iBestRangeDistance or 0)) --Can engagement min range based on range of Aeon battleship, so all battleships should be able to engage
+                    if bDebugMessages == true then LOG(sFunctionRef..': Set min range for engagement to iBestRangeDistance='..(iBestRangeDistance or 'nil')) end
+                end
+
+                --Reduce min range for engagement to 0 if enemy near our base
+                if M27UnitInfo.IsUnitValid(oClosestEnemyCombatUnit) and M27Utilities.GetDistanceBetweenPositions(oClosestEnemyCombatUnit:GetPosition(), tOurBase) <= math.max(oClosestEnemyCombatUnit[M27UnitInfo.refiDFRange], oClosestEnemyCombatUnit[M27UnitInfo.refiIndirectRange], oClosestEnemyCombatUnit[M27UnitInfo.refiAntiNavyRange]) + 30 then
+                    iMinRangeForEngagement = 0
+                end
+
+                --Get the target enemy position:
+
+                local tClosestEnemyTargetToUse
+                if M27UnitInfo.IsUnitValid(oClosestSurfaceEnemy) and M27Utilities.CanSeeUnit(aiBrain, oClosestSurfaceEnemy) then UpdateUnitPond(oClosestSurfaceEnemy, iTeam, true) end  --Redundancy to update how far away it is in case delay with central logic
+                if M27UnitInfo.IsUnitValid(oClosestEnemyUnit) and M27Utilities.CanSeeUnit(aiBrain, oClosestEnemyUnit) then
+                    UpdateUnitPond(oClosestEnemyUnit, iTeam, true)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have updated unit pond for closest enemy unit='..oClosestEnemyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestEnemyUnit)..'; Distance between last known position and cur position (shoudl be 0)='..M27Utilities.GetDistanceBetweenPositions(oClosestEnemyUnit[M27UnitInfo.reftLastKnownPosition], oClosestEnemyUnit:GetPosition())) end
+                end --Redundancy to update how far away it is in case delay in updating all units
+                if M27UnitInfo.IsUnitValid(oClosestEnemyCombatUnit) and M27Utilities.CanSeeUnit(aiBrain, oClosestEnemyCombatUnit) then
+                    UpdateUnitPond(oClosestEnemyCombatUnit, iTeam, true)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have updated unit pond for closest enemy combat unit='..oClosestEnemyCombatUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestEnemyCombatUnit)..'; Dist to last known position (shoudl be 0)='..M27Utilities.GetDistanceBetweenPositions(oClosestEnemyCombatUnit:GetPosition(), oClosestEnemyCombatUnit[M27UnitInfo.reftLastKnownPosition])) end
+                end --Redundancy to update how far away it is in case delay in updating all units
+                if bDebugMessages == true then LOG(sFunctionRef..': oClosestEnemyUnit='..oClosestEnemyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestEnemyUnit)..'; Last known position='..repru(oClosestEnemyUnit[M27UnitInfo.reftLastKnownPosition])..'; Is visible='..tostring(M27Utilities.CanSeeUnit(aiBrain, oClosestEnemyUnit, true))..'; Distance between cur position and last known position='..M27Utilities.GetDistanceBetweenPositions(oClosestEnemyUnit:GetPosition(), oClosestEnemyUnit[M27UnitInfo.reftLastKnownPosition])) end
+
+                local bChargeEnemyBase = false --true if we decide to ignore closest enemies and just go for neemy base, e.g. if have far more threat
+
+
+                if bAttackNearbyEnemies and not(bAllOutSubAttack) and oClosestEnemySurfaceCombat and (M27Utilities.CanSeeUnit(aiBrain, oClosestEnemySurfaceCombat)  or M27Utilities.GetDistanceBetweenPositions(oClosestEnemySurfaceCombat[M27UnitInfo.reftLastKnownPosition], oClosestEnemySurfaceCombat:GetPosition()) <= 50) then tClosestEnemyTargetToUse = oClosestEnemySurfaceCombat[M27UnitInfo.reftLastKnownPosition]
+                elseif bAttackNearbyEnemies and bAllOutSubAttack and oClosestEnemyCombatUnit and (M27Utilities.CanSeeUnit(aiBrain, oClosestEnemyUnit)  or M27Utilities.GetDistanceBetweenPositions(oClosestEnemyCombatUnit[M27UnitInfo.reftLastKnownPosition], oClosestEnemyCombatUnit:GetPosition()) <= 50) then tClosestEnemyTargetToUse = oClosestEnemyCombatUnit[M27UnitInfo.reftLastKnownPosition]
+                else
+                    --If we massively outnumber enemy naval threat then just go for the enemy naval factories
+                    if bDebugMessages == true then LOG(sFunctionRef..': If massively outnumber enemy in navy and likely have battleships then target enemy naval factory. iOurSurfaceThreat='..iOurSurfaceThreat..'; iEnemySurfaceThreat='..iEnemySurfaceThreat) end
+                    if iOurSurfaceThreat > iEnemySurfaceThreat * 3.5 and iOurSurfaceThreat >= 30000 then
+                        local tEnemyFactories = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalFactory, M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond])
+                        if M27Utilities.IsTableEmpty(tEnemyFactories) == false then
+                            bChargeEnemyBase = true
+                            tClosestEnemyTargetToUse = M27Utilities.GetNearestUnit(tEnemyFactories, tOurBase):GetPosition()
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will target closest enemy unit='..M27Utilities.GetNearestUnit(tEnemyFactories, tOurBase).UnitId..M27UnitInfo.GetUnitLifetimeCount(M27Utilities.GetNearestUnit(tEnemyFactories, tOurBase))) end
+                        end
+                    end
+                    if M27Utilities.IsTableEmpty(tClosestEnemyTargetToUse) then
+                        if M27Utilities.GetDistanceBetweenPositions(oClosestEnemyUnit[M27UnitInfo.reftLastKnownPosition], oClosestEnemyUnit:GetPosition()) > 50 then
+                            local tVisibleEnemiesAroundFrontUnit = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySurfaceAmphibiousCombat, oClosestFriendlyUnitToEnemyBase:GetPosition(), math.max(iEnemyBestSurfaceRange, iEnemyBestAntiNavyRange, 70) + 20)
+                            if M27Utilities.IsTableEmpty(tVisibleEnemiesAroundFrontUnit) then
+                                --No nearby visible neemies, target enemy base
+                                tClosestEnemyTargetToUse = { tEnemyBase[1], tEnemyBase[2], tEnemyBase[3] }
+                                if bDebugMessages == true then LOG(sFunctionRef..': No visible enemies, will target enemy base instead of closest enemy for tClosestEnemyTargetToUse') end
+                            else
+                                --Get closest visible enemy
+                                tClosestEnemyTargetToUse = M27Utilities.GetNearestUnit(tVisibleEnemiesAroundFrontUnit, oClosestFriendlyUnitToEnemyBase:GetPosition()):GetPosition()
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have visible enemies so setting tClosestEnemyTargetToUse to this') end
+                            end
+                        else
+                            tClosestEnemyTargetToUse = { oClosestEnemyUnit[M27UnitInfo.reftLastKnownPosition][1], oClosestEnemyUnit[M27UnitInfo.reftLastKnownPosition][2], oClosestEnemyUnit[M27UnitInfo.reftLastKnownPosition][3] }
+                            if bDebugMessages == true then LOG(sFunctionRef..': Setting closest enemy target to its last known position') end
+                        end
+                    end
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': Do we have a min engagement range of more than 0? iMinRangeForEngagement='..(iMinRangeForEngagement or 'nil')..'; tClosestEnemyTargetToUse='..repru(tClosestEnemyTargetToUse)..'; Dist between here and tenemybase='..M27Utilities.GetDistanceBetweenPositions(tEnemyBase, tClosestEnemyTargetToUse)..'; iMinRangeForEngagement='..(iMinRangeForEngagement or 'nil')..'; is table of enemy units near front empty='..tostring(M27Utilities.IsTableEmpty(tFriendliesNearFront))) end
+
+
+                --If we only want to do an all out attack for certain ranged units, then work out where units with a shorter range should go, or if they should do an all out attack as well due ot the enemy being close to our long range unit
+
+                if iMinRangeForEngagement > 0 and M27Utilities.IsTableEmpty(tFriendliesNearFront) == false then
+                    local iDistanceBehindFrontUnitWanted = 12
+                    local oNearestFriendlyWithSufficientRange
+                    local iCurDistToEnemy
+                    local iClosestDistToEnemy = 10000
+                    local iCurRange
+                    for iUnit, oUnit in tFriendliesNearFront do
+                        if bAllOutSubAttack then
+                            if EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) then iCurRange = oUnit[M27UnitInfo.refiAntiNavyRange] end
+                        elseif bUseIndirectRangeIfHigher then --general all out attack that can include indirect range as nearest unit is structure
+                            iCurRange = math.max(oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiAntiNavyRange], oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiDFRange], oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiIndirectRange])
+                        else --general all out attack
+                            iCurRange = math.max(oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiAntiNavyRange], oClosestFriendlyUnitToEnemyBase[M27UnitInfo.refiDFRange])
+                        end
+                        if iCurRange >= iMinRangeForEngagement then
+                            iCurDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tClosestEnemyTargetToUse)
+                            if iCurDistToEnemy < iClosestDistToEnemy then
+                                oNearestFriendlyWithSufficientRange = oUnit
+                            end
+                        end
+                    end
+                    if not(oNearestFriendlyWithSufficientRange) and iRangeOfClosestFriendlyUnit < iMinRangeForEngagement then
+                        --Backup for rare cases where no unit with enough range
+                        iDistanceBehindFrontUnitWanted = 30
+                        tDestinationForShortRangeUnits = M27Utilities.MoveInDirection(oClosestFriendlyUnitToEnemyBase:GetPosition(), M27Utilities.GetAngleFromAToB(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase), iDistanceBehindFrontUnitWanted, true, false)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Dont have a nearest friendly unit with sufficient range, so will set the destination for short range units equal to the position of the nearest unit to enemy base') end
+                    else
+                        --Is the enemy front unit almost within range?
+                        local iEnemyRange
+                        if bAllOutSubAttack then iEnemyRange = oClosestEnemyUnit[M27UnitInfo.refiAntiNavyRange]
+                        else
+                            iEnemyRange = math.max(oClosestEnemyUnit[M27UnitInfo.refiAntiNavyRange], oClosestEnemyUnit[M27UnitInfo.refiDFRange])
+                        end
+                        if M27Utilities.GetDistanceBetweenPositions(oNearestFriendlyWithSufficientRange:GetPosition(), tClosestEnemyTargetToUse) + iEnemyRange + iDistanceBehindFrontUnitWanted - 4 > iMinRangeForEngagement then
+                            iMinRangeForEngagement = 0 --Dont want a minimum range as enemy almost in range
+                            iDistanceBehindFrontUnitWanted = 30
+                            if bDebugMessages == true then LOG(sFunctionRef..': Dont want a minimum range as enemy almost in range so will set short range unit destination equal to 30 behind the front unit') end
+                        end
+                        tDestinationForShortRangeUnits = M27Utilities.MoveInDirection(oNearestFriendlyWithSufficientRange:GetPosition(), M27Utilities.GetAngleFromAToB(oNearestFriendlyWithSufficientRange:GetPosition(), tOurBase), iDistanceBehindFrontUnitWanted, true, false)
+
                     end
                 else
-                    --If we include all reinforcements do we have enough threat?
-                    local iReinforcementSurfaceThreat = M27Logic.GetCombatThreatRating(aiBrain, tFriendlyFurtherAwayReinforcements, false, nil, nil, false, false, false, false, true, false, false)
-                    local iReinforcementAntiNavyThreat = M27Logic.GetCombatThreatRating(aiBrain, tFriendlyFurtherAwayReinforcements, false, nil, nil, false, false, false, true, false, false, false)
+                    --Placehodler - dont expect to use this
+                    tDestinationForShortRangeUnits = M27Utilities.MoveInDirection(oClosestFriendlyUnitToEnemyBase:GetPosition(), M27Utilities.GetAngleFromAToB(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase), 30, true, false)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Not doing all out attack, will just record tDestinationForShortRangeUnits as being the closest friendly unit to enemy so dont have nil value') end
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': Finished determining tDestinationForShortRangeUnits='..repru(tDestinationForShortRangeUnits)) end
+
+                if bAllOutAttack then
+                    local oNearestThreatToConsider
+                    local bAttackNearestThreatInstead = false
+
+                    --Do we want to attack the enemy base or the enemy naval unit?
+                    if bIgnoreEnemySubs and EntityCategoryContains(categories.SUBMERSIBLE, oClosestEnemyUnit.UnitId) then
+                        --Get closest non-submersible threat
+                        oNearestThreatToConsider = oClosestSurfaceEnemy
+                    else
+                        oNearestThreatToConsider = oClosestEnemyUnit
+                    end
+                    if oNearestThreatToConsider then
+                        if M27Utilities.GetDistanceBetweenPositions(oNearestThreatToConsider[M27UnitInfo.reftLastKnownPosition], tOurBase) + M27UnitInfo.GetNavalDirectAndSubRange(oNearestThreatToConsider) - 10 <= iFriendlyDistToEnemy + M27UnitInfo.GetNavalDirectAndSubRange(oClosestFriendlyUnitToEnemyBase) then
+                            --Special case - avoid navy all heading towards a really old position of a unit - approximate by comparing the actual position to last known position and not proceeding if it is more than 50 away
+                            if M27Utilities.GetDistanceBetweenPositions(oNearestThreatToConsider[M27UnitInfo.reftLastKnownPosition], oNearestThreatToConsider:GetPosition()) <= 50 then
+                                bAttackNearestThreatInstead = true
+                            end
+                        end
+                    end
+
+                    if bAttackNearestThreatInstead then
+                        --Attack nearest enemy unit - move to just before actual position if we have seen the unit
+                        if M27Utilities.CanSeeUnit(aiBrain, oNearestThreatToConsider, true) then
+                            tGlobalNavalDestination = M27Utilities.MoveInDirection(oNearestThreatToConsider:GetPosition(), M27Utilities.GetAngleFromAToB(oNearestThreatToConsider:GetPosition(), tOurBase), 4, true, false)
+                        else
+                            tGlobalNavalDestination = { oNearestThreatToConsider[M27UnitInfo.reftLastKnownPosition][1], oNearestThreatToConsider[M27UnitInfo.reftLastKnownPosition][2], oNearestThreatToConsider[M27UnitInfo.reftLastKnownPosition][3] }
+                        end
+                    else
+                        --Attack enemy base
+                        tGlobalNavalDestination = tEnemyBase
+                        --Bombardment mode instead if enemy has no base and minimal threat vs ours
+                        if iEnemySurfaceThreat <= 1000 and iEnemySurfaceThreat * 8 <= iOurSurfaceThreat and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.STRUCTURE, M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond])) then
+                            bConsiderBombardment = true
+                        elseif iOurSurfaceThreat >= 25000 and iEnemySurfaceThreat * 8 <= iOurSurfaceThreat and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalFactory, M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond])) then
+                            bConsiderBombardment = true
+                        end
+
+                    end
+                else
+                    --If we meet up with nearby reinforcements will we have enough surface threat?
+                    local iReinforcementSurfaceThreat = M27Logic.GetCombatThreatRating(aiBrain, tFriendlyNearbyReinforcements, false, nil, nil, false, false, false, false, true, false, false)
+                    local iReinforcementAntiNavyThreat = M27Logic.GetCombatThreatRating(aiBrain, tFriendlyNearbyReinforcements, false, nil, nil, false, false, false, true, false, false, false)
                     iOurSurfaceThreat = iOurSurfaceThreat + iReinforcementSurfaceThreat
                     iOurAntiNavyThreat = iOurAntiNavyThreat + iReinforcementAntiNavyThreat
-
                     if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Our threats after increasing for further away reinforcements: iOurSurfaceThreat=' .. iOurSurfaceThreat .. '; iOurAntiNavyThreat=' .. iOurAntiNavyThreat)
+                        LOG(sFunctionRef .. ': Our threats after increasing for reinforcements: iOurSurfaceThreat=' .. iOurSurfaceThreat .. '; iOurAntiNavyThreat=' .. iOurAntiNavyThreat)
+                        if M27Utilities.IsTableEmpty(tFriendlyNearbyReinforcements) == false then
+                            LOG(sFunctionRef .. ': Size of tFriendlyNearbyReinforcements=' .. table.getn(tFriendlyNearbyReinforcements))
+                        end
                     end
+
                     if (iReinforcementSurfaceThreat > 0 or iReinforcementAntiNavyThreat > 0) and iOurSurfaceThreat >= iEnemySurfaceThreat * 1.1 and iOurAntiNavyThreat >= iEnemySubmersibleThreat then
                         --Consolidate forces
                         bConsolidateForces = true
@@ -2206,237 +2318,142 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                                 table.insert(tTablesOfUnitsToAverage, tMobileFriendliesNearFront)
                             end
                         end
-                        if M27Utilities.IsTableEmpty(tFriendlyFurtherAwayReinforcements) == false then
-                            local tMobileFriendliesNearFront = EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer, tFriendlyFurtherAwayReinforcements)
-                            if M27Utilities.IsTableEmpty(tMobileFriendliesNearFront) == false then
-                                table.insert(tTablesOfUnitsToAverage, tMobileFriendliesNearFront)
-                            end
-                        end
-
                         if M27Utilities.IsTableEmpty(tTablesOfUnitsToAverage) == false then
-                            tGlobalNavalDestination = M27Utilities.GetAveragePositionOfMultipleTablesOfUnits(tTablesOfUnitsToAverage)
 
-                            if bDebugMessages == true then
-                                local iUnits = 0
-                                for iUnitTable, tUnitTable in tTablesOfUnitsToAverage do
-                                    iUnits = iUnits + table.getn(tUnitTable)
-                                end
-                                LOG(sFunctionRef .. ': Want to consolidate all reinforcement forces, will move to average location of mobile unites=' .. repru(tGlobalNavalDestination) .. '; size of UnitsToAverage=' .. iUnits)
-                            end
+                            tGlobalNavalDestination = M27Utilities.GetAveragePositionOfMultipleTablesOfUnits(tTablesOfUnitsToAverage)
                         else
                             tGlobalNavalDestination = { tOurBase[1], tOurBase[2], tOurBase[3] }
                         end
-                    else
 
-                        --Retreat
-
-                        tGlobalNavalDestination = M27Utilities.MoveInDirection(tOurBase, iAngleToEnemy, 40, true, false)
-                        --If not in same pond then reduce dist to 5 and try in opposite direction
-                        if not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, tGlobalNavalDestination) == iPond) then
-                            for iAngleMod = 0, 315, 45 do
-                                tGlobalNavalDestination = M27Utilities.MoveInDirection(tOurBase, iAngleToEnemy + iAngleMod, 8, true, false)
-                                if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, tGlobalNavalDestination) == iPond then
-                                    break
-                                end
-                            end
-                        end
                         if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Want to retreat, will run to base=' .. repru(tGlobalNavalDestination))
+                            local iUnits = 0
+                            for iUnitTable, tUnitTable in tTablesOfUnitsToAverage do
+                                iUnits = iUnits + table.getn(tUnitTable)
+                            end
+                            LOG(sFunctionRef .. ': Want to consolidate nearby reinforcement forces, will move to average location of mobile unites=' .. repru(tGlobalNavalDestination) .. '; size of UnitsToAverage=' .. iUnits)
                         end
-                    end
-                end
-            end
+                    else
+                        --If we include all reinforcements do we have enough threat?
+                        local iReinforcementSurfaceThreat = M27Logic.GetCombatThreatRating(aiBrain, tFriendlyFurtherAwayReinforcements, false, nil, nil, false, false, false, false, true, false, false)
+                        local iReinforcementAntiNavyThreat = M27Logic.GetCombatThreatRating(aiBrain, tFriendlyFurtherAwayReinforcements, false, nil, nil, false, false, false, true, false, false, false)
+                        iOurSurfaceThreat = iOurSurfaceThreat + iReinforcementSurfaceThreat
+                        iOurAntiNavyThreat = iOurAntiNavyThreat + iReinforcementAntiNavyThreat
 
-            --Decide individually if units should move to the destination or move away from the enemy (if kiting) - handle submersible units separately
-
-
-            ---->>>>SUBMERSIBLES<<<----
-            local tBaseRallyPoint = M27Utilities.MoveInDirection(tOurBase, M27Utilities.GetAngleFromAToB(tOurBase, tEnemyBase), 8, true, false)
-            if not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, tBaseRallyPoint) == iPond) then
-                for iAngleMod = 45, 315, 45 do
-                    tBaseRallyPoint = M27Utilities.MoveInDirection(tOurBase, iAngleToEnemy + iAngleMod, 8, true, false)
-                    if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, tGlobalNavalDestination) == iPond then
-                        break
-                    end
-                end
-            end
-
-            local tOurSubmersibles = EntityCategoryFilterDown(M27UnitInfo.refCategorySubmarine, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
-            if bDebugMessages == true then LOG(sFunctionRef..': About to send orders to any subs we have. bAllOutSubAttack='..tostring(bAllOutSubAttack)..'; Is table of our submersibles empty='..tostring(M27Utilities.IsTableEmpty(tOurSubmersibles))) end
-            --Want to get all subs for below (regardless of if close or reinforcement) - will have already decided above whether to attack or not with subs
-
-            if M27Utilities.IsTableEmpty(tOurSubmersibles) == false then
-                --Assign actions to subs
-                --If in all out attack mode or outrange enemy then move to be in attack range
-                local iMaxDistanceWithinAttackRangeWanted = nil
-                local iMinDistanceWithinAttackRangeWanted = nil
-
-                --Update ranges wanted - keep as nil if want to ignore nearest enemy unit
-
-                if iOurBestSubmersibleRange > iEnemyBestAntiNavyRange then
-                    iMaxDistanceWithinAttackRangeWanted = 0.5
-                    iMinDistanceWithinAttackRangeWanted = -7.5
-                elseif bAllOutAttack or bAllOutSubAttack then
-                    iMaxDistanceWithinAttackRangeWanted = 8.5
-                    iMinDistanceWithinAttackRangeWanted = 1.3
-                end
-
-                if iMaxDistanceWithinAttackRangeWanted then
-                    --Want to either move towards enemy or do kiting retreat
-                    --Move towards nearest enemy unit until within range
-                    local iCurDistToClosestEnemy
-                    for iUnit, oUnit in tOurSubmersibles do
-                        --Do we want to engage the enemy?
-                        if bDebugMessages == true then LOG(sFunctionRef..': Considering submersible unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; AntiNavyRange='..(oUnit[M27UnitInfo.refiAntiNavyRange] or 'nil')..'; iMinRangeForEngagement='..iMinRangeForEngagement) end
-                        if oUnit[M27UnitInfo.refiAntiNavyRange] < iMinRangeForEngagement then
-                            MoveUnitTowardsTarget(oUnit, tDestinationForShortRangeUnits, false, 'ShortRange')
-                        else
-                            iCurDistToClosestEnemy = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tClosestEnemyTargetToUse)
-
-                            if iCurDistToClosestEnemy + iMaxDistanceWithinAttackRangeWanted < oUnit[M27UnitInfo.refiAntiNavyRange] then
-                                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tOurBase) <= 20 then
-                                    MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, true, 'ASKitingRetreat')
-                                else
-                                    MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, false, 'MSKitingRetreat')
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Our threats after increasing for further away reinforcements: iOurSurfaceThreat=' .. iOurSurfaceThreat .. '; iOurAntiNavyThreat=' .. iOurAntiNavyThreat)
+                        end
+                        if (iReinforcementSurfaceThreat > 0 or iReinforcementAntiNavyThreat > 0) and iOurSurfaceThreat >= iEnemySurfaceThreat * 1.1 and iOurAntiNavyThreat >= iEnemySubmersibleThreat then
+                            --Consolidate forces
+                            bConsolidateForces = true
+                            local tTablesOfUnitsToAverage = {}
+                            if M27Utilities.IsTableEmpty(tFriendliesNearFront) == false then
+                                local tMobileFriendliesNearFront = EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer, tFriendliesNearFront)
+                                if M27Utilities.IsTableEmpty(tMobileFriendliesNearFront) == false then
+                                    table.insert(tTablesOfUnitsToAverage, tMobileFriendliesNearFront)
                                 end
-                            elseif iCurDistToClosestEnemy + iMinDistanceWithinAttackRangeWanted < oUnit[M27UnitInfo.refiAntiNavyRange] then
-                                --Attack-move to target
-                                MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, true, 'AGetInRange')
+                            end
+                            if M27Utilities.IsTableEmpty(tFriendlyNearbyReinforcements) == false then
+                                local tMobileFriendliesNearFront = EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer, tFriendlyNearbyReinforcements)
+                                if M27Utilities.IsTableEmpty(tMobileFriendliesNearFront) == false then
+                                    table.insert(tTablesOfUnitsToAverage, tMobileFriendliesNearFront)
+                                end
+                            end
+                            if M27Utilities.IsTableEmpty(tFriendlyFurtherAwayReinforcements) == false then
+                                local tMobileFriendliesNearFront = EntityCategoryFilterDown(categories.MOBILE - M27UnitInfo.refCategoryEngineer, tFriendlyFurtherAwayReinforcements)
+                                if M27Utilities.IsTableEmpty(tMobileFriendliesNearFront) == false then
+                                    table.insert(tTablesOfUnitsToAverage, tMobileFriendliesNearFront)
+                                end
+                            end
+
+                            if M27Utilities.IsTableEmpty(tTablesOfUnitsToAverage) == false then
+                                tGlobalNavalDestination = M27Utilities.GetAveragePositionOfMultipleTablesOfUnits(tTablesOfUnitsToAverage)
+
+                                if bDebugMessages == true then
+                                    local iUnits = 0
+                                    for iUnitTable, tUnitTable in tTablesOfUnitsToAverage do
+                                        iUnits = iUnits + table.getn(tUnitTable)
+                                    end
+                                    LOG(sFunctionRef .. ': Want to consolidate all reinforcement forces, will move to average location of mobile unites=' .. repru(tGlobalNavalDestination) .. '; size of UnitsToAverage=' .. iUnits)
+                                end
                             else
-                                --Move towards target (non-attack move)
-                                MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, false, 'MGetInRange')
+                                tGlobalNavalDestination = { tOurBase[1], tOurBase[2], tOurBase[3] }
+                            end
+                        else
+
+                            --Retreat
+
+                            tGlobalNavalDestination = M27Utilities.MoveInDirection(tOurBase, iAngleToEnemy, 40, true, false)
+                            --If not in same pond then reduce dist to 5 and try in opposite direction
+                            if not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, tGlobalNavalDestination) == iPond) then
+                                for iAngleMod = 0, 315, 45 do
+                                    tGlobalNavalDestination = M27Utilities.MoveInDirection(tOurBase, iAngleToEnemy + iAngleMod, 8, true, false)
+                                    if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, tGlobalNavalDestination) == iPond then
+                                        break
+                                    end
+                                end
+                            end
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': Want to retreat, will run to base=' .. repru(tGlobalNavalDestination))
                             end
                         end
                     end
-                else
-                    --We dont outrange enemy, and htink we will lose if we will attack, so retreat
-                    local sOrderDesc = 'MainRetreat'
-                    if bConsolidateForces then
-                        sOrderDesc = 'Consolidate'
-                    end
-                    for iUnit, oUnit in tOurSubmersibles do
-                        MoveUnitTowardsTarget(oUnit, tGlobalNavalDestination, sOrderDesc)
+                end
+
+                --Decide individually if units should move to the destination or move away from the enemy (if kiting) - handle submersible units separately
+
+
+                ---->>>>SUBMERSIBLES<<<----
+                local tBaseRallyPoint = M27Utilities.MoveInDirection(tOurBase, M27Utilities.GetAngleFromAToB(tOurBase, tEnemyBase), 8, true, false)
+                if not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, tBaseRallyPoint) == iPond) then
+                    for iAngleMod = 45, 315, 45 do
+                        tBaseRallyPoint = M27Utilities.MoveInDirection(tOurBase, iAngleToEnemy + iAngleMod, 8, true, false)
+                        if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, tGlobalNavalDestination) == iPond then
+                            break
+                        end
                     end
                 end
-            end
 
-            ---->>>>SURFACE NAVY<<<----
-            if not (bConsiderBombardment) then
-                local tOurSurfaceCombatNavy = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileNavalSurface - iSupportNavyCategory, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
-                if M27Utilities.IsTableEmpty(tOurSurfaceCombatNavy) == false then
+                local tOurSubmersibles = EntityCategoryFilterDown(M27UnitInfo.refCategorySubmarine, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
+                if bDebugMessages == true then LOG(sFunctionRef..': About to send orders to any subs we have. bAllOutSubAttack='..tostring(bAllOutSubAttack)..'; Is table of our submersibles empty='..tostring(M27Utilities.IsTableEmpty(tOurSubmersibles))) end
+                --Want to get all subs for below (regardless of if close or reinforcement) - will have already decided above whether to attack or not with subs
 
+                if M27Utilities.IsTableEmpty(tOurSubmersibles) == false then
+                    --Assign actions to subs
+                    --If in all out attack mode or outrange enemy then move to be in attack range
                     local iMaxDistanceWithinAttackRangeWanted = nil
                     local iMinDistanceWithinAttackRangeWanted = nil
 
-
                     --Update ranges wanted - keep as nil if want to ignore nearest enemy unit
-                    --Do we outrange the enemy with our attack?
-                    if iOurBestSurfaceRange > math.max(iEnemyBestSurfaceRange, iEnemyBestAntiNavyRange) then
-                        --Is the nearest enemy a surface unit, or alternatively do we outrange the enemy with our antinavy?
-                        if not (M27UnitInfo.IsUnitUnderwater(oClosestEnemyUnit)) then
-                            if iOurBestSurfaceRange >= 100 then --Dealing with battleship, so allow a bit more of a margin before flee
-                                iMaxDistanceWithinAttackRangeWanted = 7.5
-                                iMinDistanceWithinAttackRangeWanted = -0.5
-                                if iOurSurfaceThreat > iEnemySurfaceThreat * 2.5 and iOurSurfaceThreat >= 20000 then
-                                    iMaxDistanceWithinAttackRangeWanted = 20
-                                end
-                            else
-                                iMaxDistanceWithinAttackRangeWanted = 0.5
-                                iMinDistanceWithinAttackRangeWanted = -7.5
-                            end
-                        elseif iOurBestSurfaceAntiNavyRange > iEnemyBestSubmersibleRange then
-                            iMaxDistanceWithinAttackRangeWanted = 0.5
-                            iMinDistanceWithinAttackRangeWanted = -7.5
-                        end
-                        --Are we doing an all out attack and either we arent dealing with a sub, or we have an antinavy attack?
-                    elseif bAllOutAttack and (not (M27UnitInfo.IsUnitUnderwater(oClosestEnemyUnit)) or iOurBestSurfaceAntiNavyRange > 0) then
-                        iMaxDistanceWithinAttackRangeWanted = 8.5 --Refresh rate can be every 1.2s; frigates move at 6 speed; want min of 7.2 gap in distance threshold to avoid frigate not switching to attack-move when closing in on a stationery target
+
+                    if iOurBestSubmersibleRange > iEnemyBestAntiNavyRange then
+                        iMaxDistanceWithinAttackRangeWanted = 0.5
+                        iMinDistanceWithinAttackRangeWanted = -7.5
+                    elseif bAllOutAttack or bAllOutSubAttack then
+                        iMaxDistanceWithinAttackRangeWanted = 8.5
                         iMinDistanceWithinAttackRangeWanted = 1.3
                     end
 
-                    --Reduce kiting if nearest unit is a structure since it cant pursue us
-                    if iMinDistanceWithinAttackRangeWanted and EntityCategoryContains(categories.STRUCTURE, oClosestEnemyUnit.UnitId) then
-                        iMinDistanceWithinAttackRangeWanted = math.max(iMinDistanceWithinAttackRangeWanted, 0)
-                        if EntityCategoryContains(categories.DIRECTFIRE + categories.INDIRECTFIRE + categories.ANTINAVY, oClosestEnemyUnit.UnitId) then
-                            iMaxDistanceWithinAttackRangeWanted = math.max(iMinDistanceWithinAttackRangeWanted + 4, iMinDistanceWithinAttackRangeWanted)
-                        else
-                            iMaxDistanceWithinAttackRangeWanted = math.max(iMinDistanceWithinAttackRangeWanted + 8, iMinDistanceWithinAttackRangeWanted)
-                        end
-
-                    end
-
-                    if bDebugMessages == true then LOG(sFunctionRef..': About to consider attacking with surface units, iOurBestSurfaceRange='..iOurBestSurfaceRange..'; iMaxDistanceWithinAttackRangeWanted='..(iMaxDistanceWithinAttackRangeWanted or 'nil')..'; iMinRangeForEngagement='..iMinRangeForEngagement) end
-
                     if iMaxDistanceWithinAttackRangeWanted then
-                        local iCurDistToClosestEnemy
                         --Want to either move towards enemy or do kiting retreat
                         --Move towards nearest enemy unit until within range
-                        local iCurRange
-
-                        --Get shortlist of priority structures if are charging at enemy base in case shot is blocked
-                        local tPriorityTargets = {}
-                        local oPriorityTarget
-                        local iCurDistToPriority
-                        if bChargeEnemyBase then
-                            tPriorityTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD + M27UnitInfo.refCategoryTorpedoLauncher - categories.SUBMERSIBLE + M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryNavalFactory, tClosestEnemyTargetToUse, 120, 'Enemy')
-                        end
-
-                        for iUnit, oUnit in tOurSurfaceCombatNavy do
-                            --Do we want to engage the enemy with surface unit?
-                            if not(oUnit[M27UnitInfo.refiDFRange]) then iCurRange = M27UnitInfo.GetNavalDirectAndSubRange(oUnit) --this line is for redundancy so dont need to worry about factoring in indirect as shoudl be a 1-off
-                            else
-                                if bUseIndirectRangeIfHigher then
-                                    iCurRange = math.max(oUnit[M27UnitInfo.refiAntiNavyRange], oUnit[M27UnitInfo.refiDFRange], oUnit[M27UnitInfo.refiIndirectRange])
-                                else
-                                    iCurRange = math.max(oUnit[M27UnitInfo.refiAntiNavyRange], oUnit[M27UnitInfo.refiDFRange])
-                                end
-                            end
-                            if iCurRange < iMinRangeForEngagement then
-                                if bDebugMessages == true then LOG(sFunctionRef..': iCurRange='..iCurRange..'; iMinRangeForEngagement='..iMinRangeForEngagement) end
+                        local iCurDistToClosestEnemy
+                        for iUnit, oUnit in tOurSubmersibles do
+                            --Do we want to engage the enemy?
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering submersible unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; AntiNavyRange='..(oUnit[M27UnitInfo.refiAntiNavyRange] or 'nil')..'; iMinRangeForEngagement='..iMinRangeForEngagement) end
+                            if oUnit[M27UnitInfo.refiAntiNavyRange] < iMinRangeForEngagement then
                                 MoveUnitTowardsTarget(oUnit, tDestinationForShortRangeUnits, false, 'ShortRange')
                             else
                                 iCurDistToClosestEnemy = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tClosestEnemyTargetToUse)
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': oUnit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; iCurDistToClosestEnemy=' .. iCurDistToClosestEnemy .. '; iMaxDistanceWithinAttackRangeWanted=' .. iMaxDistanceWithinAttackRangeWanted .. '; iMinDistanceWithinAttackRangeWanted=' .. iMinDistanceWithinAttackRangeWanted .. '; Range=' .. M27UnitInfo.GetNavalDirectAndSubRange(oUnit))
-                                end
-                                if EntityCategoryContains(M27UnitInfo.refCategorySupportNavy, oUnit.UnitId) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oClosestFriendlyUnitToEnemyBase:GetPosition()) <= 40 then
-                                    MoveUnitTowardsTarget(oUnit, tOurBase, false, 'SupportRetreat')
-                                elseif iCurDistToClosestEnemy + iMaxDistanceWithinAttackRangeWanted < iCurRange then
-                                    --Kiting retreat unless are near our naval factory in which case do attack-move
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering kiting retreat for unit unless close to our base in which case will attack move. Dist to our base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tOurBase)) end
+
+                                if iCurDistToClosestEnemy + iMaxDistanceWithinAttackRangeWanted < oUnit[M27UnitInfo.refiAntiNavyRange] then
                                     if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tOurBase) <= 20 then
-                                        MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, true, 'AKitingRetreat')
+                                        MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, true, 'ASKitingRetreat')
                                     else
-                                        MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, false, 'MKitingRetreat')
+                                        MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, false, 'MSKitingRetreat')
                                     end
-                                elseif iCurDistToClosestEnemy + iMinDistanceWithinAttackRangeWanted < iCurRange then
-                                    --Attack-move to target; however do issueattack if we are moving to enemy naval base
-                                    if bChargeEnemyBase and iCurDistToClosestEnemy < iCurRange and (oUnit[M27UnitInfo.refbLastShotBlocked] or (oUnit[M27PlatoonUtilities.refiLastOrderType] == M27PlatoonUtilities.refiOrderIssueAttack and M27UnitInfo.IsUnitValid(oUnit[M27UnitInfo.refoLastOrderUnitTarget]))) then
-                                        --Shot blocked and we are charging to enemy base so want to focus down the enemy base
-                                        oPriorityTarget = nil
-                                        if M27Utilities.IsTableEmpty(tPriorityTargets) == false then
-                                            for iEnemy, oEnemy in tPriorityTargets do
-                                                iCurDistToPriority = M27Utilities.GetDistanceBetweenPositions(oEnemy:GetPosition(), oUnit:GetPosition())
-                                                if iCurDistToPriority <= iCurRange or (iCurDistToPriority - 6 <= iCurRange and not(oPriorityTarget)) then
-                                                    --Is shot blocked?
-                                                    if not(M27Logic.IsShotBlocked(oUnit, oEnemy)) then
-                                                        oPriorityTarget = oEnemy
-                                                        if iCurDistToPriority <= iCurRange then break end
-                                                    end
-                                                end
-                                            end
-                                        end
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Shot is blocked so looking to see if have a nearly in range prioriyt target; Is oPriorityTarget valid='..tostring(M27UnitInfo.IsUnitValid(oPriorityTarget))) end
-                                        if oPriorityTarget and M27Utilities.GetDistanceBetweenPositions(oPriorityTarget:GetPosition(), oUnit:GetPosition()) - 6 <= iCurRange then
-                                            TellUnitToAttackTarget(oUnit, oPriorityTarget, 'Blocked')
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Want to attack specific unit='..oPriorityTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPriorityTarget)..' which is '..M27Utilities.GetDistanceBetweenPositions(oPriorityTarget:GetPosition(), oUnit:GetPosition())..' away from unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
-                                        else
-                                            MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, false, 'AGetInRange')
-                                            if bDebugMessages == true then LOG(sFunctionRef..': no suitable target so will just move towards closest enemy target to use') end
-                                        end
-                                    else
-                                        MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, true, 'AGetInRange')
-                                    end
+                                elseif iCurDistToClosestEnemy + iMinDistanceWithinAttackRangeWanted < oUnit[M27UnitInfo.refiAntiNavyRange] then
+                                    --Attack-move to target
+                                    MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, true, 'AGetInRange')
                                 else
                                     --Move towards target (non-attack move)
                                     MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, false, 'MGetInRange')
@@ -2444,53 +2461,189 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                             end
                         end
                     else
-                        --We dont outrange enemy, and htink we will lose if we will attack, so retreat/head to destination if are ignoring enemy subs
+                        --We dont outrange enemy, and htink we will lose if we will attack, so retreat
                         local sOrderDesc = 'MainRetreat'
                         if bConsolidateForces then
                             sOrderDesc = 'Consolidate'
                         end
+                        for iUnit, oUnit in tOurSubmersibles do
+                            MoveUnitTowardsTarget(oUnit, tGlobalNavalDestination, sOrderDesc)
+                        end
+                    end
+                end
+
+                ---->>>>SURFACE NAVY<<<----
+                if not (bConsiderBombardment) then
+                    local tOurSurfaceCombatNavy = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileNavalSurface - iSupportNavyCategory, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
+                    if M27Utilities.IsTableEmpty(tOurSurfaceCombatNavy) == false then
+
+                        local iMaxDistanceWithinAttackRangeWanted = nil
+                        local iMinDistanceWithinAttackRangeWanted = nil
+
+
+                        --Update ranges wanted - keep as nil if want to ignore nearest enemy unit
+                        --Do we outrange the enemy with our attack?
+                        if iOurBestSurfaceRange > math.max(iEnemyBestSurfaceRange, iEnemyBestAntiNavyRange) then
+                            --Is the nearest enemy a surface unit, or alternatively do we outrange the enemy with our antinavy?
+                            if not (M27UnitInfo.IsUnitUnderwater(oClosestEnemyUnit)) then
+                                if iOurBestSurfaceRange >= 100 then --Dealing with battleship, so allow a bit more of a margin before flee
+                                    iMaxDistanceWithinAttackRangeWanted = 7.5
+                                    iMinDistanceWithinAttackRangeWanted = -0.5
+                                    if iOurSurfaceThreat > iEnemySurfaceThreat * 2.5 and iOurSurfaceThreat >= 20000 then
+                                        iMaxDistanceWithinAttackRangeWanted = 20
+                                    end
+                                else
+                                    iMaxDistanceWithinAttackRangeWanted = 0.5
+                                    iMinDistanceWithinAttackRangeWanted = -7.5
+                                end
+                            elseif iOurBestSurfaceAntiNavyRange > iEnemyBestSubmersibleRange then
+                                iMaxDistanceWithinAttackRangeWanted = 0.5
+                                iMinDistanceWithinAttackRangeWanted = -7.5
+                            end
+                            --Are we doing an all out attack and either we arent dealing with a sub, or we have an antinavy attack?
+                        elseif bAllOutAttack and (not (M27UnitInfo.IsUnitUnderwater(oClosestEnemyUnit)) or iOurBestSurfaceAntiNavyRange > 0) then
+                            iMaxDistanceWithinAttackRangeWanted = 8.5 --Refresh rate can be every 1.2s; frigates move at 6 speed; want min of 7.2 gap in distance threshold to avoid frigate not switching to attack-move when closing in on a stationery target
+                            iMinDistanceWithinAttackRangeWanted = 1.3
+                        end
+
+                        --Reduce kiting if nearest unit is a structure since it cant pursue us
+                        if iMinDistanceWithinAttackRangeWanted and EntityCategoryContains(categories.STRUCTURE, oClosestEnemyUnit.UnitId) then
+                            iMinDistanceWithinAttackRangeWanted = math.max(iMinDistanceWithinAttackRangeWanted, 0)
+                            if EntityCategoryContains(categories.DIRECTFIRE + categories.INDIRECTFIRE + categories.ANTINAVY, oClosestEnemyUnit.UnitId) then
+                                iMaxDistanceWithinAttackRangeWanted = math.max(iMinDistanceWithinAttackRangeWanted + 4, iMinDistanceWithinAttackRangeWanted)
+                            else
+                                iMaxDistanceWithinAttackRangeWanted = math.max(iMinDistanceWithinAttackRangeWanted + 8, iMinDistanceWithinAttackRangeWanted)
+                            end
+
+                        end
+
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to consider attacking with surface units, iOurBestSurfaceRange='..iOurBestSurfaceRange..'; iMaxDistanceWithinAttackRangeWanted='..(iMaxDistanceWithinAttackRangeWanted or 'nil')..'; iMinRangeForEngagement='..iMinRangeForEngagement) end
+
+                        if iMaxDistanceWithinAttackRangeWanted then
+                            local iCurDistToClosestEnemy
+                            --Want to either move towards enemy or do kiting retreat
+                            --Move towards nearest enemy unit until within range
+                            local iCurRange
+
+                            --Get shortlist of priority structures if are charging at enemy base in case shot is blocked
+                            local tPriorityTargets = {}
+                            local oPriorityTarget
+                            local iCurDistToPriority
+                            if bChargeEnemyBase then
+                                tPriorityTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD + M27UnitInfo.refCategoryTorpedoLauncher - categories.SUBMERSIBLE + M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryNavalFactory, tClosestEnemyTargetToUse, 120, 'Enemy')
+                            end
+
+                            for iUnit, oUnit in tOurSurfaceCombatNavy do
+                                --Do we want to engage the enemy with surface unit?
+                                if not(oUnit[M27UnitInfo.refiDFRange]) then iCurRange = M27UnitInfo.GetNavalDirectAndSubRange(oUnit) --this line is for redundancy so dont need to worry about factoring in indirect as shoudl be a 1-off
+                                else
+                                    if bUseIndirectRangeIfHigher then
+                                        iCurRange = math.max(oUnit[M27UnitInfo.refiAntiNavyRange], oUnit[M27UnitInfo.refiDFRange], oUnit[M27UnitInfo.refiIndirectRange])
+                                    else
+                                        iCurRange = math.max(oUnit[M27UnitInfo.refiAntiNavyRange], oUnit[M27UnitInfo.refiDFRange])
+                                    end
+                                end
+                                if iCurRange < iMinRangeForEngagement then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iCurRange='..iCurRange..'; iMinRangeForEngagement='..iMinRangeForEngagement) end
+                                    MoveUnitTowardsTarget(oUnit, tDestinationForShortRangeUnits, false, 'ShortRange')
+                                else
+                                    iCurDistToClosestEnemy = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tClosestEnemyTargetToUse)
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. ': oUnit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; iCurDistToClosestEnemy=' .. iCurDistToClosestEnemy .. '; iMaxDistanceWithinAttackRangeWanted=' .. iMaxDistanceWithinAttackRangeWanted .. '; iMinDistanceWithinAttackRangeWanted=' .. iMinDistanceWithinAttackRangeWanted .. '; Range=' .. M27UnitInfo.GetNavalDirectAndSubRange(oUnit))
+                                    end
+                                    if EntityCategoryContains(M27UnitInfo.refCategorySupportNavy, oUnit.UnitId) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oClosestFriendlyUnitToEnemyBase:GetPosition()) <= 40 then
+                                        MoveUnitTowardsTarget(oUnit, tOurBase, false, 'SupportRetreat')
+                                    elseif iCurDistToClosestEnemy + iMaxDistanceWithinAttackRangeWanted < iCurRange then
+                                        --Kiting retreat unless are near our naval factory in which case do attack-move
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Considering kiting retreat for unit unless close to our base in which case will attack move. Dist to our base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tOurBase)) end
+                                        if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tOurBase) <= 20 then
+                                            MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, true, 'AKitingRetreat')
+                                        else
+                                            MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, false, 'MKitingRetreat')
+                                        end
+                                    elseif iCurDistToClosestEnemy + iMinDistanceWithinAttackRangeWanted < iCurRange then
+                                        --Attack-move to target; however do issueattack if we are moving to enemy naval base
+                                        if bChargeEnemyBase and iCurDistToClosestEnemy < iCurRange and (oUnit[M27UnitInfo.refbLastShotBlocked] or (oUnit[M27PlatoonUtilities.refiLastOrderType] == M27PlatoonUtilities.refiOrderIssueAttack and M27UnitInfo.IsUnitValid(oUnit[M27UnitInfo.refoLastOrderUnitTarget]))) then
+                                            --Shot blocked and we are charging to enemy base so want to focus down the enemy base
+                                            oPriorityTarget = nil
+                                            if M27Utilities.IsTableEmpty(tPriorityTargets) == false then
+                                                for iEnemy, oEnemy in tPriorityTargets do
+                                                    iCurDistToPriority = M27Utilities.GetDistanceBetweenPositions(oEnemy:GetPosition(), oUnit:GetPosition())
+                                                    if iCurDistToPriority <= iCurRange or (iCurDistToPriority - 6 <= iCurRange and not(oPriorityTarget)) then
+                                                        --Is shot blocked?
+                                                        if not(M27Logic.IsShotBlocked(oUnit, oEnemy)) then
+                                                            oPriorityTarget = oEnemy
+                                                            if iCurDistToPriority <= iCurRange then break end
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Shot is blocked so looking to see if have a nearly in range prioriyt target; Is oPriorityTarget valid='..tostring(M27UnitInfo.IsUnitValid(oPriorityTarget))) end
+                                            if oPriorityTarget and M27Utilities.GetDistanceBetweenPositions(oPriorityTarget:GetPosition(), oUnit:GetPosition()) - 6 <= iCurRange then
+                                                TellUnitToAttackTarget(oUnit, oPriorityTarget, 'Blocked')
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Want to attack specific unit='..oPriorityTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPriorityTarget)..' which is '..M27Utilities.GetDistanceBetweenPositions(oPriorityTarget:GetPosition(), oUnit:GetPosition())..' away from unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                                            else
+                                                MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, false, 'AGetInRange')
+                                                if bDebugMessages == true then LOG(sFunctionRef..': no suitable target so will just move towards closest enemy target to use') end
+                                            end
+                                        else
+                                            MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, true, 'AGetInRange')
+                                        end
+                                    else
+                                        --Move towards target (non-attack move)
+                                        MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, false, 'MGetInRange')
+                                    end
+                                end
+                            end
+                        else
+                            --We dont outrange enemy, and htink we will lose if we will attack, so retreat/head to destination if are ignoring enemy subs
+                            local sOrderDesc = 'MainRetreat'
+                            if bConsolidateForces then
+                                sOrderDesc = 'Consolidate'
+                            end
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': About to order navy to go to tGlobalNavalDestination=' .. repru(tGlobalNavalDestination) .. '; bConsolidateForces=' .. tostring(bConsolidateForces))
+                            end
+                            for iUnit, oUnit in tOurSurfaceCombatNavy do
+                                MoveUnitTowardsTarget(oUnit, tGlobalNavalDestination, false, sOrderDesc)
+                            end
+                        end
+                    end
+                end
+            end
+        elseif oClosestFriendlyUnitToEnemyBase then
+
+            --Have destroyed all enemy naval units, focus on naval bombardment - do attack-move to closest enemy mex that enemy controls that we can hit with our current naval options
+            local tOurFriendlyCombatUnits = EntityCategoryFilterDown(categories.DIRECTFIRE * categories.MOBILE + categories.INDIRECTFIRE * categories.MOBILE, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
+            if bDebugMessages == true then
+                LOG(sFunctionRef .. ' No enemy naval units detected, will switch to considering if want bombardment mode. Is table of friendly combat units empty=' .. tostring(M27Utilities.IsTableEmpty(tOurFriendlyCombatUnits)))
+            end
+            if M27Utilities.IsTableEmpty(tOurFriendlyCombatUnits) == false then
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': oClosestFriendlyUnit=' .. oClosestFriendlyUnitToEnemyBase.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oClosestFriendlyUnitToEnemyBase) .. '; Position=' .. repru(oClosestFriendlyUnitToEnemyBase:GetPosition()))
+                end
+
+                local oClosestEnemyMex
+
+                for iUnit, oUnit in tOurFriendlyCombatUnits do
+                    if oUnit:GetFractionComplete() >= 1 then
+                        if not (bHaveAlreadyUpdatedRanges) then
+                            M27UnitInfo.GetNavalDirectAndSubRange(oUnit)
+                        end
+                        iOurBestIndirectRange = math.max(iOurBestIndirectRange, oUnit[M27UnitInfo.refiIndirectRange])
+                        iOurBestDFRange = math.max(iOurBestDFRange, oUnit[M27UnitInfo.refiDFRange])
+                        oUnit[refbTempIsUnderwater] = M27UnitInfo.IsUnitUnderwater(oUnit)
                         if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': About to order navy to go to tGlobalNavalDestination=' .. repru(tGlobalNavalDestination) .. '; bConsolidateForces=' .. tostring(bConsolidateForces))
-                        end
-                        for iUnit, oUnit in tOurSurfaceCombatNavy do
-                            MoveUnitTowardsTarget(oUnit, tGlobalNavalDestination, false, sOrderDesc)
+                            LOG(sFunctionRef .. ': Friendly combat unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ': Is underwater=' .. tostring(oUnit[refbTempIsUnderwater]) .. '; DF range=' .. oUnit[M27UnitInfo.refiDFRange] .. '; Indirect range=' .. oUnit[M27UnitInfo.refiIndirectRange])
                         end
                     end
                 end
             end
-        end
-    elseif oClosestFriendlyUnitToEnemyBase then
-
-        --Have destroyed all enemy naval units, focus on naval bombardment - do attack-move to closest enemy mex that enemy controls that we can hit with our current naval options
-        local tOurFriendlyCombatUnits = EntityCategoryFilterDown(categories.DIRECTFIRE * categories.MOBILE + categories.INDIRECTFIRE * categories.MOBILE, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
-        if bDebugMessages == true then
-            LOG(sFunctionRef .. ' No enemy naval units detected, will switch to considering if want bombardment mode. Is table of friendly combat units empty=' .. tostring(M27Utilities.IsTableEmpty(tOurFriendlyCombatUnits)))
-        end
-        if M27Utilities.IsTableEmpty(tOurFriendlyCombatUnits) == false then
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': oClosestFriendlyUnit=' .. oClosestFriendlyUnitToEnemyBase.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oClosestFriendlyUnitToEnemyBase) .. '; Position=' .. repru(oClosestFriendlyUnitToEnemyBase:GetPosition()))
-            end
-
-            local oClosestEnemyMex
-
-            for iUnit, oUnit in tOurFriendlyCombatUnits do
-                if oUnit:GetFractionComplete() >= 1 then
-                    if not (bHaveAlreadyUpdatedRanges) then
-                        M27UnitInfo.GetNavalDirectAndSubRange(oUnit)
-                    end
-                    iOurBestIndirectRange = math.max(iOurBestIndirectRange, oUnit[M27UnitInfo.refiIndirectRange])
-                    iOurBestDFRange = math.max(iOurBestDFRange, oUnit[M27UnitInfo.refiDFRange])
-                    oUnit[refbTempIsUnderwater] = M27UnitInfo.IsUnitUnderwater(oUnit)
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Friendly combat unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ': Is underwater=' .. tostring(oUnit[refbTempIsUnderwater]) .. '; DF range=' .. oUnit[M27UnitInfo.refiDFRange] .. '; Indirect range=' .. oUnit[M27UnitInfo.refiIndirectRange])
-                    end
+            if math.max(iOurBestDFRange, iOurBestIndirectRange) >= 25 then
+                bConsiderBombardment = true
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Have units iwth at least 25 range so will consider bombardment mode')
                 end
-            end
-        end
-        if math.max(iOurBestDFRange, iOurBestIndirectRange) >= 25 then
-            bConsiderBombardment = true
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Have units iwth at least 25 range so will consider bombardment mode')
             end
         end
     end
