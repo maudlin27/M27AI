@@ -1169,6 +1169,8 @@ function AssignMAAToPreferredPlatoons(aiBrain)
     local sFunctionRef = 'AssignMAAToPreferredPlatoons'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    if GetGameTimeSeconds() >= 1333 and aiBrain:GetArmyIndex() == 5 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
+
     if aiBrain[refbMAABuiltOrDied] or GetGameTimeSeconds() - (aiBrain[refiLastCheckedMAAAssignments] or -100) >= 4 then
         aiBrain[refbMAABuiltOrDied] = false
         aiBrain[refiLastCheckedMAAAssignments] = GetGameTimeSeconds()
