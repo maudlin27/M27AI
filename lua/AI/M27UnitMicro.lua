@@ -620,7 +620,7 @@ function ConsiderDodgingShot(oUnit, oWeapon)
             local iShotSpeed = oWeapon.Blueprint.MuzzleVelocity
             local iTimeUntilImpact = iDistToTarget / iShotSpeed
             if bDebugMessages == true then LOG(sFunctionRef..': Dist to target='..iDistToTarget..'; Shot speed='..iShotSpeed..'; iTimeUntilImpact='..iTimeUntilImpact) end
-            if iTimeUntilImpact > 0.7 then
+            if iTimeUntilImpact > 0.8 then
                 for iTarget, oTarget in tUnitsToConsiderDodgeFor do
                     if bDebugMessages == true then LOG(sFunctionRef..': oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Weapon damage='..oWeapon.Blueprint.Damage..'; Target health='..oTarget:GetHealth()) end
                     --Does the shot do enough damage that we want to try and doge it?
@@ -630,7 +630,7 @@ function ConsiderDodgingShot(oUnit, oWeapon)
                         local oBP = oTarget:GetBlueprint()
                         local iAverageSize = (oBP.SizeX + oBP.SizeZ) * 0.5
                         if bDebugMessages == true then LOG(sFunctionRef..': iAverageSize='..iAverageSize..'; Is unit underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oUnit))..'; Unit speed='..oBP.Physics.MaxSpeed) end
-                        if iTimeUntilImpact > 0.35 + iAverageSize * 1.5 / oBP.Physics.MaxSpeed then
+                        if iTimeUntilImpact > 0.4 + iAverageSize * 1.5 / oBP.Physics.MaxSpeed then
                             --Are we not underwater?
                             if not(M27UnitInfo.IsUnitUnderwater(oUnit)) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Will try to dodge shot') end

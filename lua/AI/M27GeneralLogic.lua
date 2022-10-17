@@ -3717,6 +3717,7 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetIntelCoverageOfPosition'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if iMinCoverageWanted == 37 and M27Utilities.GetDistanceBetweenPositions({67.893432617188, 2.703125, 89.241264343262}, tTargetPosition) <= 2 then bDebugMessages = true end
 
     if aiBrain[M27AirOverseer.refbHaveOmniVision] then
 
@@ -3729,23 +3730,26 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
 
         --Visual range - base on air segments and if they've been flagged as having had recent visual
         local iAirSegmentAdjSize = 1
-        if iMinCoverageWanted then iAirSegmentAdjSize = math.ceil(iMinCoverageWanted / M27AirOverseer.iAirSegmentSize) end
+        if iMinCoverageWanted then iAirSegmentAdjSize = math.ceil(iMinCoverageWanted   / M27AirOverseer.iAirSegmentSize) end
         local iBaseAirSegmentX, iBaseAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(tTargetPosition)
         local bHaveRecentVisual = true
         for iAdjX = -iAirSegmentAdjSize, iAirSegmentAdjSize do
             for iAdjZ = -iAirSegmentAdjSize, iAirSegmentAdjSize do
+                if bDebugMessages == true then LOG(sFunctionRef..': Time of last visual for segment with iAdjX='..iAdjX..'; iAdjZ='..iAdjZ..'='..M27AirOverseer.GetTimeSinceLastScoutedSegment(aiBrain, iBaseAirSegmentX + iAdjX, iBaseAirSegmentZ + iAdjZ)) end
                 if aiBrain[M27AirOverseer.reftAirSegmentTracker][iBaseAirSegmentX + iAdjX] and aiBrain[M27AirOverseer.reftAirSegmentTracker][iBaseAirSegmentX + iAdjX][iBaseAirSegmentZ + iAdjZ]
                         and M27AirOverseer.GetTimeSinceLastScoutedSegment(aiBrain, iBaseAirSegmentX + iAdjX, iBaseAirSegmentZ + iAdjZ) > 1.1 then
-                    --Dont have recent visual - check are either 0 adj, or are within iMinCoverageWanted
-                    if iAdjX == 0 and iAdjZ == 0 then
+                    --Dont have recent visual (prior to v60 - would check are either 0 adj, or are within iMinCoverageWanted)
+                    bHaveRecentVisual = false
+                    --[[if iAdjX == 0 and iAdjZ == 0 then
                         bHaveRecentVisual = false
                         break
                     elseif M27Utilities.GetDistanceBetweenPositions(tTargetPosition, M27AirOverseer.GetAirPositionFromSegment(iBaseAirSegmentX + iAdjX, iBaseAirSegmentZ + iAdjZ)) <= iMinCoverageWanted then
                         bHaveRecentVisual = false
                         break
-                    end
+                    end--]]
                 end
             end
+            if not(bHaveRecentVisual) then break end
         end
 
 
@@ -3774,9 +3778,10 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
                         --else
                         if not(iMinCoverageWanted==nil) then
                             if iCurIntelCoverage > iMinCoverageWanted then
-                                if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverage='..iMinCoverageWanted..'; iMaxIntelCoverage='..iMaxIntelCoverage) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverageWanted='..iMinCoverageWanted..'; iMaxIntelCoverage='..iMaxIntelCoverage..'; iCurIntelCoverage='..iCurIntelCoverage) end
                                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                                return true end
+                                return true
+                            end
                         end
                     end
                 end
