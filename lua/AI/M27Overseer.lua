@@ -1215,6 +1215,11 @@ function AssignMAAToPreferredPlatoons(aiBrain)
             end
         end
 
+
+        local oACU = M27Utilities.GetACU(aiBrain)
+
+
+
         local function GetMAAThreat(tMAAUnits)
             return M27Logic.GetAirThreatLevel(aiBrain, tMAAUnits, false, false, true, false, false)
         end
@@ -1224,8 +1229,13 @@ function AssignMAAToPreferredPlatoons(aiBrain)
         iMAAThreatWanted = math.min(iMaxMAAThreatForACU, math.max(iMinACUMAAThreatWanted, math.floor((aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 0) * iAirThreatMAAFactor)))
 
         --If ACU is near base or chokepoint and we own T2+ fixed AA near it, then reduce MAA threat wanted
-        local oACU = M27Utilities.GetACU(aiBrain)
+
         if M27UnitInfo.IsUnitValid(oACU) then
+            --If ACU near base and has nearby SAM then reduce max MAA wanted for it significantly
+            if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.max(aiBrain[iDistanceFromBaseToBeSafe], 80) and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructureAA * categories.TECH3, oACU:GetPosition(), 50, 'Ally')) == false then
+                iMAAThreatWanted = math.min(800, iMAAThreatWanted)
+                iMinACUMAAThreatWanted = math.min(iMinACUMAAThreatWanted * 0.35, iMAAThreatWanted * 0.7)
+            end
 
             if aiBrain[refiOurHighestFactoryTechLevel] >= 2 and M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.75 then
                 local iAACategory
