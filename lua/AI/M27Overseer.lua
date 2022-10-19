@@ -1232,7 +1232,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
 
         if M27UnitInfo.IsUnitValid(oACU) then
             --If ACU near base and has nearby SAM then reduce max MAA wanted for it significantly
-            if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.max(aiBrain[iDistanceFromBaseToBeSafe], 80) and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructureAA * categories.TECH3, oACU:GetPosition(), 50, 'Ally')) == false then
+            if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.max(iDistanceFromBaseToBeSafe, 80) and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructureAA * categories.TECH3, oACU:GetPosition(), 50, 'Ally')) == false then
                 iMAAThreatWanted = math.min(800, iMAAThreatWanted)
                 iMinACUMAAThreatWanted = math.min(iMinACUMAAThreatWanted * 0.35, iMAAThreatWanted * 0.7)
             end
@@ -8328,6 +8328,12 @@ function RecordAllEnemiesAndAllies(aiBrain)
                     end
                 end
             end
+        end
+
+        --Send warning of large numbers of M27AI in a game
+        if table.getn(tAllActiveM27Brains) > 4 then
+                        --SendMessage(aiBrain, sMessageType, sMessage,                                                                                                                                                      iOptionalDelayBeforeSending, iOptionalTimeBetweenMessageType, bOnlySendToTeam)
+            M27Chat.SendMessage(aiBrain, 'SendGameCompatibilityAILimit', 'More than 4 M27AI are being used, there is the risk of a crash due to RAM limitations.  Try reducing the number and using an AiX modifier instead.', 0, 100000000)
         end
 
         --Update chokepoints (note for now this will only call once per game)
