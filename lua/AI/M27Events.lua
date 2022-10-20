@@ -921,7 +921,7 @@ function OnWeaponFired(oWeapon)
                 if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, oUnit.UnitId) then
                     ForkThread(M27Logic.GetT3ArtiTarget, oUnit)
                     --DF units whose DF shot is blocked
-                elseif oWeapon.Blueprint.RangeCategory == 'UWRC_DirectFire' and EntityCategoryContains(M27UnitInfo.refCategoryDFTank + M27UnitInfo.refCategoryNavalSurface * categories.DIRECTFIRE + M27UnitInfo.refCategorySeraphimDestroyer - M27UnitInfo.refCategoryMissileNavy, oUnit.UnitId) then
+                elseif oWeapon.Blueprint.RangeCategory == 'UWRC_DirectFire' and EntityCategoryContains(M27UnitInfo.refCategoryDFTank + M27UnitInfo.refCategoryNavalSurface * categories.DIRECTFIRE + M27UnitInfo.refCategorySeraphimDestroyer - M27UnitInfo.refCategoryMissileShip, oUnit.UnitId) then
                     --Get weapon target if it is a DF weapon
                     --if EntityCategoryContains(M27UnitInfo.refCategoryNavalSurface, oUnit.UnitId) then bDebugMessages = true LOG('reprs of weapon='..reprs(oWeapon)..'; will now do log of the weapon blueprint='..reprs(oWeapon.Blueprint)) end
                     local oTarget = oWeapon:GetCurrentTarget()
@@ -1300,6 +1300,8 @@ function OnConstructed(oEngineer, oJustBuilt)
                 end
             elseif EntityCategoryContains(M27UnitInfo.refCategoryPD, oJustBuilt.UnitId) then
                 ForkThread(M27UnitInfo.SetUnitTargetPriorities, oJustBuilt, M27UnitInfo.refWeaponPriorityPD)
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryMissileShip, oJustBuilt.UnitId) then
+                ForkThread(M27UnitInfo.SetUnitTargetPriorities, oJustBuilt, M27UnitInfo.refWeaponPriorityMissileShip)
 
             end
 

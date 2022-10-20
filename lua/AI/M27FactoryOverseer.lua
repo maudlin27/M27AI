@@ -421,7 +421,7 @@ function GetNavalSurfaceCombatCategory(aiBrain, oFactory, iFactoryTechLevel)
                 local iCurHigherTierCombat = 0
                 if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false then
                     local tCurFrigates = EntityCategoryFilterDown(M27UnitInfo.refCategoryFrigate, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
-                    local tCurHigherTierCombat = EntityCategoryFilterDown(categories.DESTROYER + categories.BATTLESHIP, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                    local tCurHigherTierCombat = EntityCategoryFilterDown(categories.DESTROYER + categories.BATTLESHIP - M27UnitInfo.refCategoryMissileShip, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
                     if M27Utilities.IsTableEmpty(tCurFrigates) == false then iCurFrigates = table.getn(tCurFrigates) end
                     if M27Utilities.IsTableEmpty(tCurHigherTierCombat) == false then iCurHigherTierCombat = table.getn(tCurHigherTierCombat) end
                 end
@@ -645,13 +645,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                         bUpgradeFactoryInstead = true
                     elseif oPrimaryFactory and EntityCategoryContains(categories.TECH1, oPrimaryFactory.UnitId) then
                         --Build subs
-                        iCategoryToBuild = M27UnitInfo.refCategorySubmarine - M27UnitInfo.refCategoryMissileNavy
+                        iCategoryToBuild = M27UnitInfo.refCategorySubmarine - M27UnitInfo.refCategoryMissileShip
                     end
                 else
                     if EntityCategoryContains(categories.UEF, oFactory.UnitId) then
                         iCategoryToBuild = M27UnitInfo.refCategoryCooper
                     elseif EntityCategoryContains(categories.CYBRAN, oFactory.UnitId) or (iFactoryTechLevel == 3 and EntityCategoryContains(categories.SERAPHIM, oFactory.UnitId)) then
-                        iCategoryToBuild = M27UnitInfo.refCategorySubmarine - M27UnitInfo.refCategoryMissileNavy
+                        iCategoryToBuild = M27UnitInfo.refCategorySubmarine - M27UnitInfo.refCategoryMissileShip
                     else
                         iCategoryToBuild = M27UnitInfo.refCategoryDestroyer
                     end
@@ -1038,7 +1038,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     if bDebugMessages == true then LOG(sFunctionRef..': Seeing if want amphibious to combat emergency naval threat.  refbT2NavyNearOurBase='..tostring(aiBrain[M27Overseer.refbT2NavyNearOurBase])) end
                                     if aiBrain[M27Overseer.refbT2NavyNearOurBase] then
                                         --Do we have enemy cruisers that can fire missiles near our base, and they lack a decent destroyer/frigate escort?
-                                        local tNearbyEnemyMissileShips = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMissileNavy - categories.SUBMERSIBLE, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 250, 'Enemy')
+                                        local tNearbyEnemyMissileShips = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMissileShip - categories.SUBMERSIBLE, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 250, 'Enemy')
                                         if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy missile ships empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyMissileShips))) end
                                         if M27Utilities.IsTableEmpty(tNearbyEnemyMissileShips) == false then
                                             local oNearestMissileShip = M27Utilities.GetNearestUnit(tNearbyEnemyMissileShips, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
@@ -1479,10 +1479,10 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         bReachedLastOption = true
                                         break
                                     end
-                                    else
-                                        bReachedLastOption = true
-                                        break
-                                    end
+                                else
+                                    bReachedLastOption = true
+                                    break
+                                end
                             elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU then
                                 bGetFastest = true
                                 --If our ACU is near base then dont get fastest
@@ -2578,6 +2578,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                             --=======NAVAL FACTORY------------------
                         elseif bIsNavalFactory then
+                            if iFactoryTechLevel == 3 then bDebugMessages = true end
                             if oFactory == M27Navy.GetPrimaryNavalFactory(aiBrain, oFactory[M27Navy.refiAssignedPond]) then M27Team.tTeamData[aiBrain.M27Team][M27Team.refbHaveNavalShortfall][oFactory[M27Navy.refiAssignedPond]] = true end
                             iTotalWanted = 3 --As are looking at things on a team wide basis and this only checks on an aibrain basis will just try and build lots of the one category
                             if iCurrentConditionToTry == 1 then --Immediate threat to base
@@ -2592,7 +2593,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             if EntityCategoryContains(categories.UEF - categories.TECH1, oFactory.UnitId) then
                                                 iCategoryToBuild = M27UnitInfo.refCategoryCooper
                                             else
-                                                iCategoryToBuild = M27UnitInfo.refCategorySubmarine - M27UnitInfo.refCategoryMissileNavy
+                                                iCategoryToBuild = M27UnitInfo.refCategorySubmarine - M27UnitInfo.refCategoryMissileShip
                                             end
                                         end
                                     end
@@ -2689,7 +2690,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         if bDebugMessages == true then LOG(sFunctionRef..': LC of subs='..M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategorySubmarine)) end
                                         if M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategorySubmarine) <= 2 then
                                             if bDebugMessages == true then LOG(sFunctionRef..': Have 2 or less lifetime subs so will build another') end
-                                            iCategoryToBuild = M27UnitInfo.refCategorySubmarine - M27UnitInfo.refCategoryMissileNavy
+                                            iCategoryToBuild = M27UnitInfo.refCategorySubmarine - M27UnitInfo.refCategoryMissileShip
                                         end
                                     end
                                 end
@@ -2898,7 +2899,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 elseif iFactoryTechLevel >= 2 then
                                     if iCurrentConditionToTry == 18 then --More bombardment units based on number of mexes in range
                                         local iPotentialBombardmentRange = 60
-                                        local iBombardmentCategory = M27UnitInfo.refCategoryDestroyer + categories.BATTLESHIP
+                                        local iBombardmentCategory = M27UnitInfo.refCategoryDestroyer + categories.BATTLESHIP - M27UnitInfo.refCategoryMissileShip
                                         local iUnitsPerMexInRange = 1
                                         local sMexDistanceSubref = M27Navy.subrefMexDFDistance
                                         if EntityCategoryContains(categories.UEF + categories.SERAPHIM, oFactory.UnitId) then
@@ -2906,9 +2907,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             local tCurCruisers = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiserCarrier, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
                                             if M27Utilities.IsTableEmpty(tCurCruisers) == false then iCurCruisers = table.getn(tCurCruisers) end
                                             local bHaveBattleship = false
-                                            local tBattleship = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalSurface * categories.TECH3 * categories.BATTLESHIP, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
-                                            bHaveBattleship = not(M27Utilities.IsTableEmpty(tBattleship))
-
+                                            local tBattleships = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalSurface * categories.TECH3 * categories.BATTLESHIP - M27UnitInfo.refCategoryMissileShip, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                                            bHaveBattleship = not(M27Utilities.IsTableEmpty(tBattleships))
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Want bombardment category for UEF or Seraphim. iCurCruisers='..iCurCruisers..'; iFactoryTechLevel='..iFactoryTechLevel..'; bHaveBattleship='..tostring(bHaveBattleship)) end
                                             if iCurCruisers >= 10 and iFactoryTechLevel == 2 then
                                                 bUpgradeFactoryInstead = true
                                             elseif iCurCruisers < 5 or (iCurCruisers <= 10 and (bHaveBattleship or iFactoryTechLevel == 2)) then
@@ -2916,34 +2917,38 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 iPotentialBombardmentRange = 150
                                                 sMexDistanceSubref = M27Navy.subrefMexIndirectDistance
                                             elseif iFactoryTechLevel == 3 then
-                                                iBombardmentCategory = categories.BATTLESHIP
+                                                iBombardmentCategory = categories.BATTLESHIP - M27UnitInfo.refCategoryMissileShip
                                                 iPotentialBombardmentRange = 128
                                                 if EntityCategoryContains(categories.UEF, oFactory.UnitId) then iPotentialBombardmentRange = 150 end
                                             end
                                         elseif iFactoryTechLevel == 3 then
                                             iUnitsPerMexInRange = 0.35
                                             iPotentialBombardmentRange = 128
-                                            iBombardmentCategory = categories.BATTLESHIP
+                                            iBombardmentCategory = categories.BATTLESHIP - M27UnitInfo.refCategoryMissileShip
                                             if EntityCategoryContains(categories.AEON, oFactory.UnitId) then
                                                 --Do we already have 1+ missile ships and no battleship? If so then get battleship
-                                                iBombardmentCategory = M27UnitInfo.refCategoryMissileNavy * categories.TECH3 - categories.SUBMERSIBLE
+                                                iBombardmentCategory = M27UnitInfo.refCategoryMissileShip * categories.TECH3 - categories.SUBMERSIBLE
 
 
                                                 local iCurMissileShips = 0
                                                 local tCurMissileShips = EntityCategoryFilterDown(iBombardmentCategory, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
                                                 if M27Utilities.IsTableEmpty(tCurMissileShips) == false then iCurMissileShips = table.getn(tCurMissileShips) end
                                                 local bHaveBattleship = false
-                                                local tBattleship = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalSurface * categories.TECH3 * categories.BATTLESHIP - M27UnitInfo.refCategoryMissileNavy, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
-                                                bHaveBattleship = not(M27Utilities.IsTableEmpty(tBattleship))
+                                                local tBattleships = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalSurface * categories.TECH3 * categories.BATTLESHIP - M27UnitInfo.refCategoryMissileShip, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                                                bHaveBattleship = not(M27Utilities.IsTableEmpty(tBattleships))
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Aeon T3 naval factory, bHaveBattleship='..tostring(bHaveBattleship)..'; iCurMissileShips='..iCurMissileShips..'; Number of battleships='..table.getn(tBattleships)) end
                                                 if iCurMissileShips >= 1 and not(bHaveBattleship) then
-                                                    iBombardmentCategory = categories.BATTLESHIP
+                                                    iBombardmentCategory = categories.BATTLESHIP  - M27UnitInfo.refCategoryMissileShip
                                                     iPotentialBombardmentRange = 110
-                                                elseif iCurMissileShips < 5 then --Missile ship
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Setting bombardment category to be a battleship as we have none') end
+                                                elseif iCurMissileShips < 4 then --Missile ship
                                                     iPotentialBombardmentRange = 200
                                                     sMexDistanceSubref = M27Navy.subrefMexIndirectDistance
-                                                elseif table.getn(tBattleship) <= 1 then
-                                                    iBombardmentCategory = categories.BATTLESHIP
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': No change to default bombardment category (missile navy)') end
+                                                elseif table.getn(tBattleships) <= 1 then
+                                                    iBombardmentCategory = categories.BATTLESHIP - M27UnitInfo.refCategoryMissileShip
                                                     iPotentialBombardmentRange = 110
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Want battleship as only have one and have lots of missile ships') end
                                                 else
                                                     iBombardmentCategory = nil --have 5 missile ships and 2 battleships so dont want to get more bombardment units
                                                 end
@@ -2956,6 +2961,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 local tExistingBombardmentUnits = EntityCategoryFilterDown(iBombardmentCategory, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
                                                 local iExistingBombardmentUnits = 0
                                                 if M27Utilities.IsTableEmpty(tExistingBombardmentUnits) == false then iExistingBombardmentUnits = table.getn(tExistingBombardmentUnits) end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Want bombardment and have T2 aeon naval fac, iExistingBombardmentUnits='..iExistingBombardmentUnits) end
                                                 if iExistingBombardmentUnits >= 5 then
                                                     bUpgradeFactoryInstead = true
                                                 end
@@ -3009,7 +3015,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         local iExistingLongRange = 0
                                         local iCategoryWanted
                                         if iFactoryTechLevel <= 2 then
-                                            iCategoryWanted = M27UnitInfo.refCategoryMissileNavy + categories.BATTLESHIP * categories.TECH3
+                                            iCategoryWanted = M27UnitInfo.refCategoryMissileShip + categories.BATTLESHIP * categories.TECH3
                                             if EntityCategoryContains(categories.CYBRAN, oFactory.UnitId) then
                                                 iCategoryWanted = iCategoryWanted + M27UnitInfo.refCategoryDestroyer
                                             end

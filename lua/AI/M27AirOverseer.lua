@@ -1383,7 +1383,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
             ManualTellTorpedoBomberToAttackTarget(aiBrain, oBomber, aiBrain[M27Overseer.refoACUKillTarget])
         else
             if oBomber[refbEngiHunterMode] then
-                --if M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 then bDebugMessages = true end
+                if M27UnitInfo.GetUnitLifetimeCount(oBomber) == 2 and GetGameTimeSeconds() >= 440 then bDebugMessages = true end
                 --Hunt for engineers - get what we think is the best target (regardless of whether we have a current target)
                 --exception if our current target is near us and within the preferred angle range
                 local oBomberCurTarget = oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit]
@@ -1476,7 +1476,6 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                             local tEnemyBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                             local tOurBase = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
 
-                            local iCurTime = GetGameTimeSeconds()
                             if bDebugMessages == true then LOG(sFunctionRef..': Will cycle through mexes to identify any we havent had sight of recently and will pick one of these') end
                             local tEnemyAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, oBomber:GetPosition(), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase], 'Enemy')
                             local iDistToEnemyBase
@@ -1504,9 +1503,11 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                 bAlreadyCoveredByOtherBomber = false
                                 --iCurSegmentX, iCurSegmentZ = GetAirSegmentFromPosition(tMex)
                                 iLastVisualSight =  GetTimeSinceLastScoutedLocation(aiBrain, tMex)
-                                if iCurTime - iLastVisualSight >= 60 then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering iMex='..iMex..'; tMex='..repru(tMex)..'; Dist to our base='..M27Utilities.GetDistanceBetweenPositions(tMex, tOurBase)..'; Dist to enemy base='..M27Utilities.GetDistanceBetweenPositions(tMex, tEnemyBase)..'; iLastVisualSight='..iLastVisualSight) end
+                                if iLastVisualSight >= 60 then
                                     --Been more than 60s since had sight of the mex so consider it if its closer to enemy base than our base
                                     iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tMex, tEnemyBase)
+
                                     if M27Utilities.GetDistanceBetweenPositions(tMex, tOurBase) > iDistToEnemyBase then
                                         if iDistToEnemyBase >= 100 or (aiBrain[refiHighestEnemyAirThreat] <= 60 and (aiBrain[refiEnemyMassInGroundAA] <= 10 or M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1)) then
                                             iCurDistance = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), tMex)
@@ -1525,6 +1526,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                                 if not(bAlreadyCoveredByOtherBomber) and not(IsTargetPositionCoveredByAA(tMex, tEnemyAA, oBomber:GetPosition(), false)) then
                                                     iLowestDistance = iCurDistance
                                                     tNewTarget = {tMex[1], tMex[2], tMex[3]}
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Have a new lowest distance, iLowestDistance='..iLowestDistance) end
                                                 end
                                             end
                                         end

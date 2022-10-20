@@ -6635,7 +6635,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
         local iBigThreatSearchRange = 10000
 
-        local tEnemyBigThreatCategories = { ['Land experimental'] = M27UnitInfo.refCategoryLandExperimental, ['T3 arti'] = M27UnitInfo.refCategoryFixedT3Arti, ['Experimental building'] = M27UnitInfo.refCategoryExperimentalStructure, ['Nuke'] = M27UnitInfo.refCategorySML, ['TML'] = M27UnitInfo.refCategoryTML, ['Missile ships'] = M27UnitInfo.refCategoryMissileNavy, ['SMD'] = M27UnitInfo.refCategorySMD }
+        local tEnemyBigThreatCategories = { ['Land experimental'] = M27UnitInfo.refCategoryLandExperimental, ['T3 arti'] = M27UnitInfo.refCategoryFixedT3Arti, ['Experimental building'] = M27UnitInfo.refCategoryExperimentalStructure, ['Nuke'] = M27UnitInfo.refCategorySML, ['TML'] = M27UnitInfo.refCategoryTML, ['Missile ships'] = M27UnitInfo.refCategoryMissileShip, ['SMD'] = M27UnitInfo.refCategorySMD }
         local tCurCategoryUnits
         local tReferenceTable, bRemovedUnit
         local sUnitUniqueRef
@@ -6658,7 +6658,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                     LOG(sFunctionRef .. ': Looking for enemy nukes')
                 end
                 bWantACUToReturnToBase = true
-            elseif iCategory == M27UnitInfo.refCategoryTML or iCategory == M27UnitInfo.refCategoryMissileNavy then
+            elseif iCategory == M27UnitInfo.refCategoryTML or iCategory == M27UnitInfo.refCategoryMissileShip then
                 tReferenceTable = aiBrain[reftEnemyTML]
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': Looking for enemy TML')

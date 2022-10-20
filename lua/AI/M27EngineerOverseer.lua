@@ -6768,7 +6768,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                     end
                                     if not (tLocationToMoveTowards) then
                                         M27Utilities.ErrorHandler('Backup logic - cant find any units wanting protection from TML; if can find any enemy TML within 300 of the target location then will pick this as the location to move towards.  See log for more info')
-                                        local tNearbyTML = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTML + M27UnitInfo.refCategoryMissileNavy, tTargetLocation, 300, 'Enemy')
+                                        local tNearbyTML = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTML + M27UnitInfo.refCategoryMissileShip, tTargetLocation, 300, 'Enemy')
                                         if M27Utilities.IsTableEmpty(tNearbyTML) then
                                             bAbort = true
                                         else
@@ -8233,7 +8233,7 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
 
         if bDebugMessages == true then LOG(sFunctionRef..': Is table of units by firebase ref empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftFirebaseUnitsByFirebaseRef]))) end
         if M27Utilities.IsTableEmpty(aiBrain[reftFirebaseUnitsByFirebaseRef]) == false then
-            local tEnemyT2PlusIndirect = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryIndirectT2Plus + M27UnitInfo.refCategorySniperBot + M27UnitInfo.refCategoryMissileNavy, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.refiDistanceToNearestEnemyBase], 'Enemy')
+            local tEnemyT2PlusIndirect = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryIndirectT2Plus + M27UnitInfo.refCategorySniperBot + M27UnitInfo.refCategoryMissileShip, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.refiDistanceToNearestEnemyBase], 'Enemy')
             local iEnemyT2PlusIndirect = 0
             if M27Utilities.IsTableEmpty(tEnemyT2PlusIndirect) == false then iEnemyT2PlusIndirect = table.getn(tEnemyT2PlusIndirect) end
             local bWantFortification = false
@@ -9985,7 +9985,7 @@ end--]]
                         end
 
                         if not(iActionToAssign) and aiBrain[M27Overseer.refbT2NavyNearOurBase] then
-                            local tEnemyMissileNavy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMissileNavy, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 250, 'Enemy')
+                            local tEnemyMissileNavy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMissileShip, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 250, 'Enemy')
                             if M27Utilities.IsTableEmpty(tEnemyMissileNavy) == false then
                                 local iTMDWanted = table.getn(tEnemyMissileNavy) * 1.5
                                 if aiBrain:GetFactionIndex() == M27UnitInfo.refFactionAeon then iTMDWanted = math.max(iTMDWanted, 3) end

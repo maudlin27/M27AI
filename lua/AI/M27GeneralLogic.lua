@@ -1977,7 +1977,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                         if not(bIndirectFireThreatOnly) then
                             if bAntiNavyOnly or bSubmersibleOnly then
                                 iMassMod = 0
-                                if (bSubmersibleOnly and (EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) or oBP.Physics.MotionType == 'RULEUMT_Amphibious')) or (not(bSubmersibleOnly) and bAntiNavyOnly and EntityCategoryContains(categories.ANTINAVY+categories.OVERLAYANTINAVY, oUnit.UnitId)) then
+                                if (bSubmersibleOnly and (EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) or oBP.Physics.MotionType == 'RULEUMT_Amphibious')) or (not(bSubmersibleOnly) and bAntiNavyOnly and EntityCategoryContains(categories.ANTINAVY+categories.OVERLAYANTINAVY + M27UnitInfo.refCategoryBattleship, oUnit.UnitId)) then
                                     iMassMod = 0.25 --e.g. for overlayantinavy or submersibles with no attack
                                     if EntityCategoryContains(categories.ANTINAVY, oUnit.UnitId) then
                                         iMassMod = 1
@@ -1997,6 +1997,8 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                         iMassMod = 0.8
                                     elseif EntityCategoryContains(M27UnitInfo.refCategoryMegalith, oUnit.UnitId) then
                                         iMassMod = 0.5
+                                    elseif EntityCategoryContains(M27UnitInfo.refCategoryBattleship, oUnit.UnitId) then
+                                        iMassMod = 0.05 --battleships could ground fire, although theyre unlikely to and very inaccurate if the target is moving
                                     end
                                 end
                             elseif bLongRangeThreatOnly then

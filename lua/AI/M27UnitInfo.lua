@@ -223,13 +223,13 @@ refCategoryAllAmphibiousAndNavy = categories.NAVAL + categories.AMPHIBIOUS + cat
 refCategoryPondFixedCategory = refCategoryNavalSurface - categories.AMPHIBIOUS * categories.MOBILE + refCategoryTMD + refCategoryTorpedoLauncher + refCategorySonar + refCategoryStructureAA
 refCategoryNavyThatCanBeTorpedoed = categories.NAVAL + categories.AMPHIBIOUS + categories.STRUCTURE + categories.COMMAND + refCategoryEngineer - categories.HOVER --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures; Hover units cant be targeted
 refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categories.ANTINAVY * categories.NAVAL + categories.OVERLAYANTINAVY * categories.LAND + categories.ANTINAVY * categories.STRUCTURE --If removing overlayantinavy then think up better solution for fatboy/experimentals so they dont run when in water
-refCategoryMissileNavy = categories.NAVAL * categories.SILO + categories.BATTLESHIP * categories.INDIRECTFIRE - categories.BATTLESHIP * categories.SERAPHIM --i.e. UEF+Sera cruisers, and nukesubs
+refCategoryMissileShip = categories.NAVAL * categories.SILO + categories.BATTLESHIP * categories.INDIRECTFIRE - categories.BATTLESHIP * categories.SERAPHIM --i.e. UEF+Sera cruisers, and nukesubs
 refCategorySubmarine = categories.NAVAL * categories.SUBMERSIBLE * categories.ANTINAVY
 refCategoryCooper = categories.NAVAL * categories.ANTINAVY * categories.TECH2 - categories.SUBMERSIBLE - categories.DESTROYER
 refCategoryShieldBoat = categories.NAVAL * categories.SHIELD + categories.HOVER * categories.SHIELD --Includes mobile land shields that can hover
 refCategoryStealthBoat = categories.NAVAL * categories.STEALTHFIELD
 refCategoryBattlecruiser = categories.BATTLESHIP * categories.PRODUCTFA * categories.UEF
-refCategoryBattleship = categories.BATTLESHIP - refCategoryBattlecruiser
+refCategoryBattleship = categories.BATTLESHIP - refCategoryBattlecruiser - refCategoryMissileShip
 
 
 --Multi-category:
@@ -257,6 +257,7 @@ refWeaponPriorityOurGroundExperimental = {categories.COMMAND, refCategoryLandExp
 refWeaponPriorityOurFatboy = {refCategoryFixedShield, refCategoryFixedT2Arti, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryT3PD, refCategoryPD, categories.COMMAND, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
 refWeaponPriorityTorpBomber = {refCategoryCruiser, refCategoryCruiserCarrier, refCategoryFrigate, refCategoryNavyThatCanBeTorpedoed, categories.ALLUNITS - categories.BENIGN}
 refWeaponPriorityT2Arti = {refCategoryFatboy, refCategoryIndirectT2Plus + refCategoryFixedT2Arti, refCategoryFixedShield + refCategoryCruiser, refCategoryNavalSurface + refCategoryStructure - categories.TECH1 + refCategoryMobileLandShield, refCategoryStructure + refCategoryLandCombat - categories.TECH1, categories.LAND - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityMissileShip = {refCategoryFixedShield + refCategoryTMD, refCategoryFixedT2Arti, refCategoryExperimentalStructure + refCategoryFixedT3Arti + refCategorySML, refCategoryStructure * categories.TECH3, refCategoryNavalFactory - categories.TECH1, refCategoryT3Mex + refCategoryT3Power, refCategoryStructure * categories.TECH3, refCategoryT2Mex, refCategoryStructure * categories.TECH2, refCategoryStructure - refCategoryMex, refCategoryMex, refCategoryShieldBoat, refCategoryMobileLandShield, categories.NAVAL * categories.EXPERIMENTAL, categories.EXPERIMENTAL, categories.TECH3 * categories.NAVAL, categories.TECH2 * categories.NAVAL, refCategoryIndirect + categories.NAVAL, categories.TECH3, categories.TECH2, categories.ALLUNITS - categories.BENIGN}
 
 
 function GetUnitLifetimeCount(oUnit)
