@@ -9505,6 +9505,10 @@ function GunshipManager(aiBrain)
         local iCurEnemyDist
         local oClosestEnemy
         local iGunshipOperationalRange = math.max(aiBrain[refiBomberDefenceModDistance] + 30, 150)
+        local iAvailableGunships = table.getn(aiBrain[reftAvailableGunships])
+        if iAvailableGunships > 4 then  iGunshipOperationalRange = iGunshipOperationalRange + 8 * (iAvailableGunships - 4) end
+        local iMaxDirectLineExtraDist = math.min(100, 20 + 8 * iAvailableGunships) --Amount of extra search range on units where the mod range is within the operational range
+        if bDebugMessages == true then LOG(sFunctionRef..': About to start main gunship logic, Gunships available='..iAvailableGunships..'; Gunship range='..iGunshipOperationalRange..'; iMaxDirectLineExtraDist='..iMaxDirectLineExtraDist) end
 
         function ConsiderTargetingUnit(oUnit)
             if not(oUnit:IsUnitState('Attached')) and not(M27UnitInfo.IsUnitUnderwater(oUnit)) then
@@ -9757,30 +9761,38 @@ function GunshipManager(aiBrain)
         --if iClosestEnemyDist > iGunshipOperationalRange then oClosestEnemy = nil end --Dont want this for enemies threatening a mex
         if not(oClosestEnemy) then
             --Get nearest enemy unit within defensive range, unless alreadhave enemies near the front unit
+            if bDebugMessages == true then LOG(sFunctionRef..': Dont have a target yet, considering nearest enemy unit within defensive range unlesss already have enemies near front unit. iSmallestBasePlacement='..iSmallestBasePlacement) end
 
             local tEnemiesInGunshipRange
-            if iSmallestBasePlacement <= 3 then
-                --Check for units near our gunship (i.e. that it is already in range or almost within range of)
-                local iSearchRange = math.max(20, M27UnitInfo.GetNavalDirectAndSubRange(oFrontGunship) + 5) --Gets the direct fire range, used for convenience
-                tEnemiesInGunshipRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryNavalSurface, oFrontGunship:GetPosition(), iSearchRange, 'Enemy')
-                if M27Utilities.IsTableEmpty(tEnemiesInGunshipRange) == false then
-                    for iUnit, oUnit in tEnemiesInGunshipRange do
-                        ConsiderTargetingUnit(oUnit)
-                    end
+            --if iSmallestBasePlacement <= 3 then
+            --Check for units near our gunship (i.e. that it is already in range or almost within range of)
+            local iSearchRange = math.max(20, M27UnitInfo.GetNavalDirectAndSubRange(oFrontGunship) + math.min(30, 5 + iAvailableGunships)) --Gets the direct fire range, used for convenience
+            tEnemiesInGunshipRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryNavalSurface, oFrontGunship:GetPosition(), iSearchRange, 'Enemy')
+            if M27Utilities.IsTableEmpty(tEnemiesInGunshipRange) == false then
+                for iUnit, oUnit in tEnemiesInGunshipRange do
+                    ConsiderTargetingUnit(oUnit)
                 end
             end
+            --end
             if not(oClosestEnemy) then
-                tEnemiesInGunshipRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryNavalSurface, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iGunshipOperationalRange, 'Enemy')
+                tEnemiesInGunshipRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryNavalSurface, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iGunshipOperationalRange + iMaxDirectLineExtraDist, 'Enemy')
+                if bDebugMessages == true then LOG(sFunctionRef..': Still no enemy, is tEnemiesInGunshipRange empty='..tostring(M27Utilities.IsTableEmpty(tEnemiesInGunshipRange))..'; iGunshipOperationalRange + iMaxDirectLineExtraDist='..iGunshipOperationalRange + iMaxDirectLineExtraDist) end
                 if M27Utilities.IsTableEmpty(tEnemiesInGunshipRange) == false then
                     for iUnit, oUnit in tEnemiesInGunshipRange do
-                        ConsiderTargetingUnit(oUnit)
+                        --Is our mod distance within range?
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering targeting enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Mod dist to start='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition())..'; iGunshipOperationalRange='..iGunshipOperationalRange) end
+                        if M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition()) <= iGunshipOperationalRange then
+                            ConsiderTargetingUnit(oUnit)
+                        end
                     end
                 end
-                if iClosestEnemyDist > iGunshipOperationalRange then oClosestEnemy = nil end --(Redundancy)
+                if iClosestEnemyDist > iGunshipOperationalRange + iMaxDirectLineExtraDist then oClosestEnemy = nil end --(Redundancy)
             end
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': Finished considering all potential targets, do we have a valid target='..tostring(M27UnitInfo.IsUnitValid(oClosestEnemy))) end
         if oClosestEnemy then
             --Factor in enemy AA around the target and dont engage if it's too much to try and attack attritionally, unless it's in critical defence range
+            if bDebugMessages == true then LOG(sFunctionRef..': Have a potential enemy near our gunship to target, will check for AA around it. iClosestEnemyDist='..iClosestEnemyDist..'; aiBrain[refiBomberDefenceCriticalThreatDistance]='..aiBrain[refiBomberDefenceCriticalThreatDistance]) end
             if iClosestEnemyDist > aiBrain[refiBomberDefenceCriticalThreatDistance] then
                 local tPotentialGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, oFrontGunship:GetPosition(), M27Utilities.GetDistanceBetweenPositions(oFrontGunship:GetPosition(), oClosestEnemy:GetPosition()) + 75, 'Enemy')
                 if M27Utilities.IsTableEmpty(tPotentialGroundAA) == false then
@@ -9790,6 +9802,7 @@ function GunshipManager(aiBrain)
                         --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo, bBlueprintThreat)
                         local iAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tAACoverage, false, false, true, false, false, nil, nil, nil, nil, false)
                         if iAAThreat >= 50 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': iAAThreat='..iAAThreat) end
                             if iAAThreat >= 1600 then --Equivalent to 1 SAM
                                 oClosestEnemy = nil
                             else

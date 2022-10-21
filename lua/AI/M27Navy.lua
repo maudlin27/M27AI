@@ -2803,7 +2803,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
 
                         local bConsiderGroundFiring = false
 
-                        if M27Utilities.IsTableEmpty(tPotentialGroundFireTargets) == false and M27UnitInfo.IsUnitUnderwater(oClosestEnemyCombatUnit) then
+                        if M27Utilities.IsTableEmpty(tPotentialGroundFireTargets) == false and M27UnitInfo.IsUnitValid(oClosestEnemyCombatUnit) and M27UnitInfo.IsUnitUnderwater(oClosestEnemyCombatUnit) then
                             bConsiderGroundFiring = true
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': Is Potential ground fire targets empty='..tostring(M27Utilities.IsTableEmpty(tPotentialGroundFireTargets))..'; Is closest enemy combat unit underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oClosestEnemyCombatUnit))..'; Closest enemy combat unit='..oClosestEnemyCombatUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestEnemyCombatUnit)..'; bConsiderGroundFiring='..tostring(bConsiderGroundFiring)) end
