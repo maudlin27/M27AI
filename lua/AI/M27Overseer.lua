@@ -9277,7 +9277,18 @@ end
 function TestCustom(aiBrain)
     local sFunctionRef = 'TestCustom'
 
-    M27Utilities.DrawLocation({640.69580078125, 18.948984146118, 367.01770019531}, nil, 3, 200, 4)
+    local tMissileShips = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryMissileShip)
+    if M27Utilities.IsTableEmpty(tMissileShips) == false then
+        for iUnit, oUnit in tMissileShips do
+            ForkThread(M27UnitInfo.SetUnitTargetPriorities, oUnit, M27UnitInfo.refWeaponPriorityMissileShip)
+            --[[for i =1, oUnit:GetWeaponCount() do
+                local wep = oUnit:GetWeapon(i)
+                wep:SetTargetingPriorities(M27UnitInfo.refWeaponPriorityMissileShip)
+            end--]]
+        end
+    end
+
+    --M27Utilities.DrawLocation({640.69580078125, 18.948984146118, 367.01770019531}, nil, 3, 200, 4)
 
 
     --[[LOG('Table with table key will get printed to give reference')

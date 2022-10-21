@@ -512,7 +512,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineWhatToBuild'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetGameTimeSeconds() >= 1333 and aiBrain:GetArmyIndex() == 5 and EntityCategoryContains(categories.TECH3 * categories.LAND, oFactory.UnitId) then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 1333 and aiBrain:GetArmyIndex() == 5 and EntityCategoryContains(categories.TECH3 * categories.LAND, oFactory.UnitId) then bDebugMessages = true end
     --if oFactory.UnitId == 'ueb0201' then bDebugMessages = true end
 
     --if EntityCategoryContains(M27UnitInfo.refCategoryAirFactory * categories.TECH2, oFactory.UnitId) and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 10 then bDebugMessages = true end
@@ -2728,7 +2728,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     end
                                 end
                             elseif iCurrentConditionToTry == 7 then --Shield boat (UEF specific)
-                                if bDebugMessages == true then LOG(sFunctionRef..': Considering if want shield boat. Factory Tech level='..iFactoryTechLevel..'; Energy net base income='..aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome]..'; Is factory uef='..tostring(EntityCategoryContains(categories.UEF, oFactory.UnitId))..' friendly naval threat in pond='..M27Team.tTeamData[aiBrain.M27Team][M27Team.refiFriendlyNavalThreatByPond][oFactory[M27Navy.refiAssignedPond]]) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering if want shield boat. Factory Tech level='..iFactoryTechLevel..'; Energy net base income='..aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome]..'; Is factory uef='..tostring(EntityCategoryContains(categories.UEF, oFactory.UnitId))..' friendly naval threat in pond='..(M27Team.tTeamData[aiBrain.M27Team][M27Team.refiFriendlyNavalThreatByPond][oFactory[M27Navy.refiAssignedPond]] or 'nil')) end
                                 if iFactoryTechLevel >= 2 and EntityCategoryContains(categories.UEF, oFactory.UnitId) and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] >= 18 then
                                     --Do we have enough surface threat to justify getting shield boat?
                                     if M27Team.tTeamData[aiBrain.M27Team][M27Team.refiFriendlyNavalThreatByPond][oFactory[M27Navy.refiAssignedPond]] >= 2500 then

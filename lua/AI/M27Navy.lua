@@ -1641,22 +1641,31 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                         local iExcludedGroupCount = 0
                         local iCumulativeThreat = 0
                         for iGroup, tUnits in tEnemyUnitsByGroup do
-                            iCumulativeUnitCount = iCumulativeUnitCount + table.getn(tUnits)
-                            if iCumulativeUnitCount <= iUnitLimit - 5 then
-                                tEnemyThreatByGroup[iGroup] = M27Logic.GetCombatThreatRating(aiBrain, tUnits, false, nil, nil, false, false, false, false, true, false, false)
-                                if tEnemyThreatByGroup[iGroup] + iCumulativeThreat < iMiniThreatThreshold and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.FACTORY, tUnits)) then
-                                    --Ignore this for our main force and instead get a small subforce to deal with it
-                                    iCumulativeThreat = iCumulativeThreat + tEnemyThreatByGroup[iGroup]
-                                    for iUnit, oUnit in tUnits do
-                                        oUnit[refbIgnoreUnit] = true
+                            --Stop if the closest unit in this group is close to our front position
+                            tEnemyThreatByGroup[iGroup] = M27Logic.GetCombatThreatRating(aiBrain, tUnits, false, nil, nil, false, false, false, false, true, false, false)
+                            if tEnemyThreatByGroup[iGroup] >= 250 and M27Utilities.GetDistanceBetweenPositions(M27Team.tTeamData[iTeam][M27Team.refoClosestFriendlyUnitToEnemyByPond][iPond]:GetPosition(), tUnits[1]:GetPosition()) <= 50 then
+                                --Enemy has some form of threat and is near our front unit so want to engage with main navy as wont be a detour to attack it
+                                break
+                            else
+
+
+                                iCumulativeUnitCount = iCumulativeUnitCount + table.getn(tUnits)
+                                if iCumulativeUnitCount <= iUnitLimit - 5 then
+                                    tEnemyThreatByGroup[iGroup] = M27Logic.GetCombatThreatRating(aiBrain, tUnits, false, nil, nil, false, false, false, false, true, false, false)
+                                    if tEnemyThreatByGroup[iGroup] + iCumulativeThreat < iMiniThreatThreshold and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.FACTORY, tUnits)) then
+                                        --Ignore this for our main force and instead get a small subforce to deal with it
+                                        iCumulativeThreat = iCumulativeThreat + tEnemyThreatByGroup[iGroup]
+                                        for iUnit, oUnit in tUnits do
+                                            oUnit[refbIgnoreUnit] = true
+                                        end
+                                        iExcludedGroupCount = iExcludedGroupCount + 1
+                                    else
+                                        --Threat is too great so stop looking for threats to ignore
+                                        break
                                     end
-                                    iExcludedGroupCount = iExcludedGroupCount + 1
                                 else
-                                    --Threat is too great so stop looking for threats to ignore
                                     break
                                 end
-                            else
-                                break
                             end
                         end
                         if iExcludedGroupCount == 0 then
@@ -1753,7 +1762,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                         for iUnit, oUnit in tMiniThreatFriendlyUnits do
                             --Attack move to near the target
                             if bDebugMessages == true then LOG(sFunctionRef..': About to tell unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to move to closest enemy') end
-                            MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, true, 'MNAGetInRange')
+                            MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, not(oUnit[M27UnitInfo.refbLastShotBlocked]), 'MNAGetInRange')
                         end
                     end
                 else
@@ -2698,13 +2707,13 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
 
                                 if iCurDistToClosestEnemy + iMaxDistanceWithinAttackRangeWanted < oUnit[M27UnitInfo.refiAntiNavyRange] then
                                     if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tOurBase) <= 20 then
-                                        MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, true, 'ASKitingRetreat')
+                                        MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, not(oUnit[M27UnitInfo.refbLastShotBlocked]), 'ASKitingRetreat')
                                     else
                                         MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, false, 'MSKitingRetreat')
                                     end
                                 elseif iCurDistToClosestEnemy + iMinDistanceWithinAttackRangeWanted < oUnit[M27UnitInfo.refiAntiNavyRange] then
                                     --Attack-move to target
-                                    MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, true, 'AGetInRange')
+                                    MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, not(oUnit[M27UnitInfo.refbLastShotBlocked]), 'AGetInRange')
                                 else
                                     --Move towards target (non-attack move)
                                     MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, false, 'MGetInRange')
@@ -2767,7 +2776,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                             end
 
                         end
-                        if GetGameTimeSeconds() >= 1800 then bDebugMessages = true end
+                        if GetGameTimeSeconds() >= 1500 then bDebugMessages = true end
                         if bDebugMessages == true then LOG(sFunctionRef..': About to consider attacking with surface units, iOurBestSurfaceRange='..iOurBestSurfaceRange..'; iMaxDistanceWithinAttackRangeWanted='..(iMaxDistanceWithinAttackRangeWanted or 'nil')..'; iMinRangeForEngagement='..iMinRangeForEngagement..'; Is table of tEnemiesBetweenUsAndBase empty='..tostring(M27Utilities.IsTableEmpty(tEnemiesBetweenUsAndBase))) end
 
                         local tPotentialGroundFireTargets = {}
@@ -2801,15 +2810,18 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                             if bConsiderGroundFiring and EntityCategoryContains(M27UnitInfo.refCategoryBattleship, oUnit.UnitId) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to ground fire for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Distance to closest enemy surface combat='..M27Utilities.GetDistanceBetweenPositions(oClosestEnemySurfaceCombat:GetPosition(), oUnit:GetPosition())..'; DF range='..oUnit[M27UnitInfo.refiDFRange]..'; oUnit[M27UnitInfo.refbLastShotBlocked]='..tostring(oUnit[M27UnitInfo.refbLastShotBlocked])) end
                                 --Have a unit that can ground fire, and the nearest enemy unit is underwater; if we have no surface naval units within our range then will issue ground fire order
-                                if not(oUnit[M27UnitInfo.refbLastShotBlocked]) and M27Utilities.GetDistanceBetweenPositions(oClosestEnemySurfaceCombat:GetPosition(), oUnit:GetPosition()) > oUnit[M27UnitInfo.refiDFRange] then
+                                if M27Utilities.GetDistanceBetweenPositions(oClosestEnemySurfaceCombat:GetPosition(), oUnit:GetPosition()) > oUnit[M27UnitInfo.refiDFRange] then
                                     local oGroundFireTarget
                                     for iSub, oSub in tPotentialGroundFireTargets do
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to groundfire sub '..oSub.UnitId..M27UnitInfo.GetUnitLifetimeCount(oSub)..' which is '..M27Utilities.GetDistanceBetweenPositions(oSub[M27UnitInfo.reftLastKnownPosition], oUnit:GetPosition())..' away from us based on its last known position') end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to groundfire sub '..oSub.UnitId..M27UnitInfo.GetUnitLifetimeCount(oSub)..' which is '..M27Utilities.GetDistanceBetweenPositions(oSub[M27UnitInfo.reftLastKnownPosition], oUnit:GetPosition())..' away from us based on its last known position. Is it water or flat to this sub='..tostring(M27MapInfo.IsWaterOrFlatAlongLine(oUnit:GetPosition(), oSub:GetPosition()))) end
                                         if M27Utilities.GetDistanceBetweenPositions(oSub[M27UnitInfo.reftLastKnownPosition], oUnit:GetPosition()) + 2 < oUnit[M27UnitInfo.refiDFRange] then
-                                            --Isuse attack ground order
-                                            TellUnitToAttackGround(oUnit, {oSub[M27UnitInfo.reftLastKnownPosition][1], oSub[M27UnitInfo.reftLastKnownPosition][2], oSub[M27UnitInfo.reftLastKnownPosition][3]}, 'GroundAttack')
-                                            if bDebugMessages == true then LOG(sFunctionRef..': will ground fire the sub') end
-                                            return true
+                                            --Check shot not blocked
+                                            if M27MapInfo.IsWaterOrFlatAlongLine(oUnit:GetPosition(), oSub:GetPosition()) then
+                                                --Isuse attack ground order
+                                                TellUnitToAttackGround(oUnit, {oSub[M27UnitInfo.reftLastKnownPosition][1], oSub[M27UnitInfo.reftLastKnownPosition][2], oSub[M27UnitInfo.reftLastKnownPosition][3]}, 'GroundAttack')
+                                                if bDebugMessages == true then LOG(sFunctionRef..': will ground fire the sub') end
+                                                return true
+                                            end
                                         end
                                     end
                                 end
@@ -2863,7 +2875,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                                         if not(ConsiderIssuingGroundFireOrder(oUnit)) then
                                             if bDebugMessages == true then LOG(sFunctionRef..': Considering kiting retreat for unit unless close to our base in which case will attack move. Dist to our base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tOurBase)) end
                                             if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tOurBase) <= 20 then
-                                                MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, true, 'AKitingRetreat')
+                                                MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, not(oUnit[M27UnitInfo.refbLastShotBlocked]), 'AKitingRetreat')
                                             else
                                                 MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, false, 'MKitingRetreat')
                                             end
@@ -2895,7 +2907,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                                             end
                                         else
                                             if not(ConsiderIssuingGroundFireOrder(oUnit)) then
-                                                MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, true, 'AGetInRange')
+                                                MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, not(oUnit[M27UnitInfo.refbLastShotBlocked]), 'AGetInRange')
                                             end
                                         end
                                     else
