@@ -33,6 +33,7 @@ reftEnemyTorpBombers = 'M27TeamTorpBombers' --against tTeamData[aiBrain.M27Team]
 
 --Naval team data:
 refbActiveNavalManager = 'NavalActiveManager' --True/false
+refbHaveGivenSurfaceOrderToSubs = 'NavalM27GivenSurfaceOrder' --true/false (against tTeamData[aiBrain.M27Team]) - uesd to determine whether to do a check for submerging subs
 reftEnemyUnitsByPond = 'NavalEnemyUnitsByPond' --[x] is the pond ref, returns table of enemy units
 reftFriendlyUnitsByPond = 'NavalM27UnitsByPond' --[x] is the pond ref; only stores M27 naval units
 refiDestroyedNavalFactoriesByPond = 'NavalM27FailedBuildAttempts' --[x] is the pond ref; number of naval factories that have been destroyed by pond

@@ -1310,3 +1310,11 @@ function RefreshUnitDFStrikeDamage(oTarget)
         end
     end
 end
+
+function ToggleUnitDiveOrSurfaceStatus(oUnit)
+    --Assumes have already checked that the unit is or isnt underwater
+    M27Utilities.IssueTrackedClearCommands({ oUnit})
+    IssueDive({oUnit})
+    oUnit[refbSpecialMicroActive] = true
+    M27Utilities.DelayChangeVariable(oUnit, refbSpecialMicroActive, false, 1)
+end

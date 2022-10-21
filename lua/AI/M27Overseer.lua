@@ -4778,6 +4778,16 @@ function ACUManager(aiBrain)
             end
         end
 
+        --Clear entries from more than 1m ago
+        if oACU[reftACURecentHealth][iCurTime - 60] then
+            local iCurAdjust = 60
+            while oACU[reftACURecentHealth][iCurTime - iCurAdjust] do
+
+                oACU[reftACURecentHealth][iCurTime - iCurAdjust] = nil
+                iCurAdjust = iCurAdjust + 1
+            end
+        end
+
         --if M27Utilities.IsACU(oACU) then
 
         if not (oACU[refbACUOnInitialBuildOrder]) then
@@ -5691,6 +5701,14 @@ function ACUManager(aiBrain)
                             aiBrain[refiAIBrainCurrentStrategy] = refStrategyProtectACU
                         end
                     end
+                else
+                    --ACU not upgrading; check its owrk progress is 0 or 100 and if so then clear table
+                    if oACU[reftACURecentUpgradeProgress] then
+                        if oACU:GetWorkProgress() == 0 or oACU:GetWorkProgress() == 1 then
+                            oACU[reftACURecentUpgradeProgress] = nil
+                        end
+                    end
+
                 end
             end
 
@@ -9278,16 +9296,21 @@ end
 function TestCustom(aiBrain)
     local sFunctionRef = 'TestCustom'
 
-    local tMissileShips = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryMissileShip)
+    local tFriendlyACU = aiBrain:GetListOfUnits(ParseEntityCategory('COMMAND'))
+    LOG('Is table empty='..tostring(M27Utilities.IsTableEmpty(tFriendlyACU)))
+    local tAltACU = aiBrain:GetListOfUnits(ParseEntityCategory(categories.COMMAND))
+    LOG('Is 2nd table empty='..tostring(M27Utilities.IsTableEmpty(tAltACU)))
+
+    --[[local tMissileShips = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryMissileShip)
     if M27Utilities.IsTableEmpty(tMissileShips) == false then
         for iUnit, oUnit in tMissileShips do
             ForkThread(M27UnitInfo.SetUnitTargetPriorities, oUnit, M27UnitInfo.refWeaponPriorityMissileShip)
-            --[[for i =1, oUnit:GetWeaponCount() do
+            for i =1, oUnit:GetWeaponCount() do
                 local wep = oUnit:GetWeapon(i)
                 wep:SetTargetingPriorities(M27UnitInfo.refWeaponPriorityMissileShip)
-            end--]]
+            end
         end
-    end
+    end--]]
 
     --M27Utilities.DrawLocation({640.69580078125, 18.948984146118, 367.01770019531}, nil, 3, 200, 4)
 

@@ -1911,6 +1911,28 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
             tFriendlyAA = EntityCategoryFilterDown(categories.ANTIAIR, tFriendlyNavalExcludingIntercept)
             local iClosestTorpToFront = 10000
             if M27Utilities.IsTableEmpty(tFriendlyAA) == false then
+                --First get any subs that have AA to surface
+                local bGivenSurfaceOrder = false
+                bDebugMessages = true
+
+
+                local tSubAA = EntityCategoryFilterDown(categories.SUBMERSIBLE, tFriendlyAA)
+                if bDebugMessages == true then LOG(sFunctionRef..': Is tSubAA empty='..tostring(M27Utilities.IsTableEmpty(tSubAA))) end
+                if M27Utilities.IsTableEmpty(tSubAA) == false then
+                    for iUnit, oUnit in tSubAA do
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering sub AA unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Special micro='..tostring(oUnit[M27UnitInfo.refbSpecialMicroActive])..'; Is underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oUnit))) end
+                        if not(oUnit[M27UnitInfo.refbSpecialMicroActive]) and M27UnitInfo.IsUnitUnderwater(oUnit) then
+                            M27UnitInfo.ToggleUnitDiveOrSurfaceStatus(oUnit)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have given surface order to the unit') end
+                            bGivenSurfaceOrder = true
+                        end
+                    end
+                end
+                if bGivenSurfaceOrder then
+                    M27Team.tTeamData[iTeam][M27Team.refbHaveGivenSurfaceOrderToSubs] = true
+                end
+
+
                 oClosestFriendlyAA = M27Utilities.GetNearestUnit(tFriendlyAA, oClosestFriendlyUnitToEnemyBase:GetPosition())
                 --Are enemy torps within AA range of this unit, or our front unit?
                 local iClosestTorpToAA = 10000
@@ -1950,6 +1972,19 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                     local iDistFromAAToFront = M27Utilities.GetDistanceBetweenPositions(oClosestFriendlyAA:GetPosition(), oClosestFriendlyUnitToEnemyBase:GetPosition())
                     if iDistFromAAToFront >= math.min(60, iClosestTorpToFront + 30) then
                         bAANotNearFrontUnit = true
+                    end
+                end
+            end
+        else
+            --Check if we have any surfaced subs that we want to unsurface
+            if M27Team.tTeamData[iTeam][M27Team.refbHaveGivenSurfaceOrderToSubs] then
+                M27Team.tTeamData[iTeam][M27Team.refbHaveGivenSurfaceOrderToSubs] = false
+                local tAASubs = EntityCategoryFilterDown(categories.SUBMERSIBLE * categories.ANTIAIR, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])
+                if M27Utilities.IsTableEmpty(tAASubs) == false then
+                    for iUnit, oUnit in tAASubs do
+                        if not(M27UnitInfo.IsUnitUnderwater(oUnit)) then
+                            M27UnitInfo.ToggleUnitDiveOrSurfaceStatus(oUnit)
+                        end
                     end
                 end
             end
