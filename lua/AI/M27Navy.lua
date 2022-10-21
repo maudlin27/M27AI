@@ -2802,6 +2802,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                         end
 
                         local bConsiderGroundFiring = false
+                        local bHaveValidSurfaceCombat = M27UnitInfo.IsUnitValid(oClosestEnemySurfaceCombat)
 
                         if M27Utilities.IsTableEmpty(tPotentialGroundFireTargets) == false and M27UnitInfo.IsUnitValid(oClosestEnemyCombatUnit) and M27UnitInfo.IsUnitUnderwater(oClosestEnemyCombatUnit) then
                             bConsiderGroundFiring = true
@@ -2813,7 +2814,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                             if bConsiderGroundFiring and EntityCategoryContains(M27UnitInfo.refCategoryBattleship, oUnit.UnitId) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to ground fire for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Distance to closest enemy surface combat='..M27Utilities.GetDistanceBetweenPositions(oClosestEnemySurfaceCombat:GetPosition(), oUnit:GetPosition())..'; DF range='..oUnit[M27UnitInfo.refiDFRange]..'; oUnit[M27UnitInfo.refbLastShotBlocked]='..tostring(oUnit[M27UnitInfo.refbLastShotBlocked])) end
                                 --Have a unit that can ground fire, and the nearest enemy unit is underwater; if we have no surface naval units within our range then will issue ground fire order
-                                if M27Utilities.GetDistanceBetweenPositions(oClosestEnemySurfaceCombat:GetPosition(), oUnit:GetPosition()) > oUnit[M27UnitInfo.refiDFRange] then
+                                if not(bHaveValidSurfaceCombat) or M27Utilities.GetDistanceBetweenPositions(oClosestEnemySurfaceCombat:GetPosition(), oUnit:GetPosition()) > oUnit[M27UnitInfo.refiDFRange] then
                                     local oGroundFireTarget
                                     for iSub, oSub in tPotentialGroundFireTargets do
                                         if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to groundfire sub '..oSub.UnitId..M27UnitInfo.GetUnitLifetimeCount(oSub)..' which is '..M27Utilities.GetDistanceBetweenPositions(oSub[M27UnitInfo.reftLastKnownPosition], oUnit:GetPosition())..' away from us based on its last known position. Is it water or flat to this sub='..tostring(M27MapInfo.IsWaterOrFlatAlongLine(oUnit:GetPosition(), oSub:GetPosition()))) end
