@@ -3719,7 +3719,6 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetIntelCoverageOfPosition'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if iMinCoverageWanted == 37 and M27Utilities.GetDistanceBetweenPositions({67.893432617188, 2.703125, 89.241264343262}, tTargetPosition) <= 2 then bDebugMessages = true end
 
     if aiBrain[M27AirOverseer.refbHaveOmniVision] then
 

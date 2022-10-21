@@ -33,6 +33,10 @@ reftoAssignedShields = 'M27NavyAssignedShields' --against unit, table of all shi
 reftoAssignedStealth = 'M27NavyAssignedStealth' --against unit, table of all stealth boats assigned to support this unit
 refoSupportTarget = 'M27NavySupportTarget' --against unit, the unit that it is supporting (e.g. for a shield this would be the unit it is shielding)
 
+--Naval factory 'avoid moving onto land and dying' variables
+refbCheckedFactoryForNearbyLand = 'M27NavyCheckedFactoryForNearbyLand' --true if we have checked for nearby land when a unit has just been built by a naval factory
+reftInitialFactoryRallyPointOverride = 'M27NavyInitialFactoryRallyPointOverride' --If we have nearby land then this should be a location near to where units get built that has water in it, to hopefully avoid units moving onto land and dying
+
 --TeamData variables (references are to tTeamData[aiBrain.M27Team] - see M27Team
 
 --Global variables
@@ -2776,7 +2780,6 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                             end
 
                         end
-                        if GetGameTimeSeconds() >= 1500 then bDebugMessages = true end
                         if bDebugMessages == true then LOG(sFunctionRef..': About to consider attacking with surface units, iOurBestSurfaceRange='..iOurBestSurfaceRange..'; iMaxDistanceWithinAttackRangeWanted='..(iMaxDistanceWithinAttackRangeWanted or 'nil')..'; iMinRangeForEngagement='..iMinRangeForEngagement..'; Is table of tEnemiesBetweenUsAndBase empty='..tostring(M27Utilities.IsTableEmpty(tEnemiesBetweenUsAndBase))) end
 
                         local tPotentialGroundFireTargets = {}

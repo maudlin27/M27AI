@@ -1409,6 +1409,61 @@ function OnConstructed(oEngineer, oJustBuilt)
                         end
                     end
                 end
+
+                --Have we just built a T3 naval unit? If so then send it to an open stretch of water if we have nearby land that is closer to us than the naval factory
+                if EntityCategoryContains(M27UnitInfo.refCategoryNavalSurface * categories.TECH3, oJustBuilt.UnitId) then
+                    if not(oEngineer[M27Navy.refbCheckedFactoryForNearbyLand]) then
+                        --Check if have nearby land and need a detour
+                        local iDistanceCheck = 16
+                        local iInterval = 360 / 8
+                        local tCurLocation
+                        local tFactoryLocation = oEngineer:GetPosition()
+                        local tPossibleWaterLocation
+                        local iBaseAngle = M27Utilities.GetAngleFromAToB(tFactoryLocation, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                        local tUnitLocation = oJustBuilt:GetPosition()
+                        oEngineer[M27Navy.refbCheckedFactoryForNearbyLand] = true
+                        local bHaveNearbyLand = false
+                        if bDebugMessages == true then LOG(sFunctionRef..': oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' has just built '..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)) end
+                        for iAngleAdjust = 0, (360 - iInterval), iInterval do
+                            tCurLocation = M27Utilities.MoveInDirection(tUnitLocation, iBaseAngle + iAngleAdjust, iDistanceCheck, true)
+                            tCurLocation[2] = GetTerrainHeight(tCurLocation[1], tCurLocation[3])
+                            --Are we underwater by at least 2?
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering tCurLocation='..repru(tCurLocation)..'; Terrain height='..GetTerrainHeight(tCurLocation[1], tCurLocation[3])..'; Surface height='..GetSurfaceHeight(tCurLocation[1], tCurLocation[3])..'; Is underwater by at least 2='..tostring(M27MapInfo.IsUnderwater(tCurLocation, false, 2))) end
+                            if M27MapInfo.IsUnderwater(tCurLocation, false, 2) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have a potential water location to move to; do we already ahve a possible water location='..repru(tPossibleWaterLocation)) M27Utilities.DrawLocation(tCurLocation) end
+                                if not(tPossibleWaterLocation) then
+                                    tPossibleWaterLocation = {tCurLocation[1], tCurLocation[2], tCurLocation[3]}
+
+
+                                    if bHaveNearbyLand then break end
+                                end
+                            else
+                                --Is this location closer to us than our naval factory?
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Cant path here with naval unit. bHaveNearbyLand='..tostring(bHaveNearbyLand)..'; Distance to unit='..M27Utilities.GetDistanceBetweenPositions(tUnitLocation, tCurLocation)..'; Distance to factory='..M27Utilities.GetDistanceBetweenPositions(tFactoryLocation, tCurLocation))  M27Utilities.DrawLocation(tCurLocation, nil, 2)  end
+                                if not(bHaveNearbyLand) and M27Utilities.GetDistanceBetweenPositions(tUnitLocation, tCurLocation) <= M27Utilities.GetDistanceBetweenPositions(tFactoryLocation, tCurLocation) then
+                                    bHaveNearbyLand = true
+                                    if tPossibleWaterLocation then break
+                                    end
+                                end
+                            end
+                            end
+                        if bDebugMessages == true then LOG(sFunctionRef..': bHaveNearbyLand='..tostring(bHaveNearbyLand)..'; tPossibleWaterLocation='..repru(tPossibleWaterLocation)) end
+                        if bHaveNearbyLand then
+                            if not(tPossibleWaterLocation) then tPossibleWaterLocation = tFactoryLocation end
+
+                            oEngineer[M27Navy.reftInitialFactoryRallyPointOverride] = {tPossibleWaterLocation[1], tPossibleWaterLocation[2], tPossibleWaterLocation[3]}
+                        end
+                    end
+                    if M27Utilities.IsTableEmpty(oEngineer[M27Navy.reftInitialFactoryRallyPointOverride]) == false then
+                        oJustBuilt[M27UnitInfo.refbSpecialMicroActive] = true
+                        M27Utilities.IssueTrackedClearCommands({oJustBuilt})
+                        IssueMove({oJustBuilt}, oEngineer[M27Navy.reftInitialFactoryRallyPointOverride])
+                        if bDebugMessages == true then LOG(sFunctionRef..': Sent special micro order to the unit '..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)..' to try and move to open water') end
+                        M27Utilities.DelayChangeVariable(oJustBuilt, M27UnitInfo.refbSpecialMicroActive, false, 10)
+                    end
+                end
+
+
                 --Other tracking
             else
                 --Have we just built an experimental unit? If so then tell our ACU to return to base as even if we havent scouted enemy threat they could have an experimental by now

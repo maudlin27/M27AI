@@ -1383,7 +1383,6 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
             ManualTellTorpedoBomberToAttackTarget(aiBrain, oBomber, aiBrain[M27Overseer.refoACUKillTarget])
         else
             if oBomber[refbEngiHunterMode] then
-                if M27UnitInfo.GetUnitLifetimeCount(oBomber) == 2 and GetGameTimeSeconds() >= 440 then bDebugMessages = true end
                 --Hunt for engineers - get what we think is the best target (regardless of whether we have a current target)
                 --exception if our current target is near us and within the preferred angle range
                 local oBomberCurTarget = oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit]
@@ -9500,6 +9499,7 @@ function GunshipManager(aiBrain)
 
 
     if M27Utilities.IsTableEmpty(aiBrain[reftAvailableGunships]) == false then
+        if table.getn(aiBrain[reftAvailableGunships]) >= 4 then bDebugMessages = true end
         --First get the nearest threat that we want to focus on, then decide how we will approach it
         local iClosestEnemyDist = 100000
         local iCurEnemyDist

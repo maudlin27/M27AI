@@ -2371,7 +2371,6 @@ function IsWaterOrFlatAlongLine(tStart, tEnd)
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return true
         else
-            if iTotalDistance <= 110 then bDebugMessages = true end
             local iXAdjust = (tEnd[1] - tStart[1]) / iTotalDistance
             local iZAdjust = (tEnd[3] - tStart[3]) / iTotalDistance
             local iInterval = 1
