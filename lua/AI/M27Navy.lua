@@ -1453,7 +1453,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ManageTeamNavy'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if GetGameTimeSeconds() >= 1440 and M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.TECH3 * M27UnitInfo.refCategoryMissileShip, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])) == false then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 600 and M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.TECH3 * M27UnitInfo.refCategoryBattleship, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])) == false then bDebugMessages = true end
     --if GetGameTimeSeconds() >= 720 then bDebugMessages = true end
     --if GetGameTimeSeconds() >= 840 and (aiBrain:GetArmyIndex() == 2 or aiBrain:GetArmyIndex() == 4) then bDebugMessages = true end
 
@@ -1710,7 +1710,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                     if bDebugMessages == true then LOG(sFunctionRef..': About to allocate units to fight mini threats. iMiniAntiNavyThreatWanted='..iMiniAntiNavyThreatWanted..'; iMiniNavyFriendlyAntiNavyThreat='..iMiniNavyFriendlyAntiNavyThreat..'; iMiniSurfaceThreatWanted='..iMiniSurfaceThreatWanted..'; iMiniNavyFriendlySurfaceThreat='..iMiniNavyFriendlySurfaceThreat..'; iMiniEnemySurfaceThreat='..iMiniEnemySurfaceThreat..'; iMiniEnemySubmersibleThreat='..iMiniEnemySubmersibleThreat) end
 
                     if iMiniAntiNavyThreatWanted > iMiniNavyFriendlyAntiNavyThreat or iMiniSurfaceThreatWanted > iMiniNavyFriendlySurfaceThreat or (iMiniNavyFriendlyAntiNavyThreat + iMiniNavyFriendlySurfaceThreat) == 0 then
-                        local tFriendlyT2AndLowerMainNavy = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalSurface * categories.DIRECTFIRE + M27UnitInfo.refCategoryNavalSurface * categories.ANTINAVY - categories.TECH3 - categories.EXPERIMENTAL, tFriendlyNavalExcludingIntercept)
+                        local tFriendlyT2AndLowerMainNavy = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalSurface * categories.DIRECTFIRE + M27UnitInfo.refCategoryNavalSurface * categories.ANTINAVY - categories.ANTIAIR - categories.TECH3 - categories.EXPERIMENTAL, tFriendlyNavalExcludingIntercept)
                         if bDebugMessages == true then LOG(sFunctionRef..': Is table of T2 and lower navy empty='..tostring(M27Utilities.IsTableEmpty(tFriendlyT2AndLowerMainNavy))) end
                         if M27Utilities.IsTableEmpty(tFriendlyT2AndLowerMainNavy) == false then
                             if iMiniAntiNavyThreatWanted > iMiniNavyFriendlyAntiNavyThreat then
@@ -1939,6 +1939,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                 local iClosestTorpToAA = 10000
                 local iCurDist
                 local iTorpBomberRangeThreshold = M27UnitInfo.GetUnitAARange(oClosestFriendlyAA)
+                if bDebugMessages == true then LOG(sFunctionRef..': iTorpBomberRangeThreshold='..iTorpBomberRangeThreshold..'; oClosestFriendlyAA used to determine this='..oClosestFriendlyAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestFriendlyAA)..'; AA range of this unit='..M27UnitInfo.GetUnitAARange(oClosestFriendlyAA)) end
 
                 for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers] do
                     iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit[M27UnitInfo.reftLastKnownPosition], oClosestFriendlyUnitToEnemyBase:GetPosition())
@@ -1960,9 +1961,10 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                 elseif iClosestTorpToFront <= 100 then
                     bTorpsCloseToFrontUnit = true
                 end
-                if bDebugMessages == true then LOG(sFunctionRef..': oClosestFriendlyAA='..oClosestFriendlyAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestFriendlyAA)..'; iTorpBomberRangeThreshold='..iTorpBomberRangeThreshold..'; iClosestTorpToAA='..iClosestTorpToAA..'; iClosestTorpToFront='..iClosestTorpToFront..'; bTorpsInRangeOfFrontAA='..tostring(bTorpsInRangeOfFrontAA)..'; bTorpsCloseToFrontUnit='..tostring(bTorpsCloseToFrontUnit)) end
+                if bDebugMessages == true then LOG(sFunctionRef..': oClosestFriendlyAA='..oClosestFriendlyAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestFriendlyAA)..'; iTorpBomberRangeThreshold='..iTorpBomberRangeThreshold..'; iClosestTorpToAA='..iClosestTorpToAA..'; iClosestTorpToFront='..iClosestTorpToFront..'; bTorpsInRangeOfFrontAA='..tostring(bTorpsInRangeOfFrontAA)..'; bTorpsCloseToFrontUnit='..tostring(bTorpsCloseToFrontUnit)..'; iTorpBomberRangeThreshold='..iTorpBomberRangeThreshold) end
             else
                 bTorpsCloseToFrontUnit = true
+                if bDebugMessages == true then LOG(sFunctionRef..': We have no friendly AA so assume torps are close to front unit as want to retreat to base') end
             end
 
             if bTorpsCloseToFrontUnit and not(bTorpsInRangeOfFrontAA) then
@@ -1993,7 +1995,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     end
 
     --Logic when under torp attack - ignore normal appraoch and move units based on where AA is, unless we are already within 75 of our base
-
+    if bDebugMessages == true then LOG(sFunctionRef..': Checking if under torp attack. bTorpsInRangeOfFrontAA='..tostring(bTorpsInRangeOfFrontAA)..'; bTorpsCloseToFrontUnit='..tostring(bTorpsCloseToFrontUnit)..'; bAANotNearFrontUnit='..tostring(bAANotNearFrontUnit)..'; Distance of closest friendly unit to enemy base='..M27Utilities.GetDistanceBetweenPositions(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase)) end
     if (bTorpsInRangeOfFrontAA or (bTorpsCloseToFrontUnit and bAANotNearFrontUnit)) and M27Utilities.GetDistanceBetweenPositions(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase) > 75 then
         bConsiderBombardment = false --redundancy
         local tNonAACombatAndSupport = EntityCategoryFilterDown(M27UnitInfo.refCategoryAllAmphibiousAndNavy - categories.ANTIAIR - categories.STRUCTURE - M27UnitInfo.refCategoryEngineer, tFriendlyNavalExcludingIntercept)
@@ -2003,6 +2005,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
             --Enemy has nearby torp bombers but we have AA unit, so consolidate main forces by AA, and either move closest friendly AA unit forwards if not in range, or back if in range
             tCombatDestination = M27Utilities.MoveInDirection(oClosestFriendlyAA:GetPosition(), M27Utilities.GetAngleFromAToB(oClosestFriendlyAA:GetPosition(), tOurBase), 15, true)
             tOtherAADestination = M27Utilities.MoveInDirection(oClosestFriendlyAA:GetPosition(), M27Utilities.GetAngleFromAToB(oClosestFriendlyAA:GetPosition(), tOurBase), 10, true)
+            if bDebugMessages == true then LOG(sFunctionRef..': Have oClosestFriendlyAA so will set tOtherAADestination and tCombatDestination to near here. tCombatDestination='..repru(tCombatDestination)..'; Distance to our base for tCombatDestination='..M27Utilities.GetDistanceBetweenPositions(tCombatDestination, tOurBase)) end
             if bTorpsInRangeOfFrontAA then
                 MoveUnitTowardsTarget(oClosestFriendlyAA, tOurBase, false, 'FrontAAToBase')
             else
@@ -2024,6 +2027,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
         end
         if M27Utilities.IsTableEmpty(tNonAACombatAndSupport) == false then
             for iUnit, oUnit in tNonAACombatAndSupport do
+                if bDebugMessages == true then LOG(sFunctionRef..': About to tell nonAA combat and support unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to move to combat destination') end
                 MoveUnitTowardsTarget(oUnit, tCombatDestination, false, 'RunFromBomber')
             end
         end
