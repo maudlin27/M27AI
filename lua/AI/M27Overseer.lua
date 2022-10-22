@@ -8347,7 +8347,6 @@ function RecordAllEnemiesAndAllies(aiBrain)
         end
 
         --Send warning of large numbers of M27AI in a game
-        bDebugMessages = true
         if bDebugMessages == true then LOG(sFunctionRef..': Number of M27 in the game='..table.getn(tAllActiveM27Brains)) end
         if table.getn(tAllActiveM27Brains) > 4 then
             --SendMessage(aiBrain, sMessageType, sMessage,                                                                                                                                                      iOptionalDelayBeforeSending, iOptionalTimeBetweenMessageType, bOnlySendToTeam)

@@ -120,7 +120,7 @@ refiModDefenceRangeAtTimeTargetAssigned = 'M27AirBomberModDefenceRangeAtTimeTarg
 refoAssignedAirScout = 'M27HaveAssignedAirScout' --Assigned to a unit that wants a dedicated air scout (e.g. experimental) - the unit air scout assigned to it; also attached to air scout to indicate the unit it is assisting
 refbEngiHunterMode = 'M27AirBomberEngiHunterLogic' --set to true for t1 bombers with low lifetime count who are in engi hunter mode
 refbHaveDelayedTargeting = 'M27AirBomberHaveDelayedTargeting' --set to true against a bomber if it has already delayed targeting to give another engi a chance - currently used for engihunter bombers
-local refiGunshipPlacement = 'M27AirGunshipPlacementNumber' --Against unit (gunship) for the placement number
+refiGunshipPlacement = 'M27AirGunshipPlacementNumber' --Against unit (gunship) for the placement number
 
 
 refiLastCoveredByAAByTech = 'M27AirLastTimeUnitHadAA' --[x] is the tech level of AA we are concerned about (e.g. 1 = 1+; 2 = 2+ 3 = 3+)
@@ -207,7 +207,7 @@ local refCategoryAirNonScout = M27UnitInfo.refCategoryAirNonScout
 local iLongCycleThreshold = 4
 local iLowFuelPercent = 0.25
 local iLowHealthPercent = 0.55
-local iGunshipLowHealthPercent = 0.6
+iGunshipLowHealthPercent = 0.6
 
 function GetAirSegmentFromPosition(tPosition)
     --returns x and z values of the segment that tPosition is in
@@ -9499,7 +9499,6 @@ function GunshipManager(aiBrain)
 
 
     if M27Utilities.IsTableEmpty(aiBrain[reftAvailableGunships]) == false then
-        if table.getn(aiBrain[reftAvailableGunships]) >= 4 then bDebugMessages = true end
         --First get the nearest threat that we want to focus on, then decide how we will approach it
         local iClosestEnemyDist = 100000
         local iCurEnemyDist

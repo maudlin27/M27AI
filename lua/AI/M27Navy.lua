@@ -1276,8 +1276,10 @@ function ShouldWeRefreshUnitOrder(oUnit, iOrderType, tOrderLocation, oOrderUnit)
             else
                 --LOG('ShouldWeRefresh: Unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; tOrderLocation='..repru(tOrderLocation)..'; Unit last order target='..repru(oUnit[M27UnitInfo.reftLastOrderTarget]))
                 local iDistThreshold = 5
-                if EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, oUnit.UnitId) then iDistThreshold = 2.5 end
-                if M27Utilities.GetDistanceBetweenPositions(tOrderLocation, oUnit[M27UnitInfo.reftLastOrderTarget]) <= 5 then
+                if EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, oUnit.UnitId) then iDistThreshold = 2.5
+                elseif iOrderType == M27PlatoonUtilities.refiOrderIssueGroundAttack then iDistThreshold = 0.5
+                end
+                if M27Utilities.GetDistanceBetweenPositions(tOrderLocation, oUnit[M27UnitInfo.reftLastOrderTarget]) <= iDistThreshold then
                     if not(M27Logic.IsUnitIdle(oUnit, false, true, false, false)) then
                         bRefreshOrder = false
                     end
@@ -1913,7 +1915,6 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
             if M27Utilities.IsTableEmpty(tFriendlyAA) == false then
                 --First get any subs that have AA to surface
                 local bGivenSurfaceOrder = false
-                bDebugMessages = true
 
 
                 local tSubAA = EntityCategoryFilterDown(categories.SUBMERSIBLE, tFriendlyAA)

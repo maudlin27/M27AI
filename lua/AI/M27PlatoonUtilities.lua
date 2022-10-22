@@ -5348,6 +5348,8 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                         for iUnit, oUnit in oPlatoon[reftDFUnits] do
                             if EntityCategoryContains(M27UnitInfo.refCategoryShieldDisruptor, oUnit.UnitId) then
                                 M27UnitInfo.SetUnitTargetPriorities(oUnit, M27UnitInfo.refWeaponPriorityShieldDisruptor)
+                            elseif EntityCategoryContains(M27UnitInfo.refCategorySniperBot, oUnit.UnitId) then
+                                M27UnitInfo.SetUnitTargetPriorities(oUnit, M27UnitInfo.refWeaponPrioritySniperBot)
                             else
                                 M27UnitInfo.SetUnitTargetPriorities(oUnit, oPlatoon[reftPlatoonDFTargettingCategories])
                             end
@@ -12887,6 +12889,8 @@ function ProcessPlatoonAction(oPlatoon)
                                     --Dont wait for the normal logic on weapon targeting to trigger
                                     if EntityCategoryContains(M27UnitInfo.refCategoryShieldDisruptor, oDFUnit.UnitId) then
                                         M27UnitInfo.SetUnitTargetPriorities(oDFUnit, M27UnitInfo.refWeaponPriorityShieldDisruptor)
+                                    elseif EntityCategoryContains(M27UnitInfo.refCategorySniperBot, oDFUnit.UnitId) then
+                                        M27UnitInfo.SetUnitTargetPriorities(oDFUnit, M27UnitInfo.refWeaponPrioritySniperBot)
                                     else
                                         M27UnitInfo.SetUnitTargetPriorities(oDFUnit, oPlatoon[reftPlatoonDFTargettingCategories])
                                     end
@@ -12975,6 +12979,8 @@ function ProcessPlatoonAction(oPlatoon)
                         for iUnit, oUnit in tDFUnits do
                             if EntityCategoryContains(M27UnitInfo.refCategoryShieldDisruptor, oUnit.UnitId) then
                                 M27UnitInfo.SetUnitTargetPriorities(oUnit, M27UnitInfo.refWeaponPriorityShieldDisruptor)
+                            elseif EntityCategoryContains(M27UnitInfo.refCategorySniperBot, oUnit.UnitId) then
+                                M27UnitInfo.SetUnitTargetPriorities(oUnit, M27UnitInfo.refWeaponPrioritySniperBot)
                             else
                                 M27UnitInfo.SetUnitTargetPriorities(oUnit, oPlatoon[reftPlatoonDFTargettingCategories])
                             end
