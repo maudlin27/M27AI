@@ -2358,6 +2358,54 @@ function IsUnderwater(tPosition, bReturnSurfaceHeightInstead, iOptionalAmountToB
     end
 end
 
+function IsWaterOrFlatAlongLine(tStart, tEnd)
+    --Intended e.g. for battleships to decide if their shot is likely to be blocked, so they wont ground fire, as a more performant version of isshotblocked
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'IsWaterOrFlatAlongLine'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local iWaterHeight = iMapWaterHeight + 0.01 --ensure rounding doesnt cause issues (not actually tested to see if it would have caused issues, more just a precaution)
+    if GetTerrainHeight(tStart[1], tStart[3]) <= iWaterHeight and GetTerrainHeight(tEnd[1], tEnd[3]) <= iWaterHeight then
+        local iTotalDistance = math.floor(M27Utilities.GetDistanceBetweenPositions(tStart, tEnd))
+        if iTotalDistance < 1 then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return true
+        else
+            local iXAdjust = (tEnd[1] - tStart[1]) / iTotalDistance
+            local iZAdjust = (tEnd[3] - tStart[3]) / iTotalDistance
+            local iInterval = 1
+            if iTotalDistance >= 100 then
+                iInterval = 3
+                iTotalDistance = math.floor(iTotalDistance / iInterval) * iInterval
+            elseif iTotalDistance >= 50 then
+                iInterval = 2
+                iTotalDistance = math.floor(iTotalDistance / iInterval) * iInterval
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': tStart='..repru(tStart)..'; tEnd='..repru(tEnd)..'; Total distance rounded down='..iTotalDistance..'; iXAdjust='..iXAdjust..'; iZAdjust='..iZAdjust..'; iInterval='..iInterval) end
+            local iCurX, iCurZ
+            for iEntry = iInterval, iTotalDistance, iInterval do
+                iCurX = tStart[1] + iXAdjust * iEntry
+                iCurZ = tStart[3] + iZAdjust * iEntry
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': iInterval='..iInterval..'; Considering position X-Z='..iCurX..'-'..iCurZ..'; iWaterHeight='..iWaterHeight..'; Terrain height='..GetTerrainHeight(iCurX, iCurZ))
+                    M27Utilities.DrawLocation({ iCurX, GetTerrainHeight(iCurX, iCurZ), iCurZ })
+                end
+                if GetTerrainHeight(iCurX, iCurZ) > iWaterHeight then
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                    return false
+                end
+            end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return true
+        end
+
+    else
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return false
+    end
+
+end
+
 function GetNearestPathableLandPosition(oPathingUnit, tTravelTarget, iMaxSearchRange)
     --Looks for a position with >0 surface height within iMaxSearchRange of oPathingUnit
     --first looks in a straight line along tTravelTarget, and only if no match does it consider looking left, right and behind

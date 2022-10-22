@@ -1977,7 +1977,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                         if not(bIndirectFireThreatOnly) then
                             if bAntiNavyOnly or bSubmersibleOnly then
                                 iMassMod = 0
-                                if (bSubmersibleOnly and (EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) or oBP.Physics.MotionType == 'RULEUMT_Amphibious')) or (not(bSubmersibleOnly) and bAntiNavyOnly and EntityCategoryContains(categories.ANTINAVY+categories.OVERLAYANTINAVY, oUnit.UnitId)) then
+                                if (bSubmersibleOnly and (EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) or oBP.Physics.MotionType == 'RULEUMT_Amphibious')) or (not(bSubmersibleOnly) and bAntiNavyOnly and EntityCategoryContains(categories.ANTINAVY+categories.OVERLAYANTINAVY + M27UnitInfo.refCategoryBattleship, oUnit.UnitId)) then
                                     iMassMod = 0.25 --e.g. for overlayantinavy or submersibles with no attack
                                     if EntityCategoryContains(categories.ANTINAVY, oUnit.UnitId) then
                                         iMassMod = 1
@@ -1997,6 +1997,8 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                         iMassMod = 0.8
                                     elseif EntityCategoryContains(M27UnitInfo.refCategoryMegalith, oUnit.UnitId) then
                                         iMassMod = 0.5
+                                    elseif EntityCategoryContains(M27UnitInfo.refCategoryBattleship, oUnit.UnitId) then
+                                        iMassMod = 0.05 --battleships could ground fire, although theyre unlikely to and very inaccurate if the target is moving
                                     end
                                 end
                             elseif bLongRangeThreatOnly then
@@ -3729,23 +3731,26 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
 
         --Visual range - base on air segments and if they've been flagged as having had recent visual
         local iAirSegmentAdjSize = 1
-        if iMinCoverageWanted then iAirSegmentAdjSize = math.ceil(iMinCoverageWanted / M27AirOverseer.iAirSegmentSize) end
+        if iMinCoverageWanted then iAirSegmentAdjSize = math.ceil(iMinCoverageWanted   / M27AirOverseer.iAirSegmentSize) end
         local iBaseAirSegmentX, iBaseAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(tTargetPosition)
         local bHaveRecentVisual = true
         for iAdjX = -iAirSegmentAdjSize, iAirSegmentAdjSize do
             for iAdjZ = -iAirSegmentAdjSize, iAirSegmentAdjSize do
+                if bDebugMessages == true then LOG(sFunctionRef..': Time of last visual for segment with iAdjX='..iAdjX..'; iAdjZ='..iAdjZ..'='..M27AirOverseer.GetTimeSinceLastScoutedSegment(aiBrain, iBaseAirSegmentX + iAdjX, iBaseAirSegmentZ + iAdjZ)) end
                 if aiBrain[M27AirOverseer.reftAirSegmentTracker][iBaseAirSegmentX + iAdjX] and aiBrain[M27AirOverseer.reftAirSegmentTracker][iBaseAirSegmentX + iAdjX][iBaseAirSegmentZ + iAdjZ]
                         and M27AirOverseer.GetTimeSinceLastScoutedSegment(aiBrain, iBaseAirSegmentX + iAdjX, iBaseAirSegmentZ + iAdjZ) > 1.1 then
-                    --Dont have recent visual - check are either 0 adj, or are within iMinCoverageWanted
-                    if iAdjX == 0 and iAdjZ == 0 then
+                    --Dont have recent visual (prior to v60 - would check are either 0 adj, or are within iMinCoverageWanted)
+                    bHaveRecentVisual = false
+                    --[[if iAdjX == 0 and iAdjZ == 0 then
                         bHaveRecentVisual = false
                         break
                     elseif M27Utilities.GetDistanceBetweenPositions(tTargetPosition, M27AirOverseer.GetAirPositionFromSegment(iBaseAirSegmentX + iAdjX, iBaseAirSegmentZ + iAdjZ)) <= iMinCoverageWanted then
                         bHaveRecentVisual = false
                         break
-                    end
+                    end--]]
                 end
             end
+            if not(bHaveRecentVisual) then break end
         end
 
 
@@ -3774,9 +3779,10 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
                         --else
                         if not(iMinCoverageWanted==nil) then
                             if iCurIntelCoverage > iMinCoverageWanted then
-                                if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverage='..iMinCoverageWanted..'; iMaxIntelCoverage='..iMaxIntelCoverage) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverageWanted='..iMinCoverageWanted..'; iMaxIntelCoverage='..iMaxIntelCoverage..'; iCurIntelCoverage='..iCurIntelCoverage) end
                                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                                return true end
+                                return true
+                            end
                         end
                     end
                 end

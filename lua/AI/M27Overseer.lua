@@ -1213,6 +1213,11 @@ function AssignMAAToPreferredPlatoons(aiBrain)
             end
         end
 
+
+        local oACU = M27Utilities.GetACU(aiBrain)
+
+
+
         local function GetMAAThreat(tMAAUnits)
             return M27Logic.GetAirThreatLevel(aiBrain, tMAAUnits, false, false, true, false, false)
         end
@@ -1222,8 +1227,13 @@ function AssignMAAToPreferredPlatoons(aiBrain)
         iMAAThreatWanted = math.min(iMaxMAAThreatForACU, math.max(iMinACUMAAThreatWanted, math.floor((aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 0) * iAirThreatMAAFactor)))
 
         --If ACU is near base or chokepoint and we own T2+ fixed AA near it, then reduce MAA threat wanted
-        local oACU = M27Utilities.GetACU(aiBrain)
+
         if M27UnitInfo.IsUnitValid(oACU) then
+            --If ACU near base and has nearby SAM then reduce max MAA wanted for it significantly
+            if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.max(iDistanceFromBaseToBeSafe, 80) and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructureAA * categories.TECH3, oACU:GetPosition(), 50, 'Ally')) == false then
+                iMAAThreatWanted = math.min(800, iMAAThreatWanted)
+                iMinACUMAAThreatWanted = math.min(iMinACUMAAThreatWanted * 0.35, iMAAThreatWanted * 0.7)
+            end
 
             if aiBrain[refiOurHighestFactoryTechLevel] >= 2 and M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.75 then
                 local iAACategory
@@ -4768,6 +4778,16 @@ function ACUManager(aiBrain)
             end
         end
 
+        --Clear entries from more than 1m ago
+        if oACU[reftACURecentHealth][iCurTime - 60] then
+            local iCurAdjust = 60
+            while oACU[reftACURecentHealth][iCurTime - iCurAdjust] do
+
+                oACU[reftACURecentHealth][iCurTime - iCurAdjust] = nil
+                iCurAdjust = iCurAdjust + 1
+            end
+        end
+
         --if M27Utilities.IsACU(oACU) then
 
         if not (oACU[refbACUOnInitialBuildOrder]) then
@@ -5681,6 +5701,14 @@ function ACUManager(aiBrain)
                             aiBrain[refiAIBrainCurrentStrategy] = refStrategyProtectACU
                         end
                     end
+                else
+                    --ACU not upgrading; check its owrk progress is 0 or 100 and if so then clear table
+                    if oACU[reftACURecentUpgradeProgress] then
+                        if oACU:GetWorkProgress() == 0 or oACU:GetWorkProgress() == 1 then
+                            oACU[reftACURecentUpgradeProgress] = nil
+                        end
+                    end
+
                 end
             end
 
@@ -6623,7 +6651,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
         local iBigThreatSearchRange = 10000
 
-        local tEnemyBigThreatCategories = { ['Land experimental'] = M27UnitInfo.refCategoryLandExperimental, ['T3 arti'] = M27UnitInfo.refCategoryFixedT3Arti, ['Experimental building'] = M27UnitInfo.refCategoryExperimentalStructure, ['Nuke'] = M27UnitInfo.refCategorySML, ['TML'] = M27UnitInfo.refCategoryTML, ['Missile ships'] = M27UnitInfo.refCategoryMissileNavy, ['SMD'] = M27UnitInfo.refCategorySMD }
+        local tEnemyBigThreatCategories = { ['Land experimental'] = M27UnitInfo.refCategoryLandExperimental, ['T3 arti'] = M27UnitInfo.refCategoryFixedT3Arti, ['Experimental building'] = M27UnitInfo.refCategoryExperimentalStructure, ['Nuke'] = M27UnitInfo.refCategorySML, ['TML'] = M27UnitInfo.refCategoryTML, ['Missile ships'] = M27UnitInfo.refCategoryMissileShip, ['SMD'] = M27UnitInfo.refCategorySMD }
         local tCurCategoryUnits
         local tReferenceTable, bRemovedUnit
         local sUnitUniqueRef
@@ -6646,7 +6674,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                     LOG(sFunctionRef .. ': Looking for enemy nukes')
                 end
                 bWantACUToReturnToBase = true
-            elseif iCategory == M27UnitInfo.refCategoryTML or iCategory == M27UnitInfo.refCategoryMissileNavy then
+            elseif iCategory == M27UnitInfo.refCategoryTML or iCategory == M27UnitInfo.refCategoryMissileShip then
                 tReferenceTable = aiBrain[reftEnemyTML]
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': Looking for enemy TML')
@@ -8318,6 +8346,14 @@ function RecordAllEnemiesAndAllies(aiBrain)
             end
         end
 
+        --Send warning of large numbers of M27AI in a game
+        if bDebugMessages == true then LOG(sFunctionRef..': Number of M27 in the game='..table.getn(tAllActiveM27Brains)) end
+        if table.getn(tAllActiveM27Brains) > 4 then
+            --SendMessage(aiBrain, sMessageType, sMessage,                                                                                                                                                      iOptionalDelayBeforeSending, iOptionalTimeBetweenMessageType, bOnlySendToTeam)
+            if bDebugMessages == true then LOG(sFunctionRef..': About to call SendMessage') end
+            M27Chat.SendMessage(aiBrain, 'SendGameCompatibilityAILimit', 'More than 4 M27AI are being used, there is the risk of a crash  on large maps or late game due to RAM limitations.  Try reducing the number and using an AiX modifier instead.', 0, 1000000, false)
+        end
+
         --Update chokepoints (note for now this will only call once per game)
         ForkThread(M27MapInfo.IdentifyTeamChokepoints, aiBrain)
 
@@ -9259,7 +9295,23 @@ end
 function TestCustom(aiBrain)
     local sFunctionRef = 'TestCustom'
 
-    M27Utilities.DrawLocation({640.69580078125, 18.948984146118, 367.01770019531}, nil, 3, 200, 4)
+    local tFriendlyACU = aiBrain:GetListOfUnits(ParseEntityCategory('COMMAND'))
+    LOG('Is table empty='..tostring(M27Utilities.IsTableEmpty(tFriendlyACU)))
+    local tAltACU = aiBrain:GetListOfUnits(ParseEntityCategory(categories.COMMAND))
+    LOG('Is 2nd table empty='..tostring(M27Utilities.IsTableEmpty(tAltACU)))
+
+    --[[local tMissileShips = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryMissileShip)
+    if M27Utilities.IsTableEmpty(tMissileShips) == false then
+        for iUnit, oUnit in tMissileShips do
+            ForkThread(M27UnitInfo.SetUnitTargetPriorities, oUnit, M27UnitInfo.refWeaponPriorityMissileShip)
+            for i =1, oUnit:GetWeaponCount() do
+                local wep = oUnit:GetWeapon(i)
+                wep:SetTargetingPriorities(M27UnitInfo.refWeaponPriorityMissileShip)
+            end
+        end
+    end--]]
+
+    --M27Utilities.DrawLocation({640.69580078125, 18.948984146118, 367.01770019531}, nil, 3, 200, 4)
 
 
     --[[LOG('Table with table key will get printed to give reference')

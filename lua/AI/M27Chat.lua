@@ -98,14 +98,16 @@ function SendForkedMessage(aiBrain, sMessageType, sMessage, iOptionalDelayBefore
             WaitSeconds(iOptionalDelayBeforeSending)
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         end
-        if bDebugMessages == true then LOG(sFunctionRef..': iOptionalTimeBetweenTaunts='..(iOptionalTimeBetweenMessageType or 'nil')..'; tiM27VoiceTauntByType[sMessageType]='..(tiM27VoiceTauntByType[sMessageType] or 'nil')..'; Cur game time='..GetGameTimeSeconds()) end
+
 
         local iTimeSinceSentSimilarMessage
         if bOnlySendToTeam then
             iTimeSinceSentSimilarMessage = GetGameTimeSeconds() - (M27Team.tTeamData[aiBrain.M27Team][M27Team.reftiTeamMessages][sMessageType] or -100000)
         else
-            iTimeSinceSentSimilarMessage = GetGameTimeSeconds() - (tiM27VoiceTauntByType[sMessageType] or -100000)
+            iTimeSinceSentSimilarMessage = GetGameTimeSeconds() - (tiM27VoiceTauntByType[sMessageType] or -100000000)
         end
+
+        if bDebugMessages == true then LOG(sFunctionRef..': sMessageType='..(sMessageType or 'nil')..'; iOptionalTimeBetweenTaunts='..(iOptionalTimeBetweenMessageType or 'nil')..'; tiM27VoiceTauntByType[sMessageType]='..(tiM27VoiceTauntByType[sMessageType] or 'nil')..'; Cur game time='..GetGameTimeSeconds()..'; iTimeSinceSentSimilarMessage='..iTimeSinceSentSimilarMessage) end
 
         if iTimeSinceSentSimilarMessage > (iOptionalTimeBetweenMessageType or 60) then
             if bOnlySendToTeam then

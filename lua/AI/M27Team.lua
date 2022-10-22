@@ -29,9 +29,11 @@ refbActiveResourceMonitor = 'M27TeamActiveResourceMonitor' --against tTeamData[a
 reftUnseenPD = 'M27TeamUnseenPD' --against tTeamData[aiBrain.M27Team], table of T2+ PD objects that have damaged an ally but havent been revealed yet
 refbEnemyTeamHasUpgrade = 'M27TeamEnemeyHasUpgrade' --against tTeamData[aiBrain.M27Team], true if enemy has started ACU upgrade or has ACU upgrade
 reftiTeamMessages = 'M27TeamMessages' --against tTeamData[aiBrain.M27Team], [x] is the message type string, returns the gametime that last sent a message of this type to the team
+reftEnemyTorpBombers = 'M27TeamTorpBombers' --against tTeamData[aiBrain.M27Team], [x] is a count so table.getn works
 
 --Naval team data:
 refbActiveNavalManager = 'NavalActiveManager' --True/false
+refbHaveGivenSurfaceOrderToSubs = 'NavalM27GivenSurfaceOrder' --true/false (against tTeamData[aiBrain.M27Team]) - uesd to determine whether to do a check for submerging subs
 reftEnemyUnitsByPond = 'NavalEnemyUnitsByPond' --[x] is the pond ref, returns table of enemy units
 reftFriendlyUnitsByPond = 'NavalM27UnitsByPond' --[x] is the pond ref; only stores M27 naval units
 refiDestroyedNavalFactoriesByPond = 'NavalM27FailedBuildAttempts' --[x] is the pond ref; number of naval factories that have been destroyed by pond
@@ -729,6 +731,7 @@ function TeamInitialisation(iTeamRef)
     tTeamData[iTeamRef][subrefNukeLaunchLocations] = {}
     tTeamData[iTeamRef][reftEnemyArtiToAvoid] = {}
     tTeamData[iTeamRef][reftEnemyAAToAvoid] = {}
+    tTeamData[iTeamRef][reftEnemyTorpBombers] = {}
     tTeamData[iTeamRef][reftTimeOfTransportLastLocationAttempt] = {}
     tTeamData[iTeamRef][tScoutAssignedToMexLocation] = {}
     tTeamData[iTeamRef][reftiTeamMessages] = {}

@@ -223,13 +223,13 @@ refCategoryAllAmphibiousAndNavy = categories.NAVAL + categories.AMPHIBIOUS + cat
 refCategoryPondFixedCategory = refCategoryNavalSurface - categories.AMPHIBIOUS * categories.MOBILE + refCategoryTMD + refCategoryTorpedoLauncher + refCategorySonar + refCategoryStructureAA
 refCategoryNavyThatCanBeTorpedoed = categories.NAVAL + categories.AMPHIBIOUS + categories.STRUCTURE + categories.COMMAND + refCategoryEngineer - categories.HOVER --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures; Hover units cant be targeted
 refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categories.ANTINAVY * categories.NAVAL + categories.OVERLAYANTINAVY * categories.LAND + categories.ANTINAVY * categories.STRUCTURE --If removing overlayantinavy then think up better solution for fatboy/experimentals so they dont run when in water
-refCategoryMissileNavy = categories.NAVAL * categories.SILO + categories.BATTLESHIP * categories.INDIRECTFIRE - categories.BATTLESHIP * categories.SERAPHIM --i.e. UEF+Sera cruisers, and nukesubs
+refCategoryMissileShip = categories.NAVAL * categories.SILO + categories.BATTLESHIP * categories.INDIRECTFIRE - categories.BATTLESHIP * categories.SERAPHIM --i.e. UEF+Sera cruisers, and nukesubs
 refCategorySubmarine = categories.NAVAL * categories.SUBMERSIBLE * categories.ANTINAVY
 refCategoryCooper = categories.NAVAL * categories.ANTINAVY * categories.TECH2 - categories.SUBMERSIBLE - categories.DESTROYER
 refCategoryShieldBoat = categories.NAVAL * categories.SHIELD + categories.HOVER * categories.SHIELD --Includes mobile land shields that can hover
 refCategoryStealthBoat = categories.NAVAL * categories.STEALTHFIELD
 refCategoryBattlecruiser = categories.BATTLESHIP * categories.PRODUCTFA * categories.UEF
-refCategoryBattleship = categories.BATTLESHIP - refCategoryBattlecruiser
+refCategoryBattleship = categories.BATTLESHIP - refCategoryBattlecruiser - refCategoryMissileShip
 
 
 --Multi-category:
@@ -248,15 +248,27 @@ refCategoryLongRangeMobile = refCategoryLongRangeDFLand + refCategoryNavalSurfac
 refCategoryShortRangeMobile = refCategoryLandCombat + refCategoryFrigate - refCategoryLongRangeMobile
 refCategoryReclaimable = categories.RECLAIMABLE - refCategoryAllAir
 
---Weapon target priorities
-refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
-refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategorySkirmisher, refCategoryLandCombat - categories.COMMAND, refCategoryEngineer, categories.LAND * categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
-refWeaponPriorityPD = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryIndirect, refCategorySkirmisher, refCategoryLandCombat - categories.COMMAND, refCategoryEngineer, categories.LAND * categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
-refWeaponPriorityShieldDisruptor = {refCategoryFixedShield, refCategoryMobileLandShield, refCategoryPersonalShield + refCategoryFatboy, refCategoryRadar, categories.ALLUNITS - categories.BENIGN}
-refWeaponPriorityOurGroundExperimental = {categories.COMMAND, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryFixedT2Arti, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
-refWeaponPriorityOurFatboy = {refCategoryFixedShield, refCategoryFixedT2Arti, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryT3PD, refCategoryPD, categories.COMMAND, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
-refWeaponPriorityTorpBomber = {refCategoryCruiser, refCategoryCruiserCarrier, refCategoryFrigate, refCategoryNavyThatCanBeTorpedoed, categories.ALLUNITS - categories.BENIGN}
-refWeaponPriorityT2Arti = {refCategoryFatboy, refCategoryIndirectT2Plus + refCategoryFixedT2Arti, refCategoryFixedShield + refCategoryCruiser, refCategoryNavalSurface + refCategoryStructure - categories.TECH1 + refCategoryMobileLandShield, refCategoryStructure + refCategoryLandCombat - categories.TECH1, categories.LAND - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
+--Weapon target priorities - note these use string categories. Use "," within 's in place of "+", and just have a space in place of "*"
+--refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityACU = {'COMMAND', 'MOBILE LAND SHIELD', 'STRUCTURE SHIELD', 'SNIPER', 'CYBRAN MOBILE TECH2 DIRECTFIRE BOT, UEF MOBILE TECH2 DIRECTFIRE BOT', 'TECH1 INDIRECTFIRE', 'DIRECTFIRE, INDIRECTFIRE', 'ALLUNITS'}
+--refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategorySkirmisher, refCategoryLandCombat - categories.COMMAND, refCategoryEngineer, categories.LAND * categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityNormal =  {'MOBILE LAND SHIELD', 'STRUCTURE SHIELD', 'SNIPER', 'CYBRAN MOBILE TECH2 DIRECTFIRE BOT, UEF MOBILE TECH2 DIRECTFIRE BOT', 'TECH1 INDIRECTFIRE', 'RECLAIMABLE DIRECTFIRE', 'RECLAIMABLE INDIRECTFIRE', 'RECLAIMABLE ENGINEER', 'MOBILE LAND', 'STRUCTURE', 'ALLUNITS'}
+    --refWeaponPriorityPD = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryIndirect, refCategorySkirmisher, refCategoryLandCombat - categories.COMMAND, refCategoryEngineer, categories.LAND * categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityPD = {'MOBILE LAND SHIELD', 'STRUCTURE SHIELD', 'STRUCTURE DIRECTFIRE', 'MOBILE INDIRECTFIRE', 'SNIPER', 'CYBRAN MOBILE TECH2 DIRECTFIRE BOT, UEF MOBILE TECH2 DIRECTFIRE BOT', 'RECLAIMABLE DIRECTFIRE, RECLAIMABLE INDIRECTFIRE', 'RECLAIMABLE ENGINEER', 'MOBILE LAND', 'STRUCTURE', 'ALLUNITS'}
+--refWeaponPriorityShieldDisruptor = {refCategoryFixedShield, refCategoryMobileLandShield, refCategoryPersonalShield + refCategoryFatboy, refCategoryRadar, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityShieldDisruptor = {'STRUCTURE SHIELD', 'MOBILE SHIELD', 'PERSONALSHIELD', 'STRUCTURE RADAR', 'ALLUNITS'}
+--refWeaponPriorityOurGroundExperimental = {categories.COMMAND, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryFixedT2Arti, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityOurGroundExperimental = {'COMMAND', 'EXPERIMENTAL LAND', 'EXPERIMENTAL', 'STRUCTURE SHIELD', 'STRUCTURE DIRECTFIRE', 'STRUCTURE INDIRECTFIRE', 'MOBILE LAND DIRECTFIRE TECH3', 'MOBILE LAND INDIRECTFIRE TECH3', 'MOBILE LAND DIRECTFIRE TECH2', 'MOBILE LAND TECH2', 'ALLUNITS'}
+--refWeaponPriorityOurFatboy = {refCategoryFixedShield, refCategoryFixedT2Arti, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryT3PD, refCategoryPD, categories.COMMAND, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityOurFatboy = {'STRUCTURE SHIELD', 'STRUCTURE ARILLERY TECH2', 'EXPERIMENTAL MOBILE LAND', 'EXPERIMENTAL', 'STRUCTURE DIRECTFIRE TECH3', 'MOBILE LAND INDIRECTFIRE TECH3', 'STRUCTURE DIRECTFIRE', 'COMMAND', 'MOBILE LAND DIRECTFIRE TECH3', 'STRUCTURE TECH2, STRUCTURE TECH3', 'MOBILE LAND DIRECTFIRE, MOBILE LAND INDIRECTFIRE', 'STRUCTURE', 'ALLUNITS'}
+--refWeaponPriorityTorpBomber = {refCategoryCruiser, refCategoryCruiserCarrier, refCategoryFrigate, refCategoryNavyThatCanBeTorpedoed, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityTorpBomber = {'NAVAL CRUISER, NAVAL CARRIER, NAVAL ANTIAIR, NAVAL FRIGATE, NAVAL, ALLUNITS'}
+--refWeaponPriorityT2Arti = {refCategoryFatboy, refCategoryIndirectT2Plus + refCategoryFixedT2Arti, refCategoryFixedShield + refCategoryCruiser, refCategoryNavalSurface + refCategoryStructure - categories.TECH1 + refCategoryMobileLandShield, refCategoryStructure + refCategoryLandCombat - categories.TECH1, categories.LAND - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityT2Arti = {'EXPERIMENTAL MOBILE LAND FACTORY', 'INDIRECTFIRE TECH2, INDIRECTFIRE TECH3 MOBILE', 'STRUCTURE SHIELD, CRUISER', 'DESTROYER, BATTLESHIP', 'STRUCTURE TECH2, STRUCTURE TECH3, STRUCTURE EXPERIMENTAL, MOBILE LAND SHIELD, MOBILE NAVAL SHIELD', 'STRUCTURE', 'DIRECTFIRE, INDIRECTFIRE', 'ALLUNITS'}
+refWeaponPrioritySniperBot = {'EXPERIMENTAL MOBILE LAND', 'TECH3 MOBILE LAND DIRECTFIRE, TECH3 MOBILE LAND INDIRECTFIRE', 'STRUCTURE DIRECTFIRE, STRUCTURE INDIRECTFIRE, STRUCTURE SHIELD', 'NAVAL', 'TECH2 MOBILE LAND DIRECTFIRE', 'STRUCTURE', 'DIRECTFIRE, INDIRECTFIRE', 'ALLUNITS'}
+
+refWeaponPriorityMissileShip = {'SHIELD STRUCTURE, ANTIMISSILE STRUCTURE', 'STRUCTURE INDIRECTFIRE ARTILLERY TECH2', 'EXPERIMENTAL STRUCTURE, STRUCTURE ARTILLERY TECH3, STRUCTURE TECH3 SILO', 'STRUCTURE TECH3 VOLATILE', 'STRUCTURE TECH3 ECONOMIC', 'STRUCTURE NAVAL TECH3, STRUCTURE NAVAL TECH2', 'STRUCTURE TECH3', 'STRUCTURE TECH2 ECONOMIC', 'STRUCTURE TECH2', 'STRUCTURE VOLATILE, STRUCTURE DEFENSE, STRUCTURE FACTORY, STRUCTURE INTELLIGENCE', 'STRUCTURE', 'NAVAL SHIELD', 'SHIELD', 'EXPERIMENTAL NAVAL', 'EXPERIMENTAL', 'TECH3 NAVAL', 'TECH2 NAVAL', 'INDIRECTFIRE NAVAL', 'TECH3', 'TECH2', 'ALLUNITS'}
+refWeaponPriorityBattleShip = {'EXPERIMENTAL NAVAL, TECH3 NAVAL', 'TECH2 NAVAL', 'STRUCTURE SHIELD', 'STRUCTURE INDIRECTFIRE ARTILLERY', 'EXPERIMENTAL STRUCTURE, STRUCTURE TECH3 SILO, STRUCTURE TECH3 VOLATILE', 'MOBILE LAND EXPERIMENTAL, MOBILE LAND TECH3 DIRECTFIRE, MOBILE LAND TECH3 INDIRECTFIRE', 'EXPERIMENTAL', 'NAVAL', 'STRUCTURE', 'ALLUNITS'}
 
 
 function GetUnitLifetimeCount(oUnit)
@@ -1299,4 +1311,12 @@ function RefreshUnitDFStrikeDamage(oTarget)
             end
         end
     end
+end
+
+function ToggleUnitDiveOrSurfaceStatus(oUnit)
+    --Assumes have already checked that the unit is or isnt underwater
+    M27Utilities.IssueTrackedClearCommands({ oUnit})
+    IssueDive({oUnit})
+    oUnit[refbSpecialMicroActive] = true
+    M27Utilities.DelayChangeVariable(oUnit, refbSpecialMicroActive, false, 1)
 end
