@@ -9726,7 +9726,7 @@ end--]]
             --if iEngineersToConsider >= 5 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 then bDebugMessages = true end
             --if tiAvailableEngineersByTech[3] > 0 and GetGameTimeSeconds() >= 1200 then bDebugMessages = true end
 
-            --if GetGameTimeSeconds() >= 2580 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.75 then bDebugMessages = true end
+            if GetGameTimeSeconds() >= 1620 and aiBrain:GetArmyIndex() == 2 and tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
 
             local bUseNormalAssignments = true
             if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] then bUseNormalAssignments = false end
@@ -12008,7 +12008,7 @@ end--]]
                             end
                         end
                     elseif iCurrentConditionToTry == 54 then --Build factories (or upgrade HQ) if getting too much mass
-                        if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; bHaveVeryLowPower='..tostring(bHaveVeryLowPower)) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; bHaveVeryLowPower='..tostring(bHaveVeryLowPower)..'; Have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl])..'; aiBrain[M27AirOverseer.refiAirAANeeded]='..(aiBrain[M27AirOverseer.refiAirAANeeded] or 'nil')..'; AirAAWanted='..(aiBrain[M27AirOverseer.refiAirAAWanted] or 'nil')..'; Air factory cap='..(aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] or 'nil')..'; Have low mass='..tostring(bHaveLowMass)) end
                         if bHaveVeryLowPower == false and bHaveLowMass == false then
                             if iLandFactories == nil then
                                 iLandFactories = aiBrain:GetCurrentUnits(refCategoryLandFactory)

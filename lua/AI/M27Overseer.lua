@@ -6122,6 +6122,7 @@ function SetMaximumFactoryLevels(aiBrain)
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SetMaximumFactoryLevels'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if aiBrain[M27AirOverseer.refiAirAAWanted] >= 100 then bDebugMessages = true end
     --if aiBrain:GetEconomyStoredRatio('MASS') >= 0.6 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 1 then bDebugMessages = true end
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Start of code')
@@ -6259,6 +6260,7 @@ function SetMaximumFactoryLevels(aiBrain)
                 aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = iAirFactoriesOwned + 1
             else
                 aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(1, iAirFactoriesOwned)
+                if bDebugMessages == true then LOG(sFunctionRef..': Have less than 10% mass stored so capping number of air factories at the number we already own') end
             end
             aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = aiBrain[refiMinLandFactoryBeforeOtherTypes]
         end
@@ -6296,25 +6298,40 @@ function SetMaximumFactoryLevels(aiBrain)
 
         if aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] > 0 then
             aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(aiBrain[reftiMaxFactoryByType][refFactoryTypeLand], 1)
-            if bDebugMessages == true then LOG(sFunctionRef..': Have factories temporarily paused so only want 1 factory max') end
+            if bDebugMessages == true then LOG(sFunctionRef..': Have factories temporarily paused so only want 1 land factory max') end
         end
 
         --Reduce air factories wanted based on gross energy and mass.  Air fac uses 90 energy for intercepter (T1); Mass usage by air fac and tehc: T1: 2; T2: 5.2; T3: 14
         if bDebugMessages == true then
-            LOG(sFunctionRef .. ': aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]=' .. (aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] or 'nil'))
+            LOG(sFunctionRef .. ': Factory wanted before reducing based on gross energy and mass: aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]=' .. (aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] or 'nil'))
             LOG(sFunctionRef .. ': aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]=' .. (aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] or 'nil'))
             LOG(sFunctionRef .. ': aiBrain[refiOurHighestAirFactoryTech]=' .. (aiBrain[refiOurHighestAirFactoryTech] or 'nil'))
         end
         local iAirFactoriesPerMass
-        if aiBrain[refiOurHighestAirFactoryTech] >= 3 then iAirFactoriesPerMass = 0.6 / 14
-        elseif aiBrain[refiOurHighestAirFactoryTech] == 2 then iAirFactoriesPerMass = 0.4 / 5.2
-        else iAirFactoriesPerMass = 0.25 / 2
+        if aiBrain[refiOurHighestAirFactoryTech] >= 3 then
+            --A t3 air fac needs 14 mass/s to build an asf; assuming we devote 25% of our mass to air, that would mean wanting 1.7 air facs for every 100 gross mass; note this is the amount before various caps which will also factor in our eco
+
+            --T2 air fac building inties uses 4 mass per sec; building t1 bombers it is 7.2
+            --T1 air fac is half this
+            local iMassProportionToSpendOnAir = 0.15 --assumed amount to spend on air as a minimum
+            if not(aiBrain[M27AirOverseer.refbHaveAirControl]) or aiBrain[M27AirOverseer.refiAirAANeeded] >= 3 or aiBrain[M27AirOverseer.refiAirAAWanted] >= 8 then
+                iMassProportionToSpendOnAir = 0.25
+                if not(aiBrain[M27AirOverseer.refbHaveAirControl]) and aiBrain[M27AirOverseer.refiAirAAWanted] >= 10 then
+                    iMassProportionToSpendOnAir = 0.4
+                    if aiBrain[M27AirOverseer.refiAirAAWanted] >= 15 and aiBrain[M27AirOverseer.refiAirAANeeded] >= 3 then
+                        iMassProportionToSpendOnAir = 0.5
+                    end
+                end
+            end
+            iAirFactoriesPerMass = iMassProportionToSpendOnAir / 1.4
+        elseif aiBrain[refiOurHighestAirFactoryTech] == 2 then iAirFactoriesPerMass = 0.2 / 0.7
+        else iAirFactoriesPerMass = 0.2 / 0.35
         end
 
         aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(1, math.min((aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] or 1), math.floor(iAirFactoriesPerMass * aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]), math.floor(aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] / (13 * aiBrain[refiOurHighestAirFactoryTech] * aiBrain[refiOurHighestAirFactoryTech]))))
 
         if bDebugMessages == true then
-            LOG(sFunctionRef .. ': bActiveExperimental=' .. tostring(bActiveExperimental) .. '; Idle factories=' .. aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused])
+            LOG(sFunctionRef .. ': bActiveExperimental=' .. tostring(bActiveExperimental) .. '; Idle factories=' .. aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused]..'; iAirFactoriesPerMass='..iAirFactoriesPerMass..'; Mass income='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; Energy base income='..aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..(aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] or 'nil'))
         end
 
         aiBrain[refiMinLandFactoryBeforeOtherTypes] = math.min(aiBrain[refiMinLandFactoryBeforeOtherTypes], aiBrain[reftiMaxFactoryByType][refFactoryTypeLand])
@@ -6329,11 +6346,18 @@ function SetMaximumFactoryLevels(aiBrain)
         if aiBrain[refbCloseToUnitCap] then
             aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.min(10, aiBrain[reftiMaxFactoryByType][refFactoryTypeAir])
             aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(3, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand])
+            if bDebugMessages == true then LOG(sFunctionRef..': Close to unit cap so capping air at 10 factories, and land at 3') end
         end
 
         --Cap air factories if have 4 and low mass and dont have T3 yet
-        if aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] > 4 and aiBrain[refiOurHighestAirFactoryTech] < 3 and M27Conditions.HaveLowMass(aiBrain) then
-            aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = 4
+        if aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] > 4 and aiBrain[refiOurHighestAirFactoryTech] < 3 then
+            if M27Conditions.HaveLowMass(aiBrain) then
+                aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = 4
+                if bDebugMessages == true then LOG(sFunctionRef..': Capping air factories at 4 as dont ahve t3 yet and have low mass') end
+            else
+                aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = 5
+                if bDebugMessages == true then LOG(sFunctionRef..': Capping air factories at 5 as dont ahve t3 yet') end
+            end
         end
     end
 
