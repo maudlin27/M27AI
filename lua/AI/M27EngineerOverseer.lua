@@ -12009,7 +12009,7 @@ end--]]
                         end
                     elseif iCurrentConditionToTry == 54 then --Build factories (or upgrade HQ) if getting too much mass
                         if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; bHaveVeryLowPower='..tostring(bHaveVeryLowPower)..'; Have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl])..'; aiBrain[M27AirOverseer.refiAirAANeeded]='..(aiBrain[M27AirOverseer.refiAirAANeeded] or 'nil')..'; AirAAWanted='..(aiBrain[M27AirOverseer.refiAirAAWanted] or 'nil')..'; Air factory cap='..(aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] or 'nil')..'; Have low mass='..tostring(bHaveLowMass)) end
-                        if bHaveVeryLowPower == false and bHaveLowMass == false then
+                        if bHaveVeryLowPower == false and (bHaveLowMass == false or (aiBrain[M27AirOverseer.refbHaveAirControl] == false and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 and aiBrain[M27AirOverseer.refiAirAAWanted] >= 10)) then
                             if iLandFactories == nil then
                                 iLandFactories = aiBrain:GetCurrentUnits(refCategoryLandFactory)
                                 if iLandFactories == nil then iLandFactories = 0 end
@@ -12056,8 +12056,10 @@ end--]]
                                                 if aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] > iAirFactories then
                                                     if not(aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons]) then bTooFewAirFacs = true
                                                     else
-                                                        --Are making use of land units, check ratio of land fac vs air fac
-                                                        if iLandFactories / math.max(1,aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand]) >= iAirFactories / math.max(1, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir]) then
+                                                        if aiBrain[M27AirOverseer.refbHaveAirControl] == false and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 and aiBrain[M27AirOverseer.refiAirAAWanted] >= 5 then
+                                                            bTooFewAirFacs = true
+                                                            --Are making use of land units, check ratio of land fac vs air fac
+                                                        elseif iLandFactories / math.max(1,aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand]) >= iAirFactories / math.max(1, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir]) then
                                                             bTooFewAirFacs = true
                                                         end
                                                     end
@@ -12066,7 +12068,7 @@ end--]]
                                             end
                                         end
                                     end
-                                    if not(iActionToAssign) then
+                                    if not(iActionToAssign) and not(bHaveLowMass) then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Not building air factory; consider if we want to build more land factories; aiBrain[M27EconomyOverseer.refbWantMoreFactories]='..tostring(aiBrain[M27EconomyOverseer.refbWantMoreFactories])) end
                                         if not(iActionToAssign) then
                                             --Dont want to build any more air facs, or upgrade a HQ, and have the min. level of land facs; build another tank if we are making use of tanks and dont ahve the max number
