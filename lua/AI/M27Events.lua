@@ -9,6 +9,7 @@ local M27UnitMicro = import('/mods/M27AI/lua/AI/M27UnitMicro.lua')
 local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
+local M27Stats = import('/mods/M27AI/lua/M27StatTracking.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27PlatoonFormer = import('/mods/M27AI/lua/AI/M27PlatoonFormer.lua')
 local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
@@ -364,6 +365,30 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
             end
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    end
+
+    --Stat tracking
+    if M27Config.M27StatTracking then
+        if oUnitKilled.GetAIBrain then
+            local oKillerUnit
+            if instigator then
+                if instigator.Launcher then
+                    oKillerUnit = instigator.Launcher
+                elseif instigator.DamageData and not(instigator.unit) and not(instigator.UnitId) then
+                    --Can get errors for artillery shells when running IsProjectile
+                elseif IsProjectile(instigator) or IsCollisionBeam(instigator) then
+                    if instigator.unit then
+                        oKillerUnit = instigator.unit
+                    end
+                elseif IsUnit(instigator) then
+                    oKillerUnit = instigator
+                end
+            end
+            if oKillerUnit then
+                ForkThread(M27Stats.UpdateStatsForKiller, oKillerUnit, oUnitKilled)
+            end
+            ForkThread(M27Stats.UpdateStatsForKilled,oUnitKilled)
+        end
     end
 end
 
@@ -1316,204 +1341,204 @@ function OnConstructed(oEngineer, oJustBuilt)
 
             --Firebase tracking
             if EntityCategoryContains(M27UnitInfo.refCategoryFirebaseSuitable, oJustBuilt.UnitId) then
-            aiBrain[M27EngineerOverseer.refbPotentialFirebaseBuildingChangedSinceLastFirebaseCheck] = true
-            ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oJustBuilt)
-            --If just built by ACU than refresh firebase so ACU doesnt risk building loads more T2 PD to try and get a firebase to register
-            if EntityCategoryContains(categories.COMMAND, oEngineer.UnitId) then ForkThread(M27EngineerOverseer.RefreshListOfFirebases, aiBrain) end
+                aiBrain[M27EngineerOverseer.refbPotentialFirebaseBuildingChangedSinceLastFirebaseCheck] = true
+                ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oJustBuilt)
+                --If just built by ACU than refresh firebase so ACU doesnt risk building loads more T2 PD to try and get a firebase to register
+                if EntityCategoryContains(categories.COMMAND, oEngineer.UnitId) then ForkThread(M27EngineerOverseer.RefreshListOfFirebases, aiBrain) end
 
-            --Shields wanting hives
-            if EntityCategoryContains(M27UnitInfo.refCategoryFixedShield * categories.TECH3, oJustBuilt.UnitId) then
-            table.insert(aiBrain[M27EngineerOverseer.reftShieldsWantingHives], oJustBuilt)
-            end
+                --Shields wanting hives
+                if EntityCategoryContains(M27UnitInfo.refCategoryFixedShield * categories.TECH3, oJustBuilt.UnitId) then
+                    table.insert(aiBrain[M27EngineerOverseer.reftShieldsWantingHives], oJustBuilt)
+                end
             end
 
             --All mexes - on construction check if we have allied M27 mass storage nearby (e.g. we have rebuilt on a mex that they used to have) and if so then have that M27 gift over their mass storage
             if EntityCategoryContains(M27UnitInfo.refCategoryMex, oJustBuilt.UnitId) and aiBrain.M27AI then
-            local tMexLocation = oJustBuilt:GetPosition()
-            local tNearbyUnits = GetUnitsInRect(Rect(tMexLocation[1] - 2.1, tMexLocation[3] - 2.1, tMexLocation[1] + 2.1, tMexLocation[3] + 2.1)) --at 1.5 end up with storage thats not adjacent being gifted in some cases but not in others; at 1 none of it gets gifted; therefore added extra check for 1.5; the mass storage should be exactly 2 from the mex
-            if M27Utilities.IsTableEmpty(tNearbyUnits) == false then
-            for iUnit, oUnit in tNearbyUnits do
-            if EntityCategoryContains(M27UnitInfo.refCategoryMassStorage, oUnit.UnitId) and oUnit:GetAIBrain().M27AI and not(oUnit:GetAIBrain() == aiBrain) then
-            if bDebugMessages == true then LOG(sFunctionRef..': About to transfer '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' from brain '..oUnit:GetAIBrain().Nickname..' to '..aiBrain.Nickname..'; Dist from unit to tMexLocation='..M27Utilities.GetDistanceBetweenPositions(tMexLocation, oUnit:GetPosition())) end
-            if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tMexLocation) <= 2.1 then
-            M27Team.TransferUnitsToPlayer({oUnit}, aiBrain:GetArmyIndex(), false)
+                local tMexLocation = oJustBuilt:GetPosition()
+                local tNearbyUnits = GetUnitsInRect(Rect(tMexLocation[1] - 2.1, tMexLocation[3] - 2.1, tMexLocation[1] + 2.1, tMexLocation[3] + 2.1)) --at 1.5 end up with storage thats not adjacent being gifted in some cases but not in others; at 1 none of it gets gifted; therefore added extra check for 1.5; the mass storage should be exactly 2 from the mex
+                if M27Utilities.IsTableEmpty(tNearbyUnits) == false then
+                    for iUnit, oUnit in tNearbyUnits do
+                        if EntityCategoryContains(M27UnitInfo.refCategoryMassStorage, oUnit.UnitId) and oUnit:GetAIBrain().M27AI and not(oUnit:GetAIBrain() == aiBrain) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': About to transfer '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' from brain '..oUnit:GetAIBrain().Nickname..' to '..aiBrain.Nickname..'; Dist from unit to tMexLocation='..M27Utilities.GetDistanceBetweenPositions(tMexLocation, oUnit:GetPosition())) end
+                            if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tMexLocation) <= 2.1 then
+                                M27Team.TransferUnitsToPlayer({oUnit}, aiBrain:GetArmyIndex(), false)
+                            end
+                        end
+                    end
+                end
             end
-                end
-                end
-                end
-                end
 
-                --Initial categories below are for if not protecting from TML
-                --Mexes built by spare engineers - want to clear already assigned engineers
-                if EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oJustBuilt.UnitId) then
+            --Initial categories below are for if not protecting from TML
+            --Mexes built by spare engineers - want to clear already assigned engineers
+            if EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oJustBuilt.UnitId) then
                 if oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionSpare then
-                --reftEngineerAssignmentsByLocation --[x][y][z];  x is the unique location ref (need to use ConvertLocationToReference in utilities to use), [y] is the actionref, z is the engineer unique ref assigned to this location; returns the engineer object
-                local sLocationRef = M27Utilities.ConvertLocationToStringRef(oJustBuilt:GetPosition())
-                if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionBuildMex]) == false then
-                for iEngi, oEngi in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionBuildMex] do
-                M27Utilities.IssueTrackedClearCommands({ oEngi })
-                M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
+                    --reftEngineerAssignmentsByLocation --[x][y][z];  x is the unique location ref (need to use ConvertLocationToReference in utilities to use), [y] is the actionref, z is the engineer unique ref assigned to this location; returns the engineer object
+                    local sLocationRef = M27Utilities.ConvertLocationToStringRef(oJustBuilt:GetPosition())
+                    if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionBuildMex]) == false then
+                        for iEngi, oEngi in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionBuildMex] do
+                            M27Utilities.IssueTrackedClearCommands({ oEngi })
+                            M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
+                        end
+                    end
                 end
-                end
-                end
-                elseif EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oJustBuilt.UnitId) then
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oJustBuilt.UnitId) then
                 --Is this a land factory on a plateau?
                 local iPlateauGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oJustBuilt:GetPosition())
                 if not (iPlateauGroup == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
-                oJustBuilt[M27Transport.refiAssignedPlateau] = iPlateauGroup
-                if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup]) then
-                aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup] = {}
+                    oJustBuilt[M27Transport.refiAssignedPlateau] = iPlateauGroup
+                    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup]) then
+                        aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup] = {}
+                    end
+                    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories]) then
+                        aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories] = {}
+                    end
+                    aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories][oJustBuilt.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)] = oJustBuilt
+                    LOG('Have just recorded factory ' .. oJustBuilt.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oJustBuilt) .. ' in the list of factories for iPlateauGroup=' .. iPlateauGroup)
                 end
-                if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories]) then
-                aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories] = {}
-                end
-                aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories][oJustBuilt.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)] = oJustBuilt
-                LOG('Have just recorded factory ' .. oJustBuilt.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oJustBuilt) .. ' in the list of factories for iPlateauGroup=' .. iPlateauGroup)
-                end
-                elseif EntityCategoryContains(M27UnitInfo.refCategoryPD, oJustBuilt.UnitId) then
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryPD, oJustBuilt.UnitId) then
                 --Update PD tracking
                 aiBrain[M27EngineerOverseer.refiMassSpentOnPD] = aiBrain[M27EngineerOverseer.refiMassSpentOnPD] + oJustBuilt:GetBlueprint().Economy.BuildCostMass
-                elseif EntityCategoryContains(M27UnitInfo.refCategoryRadar - categories.TECH1, oJustBuilt.UnitId) then
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryRadar - categories.TECH1, oJustBuilt.UnitId) then
                 local tNearbyLowerTechRadar
                 local iIntelRange = oJustBuilt:GetBlueprint().Intel.RadarRadius
                 if iIntelRange >= 120 then
-                if M27UnitInfo.GetUnitTechLevel(oJustBuilt) >= 3 then
-                tNearbyLowerTechRadar = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT1Radar + M27UnitInfo.refCategoryT2Radar, oJustBuilt:GetPosition(), iIntelRange, 'Ally')
-                else
-                tNearbyLowerTechRadar = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT1Radar, oJustBuilt:GetPosition(), iIntelRange, 'Ally')
+                    if M27UnitInfo.GetUnitTechLevel(oJustBuilt) >= 3 then
+                        tNearbyLowerTechRadar = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT1Radar + M27UnitInfo.refCategoryT2Radar, oJustBuilt:GetPosition(), iIntelRange, 'Ally')
+                    else
+                        tNearbyLowerTechRadar = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT1Radar, oJustBuilt:GetPosition(), iIntelRange, 'Ally')
+                    end
+                    if M27Utilities.IsTableEmpty(tNearbyLowerTechRadar) == false then
+                        local iCurDist
+                        local iCurIntel
+                        for iUnit, oUnit in tNearbyLowerTechRadar do
+                            if oUnit:GetAIBrain().M27AI then
+                                --Are we adding any intel from here?
+                                iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oJustBuilt:GetPosition())
+                                iCurIntel = oUnit:GetBlueprint().Intel.RadarRadius or 0
+                                if bDebugMessages == true then LOG(sFunctionRef..': Just built radar '..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)..'; will consider whether have obsolete radar to destroy, oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' where iCurDist='..iCurDist..'; iCurIntel='..iCurIntel..'; iIntelRange='..iIntelRange) end
+                                if iCurDist + iCurIntel <= iIntelRange then
+                                    oUnit:Kill()
+                                end
+                            end
+                        end
+                    end
                 end
-                if M27Utilities.IsTableEmpty(tNearbyLowerTechRadar) == false then
-                local iCurDist
-                local iCurIntel
-                for iUnit, oUnit in tNearbyLowerTechRadar do
-                if oUnit:GetAIBrain().M27AI then
-                --Are we adding any intel from here?
-                iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oJustBuilt:GetPosition())
-                iCurIntel = oUnit:GetBlueprint().Intel.RadarRadius or 0
-                if bDebugMessages == true then LOG(sFunctionRef..': Just built radar '..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)..'; will consider whether have obsolete radar to destroy, oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' where iCurDist='..iCurDist..'; iCurIntel='..iCurIntel..'; iIntelRange='..iIntelRange) end
-                if iCurDist + iCurIntel <= iIntelRange then
-                oUnit:Kill()
-                end
-                end
-                end
-                end
-                end
-                elseif EntityCategoryContains(M27UnitInfo.refCategoryHive, oJustBuilt.UnitId) then
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryHive, oJustBuilt.UnitId) then
                 ForkThread(M27EngineerOverseer.HiveManager, oJustBuilt)
 
                 --Mobile unit tracking:
-                elseif EntityCategoryContains(M27UnitInfo.refCategoryLandScout, oJustBuilt.UnitId) then
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryLandScout, oJustBuilt.UnitId) then
                 aiBrain[M27Overseer.refbScoutBuiltOrDied] = true
-                elseif EntityCategoryContains(M27UnitInfo.refCategoryMAA, oJustBuilt.UnitId) then
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryMAA, oJustBuilt.UnitId) then
                 aiBrain[M27Overseer.refbMAABuiltOrDied] = true
                 --naval factory just built something?
-                elseif EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, oEngineer.UnitId) then
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, oEngineer.UnitId) then
                 --Clear assisting engineers
                 if M27Utilities.IsTableEmpty(oEngineer[M27EngineerOverseer.reftAssistingEngineers]) == false then
-                for iAssistingEngi, oAssistingEngi in oEngineer[M27EngineerOverseer.reftAssistingEngineers] do
-                --Dont clear engineers still travelling to the naval factory
-                if M27Utilities.GetDistanceBetweenPositions(oAssistingEngi:GetPosition(), oEngineer:GetPosition()) <= 30 then
-                M27Utilities.IssueTrackedClearCommands({ oAssistingEngi})
-                ClearEngineerActionTrackers(aiBrain, oAssistingEngi, true)
-                end
-                end
+                    for iAssistingEngi, oAssistingEngi in oEngineer[M27EngineerOverseer.reftAssistingEngineers] do
+                        --Dont clear engineers still travelling to the naval factory
+                        if M27Utilities.GetDistanceBetweenPositions(oAssistingEngi:GetPosition(), oEngineer:GetPosition()) <= 30 then
+                            M27Utilities.IssueTrackedClearCommands({ oAssistingEngi})
+                            ClearEngineerActionTrackers(aiBrain, oAssistingEngi, true)
+                        end
+                    end
                 end
 
                 --Have we just built a T3 naval unit? If so then send it to an open stretch of water if we have nearby land that is closer to us than the naval factory
                 if EntityCategoryContains(M27UnitInfo.refCategoryNavalSurface * categories.TECH3, oJustBuilt.UnitId) then
-                if not(oEngineer[M27Navy.refbCheckedFactoryForNearbyLand]) then
-                --Check if have nearby land and need a detour
-                local iDistanceCheck = 16
-                local iInterval = 360 / 8
-                local tCurLocation
-                local tFactoryLocation = oEngineer:GetPosition()
-                local tPossibleWaterLocation
-                local iBaseAngle = M27Utilities.GetAngleFromAToB(tFactoryLocation, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-                local tUnitLocation = oJustBuilt:GetPosition()
-                oEngineer[M27Navy.refbCheckedFactoryForNearbyLand] = true
-                local bHaveNearbyLand = false
-                if bDebugMessages == true then LOG(sFunctionRef..': oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' has just built '..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)) end
-                for iAngleAdjust = 0, (360 - iInterval), iInterval do
-                tCurLocation = M27Utilities.MoveInDirection(tUnitLocation, iBaseAngle + iAngleAdjust, iDistanceCheck, true)
-                tCurLocation[2] = GetTerrainHeight(tCurLocation[1], tCurLocation[3])
-                --Are we underwater by at least 2?
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering tCurLocation='..repru(tCurLocation)..'; Terrain height='..GetTerrainHeight(tCurLocation[1], tCurLocation[3])..'; Surface height='..GetSurfaceHeight(tCurLocation[1], tCurLocation[3])..'; Is underwater by at least 2='..tostring(M27MapInfo.IsUnderwater(tCurLocation, false, 2))) end
-                if M27MapInfo.IsUnderwater(tCurLocation, false, 2) then
-                if bDebugMessages == true then LOG(sFunctionRef..': Have a potential water location to move to; do we already ahve a possible water location='..repru(tPossibleWaterLocation)) M27Utilities.DrawLocation(tCurLocation) end
-                if not(tPossibleWaterLocation) then
-                tPossibleWaterLocation = {tCurLocation[1], tCurLocation[2], tCurLocation[3]}
+                    if not(oEngineer[M27Navy.refbCheckedFactoryForNearbyLand]) then
+                        --Check if have nearby land and need a detour
+                        local iDistanceCheck = 16
+                        local iInterval = 360 / 8
+                        local tCurLocation
+                        local tFactoryLocation = oEngineer:GetPosition()
+                        local tPossibleWaterLocation
+                        local iBaseAngle = M27Utilities.GetAngleFromAToB(tFactoryLocation, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                        local tUnitLocation = oJustBuilt:GetPosition()
+                        oEngineer[M27Navy.refbCheckedFactoryForNearbyLand] = true
+                        local bHaveNearbyLand = false
+                        if bDebugMessages == true then LOG(sFunctionRef..': oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' has just built '..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)) end
+                        for iAngleAdjust = 0, (360 - iInterval), iInterval do
+                            tCurLocation = M27Utilities.MoveInDirection(tUnitLocation, iBaseAngle + iAngleAdjust, iDistanceCheck, true)
+                            tCurLocation[2] = GetTerrainHeight(tCurLocation[1], tCurLocation[3])
+                            --Are we underwater by at least 2?
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering tCurLocation='..repru(tCurLocation)..'; Terrain height='..GetTerrainHeight(tCurLocation[1], tCurLocation[3])..'; Surface height='..GetSurfaceHeight(tCurLocation[1], tCurLocation[3])..'; Is underwater by at least 2='..tostring(M27MapInfo.IsUnderwater(tCurLocation, false, 2))) end
+                            if M27MapInfo.IsUnderwater(tCurLocation, false, 2) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have a potential water location to move to; do we already ahve a possible water location='..repru(tPossibleWaterLocation)) M27Utilities.DrawLocation(tCurLocation) end
+                                if not(tPossibleWaterLocation) then
+                                    tPossibleWaterLocation = {tCurLocation[1], tCurLocation[2], tCurLocation[3]}
 
 
-                if bHaveNearbyLand then break end
+                                    if bHaveNearbyLand then break end
+                                end
+                            else
+                                --Is this location closer to us than our naval factory?
+                                if bDebugMessages == true then LOG(sFunctionRef..': Cant path here with naval unit. bHaveNearbyLand='..tostring(bHaveNearbyLand)..'; Distance to unit='..M27Utilities.GetDistanceBetweenPositions(tUnitLocation, tCurLocation)..'; Distance to factory='..M27Utilities.GetDistanceBetweenPositions(tFactoryLocation, tCurLocation))  M27Utilities.DrawLocation(tCurLocation, nil, 2)  end
+                                if not(bHaveNearbyLand) and M27Utilities.GetDistanceBetweenPositions(tUnitLocation, tCurLocation) <= M27Utilities.GetDistanceBetweenPositions(tFactoryLocation, tCurLocation) then
+                                    bHaveNearbyLand = true
+                                    if tPossibleWaterLocation then break
+                                    end
+                                end
+                            end
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': bHaveNearbyLand='..tostring(bHaveNearbyLand)..'; tPossibleWaterLocation='..repru(tPossibleWaterLocation)) end
+                        if bHaveNearbyLand then
+                            if not(tPossibleWaterLocation) then tPossibleWaterLocation = tFactoryLocation end
+
+                            oEngineer[M27Navy.reftInitialFactoryRallyPointOverride] = {tPossibleWaterLocation[1], tPossibleWaterLocation[2], tPossibleWaterLocation[3]}
+                        end
+                    end
+                    if M27Utilities.IsTableEmpty(oEngineer[M27Navy.reftInitialFactoryRallyPointOverride]) == false then
+                        oJustBuilt[M27UnitInfo.refbSpecialMicroActive] = true
+                        M27Utilities.IssueTrackedClearCommands({oJustBuilt})
+                        IssueMove({oJustBuilt}, oEngineer[M27Navy.reftInitialFactoryRallyPointOverride])
+                        if bDebugMessages == true then LOG(sFunctionRef..': Sent special micro order to the unit '..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)..' to try and move to open water') end
+                        M27Utilities.DelayChangeVariable(oJustBuilt, M27UnitInfo.refbSpecialMicroActive, false, 10)
+                    end
                 end
-                else
-                --Is this location closer to us than our naval factory?
-                if bDebugMessages == true then LOG(sFunctionRef..': Cant path here with naval unit. bHaveNearbyLand='..tostring(bHaveNearbyLand)..'; Distance to unit='..M27Utilities.GetDistanceBetweenPositions(tUnitLocation, tCurLocation)..'; Distance to factory='..M27Utilities.GetDistanceBetweenPositions(tFactoryLocation, tCurLocation))  M27Utilities.DrawLocation(tCurLocation, nil, 2)  end
-            if not(bHaveNearbyLand) and M27Utilities.GetDistanceBetweenPositions(tUnitLocation, tCurLocation) <= M27Utilities.GetDistanceBetweenPositions(tFactoryLocation, tCurLocation) then
-            bHaveNearbyLand = true
-            if tPossibleWaterLocation then break
-            end
-            end
-            end
-            end
-            if bDebugMessages == true then LOG(sFunctionRef..': bHaveNearbyLand='..tostring(bHaveNearbyLand)..'; tPossibleWaterLocation='..repru(tPossibleWaterLocation)) end
-            if bHaveNearbyLand then
-            if not(tPossibleWaterLocation) then tPossibleWaterLocation = tFactoryLocation end
-
-            oEngineer[M27Navy.reftInitialFactoryRallyPointOverride] = {tPossibleWaterLocation[1], tPossibleWaterLocation[2], tPossibleWaterLocation[3]}
-            end
-            end
-            if M27Utilities.IsTableEmpty(oEngineer[M27Navy.reftInitialFactoryRallyPointOverride]) == false then
-            oJustBuilt[M27UnitInfo.refbSpecialMicroActive] = true
-            M27Utilities.IssueTrackedClearCommands({oJustBuilt})
-            IssueMove({oJustBuilt}, oEngineer[M27Navy.reftInitialFactoryRallyPointOverride])
-            if bDebugMessages == true then LOG(sFunctionRef..': Sent special micro order to the unit '..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)..' to try and move to open water') end
-            M27Utilities.DelayChangeVariable(oJustBuilt, M27UnitInfo.refbSpecialMicroActive, false, 10)
-            end
-            end
 
 
-            --Other tracking
+                --Other tracking
             else
-            --Have we just built an experimental unit? If so then tell our ACU to return to base as even if we havent scouted enemy threat they could have an experimental by now
-            if EntityCategoryContains(categories.EXPERIMENTAL, oJustBuilt.UnitId) then
-            aiBrain[M27Overseer.refbAreBigThreats] = true
-            end
-            if aiBrain[M27Overseer.refbEnemyTMLSightedBefore] and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
-            if EntityCategoryContains(M27UnitInfo.refCategoryProtectFromTML, oJustBuilt.UnitId) then
-            M27Logic.DetermineTMDWantedForUnits(aiBrain, { oJustBuilt })
-            elseif EntityCategoryContains(M27UnitInfo.refCategoryTMD, oJustBuilt.UnitId) then
-            --Update list of units wanting TMD to factor in if they have TMD coverage from all threats now that we have just built a TMD
-            M27Logic.DetermineTMDWantedForUnits(aiBrain, aiBrain[M27EngineerOverseer.reftUnitsWantingTMD])
-            end
-            end
-            if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, oJustBuilt.UnitId) and not (oJustBuilt[M27UnitInfo.refbActiveTargetChecker]) then
-            aiBrain[M27Overseer.refbAreBigThreats] = true
-            --T3 arti - first time its constructed want to start thread checking for power, and also tell it what to fire
-            oJustBuilt[M27UnitInfo.refbActiveTargetChecker] = true
-                ForkThread(M27Logic.GetT3ArtiTarget, oJustBuilt)
-                if bDebugMessages == true then LOG(sFunctionRef..': Just built t3 arti or equivalent so have called the logic to get t3 arti target') end
+                --Have we just built an experimental unit? If so then tell our ACU to return to base as even if we havent scouted enemy threat they could have an experimental by now
+                if EntityCategoryContains(categories.EXPERIMENTAL, oJustBuilt.UnitId) then
+                    aiBrain[M27Overseer.refbAreBigThreats] = true
+                end
+                if aiBrain[M27Overseer.refbEnemyTMLSightedBefore] and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
+                    if EntityCategoryContains(M27UnitInfo.refCategoryProtectFromTML, oJustBuilt.UnitId) then
+                        M27Logic.DetermineTMDWantedForUnits(aiBrain, { oJustBuilt })
+                    elseif EntityCategoryContains(M27UnitInfo.refCategoryTMD, oJustBuilt.UnitId) then
+                        --Update list of units wanting TMD to factor in if they have TMD coverage from all threats now that we have just built a TMD
+                        M27Logic.DetermineTMDWantedForUnits(aiBrain, aiBrain[M27EngineerOverseer.reftUnitsWantingTMD])
+                    end
+                end
+                if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, oJustBuilt.UnitId) and not (oJustBuilt[M27UnitInfo.refbActiveTargetChecker]) then
+                    aiBrain[M27Overseer.refbAreBigThreats] = true
+                    --T3 arti - first time its constructed want to start thread checking for power, and also tell it what to fire
+                    oJustBuilt[M27UnitInfo.refbActiveTargetChecker] = true
+                    ForkThread(M27Logic.GetT3ArtiTarget, oJustBuilt)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Just built t3 arti or equivalent so have called the logic to get t3 arti target') end
                 end
                 --Quantum optics redundancy
                 if EntityCategoryContains(M27UnitInfo.refCategoryQuantumOptics, oJustBuilt.UnitId) then
-                ForkThread(M27AirOverseer.QuantumOpticsManager, aiBrain, oJustBuilt)
+                    ForkThread(M27AirOverseer.QuantumOpticsManager, aiBrain, oJustBuilt)
                 end
-                end
+            end
 
 
-                --Update pond
-                if not(oJustBuilt[M27Navy.refiAssignedPond]) and (EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, oEngineer.UnitId) or EntityCategoryContains(categories.NAVAL + M27UnitInfo.refCategorySonar + M27UnitInfo.refCategoryNavalFactory + M27UnitInfo.refCategoryTorpedoLauncher, oJustBuilt.UnitId)) then
+            --Update pond
+            if not(oJustBuilt[M27Navy.refiAssignedPond]) and (EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, oEngineer.UnitId) or EntityCategoryContains(categories.NAVAL + M27UnitInfo.refCategorySonar + M27UnitInfo.refCategoryNavalFactory + M27UnitInfo.refCategoryTorpedoLauncher, oJustBuilt.UnitId)) then
                 M27Navy.UpdateUnitPond(oJustBuilt, oJustBuilt:GetAIBrain().M27Team, false)
             end
 
             --If have just upgraded a shield then clear tracking (redundancy as should also trigger from 'death' of old shield)
             if EntityCategoryContains(M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryEngineer, oEngineer.UnitId) and M27Utilities.IsTableEmpty(oJustBuilt[M27EngineerOverseer.reftAssistingEngineers]) == false then
-            for iEngi, oEngi in oJustBuilt[M27EngineerOverseer.reftAssistingEngineers] do
-            if M27UnitInfo.IsUnitValid(oEngi) then
-            M27Utilities.IssueTrackedClearCommands({ oEngi })
-            M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
-            end
-            end
+                for iEngi, oEngi in oJustBuilt[M27EngineerOverseer.reftAssistingEngineers] do
+                    if M27UnitInfo.IsUnitValid(oEngi) then
+                        M27Utilities.IssueTrackedClearCommands({ oEngi })
+                        M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
+                    end
+                end
             end
 
             --T3 mex tracking
@@ -1544,6 +1569,14 @@ function OnConstructed(oEngineer, oJustBuilt)
                 ForkThread(M27PlatoonUtilities.RunPlatoonSingleCycle, oEngineer.PlatoonHandle)
             end
         end
+    end
+
+    if M27Config.M27StatTracking then
+        if not(oJustBuilt['M27StatsTrackedConstruction']) then
+            oJustBuilt['M27StatsTrackedConstruction'] = true
+            ForkThread(M27Stats.UpdateStatsForBuilt, oJustBuilt)
+        end
+
     end
 end
 

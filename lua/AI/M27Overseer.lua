@@ -9780,6 +9780,8 @@ function OverseerManager(aiBrain)
 
     --Log of basic info to help with debugging any replays we are sent (want this enabled/running as standard)
     local sBrainInfo = 'M27Brain overseer logic is active. Nickname=' .. aiBrain.Nickname .. '; ArmyIndex=' .. aiBrain:GetArmyIndex() .. '; Start position number=' .. aiBrain.M27StartPositionNumber .. '; Start position=' .. repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) .. '; Nearest enemy brain details: Name=' .. tAllAIBrainsByArmyIndex[M27Logic.GetNearestEnemyIndex(aiBrain)].Nickname .. '; ArmyIndex=' .. M27Logic.GetNearestEnemyIndex(aiBrain) .. '; Start position=' .. M27Logic.GetNearestEnemyStartNumber(aiBrain) .. '; Start position=' .. repru(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+    if bDebugMessages == true then LOG(sFunctionRef..': reprs of brain='..reprs(aiBrain)) end
+
     if aiBrain.CheatEnabled then
         sBrainInfo = sBrainInfo..' Cheating AI with modifier '..(ScenarioInfo.Options.CheatMult or 1)..'; HasMapOmni='..tostring(ScenarioInfo.Options.OmniCheat == 'on')
     else

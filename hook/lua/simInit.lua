@@ -7,6 +7,7 @@ local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Config = import('/mods/M27AI/lua/M27Config.lua')
+local M27Stats = import('/mods/M27AI/lua/M27StatTracking.lua')
 
 --Put anything we want to only run once (not once per aiBrain) below
 local M27BeginSession = BeginSession
@@ -14,6 +15,7 @@ function BeginSession()
     M27BeginSession()
     --Call anything e.g. profilers
     if M27Config.M27RunSoftlesProfiling then ForkThread(M27Utilities.StartSoftlesProfiling) end
+    if M27Config.M27StatTracking then ForkThread(M27Stats.StatTrackingInitialisation) end
 end
 
 local M27OnCreateArmyBrain = OnCreateArmyBrain
