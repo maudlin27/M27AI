@@ -6960,8 +6960,7 @@ function AirAAManager(aiBrain)
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': Will hold back AirAA if need to build up our force.  aiBrain[refbMercySightedRecently]=' .. tostring(aiBrain[refbMercySightedRecently]) .. '; aiBrain[refiHighestEnemyAirThreat]=' .. aiBrain[refiHighestEnemyAirThreat] .. '; aiBrain[refiOurMassInAirAA]=' .. aiBrain[refiOurMassInAirAA])
         end
-        if not (aiBrain[refbMercySightedRecently]) and aiBrain[refiHighestEnemyAirThreat] >= 2000 and not ((aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill)) then
-            local iTeamAirAAMass = aiBrain[refiTeamMassInAirAA]
+        if not (aiBrain[refbMercySightedRecently]) and aiBrain[refiHighestEnemyAirThreat] >= 150 and not ((aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill)) then
             --[[if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) then
                 for iAlly, oAllyBrain in aiBrain[M27Overseer.toAllyBrains] do
                     if oAllyBrain.M27AI then
@@ -6969,7 +6968,7 @@ function AirAAManager(aiBrain)
                     end
                 end
             end--]]
-            if iTeamAirAAMass < aiBrain[refiEnemyAirAAThreat] then
+            if aiBrain[refiTeamMassInAirAA] < aiBrain[refiEnemyAirAAThreat] or (aiBrain[refiHighestEnemyAirThreat] >= 1000 and aiBrain[refiHighestEnemyAirThreat] * 0.8 > aiBrain[refiTeamMassInAirAA]) then
                 --Have lost air control so only engage threats nearby
                 bIgnoreUnlessEmergencyThreat = true
             end

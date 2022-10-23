@@ -6074,7 +6074,7 @@ function DetermineActionForNearbyReclaim(oPlatoon, bIgnoreNearbyEnemies)
                         if M27Conditions.DoesACUHaveGun(aiBrain, false) then iEnemyRangeThreshold = 40 end
                         if oFirstReclaimer:HasEnhancement('AdvancedEngineering') or oFirstReclaimer:HasEnhancement('T3Engineering') then bHaveT2OrT3 = true end
 
-                        if oPlatoon[refbACUInPlatoon] and EntityCategoryContains(categories.COMMAND, oFirstReclaimer.UnitId) and M27Utilities.IsTableEmpty(oFirstReclaimer[M27Overseer.reftACURecentHealth]) == false then iHealthLossPerSec = ((oFirstReclaimer[M27Overseer.reftACURecentHealth][iCurTime - 10] or oFirstReclaimer[M27Overseer.reftACURecentHealth][iCurTime - 11]) - (oFirstReclaimer[M27Overseer.reftACURecentHealth][iCurTime] or oFirstReclaimer[M27Overseer.reftACURecentHealth][iCurTime-1] or oFirstReclaimer[M27Overseer.reftACURecentHealth][iCurTime-2])) / 10 end
+                        if oPlatoon[refbACUInPlatoon] and EntityCategoryContains(categories.COMMAND, oFirstReclaimer.UnitId) and M27Utilities.IsTableEmpty(oFirstReclaimer[M27Overseer.reftACURecentHealth]) == false and GetGameTimeSeconds() >= 15 then iHealthLossPerSec = ((oFirstReclaimer[M27Overseer.reftACURecentHealth][iCurTime - 10] or oFirstReclaimer[M27Overseer.reftACURecentHealth][iCurTime - 11]) - (oFirstReclaimer[M27Overseer.reftACURecentHealth][iCurTime] or oFirstReclaimer[M27Overseer.reftACURecentHealth][iCurTime-1] or oFirstReclaimer[M27Overseer.reftACURecentHealth][iCurTime-2])) / 10 end
                         if iHealthLossPerSec >= 10 and (iHealthLossPerSec >= 50 or (not(bHaveT2OrT3))) then
                             bHaveNearbyEnemies = true
                         else
