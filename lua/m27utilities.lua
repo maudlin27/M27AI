@@ -1285,7 +1285,7 @@ function EveryFunctionHook()
     end
 end
 
-function OutputRecentFunctionCalls()
+function OutputRecentFunctionCalls(sRef, iCycleSize)
 --NOTE: Insert below commented out code into e.g. the overseer for the second that want it.  Also can adjust the threshold for iFunctionCurCount from 10000, but if setting to 1 then only do for an individual tick or likely will crash the game
     --[[if not(bSetHook) and GetGameTimeSeconds() >= 1459 then
         bDebugMessages = true
@@ -1298,7 +1298,7 @@ function OutputRecentFunctionCalls()
     local sName = tostring(debug.getinfo(2, "n").name)
     if sName then tFunctionCallByName[sName] = (tFunctionCallByName[sName] or 0) + 1 end
     iFunctionCurCount = iFunctionCurCount + 1
-    if iFunctionCurCount >= 10000 then
+    if iFunctionCurCount >= iCycleSize then
         iFunctionCurCount = 0
         LOG('Every function hook: tFunctionCallByName='..repru(tFunctionCallByName))
         tFunctionCallByName = {}

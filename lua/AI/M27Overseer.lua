@@ -1168,6 +1168,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AssignMAAToPreferredPlatoons'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if GetGameTimeSeconds() >= 300 and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
 
     if aiBrain[refbMAABuiltOrDied] or GetGameTimeSeconds() - (aiBrain[refiLastCheckedMAAAssignments] or -100) >= 4 then
         aiBrain[refbMAABuiltOrDied] = false
@@ -1197,13 +1198,35 @@ function AssignMAAToPreferredPlatoons(aiBrain)
         local tiMAAMassValue = { 55, 160, 400, 400 } --Will have mixture of T2 and T3 at T3+
         local iSingleMAAMassValue = tiMAAMassValue[aiBrain[refiOurHighestFactoryTechLevel]]
 
+        local oACU = M27Utilities.GetACU(aiBrain)
+
         --Adjust MAA based on enemy air threat
         if aiBrain[M27AirOverseer.refbHaveAirControl] then
             iAirThreatMAAFactor = 0.1
             iMaxMAAWantedForACUAtOnce = 1
         else
             --Increase minimum MAA slightly if enemy has a notable air threat
+            if bDebugMessages == true then LOG(sFunctionRef..': Dont have air control, will increase MAA wanted. aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]..'; iACUMinMAAThreatWantedWithAirThreat pre adjust='..iACUMinMAAThreatWantedWithAirThreat..'; ACU dist from base='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Is ACU underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oACU))..'; Enemy T2+ air factories='..(aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][2] + aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3])..'; Enemy air to ground threat='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]) end
             if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] > 250 then iACUMinMAAThreatWantedWithAirThreat = iACUMinMAAThreatWantedWithAirThreat + 55 * aiBrain[refiOurHighestFactoryTechLevel] end
+
+
+            --Further increase AA wanted if ACU is far from base
+            if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 200 and not(M27UnitInfo.IsUnitUnderwater(oACU)) then
+
+                if (aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 0) > 0 then
+
+                    if aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] > 500 and (aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][2] + aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3]) > 0 then
+                        iAirThreatMAAFactor = iAirThreatMAAFactor * 1.6
+                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy has significant air to ground threat so increasing iAirThreatMAAFactor to '..iAirThreatMAAFactor) end
+                    else
+                        iAirThreatMAAFactor = iAirThreatMAAFactor * 1.4
+                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy has some air to ground threat so increasing iAirThreatMAAFactor to '..iAirThreatMAAFactor) end
+                    end
+                else
+                    iAirThreatMAAFactor = iAirThreatMAAFactor * 1.2
+                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy has no air to ground threat so only increasing MAA factor to '..iAirThreatMAAFactor) end
+                end
+            end
         end
         if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] > 0 then
             if (aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 0) > 0 then
@@ -1214,7 +1237,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
         end
 
 
-        local oACU = M27Utilities.GetACU(aiBrain)
+
 
 
 
@@ -1233,8 +1256,10 @@ function AssignMAAToPreferredPlatoons(aiBrain)
             if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.max(iDistanceFromBaseToBeSafe, 80) and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructureAA * categories.TECH3, oACU:GetPosition(), 50, 'Ally')) == false then
                 iMAAThreatWanted = math.min(800, iMAAThreatWanted)
                 iMinACUMAAThreatWanted = math.min(iMinACUMAAThreatWanted * 0.35, iMAAThreatWanted * 0.7)
+                if bDebugMessages == true then LOG(sFunctionRef..': ACU near SAM so capping iMAAThreatWanted='..iMAAThreatWanted..'; iMinACUMAAThreatWanted='..iMinACUMAAThreatWanted) end
             end
 
+            if bDebugMessages == true then LOG(sFunctionRef..': If we have at least T2 and ACU has decent health then will limit the MAA to get for it. aiBrain[refiOurHighestFactoryTechLevel]='..aiBrain[refiOurHighestFactoryTechLevel]..'; M27UnitInfo.GetUnitHealthPercent(oACU)='..M27UnitInfo.GetUnitHealthPercent(oACU)) end
             if aiBrain[refiOurHighestFactoryTechLevel] >= 2 and M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.75 then
                 local iAACategory
                 if aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0 then iAACategory = M27UnitInfo.refCategoryStructureAA * categories.TECH3
@@ -1251,12 +1276,23 @@ function AssignMAAToPreferredPlatoons(aiBrain)
                     elseif iDistToBase <= 125 then
                         iMAAThreatWanted = math.min(iMAAThreatWanted, iMinACUMAAThreatWanted * 1.2)
                         iMinACUMAAThreatWanted = iMinACUMAAThreatWanted * 0.6
-                    else
+                    elseif iDistToBase <= 200 then
                         iMAAThreatWanted = math.min(iMAAThreatWanted, iMinACUMAAThreatWanted * 1.5)
                         iMinACUMAAThreatWanted = iMinACUMAAThreatWanted * 0.8
+                        if bDebugMessages == true then LOG(sFunctionRef..': ACU isnt that close to base so iMAAThreatWanted='..iMAAThreatWanted..'; iMinACUMAAThreatWanted='..iMinACUMAAThreatWanted) end
+                    else
+                        iMAAThreatWanted = math.min(iMAAThreatWanted, iMinACUMAAThreatWanted * 2.5, math.max(iMinACUMAAThreatWanted * 1.75, 500 + 250 * (aiBrain[refiOurHighestLandFactoryTech] - 1)))
+                        iMinACUMAAThreatWanted = iMinACUMAAThreatWanted
+                        if bDebugMessages == true then LOG(sFunctionRef..': ACU far away so greatly increasing the cap on the min MAA wanted. iMAAThreatWanted='..iMAAThreatWanted..'; iMinACUMAAThreatWanted='..iMinACUMAAThreatWanted) end
                     end
                 end
             end
+
+            if iMAAThreatWanted > 400 then
+                --Cap based on eco, and also if only have t1 land fac
+                iMAAThreatWanted = math.min(aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] * 20 + 400 * aiBrain[refiOurHighestFactoryTechLevel] + 400 * (aiBrain[refiOurHighestFactoryTechLevel] - 1), 420 + 3000 * (aiBrain[refiOurHighestFactoryTechLevel] - 1), iMAAThreatWanted)
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Added overall cap for ACU MAA wanted based on our eco. iMAAThreatWanted post cap='..iMAAThreatWanted..'; Gross mass income='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]) end
         end
         local oExistingMAAPlatoon = oACU[refoUnitsMAAHelper]
 
@@ -1268,6 +1304,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
                 iMAAThreatWanted = iMAAThreatWanted + 200
                 iMinACUMAAThreatWanted = iMinACUMAAThreatWanted + 200
             end
+            if bDebugMessages == true then LOG(sFunctionRef..': Are vulnerable to air snipe so increasing MAA wanted, iMAAThreatWanted='..iMAAThreatWanted..'; iMinACUMAAThreatWanted='..iMinACUMAAThreatWanted..'; iAirThreatMAAFactor='..iAirThreatMAAFactor) end
         end
 
 
@@ -1277,7 +1314,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
         local oNewMAAPlatoon
 
         if bDebugMessages == true then
-            LOG(sFunctionRef .. ': About to check if ACU needs MAA; iMAAWanted=' .. iMAAThreatWanted..'; iMinACUMAAThreatWanted='..iMinACUMAAThreatWanted..'; Enemy air to ground threat='..(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 0)..'; Enemy air factories='..repru(aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech]))
+            LOG(sFunctionRef .. ': About to check if ACU needs MAA; iMAAWanted=' .. iMAAThreatWanted..'; iMinACUMAAThreatWanted='..iMinACUMAAThreatWanted..'; Enemy air to ground threat='..(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 0)..'; Enemy air factories='..repru(aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech])..'; aiBrain[refbACUVulnerableToAirSnipe]='..tostring(aiBrain[refbACUVulnerableToAirSnipe])..'; ')
             if oExistingMAAPlatoon then LOG(sFunctionRef..': oExistingMAAPlatoon mass value='..oExistingMAAPlatoon[M27PlatoonUtilities.refiPlatoonMassValue]..'; current units='..oExistingMAAPlatoon[M27PlatoonUtilities.refiCurrentUnits]) end
         end
         if not (oExistingMAAPlatoon == nil) then
@@ -9822,14 +9859,14 @@ function OverseerManager(aiBrain)
         --M27IsDefeated check is below
 
         --TestCustom(aiBrain)
-        --if GetGameTimeSeconds() >= 720 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true bDebugMessages = false end
-        --if GetGameTimeSeconds() >= 1920 then bDebugMessages = true M27Config.M27RunProfiling = true ForkThread(M27Utilities.ProfilerActualTimePerTick) end
-        --[[if not(bSetHook) and GetGameTimeSeconds() >= 322 then
+        --if GetGameTimeSeconds() >= 300 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true LOG('GameTime='..GetGameTimeSeconds()) bDebugMessages = false end
+        --if GetGameTimeSeconds() >= 428.8 then bDebugMessages = true M27Config.M27RunProfiling = true ForkThread(M27Utilities.ProfilerActualTimePerTick) end
+        --[[if not(bSetHook) and GetGameTimeSeconds() >= 428.8 then
             bDebugMessages = true
             bSetHook = true
             M27Utilities.bGlobalDebugOverride = true
-            --debug.sethook(M27Utilities.AllFunctionHook, "c", 200)
             debug.sethook(M27Utilities.OutputRecentFunctionCalls, "c", 200)
+            LOG('Have started the main hook of function calls')
         end--]]
 
 

@@ -10976,7 +10976,7 @@ end--]]
                         if bDebugMessages == true then LOG(sFunctionRef..': Considerin if HaveApproachingLandExperimentalThreat='..tostring(M27Conditions.HaveApproachingLandExperimentalThreat(aiBrain))..'; Cur bombers='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber)..'; Cur air factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory)) end
                         if M27Conditions.HaveApproachingLandExperimentalThreat(aiBrain) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber) <= 100 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory) then
                             iActionToAssign = refActionAssistAirFactory
-                            iMaxEngisWanted = math.min(50, aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] / 30)
+                            iMaxEngisWanted = math.min(30, aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] / 30) --20 T3 engineers assisting a T3 air factory should produce bombers at max speed; however some engis might be lower tech, and we might be assisting multiple air factories, and we might not be building t1 bombers initially, so have cap at 30 (prev was 50)
                             if bDebugMessages == true then LOG(sFunctionRef..': Will assist air fac, iMaxEngisWanted='..tostring(iMaxEngisWanted)) end
                         end
                     elseif iCurrentConditionToTry == 23 then --Backup power - build 2nd power if have very low power and first pgen isnt constructing
