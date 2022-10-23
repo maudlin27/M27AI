@@ -133,7 +133,7 @@ function MonitorIncomeGeneration()
             --Output the tables
             LOG('?=*1Time='..iPrevRoundedTime..';About to list out the full stats table for each brain')
             for iIndex, tSubtable in tStatsByBrain do
-                if not(M27Logic.IsCivilianBrain(tBrainsToConsider[iIndex])) then
+                if tBrainsToConsider[iIndex].Nickname and not(M27Logic.IsCivilianBrain(tBrainsToConsider[iIndex])) then
                     --LOG('Brain index '..iIndex..': Does it have an empty subtable='..tostring(M27Utilities.IsTableEmpty(tSubtable[iPrevRoundedTime])))
                     if tSubtable[iPrevRoundedTime] then
                         LOG('Brain='..GetBrainName(iIndex)..'; BrainIndex='..iIndex..'; Stats for time='..iPrevRoundedTime..'='..reprs(tSubtable[iPrevRoundedTime]))
@@ -164,17 +164,23 @@ end
 
 
 function UpdateStatsForKiller(oKiller, oKilled)
-    if oKilled.GetBlueprint then
+    if oKilled.GetBlueprint and oKiller.GetAIBrain then
         UpdateStatsForUnit(oKiller:GetAIBrain():GetArmyIndex(), oKiller, subrefTypeMassKiller, oKilled:GetBlueprint().Economy.BuildCostMass)
     end
 end
 
 function UpdateStatsForKilled(oKilled)
-    UpdateStatsForUnit(oKilled:GetAIBrain():GetArmyIndex(), oKilled, subrefTypeMassLost)
+    if oKilled.GetAIBrain then
+        --NOTE: Only way to avoid occasional lua errors seems to be checking oKilled:IsDestroyed(), but this then means we dont record any units killed so defeats the purpose
+        UpdateStatsForUnit(oKilled:GetAIBrain():GetArmyIndex(), oKilled, subrefTypeMassLost)
+    end
 end
 
 function UpdateStatsForBuilt(oBuilt)
-    UpdateStatsForUnit(oBuilt:GetAIBrain():GetArmyIndex(), oBuilt, subrefTypeMassConstructed)
+    if oBuilt.GetAIBrain then
+
+            UpdateStatsForUnit(oBuilt:GetAIBrain():GetArmyIndex(), oBuilt, subrefTypeMassConstructed)
+    end
 end
 
 
