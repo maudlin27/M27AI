@@ -1498,7 +1498,8 @@ function GetACUCombatMassRating(oACU)
     return iTotalMassValue
 end
 
-function GetACUMaxDFRange(oACU)
+--v61 - removed the below so everything uses GetUnitMaxGroundRange(oUnit) instead
+--[[function GetACUMaxDFRange(oACU)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetACUMaxDFRange'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -1516,10 +1517,12 @@ function GetACUMaxDFRange(oACU)
                 end
             end
         end
+    else    --redundancy, e.g. in case have ACU or SACU with no upgrade list
+        return M27UnitInfo.GetUnitMaxGroundRange(oUnit)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iRange
-end
+end--]]
 
 
 
@@ -1548,7 +1551,7 @@ function GetDFAndT1ArtiUnitMinOrMaxRange(tUnits, iReturnRangeType)
     for i, oUnit in tAllUnits do
         --if EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId) then bDebugMessages = true end
         if not(oUnit.Dead) then
-            if M27Utilities.IsACU(oUnit) == false then
+            if M27Utilities.IsACU(oUnit) == false and not(EntityCategoryContains(categories.SUBCOMMANDER, oUnit.UnitId)) then
                 if oUnit.GetBlueprint then
                     if EntityCategoryContains(M27UnitInfo.refCategorySniperBot * categories.SERAPHIM, oUnit.UnitId) and oUnit:GetAIBrain().M27AI then
                         if oUnit[M27UnitInfo.refbSniperRifleEnabled] then iMaxRange = 75 iMinRange = 75
@@ -1564,7 +1567,9 @@ function GetDFAndT1ArtiUnitMinOrMaxRange(tUnits, iReturnRangeType)
                 end
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': Have an ACU blueprint, using custom logic to work out DF range') end
-                iMaxRange = GetACUMaxDFRange(oUnit)
+                iMaxRange = M27UnitInfo.GetUnitMaxGroundRange(oUnit)
+                if bDebugMessages == true then LOG(sFunctionRef..': iMaxRange='..(iMaxRange or 'nil')) end
+                --iMaxRange = GetACUMaxDFRange(oUnit)
                 iMinRange = iMaxRange
             end
         end

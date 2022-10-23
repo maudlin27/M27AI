@@ -1082,7 +1082,8 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
         if bDebugMessages == true then LOG(sFunctionRef..': Do we have resources to overcharge='..tostring((bResourcesToOvercharge or false))) end
         if bResourcesToOvercharge == true then
             local tUnitPosition = oUnitWithOvercharge:GetPosition()
-            local iACURange = M27Logic.GetACUMaxDFRange(oUnitWithOvercharge)
+            --local iACURange = M27Logic.GetACUMaxDFRange(oUnitWithOvercharge)
+            local iACURange = M27UnitInfo.GetUnitMaxGroundRange(oUnitWithOvercharge)
             local iOverchargeArea = 2.5
             local bAbort = false
 

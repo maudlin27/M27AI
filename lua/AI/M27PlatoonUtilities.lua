@@ -5189,7 +5189,7 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
             oPlatoon[refbACUInPlatoon] = bACUInPlatoon
             if bACUInPlatoon then
                 oPlatoon[refiReclaimers] = 1
-                oPlatoon[refiPlatoonMaxRange] = M27Logic.GetACUMaxDFRange(M27Utilities.GetACU(aiBrain))
+                oPlatoon[refiPlatoonMaxRange] = M27UnitInfo.GetUnitMaxGroundRange(M27Utilities.GetACU(aiBrain)) --M27Logic.GetACUMaxDFRange(M27Utilities.GetACU(aiBrain))
             end --Default, as later on the code will treat us as not having any reclaimers if there are nearby enemies
             oPlatoon[refiCurrentUnits] = table.getn(oPlatoon[reftCurrentUnits])
             --Update list of units by type if current unit number has changed or we have dead units in platoon
@@ -10791,7 +10791,7 @@ function ProcessPlatoonAction(oPlatoon)
                                 --Do we need to move closer to get in range of overcharge (e.g. are targetting T2 PD)?
                                 local tOCTargetPos = oPlatoon[refExtraActionTargetUnit]:GetPosition()
                                 local tOverchargingUnitPos = oOverchargingUnit:GetPosition()
-                                local iOverchargingUnitRange = M27Logic.GetACUMaxDFRange(oOverchargingUnit)
+                                local iOverchargingUnitRange = M27UnitInfo.GetUnitMaxGroundRange(oOverchargingUnit) --M27Logic.GetACUMaxDFRange(oOverchargingUnit)
                                 local iDistanceBetweenUnits = M27Utilities.GetDistanceBetweenPositions(tOCTargetPos, tOverchargingUnitPos)
                                 local tMoveTarget = {}
                                 local tPossibleTarget = {}

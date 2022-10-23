@@ -9356,10 +9356,24 @@ end
 function TestCustom(aiBrain)
     local sFunctionRef = 'TestCustom'
 
-    local tFriendlyACU = aiBrain:GetListOfUnits(ParseEntityCategory('COMMAND'))
+    --Calc range of SACUs - test
+    local tEnemySACU = aiBrain:GetUnitsAroundPoint(categories.SUBCOMMANDER, {0,0,0}, 1000, 'Enemy')
+    if M27Utilities.IsTableEmpty(tEnemySACU) == false then
+        for iUnit, oUnit in tEnemySACU do
+            LOG('Getting SACU range, oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; GetBlueprintMaxGroundRange(oBP)='..M27UnitInfo.GetBlueprintMaxGroundRange(oUnit:GetBlueprint())..'; GetUnitMaxGroundRange(oUnit)='..M27UnitInfo.GetUnitMaxGroundRange(oUnit)..'; GetNavalDirectAndSubRange(oUnit)='..M27UnitInfo.GetNavalDirectAndSubRange(oUnit)..'; GetUnitMaxGroundRange(tUnits)='..M27Logic.GetUnitMaxGroundRange({oUnit}))
+            for sEnhancement, tEnhancement in oUnit:GetBlueprint().Enhancements do
+                LOG('Does unit have enhancement '..sEnhancement..'='..tostring(oUnit:HasEnhancement(sEnhancement)))
+                if oUnit:HasEnhancement(sEnhancement) then
+                    LOG('NewMaxRadius='..(tEnhancement['NewMaxRadius'] or 'nil'))
+                end
+            end
+        end
+    end
+
+    --[[local tFriendlyACU = aiBrain:GetListOfUnits(ParseEntityCategory('COMMAND'))
     LOG('Is table empty='..tostring(M27Utilities.IsTableEmpty(tFriendlyACU)))
     local tAltACU = aiBrain:GetListOfUnits(ParseEntityCategory(categories.COMMAND))
-    LOG('Is 2nd table empty='..tostring(M27Utilities.IsTableEmpty(tAltACU)))
+    LOG('Is 2nd table empty='..tostring(M27Utilities.IsTableEmpty(tAltACU)))--]]
 
     --[[local tMissileShips = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryMissileShip)
     if M27Utilities.IsTableEmpty(tMissileShips) == false then
