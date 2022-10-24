@@ -79,7 +79,7 @@ reftoNearestEnemyBrainByGroup = 'M27NearestEnemyBrainsByGroup' --groups enemies 
 refiModDistFromStartNearestOutstandingThreat = 'M27NearestOutstandingThreat' --Mod distance of the closest enemy threat (using GetDistanceFromStartAdjustedForDistanceFromMid)
 refiModDistFromStartNearestThreat = 'M27OverseerNearestThreat' --Mod distance of the closest enemy, even if we have enough defenders to deal with it
 refiModDistEmergencyRange = 'M27OverseerModDistEmergencyRange'
-reftLocationFromStartNearestThreat = 'M27OverseerLocationNearestLandThreat' --Distance of closest enemy
+reftLocationFromStartNearestThreat = 'M27OverseerLocationNearestLandThreat' --Location of closest enemy
 refoNearestThreat = 'M27overseerNearestLandThreat' --Unit of nearest land threat
 refoNearestEnemyT2PlusStructure = 'M27OverseerNearestEnemyT2PlusStructure' --against aibrain, nearest enemy T2+ structure
 refiNearestEnemyT2PlusStructure = 'M27OverseerNearestEnemyT2PlusStructureDistance' --against aibrain, distance to our base of nearest enemy T2+ structure
@@ -136,6 +136,7 @@ refiMinIndirectTechLevel = 'M27OverseerMinIndirectTech'
 refbNeedScoutPlatoons = 'M27NeedScoutPlatoons'
 refbNeedMAABuilt = 'M27NeedMAABuilt'
 refbEmergencyMAANeeded = 'M27OverseerNeedEmergencyMAA'
+iMAAMinExperimentalLevelWithoutAir = 1500 --Mass value of MAA wanted as a minimum for experimental if we lack air control (referenced in a few places)
 refbACUVulnerableToAirSnipe = 'M27OverseerACUVulnerableToAirSnipe'
 refbUnclaimedMexNearACU = 'M27UnclaimedMexNearACU'
 refoReclaimNearACU = 'M27ReclaimObjectNearACU'
@@ -1473,6 +1474,8 @@ function AssignMAAToPreferredPlatoons(aiBrain)
                                 iMAAWanted = math.min(iMaxMAASize, math.floor(oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] / iThresholdForAMAA))
                                 if oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] or 0 <= 10000 then
                                     iMAAWanted = math.min(iMAAWanted, 8)
+                                else
+                                    iMAAWanted = math.max(iMAAWanted, iMAAMinExperimentalLevelWithoutAir)
                                 end
                                 tPlatoonCurrentMAAs = EntityCategoryFilterDown(refCategoryMAA, oPlatoon:GetPlatoonUnits())
                                 if M27Utilities.IsTableEmpty(tPlatoonCurrentMAAs) == true then

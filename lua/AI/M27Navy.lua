@@ -2757,10 +2757,10 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                                     end
                                 elseif iCurDistToClosestEnemy + iMinDistanceWithinAttackRangeWanted < oUnit[M27UnitInfo.refiAntiNavyRange] then
                                     --Attack-move to target
-                                    MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, not(oUnit[M27UnitInfo.refbLastShotBlocked]), 'AGetInRange')
+                                    MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, not(oUnit[M27UnitInfo.refbLastShotBlocked]), 'ASGetInRange')
                                 else
                                     --Move towards target (non-attack move)
-                                    MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, false, 'MGetInRange')
+                                    MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, false, 'MSGetInRange')
                                 end
                             end
                         end
@@ -2886,9 +2886,32 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                             local tPriorityTargets = {}
                             local oPriorityTarget
                             local iCurDistToPriority
+                            local tEnemyPD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD + M27UnitInfo.refCategoryTorpedoLauncher + M27UnitInfo.refCategoryFixedT2Arti, oClosestFriendlyUnitToEnemyBase:GetPosition(), 120, 'Enemy')
                             if bChargeEnemyBase then
                                 tPriorityTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD + M27UnitInfo.refCategoryTorpedoLauncher - categories.SUBMERSIBLE + M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryNavalFactory, tClosestEnemyTargetToUse, 120, 'Enemy')
                             end
+
+                            function RetreatFromPD(oUnit)
+                                bDebugMessages = true
+
+                                if M27Utilities.IsTableEmpty(tEnemyPD) == false then
+                                    for iPD, oPD in tEnemyPD do
+                                        if bDebugMessages == true then LOG(sFunctionRef..': RetreatFromPD: oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oPD='..oPD.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPD)..'; Dist between them='..M27Utilities.GetDistanceBetweenPositions(oPD:GetPosition(), oUnit:GetPosition())..'; Range of PD='..M27UnitInfo.GetNavalDirectAndSubRange(oPD)) end
+                                        if M27Utilities.GetDistanceBetweenPositions(oPD:GetPosition(), oUnit:GetPosition()) - 8 <= M27UnitInfo.GetNavalDirectAndSubRange(oPD) then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Want to retreat from PD') end
+                                            MoveUnitTowardsTarget(oUnit, tOurBase, false, 'PDRetreat')
+                                            return true
+                                        end
+                                    end
+                                end
+                                if bDebugMessages == true then LOG(sFunctionRef..': No PD to retreat from') end
+                                bDebugMessages = false
+                                return false
+
+                            end
+
+
+
 
 
 
@@ -2951,7 +2974,10 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                                             end
                                         else
                                             if not(ConsiderIssuingGroundFireOrder(oUnit)) then
-                                                MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, not(oUnit[M27UnitInfo.refbLastShotBlocked]), 'AGetInRange')
+                                                --Retreat if we are in range of any enemy PD
+                                                if not(RetreatFromPD(oUnit)) then
+                                                    MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, not(oUnit[M27UnitInfo.refbLastShotBlocked]), 'AGetInRange')
+                                                end
                                             end
                                         end
                                     else
@@ -2960,7 +2986,9 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                                             MoveUnitTowardsTarget(oUnit, tOurBase, false, 'IndirectRetreat')
                                         elseif not(ConsiderIssuingGroundFireOrder(oUnit)) then
                                             --Move towards target (non-attack move)
-                                            MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, false, 'MGetInRange')
+                                            if not(RetreatFromPD(oUnit)) then
+                                                MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, false, 'MGetInRange')
+                                            end
                                         end
                                     end
                                 end
@@ -3046,30 +3074,32 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
         local iMaxSearchRange
         for iMex, tMexInfo in tPondDetails[iPond][subrefPondMexInfo] do
             if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Considering mex that is ' .. M27Utilities.GetDistanceBetweenPositions(tMexInfo[subrefMexLocation], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) .. ' from our start position and ' .. M27Utilities.GetDistanceBetweenPositions(tMexInfo[subrefMexLocation], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) .. ' from enemy base. DF distance to hit mex=' .. tMexInfo[subrefMexDFDistance] .. '; Indirect distance=' .. tMexInfo[subrefMexIndirectDistance])
+                LOG(sFunctionRef .. ': Considering mex that is ' .. M27Utilities.GetDistanceBetweenPositions(tMexInfo[subrefMexLocation], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) .. ' from our start position and ' .. M27Utilities.GetDistanceBetweenPositions(tMexInfo[subrefMexLocation], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) .. ' from enemy base. DF distance to hit mex=' .. tMexInfo[subrefMexDFDistance] .. '; Indirect distance=' .. tMexInfo[subrefMexIndirectDistance]..'; Is underwater='..tostring(M27MapInfo.IsUnderwater(tMexInfo[subrefMexLocation])))
             end
             if tMexInfo[subrefMexDFDistance] <= iOurBestDFRange or tMexInfo[subrefMexIndirectDistance] <= iOurBestIndirectRange then
-                iCurDist = M27Utilities.GetDistanceBetweenPositions(tMexInfo[subrefMexLocation], tFrontPosition)
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': iCurDist to our closest navla unit=' .. iCurDist .. '; iClosestMexDist=' .. iClosestMexDist)
-                end
-                if iCurDist < iClosestMexDist then
-                    --Does the enemy have any buildings near here?
-                    iMaxSearchRange = 200
-                    if tMexInfo[subrefMexIndirectDistance] <= iOurBestIndirectRange then
-                        iMaxSearchRange = iOurBestIndirectRange - tMexInfo[subrefMexIndirectDistance]
-                    end
-                    if tMexInfo[subrefMexDFDistance] <= iOurBestDFRange and iOurBestDFRange >= iOurBestIndirectRange then
-                        iMaxSearchRange = iOurBestDFRange - tMexInfo[subrefMexDFDistance]
-                    end
-                    iMaxSearchRange = math.max(2, iMaxSearchRange)
-                    tEnemyBuildings = aiBrain:GetUnitsAroundPoint(iBombardmentBuildingCategory, tMexInfo[subrefMexLocation], math.min(iBombardmentSearchRange, iMaxSearchRange), 'Enemy')
+                if not(M27MapInfo.IsUnderwater(tMexInfo[subrefMexLocation])) then
+                    iCurDist = M27Utilities.GetDistanceBetweenPositions(tMexInfo[subrefMexLocation], tFrontPosition)
                     if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Is table of enemy buildings around mex empty=' .. tostring(M27Utilities.IsTableEmpty(tEnemyBuildings)))
+                        LOG(sFunctionRef .. ': iCurDist to our closest navla unit=' .. iCurDist .. '; iClosestMexDist=' .. iClosestMexDist)
                     end
-                    if M27Utilities.IsTableEmpty(tEnemyBuildings) == false then
-                        iClosestMexDist = iCurDist
-                        iClosestMexRef = iMex
+                    if iCurDist < iClosestMexDist then
+                        --Does the enemy have any buildings near here?
+                        iMaxSearchRange = 200
+                        if tMexInfo[subrefMexIndirectDistance] <= iOurBestIndirectRange then
+                            iMaxSearchRange = iOurBestIndirectRange - tMexInfo[subrefMexIndirectDistance]
+                        end
+                        if tMexInfo[subrefMexDFDistance] <= iOurBestDFRange and iOurBestDFRange >= iOurBestIndirectRange then
+                            iMaxSearchRange = iOurBestDFRange - tMexInfo[subrefMexDFDistance]
+                        end
+                        iMaxSearchRange = math.max(2, iMaxSearchRange)
+                        tEnemyBuildings = aiBrain:GetUnitsAroundPoint(iBombardmentBuildingCategory, tMexInfo[subrefMexLocation], math.min(iBombardmentSearchRange, iMaxSearchRange), 'Enemy')
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Is table of enemy buildings around mex empty=' .. tostring(M27Utilities.IsTableEmpty(tEnemyBuildings)))
+                        end
+                        if M27Utilities.IsTableEmpty(tEnemyBuildings) == false then
+                            iClosestMexDist = iCurDist
+                            iClosestMexRef = iMex
+                        end
                     end
                 end
             end
@@ -3161,12 +3191,14 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
         end
         local bEnemyUnitsNearlyInRange
         local tPotentialEnemyUnits
+        local bDontCheckIfTargetUnderwater
 
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': About to search for bombardment targets, bCheckForBuildingsToAttack=' .. tostring(bCheckForBuildingsToAttack) .. '; tBombardmentRallyPoint=' .. repru(tBombardmentRallyPoint) .. '; tNonBombardmentRallyPoint=' .. repru(tNonBombardmentRallyPoint) .. '; iDFMinRange=' .. iDFMinRange .. '; iIndirectMinRange=' .. iIndirectMinRange)
         end
 
         for iUnit, oUnit in EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileNavalSurface - iSupportNavyCategory, tFriendlyNavalExcludingIntercept) do
+            bDontCheckIfTargetUnderwater = EntityCategoryContains(categories.ANTINAVY, oUnit.UnitId)
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Considering unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; is underwater=' .. tostring(oUnit[refbTempIsUnderwater]) .. '; oUnit[M27UnitInfo.refiDFRange]=' .. oUnit[M27UnitInfo.refiDFRange] .. '; oUnit[M27UnitInfo.refiIndirectRange]=' .. oUnit[M27UnitInfo.refiIndirectRange])
             end
@@ -3221,10 +3253,29 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                         else
 
                             oBuildingToAttack = nil
+                            bDebugMessages = true
                             if bCheckForBuildingsToAttack then
-                                oBuildingToAttack = M27Utilities.GetNearestUnit(tEnemyStructuresNearFrontUnit, oUnit:GetPosition(), aiBrain)
+                                local iDistToPriority
+                                local iClosestDist = 100000
+                                if M27Utilities.IsTableEmpty(tEnemyStructuresNearFrontUnit) == false then
+                                    for iPriority, oPriority in tEnemyStructuresNearFrontUnit do
+                                        iDistToPriority = M27Utilities.GetDistanceBetweenPositions(oPriority:GetPosition(), oUnit:GetPosition())
+                                        if iDistToPriority < iClosestDist then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Considering oPriority='..oPriority.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPriority)..'; iDistToPriority='..iDistToPriority..'; Is unit underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oPriority))) end
+                                            if bDontCheckIfTargetUnderwater or not(M27UnitInfo.IsUnitUnderwater(oPriority)) then
+                                                iClosestDist = iDistToPriority
+                                                oBuildingToAttack = oPriority
+                                            end
+                                        end
+                                    end
+                                end
+
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Considering whether to attack oBuildingToAttack=' .. oBuildingToAttack.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oBuildingToAttack) .. '; Distance to it=' .. M27Utilities.GetDistanceBetweenPositions(oBuildingToAttack:GetPosition(), oUnit:GetPosition()) .. '; Our DF range=' .. oUnit[M27UnitInfo.refiDFRange] .. '; Our Indirect range=' .. oUnit[M27UnitInfo.refiIndirectRange])
+                                    if oBuildingToAttack then
+                                        LOG(sFunctionRef .. ': Considering whether to attack oBuildingToAttack=' .. oBuildingToAttack.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oBuildingToAttack) .. '; Distance to it=' .. M27Utilities.GetDistanceBetweenPositions(oBuildingToAttack:GetPosition(), oUnit:GetPosition()) .. '; Our DF range=' .. oUnit[M27UnitInfo.refiDFRange] .. '; Our Indirect range=' .. oUnit[M27UnitInfo.refiIndirectRange])
+                                    else
+                                        LOG(sFunctionRef..': Dont have a building to attack')
+                                    end
                                 end
                                 if oBuildingToAttack and M27Utilities.GetDistanceBetweenPositions(oBuildingToAttack:GetPosition(), oUnit:GetPosition()) > math.max(oUnit[M27UnitInfo.refiDFRange], oUnit[M27UnitInfo.refiIndirectRange]) then
                                     --Not in range so dont give specific attack order
@@ -3238,10 +3289,17 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                                         end
                                         local tPriorityTargets = EntityCategoryFilterDown(iPriorityCategory, tEnemyStructuresNearFrontUnit)
                                         if M27Utilities.IsTableEmpty(tPriorityTargets) == false then
-                                            local oNearestPriority = M27Utilities.GetNearestUnit(tPriorityTargets, oUnit:GetPosition(), aiBrain)
-                                            local iDistToPriority = M27Utilities.GetDistanceBetweenPositions(oNearestPriority:GetPosition(), oUnit:GetPosition())
-                                            if iDistToPriority - math.min(iDefencesHeadroom, 30) <= math.max(oUnit[M27UnitInfo.refiIndirectRange], oUnit[M27UnitInfo.refiDFRange]) then
-                                                oBuildingToAttack = oNearestPriority
+
+                                            for iPriority, oPriority in tPriorityTargets do
+                                                iDistToPriority = M27Utilities.GetDistanceBetweenPositions(oPriority:GetPosition(), oUnit:GetPosition())
+                                                if iDistToPriority < iClosestDist then
+                                                    if bDontCheckIfTargetUnderwater or not(M27UnitInfo.IsUnitUnderwater(oPriority)) then
+                                                        iClosestDist = iDistToPriority
+                                                        if iDistToPriority - math.min(iDefencesHeadroom, 30) <= math.max(oUnit[M27UnitInfo.refiIndirectRange], oUnit[M27UnitInfo.refiDFRange]) then
+                                                            oBuildingToAttack = oPriority
+                                                        end
+                                                    end
+                                                end
                                             end
                                         end
                                     end
