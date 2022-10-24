@@ -8576,7 +8576,6 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                             if bDebugMessages == true then LOG(sFunctionRef..': Will defend the chokepoint '..repru(tChokepointToDefend)) end
                             --end
                         else
-                            bDebugMessages = true
                             --Do we lack air support and enemy has large air threat?  If so then stay back
                             local bDefend = false
                             if bDebugMessages == true then LOG(sFunctionRef..': Checking if we want to stay on defence due to enemy air therat. Have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl])..'; Enemy air to ground threat='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]..'; AirAAWanted='..aiBrain[M27AirOverseer.refiAirAAWanted]) end

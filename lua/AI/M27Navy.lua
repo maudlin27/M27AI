@@ -2892,7 +2892,6 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                             end
 
                             function RetreatFromPD(oUnit)
-                                bDebugMessages = true
 
                                 if M27Utilities.IsTableEmpty(tEnemyPD) == false then
                                     for iPD, oPD in tEnemyPD do
@@ -2905,7 +2904,6 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                                     end
                                 end
                                 if bDebugMessages == true then LOG(sFunctionRef..': No PD to retreat from') end
-                                bDebugMessages = false
                                 return false
 
                             end
@@ -3253,7 +3251,6 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                         else
 
                             oBuildingToAttack = nil
-                            bDebugMessages = true
                             if bCheckForBuildingsToAttack then
                                 local iDistToPriority
                                 local iClosestDist = 100000
