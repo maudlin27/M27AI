@@ -370,24 +370,28 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
     --Stat tracking
     if M27Config.M27StatTracking then
         if oUnitKilled.GetAIBrain then
-            local oKillerUnit
-            if instigator then
-                if instigator.Launcher then
-                    oKillerUnit = instigator.Launcher
-                elseif instigator.DamageData and not(instigator.unit) and not(instigator.UnitId) then
-                    --Can get errors for artillery shells when running IsProjectile
-                elseif IsProjectile(instigator) or IsCollisionBeam(instigator) then
-                    if instigator.unit then
-                        oKillerUnit = instigator.unit
+            local refbAlreadyRun = 'M27EventsOnKilledStatsRun'
+            if not(oUnitKilled[refbAlreadyRun]) then
+                oUnitKilled[refbAlreadyRun] = true
+                local oKillerUnit
+                if instigator then
+                    if instigator.Launcher then
+                        oKillerUnit = instigator.Launcher
+                    elseif instigator.DamageData and not(instigator.unit) and not(instigator.UnitId) then
+                        --Can get errors for artillery shells when running IsProjectile
+                    elseif IsProjectile(instigator) or IsCollisionBeam(instigator) then
+                        if instigator.unit then
+                            oKillerUnit = instigator.unit
+                        end
+                    elseif IsUnit(instigator) then
+                        oKillerUnit = instigator
                     end
-                elseif IsUnit(instigator) then
-                    oKillerUnit = instigator
                 end
+                if oKillerUnit then
+                    ForkThread(M27Stats.UpdateStatsForKiller, oKillerUnit, oUnitKilled)
+                end
+                ForkThread(M27Stats.UpdateStatsForKilled,oUnitKilled)
             end
-            if oKillerUnit then
-                ForkThread(M27Stats.UpdateStatsForKiller, oKillerUnit, oUnitKilled)
-            end
-            ForkThread(M27Stats.UpdateStatsForKilled,oUnitKilled)
         end
     end
 end

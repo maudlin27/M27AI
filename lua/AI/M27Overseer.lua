@@ -1168,7 +1168,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AssignMAAToPreferredPlatoons'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetGameTimeSeconds() >= 300 and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 300 and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
 
     if aiBrain[refbMAABuiltOrDied] or GetGameTimeSeconds() - (aiBrain[refiLastCheckedMAAAssignments] or -100) >= 4 then
         aiBrain[refbMAABuiltOrDied] = false
@@ -6122,7 +6122,7 @@ function SetMaximumFactoryLevels(aiBrain)
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SetMaximumFactoryLevels'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if aiBrain[M27AirOverseer.refiAirAAWanted] >= 100 then bDebugMessages = true end
+    --if aiBrain[M27AirOverseer.refiAirAAWanted] >= 100 then bDebugMessages = true end
     --if aiBrain:GetEconomyStoredRatio('MASS') >= 0.6 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 1 then bDebugMessages = true end
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Start of code')

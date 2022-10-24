@@ -23,11 +23,11 @@ subrefNetEnergyIncome = 'M27StatsNetEnergyIncome' --Not broken down further
 refiUnitTechAndTypeRef = 'M27UnitType' --3rd index of master table - shoudl contain the unit tech and unit type reference
 --Unit types - assumption is will check in order from first to last, so dont need to add exclusions to some of hte later categories
 tUnitTypesByRef = {
-    [1] = {'MassGen', categories.MASSPRODUCTION * categories.STRUCTURE},
-    [2] = {'PowerGen', categories.ENERGYPRODUCTION * categories.STRUCTURE},
+    [1] = {'EcoMass', categories.MASSPRODUCTION * categories.STRUCTURE},
+    [2] = {'EcoPower', categories.ENERGYPRODUCTION * categories.STRUCTURE},
     [3] = {'BuildPower', categories.ENGINEER + categories.STRUCTURE * categories.FACTORY - categories.COMMAND -categories.SUBCOMMANDER},
-    [4] = {'BuildingDefence', categories.STRUCTURE * categories.SHIELD + categories.STRUCTURE * categories.ANTIMISSILE + categories.STRUCTURE * categories.ANTIAIR},
-    [5] = {'BuildingAttack', categories.STRUCTURE * categories.DIRECTFIRE + categories.STRUCTURE * categories.SILO + categories.STRUCTURE * categories.INDIRECTFIRE + categories.STRUCTURE * categories.ANTINAVY},
+    [4] = {'BuildingAttack', categories.STRUCTURE * categories.DIRECTFIRE + categories.STRUCTURE * categories.SILO - categories.STRUCTURE * categories.SILO * categories.DEFENSE * categories.ANTIMISSILE + categories.STRUCTURE * categories.INDIRECTFIRE + categories.STRUCTURE * categories.ANTINAVY},
+    [5] = {'BuildingDefence', categories.STRUCTURE * categories.SHIELD + categories.STRUCTURE * categories.ANTIMISSILE + categories.STRUCTURE * categories.ANTIAIR},
     [6] = {'BuildingOther', categories.STRUCTURE},
     [7] = {'ACU', categories.COMMAND},
     [8] = {'LandSkirmisher', categories.SNIPER * categories.TECH3 * categories.MOBILE * categories.LAND + categories.BOT * categories.TECH2 * categories.DIRECTFIRE * categories.UEF + categories.BOT * categories.TECH2 * categories.DIRECTFIRE * categories.CYBRAN},
