@@ -9724,7 +9724,7 @@ end--]]
             bThresholdPreReclaimEngineerCondition = false
 
             --if iEngineersToConsider >= 5 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 then bDebugMessages = true end
-            --if tiAvailableEngineersByTech[3] > 0 and GetGameTimeSeconds() >= 1200 then bDebugMessages = true end
+            if tiAvailableEngineersByTech[1] + tiAvailableEngineersByTech[2] + tiAvailableEngineersByTech[3] > 0 and GetGameTimeSeconds() >= 600 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship) > 0 then bDebugMessages = true end
 
             --if GetGameTimeSeconds() >= 1620 and aiBrain:GetArmyIndex() == 2 and tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
 
@@ -10362,16 +10362,26 @@ end--]]
 
                         if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
                         if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; iMassStoredRatio='..iMassStoredRatio..'; M27MapInfo.iMapTotalMass='..(M27MapInfo.iMapTotalMass or 'nil')..'; aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1]='..(aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] or 'nil')) end
-                        if iMassStoredRatio < 0.05 or (iMassStoredRatio < 0.25 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] < 10) then
+                        if iMassStoredRatio < 0.1 or (iMassStoredRatio < 0.25 and (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] < 10 or aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] < 0)) then
                             if aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] > 0 then
                                 --Have some reclaim somewhere on map, so have at least 1 engineer assigned to reclaim even if no high priority locations
                                 iActionToAssign = refActionReclaimArea
                                 --M27MapInfo.UpdateReclaimMarkers() --Does periodically if been a while since last update --Moved this to overseer so dont end up with engis waiting for this to compelte
                                 iMaxEngisWanted = math.min(2, math.max(1, math.ceil((aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] or 0)/3)))
-                                if bStillHaveEarlyEngis and aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] > 5 then iMaxEngisWanted = iMaxEngisWanted + 1 end
+                                if aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] > 5 then
+                                    if bStillHaveEarlyEngis then iMaxEngisWanted = iMaxEngisWanted + 1 end
+                                    if aiBrain[M27Overseer.refiPercentageOutstandingThreat] >= 0.35 and iMassStoredRatio <= 0.15 then iMaxEngisWanted = iMaxEngisWanted + 1 end
+                                    local iAllAssignedEngis = table.getn(aiBrain[reftEngineerActionsByEngineerRef])
+                                    if iAllAssignedEngis >= 30 and aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] >= 8 then iMaxEngisWanted = iMaxEngisWanted + 1 end
+                                    if iAllAssignedEngis >= 20 then iMaxEngisWanted = iMaxEngisWanted + 1 end
+                                end
                                 iSearchRangeForNearestEngi = 10000
+                            elseif iMassStoredRatio <= 0.01 and (aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][2]) > 0 then
+                                iActionToAssign = refActionReclaimArea
+                                iMaxEngisWanted = 1
                             end
                         end
+
                     elseif iCurrentConditionToTry == 10 then --Want 2-5 factories as a high priority (higher than power)
                         if iLandFactories == nil then
                             iLandFactories = aiBrain:GetCurrentUnits(refCategoryLandFactory)
@@ -11270,8 +11280,11 @@ end--]]
                     elseif iCurrentConditionToTry == 33 then --Very priority air staging for if we have none and have gunships
                         if bDebugMessages == true then LOG(sFunctionRef..': Air staging condition, iCurrentConditionToTry='..iCurrentConditionToTry..': bHaveLowPower='..tostring(bHaveLowPower)..'; aiBrain[M27AirOverseer.refiAirStagingWanted]='..(aiBrain[M27AirOverseer.refiAirStagingWanted] or 'nil')..'; Current air staging='..aiBrain:GetCurrentUnits(refCategoryAirStaging)) end
                         if aiBrain:GetCurrentUnits(refCategoryAirStaging) == 0 then
+
+                            local iCurGunships = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship)
                             local iLCT2PlusAirBuilt = M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAirNonScout - categories.TECH1)
-                            if ((aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) >= 3 or iLCT2PlusAirBuilt >= 5 or ((aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) > 0 and iLCT2PlusAirBuilt >= 2)) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship) > 0 then
+
+                            if (aiBrain[M27AirOverseer.refiAirStagingWanted] or 0 > 0 and iCurGunships > 0) or (aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) >= 3 or iLCT2PlusAirBuilt >= 5 or ((aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) > 0 and iLCT2PlusAirBuilt >= 2)  then
                                 iActionToAssign = refActionBuildAirStaging
                                 iSearchRangeForNearestEngi = 100
                                 iMaxEngisWanted = 1
@@ -12162,10 +12175,15 @@ end--]]
                                 iActionToAssign = refActionReclaimArea
                                 --M27MapInfo.UpdateReclaimMarkers() --Does periodically if been a while since last update --Moved this to overseer so dont end up with engis waiting for this to compelte
                                 iMaxEngisWanted = math.max(1, math.ceil((aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] or 0)/3))
-                                if iMaxEngisWanted > 5 then iMaxEngisWanted = 5 end
+                                if iMassStoredRatio >= 0.6 then iMaxEngisWanted = math.min(3, iMaxEngisWanted)
+                                elseif iMassStoredRatio >= 0.4 then iMaxEngisWanted = math.min(5, iMaxEngisWanted)
+                                elseif iMassStoredRatio >= 0.1 or aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= 0.3 then
+                                    iMaxEngisWanted = math.min(15,math.max(5, aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]))
+                                end
                                 iSearchRangeForNearestEngi = 10000
                             end
                         end
+
                     elseif iCurrentConditionToTry == 58 then
                         if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftUnitsToReclaim]) == false and (iMassStoredRatio < 0.2 or (iMassStoredRatio < 0.5 and aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] < 0)) then
                             iActionToAssign = refActionReclaimUnit
