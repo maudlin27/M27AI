@@ -53,6 +53,12 @@ refbLastBombardmentSearchRangeSuccessByPond = 'NavalM27LastBombardmentSuccess'
 refiEnemyNavalThreatByPond = 'NavalM27NavalThreatByPond'
 refiFriendlyNavalThreatByPond = 'NavalM27OurNavalThreatByPond'
 
+refiLastNavalStrategy = 'NavalM27LastStrategy'
+refiNavalStrategyAttack = 1
+refiNavalStrategyConsolidate = 2
+refiNavalStrategyRetreat = 3
+refiNavalStrategyBombard = 4
+
 reftTimeOfTransportLastLocationAttempt = 'M27TeamTimeOfLastTransportAttempt' --against tTeamData[aiBrain.M27Team], returns a table with [x] being the string location ref, and the value being the game time in seconds that we last tried to land a transport there
 tScoutAssignedToMexLocation = 'M27ScoutsAssignedByMex' --tTeamData[aiBrain.M27Team][this]: returns a table, with key [sLocationRef], that returns a scout object, e.g. [X1Z1] = oScout; only returns scout unit if one has been assigned to that location; used to track scouts assigned by mex
 
@@ -755,6 +761,7 @@ function TeamInitialisation(iTeamRef)
     tTeamData[iTeamRef][refbLastBombardmentSearchRangeSuccessByPond] = {}
     tTeamData[iTeamRef][refiEnemyNavalThreatByPond] = {}
     tTeamData[iTeamRef][refiFriendlyNavalThreatByPond] = {}
+    tTeamData[iTeamRef][refiLastNavalStrategy] = {}
 
 
 

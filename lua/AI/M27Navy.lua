@@ -1459,6 +1459,8 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code for iTeam='..iTeam..'; Brain='..aiBrain.Nickname..'; Index='..aiBrain:GetArmyIndex()..'; GameTime='..GetGameTimeSeconds()) end
 
+    local iNavalStrategy = M27Team.refiNavalStrategyRetreat --Default (e.g. including if we have no navy)
+
 
 
     local oClosestEnemyUnit
@@ -1485,9 +1487,11 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     local tEnemyNavalExcludingMiniThreats = {} --All enemy units in pond except for those classified as mini threats
     local tFriendlyNavalExcludingIntercept = {} --all units except those that are dealing with mini threats
     local tMiniThreatFriendlyUnits = {} --Units assigned to deal with enemy mini threat
+    local tBaseDefenceUnits = {} --Units assigned to deal with enemy threat that is near our naval factory
     local iEnemyMiniThreatCumulativeThreat = 0 --Cumulative threat value of units that are being ignored as mini threats
     local refbIgnoreUnit = 'M27NavyMinimalThreatEnemyUnit'
     local refbMiniFriendlyUnit = 'M27NavyMinimalThreatFriendlyUnit' --true if unit has been assigned previously as part of a mini threat intercept force
+    local refbBaseDefenceUnit = 'M27NavyBaseDefenceUnit' --true if unit has been assigned previously to defend our naval factory
 
 
     if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false then
@@ -1515,8 +1519,12 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
             end
 
             for iUnit, oUnit in tUnitsToConsider do
+                if bDebugMessages == true then LOG(sFunctionRef..': Recording units into different initial tables, oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oUnit[refbMiniFriendlyUnit]='..tostring(oUnit[refbMiniFriendlyUnit] or false)..'; oUnit[refbBaseDefenceUnit]='..tostring(oUnit[refbBaseDefenceUnit] or false)) end
                 if oUnit[refbMiniFriendlyUnit] then
                     table.insert(tMiniThreatFriendlyUnits, oUnit)
+                elseif oUnit[refbBaseDefenceUnit] then
+                    table.insert(tBaseDefenceUnits, oUnit)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is already flagged for base defence so adding it to tBaseDefenceUnits') end
                 else
                     table.insert(tFriendlyNavalExcludingIntercept, oUnit)
                 end
@@ -1526,7 +1534,12 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
             local iClosestDistance = 100000
             local iCurDistToEnemyBase
 
-            if M27Utilities.IsTableEmpty(tFriendlyNavalExcludingIntercept) then tFriendlyNavalExcludingIntercept = tMiniThreatFriendlyUnits end
+            if M27Utilities.IsTableEmpty(tFriendlyNavalExcludingIntercept) then
+                tFriendlyNavalExcludingIntercept = tMiniThreatFriendlyUnits
+                if M27Utilities.IsTableEmpty(tMiniThreatFriendlyUnits) then
+                    tFriendlyNavalExcludingIntercept = tBaseDefenceUnits
+                end
+            end
             for iUnit, oUnit in tFriendlyNavalExcludingIntercept do
                 iCurDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tEnemyBase)
                 if iCurDistToEnemyBase < iClosestDistance then
@@ -1544,6 +1557,108 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
         M27Team.tTeamData[iTeam][M27Team.refiFriendlyNavalThreatByPond][iPond] = 0
     end
     M27Team.tTeamData[iTeam][M27Team.refoClosestFriendlyUnitToEnemyByPond][iPond] = oClosestFriendlyUnitToEnemyBase
+
+    --Enemies near naval factory logic
+    local tNavalFactorySurfaceThreats = {}
+    --Dont bother checking if our navy is retreating, as they should end up close to our factory anyway
+    if bDebugMessages == true then LOG(sFunctionRef..': About to consider if we should check for units near our factory. Is oClosestFriendlyUnitToEnemyBase valid='..tostring(M27UnitInfo.IsUnitValid(oClosestFriendlyUnitToEnemyBase))..'; Last strategy='..(M27Team.tTeamData[iTeam][M27Team.refiLastNavalStrategy][iPond] or 'nil')) end
+    if oClosestFriendlyUnitToEnemyBase and not(M27Team.tTeamData[iTeam][M27Team.refiLastNavalStrategy][iPond] == M27Team.refiNavalStrategyRetreat) then
+        local iSearchRange = 90
+        local iUnitsWanted = 1
+        local tFriendlyPotentialDefenders = {}
+        if bDebugMessages == true then LOG(sFunctionRef..': Is filtered table of base defence units for destroyers empty='..tostring(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryDestroyer, tBaseDefenceUnits)))) end
+        if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryDestroyer, tBaseDefenceUnits)) == false then
+            --Use destroyer already assigned to defend
+            for iUnit, oUnit in tBaseDefenceUnits do
+                table.insert(tFriendlyPotentialDefenders, oUnit)
+                if bDebugMessages == true then LOG(sFunctionRef..': Adding destroyer unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to tFriendlyPotentialDefenders') end
+            end
+        else
+            tFriendlyPotentialDefenders = EntityCategoryFilterDown(M27UnitInfo.refCategoryDestroyer, tFriendlyNavalExcludingIntercept)
+            if M27Utilities.IsTableEmpty(tFriendlyPotentialDefenders) then
+                iUnitsWanted = 2 --want 2 frigates as 1 may not be enough
+                iSearchRange = 45 --no point searching further given frigates have poor range
+                if bDebugMessages == true then LOG(sFunctionRef..': Is table of base defence units empty='..tostring(M27Utilities.IsTableEmpty(tBaseDefenceUnits))) end
+                if M27Utilities.IsTableEmpty(tBaseDefenceUnits) == false then
+                    for iUnit, oUnit in tBaseDefenceUnits do
+                        table.insert(tFriendlyPotentialDefenders, oUnit)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Adding frigate unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to tFriendlyPotentialDefenders') end
+                    end
+                else
+                    tFriendlyPotentialDefenders = EntityCategoryFilterDown(M27UnitInfo.refCategoryFrigate, tFriendlyNavalExcludingIntercept)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Set M27Utilities.IsTableEmpty(tBaseDefenceUnits) to be frigates in our main naval force') end
+                end
+            end
+        end
+
+        if bDebugMessages == true then LOG(sFunctionRef..': Is table of friendly potential defenders empty='..tostring(M27Utilities.IsTableEmpty(tFriendlyPotentialDefenders))) end
+
+        if M27Utilities.IsTableEmpty(tFriendlyPotentialDefenders) == false then
+            local tPotentialSurfaceThreats = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat + M27UnitInfo.refCategoryIndirectT2Plus + categories.COMMAND, tOurBase, iSearchRange, 'Enemy')
+            if bDebugMessages == true then LOG(sFunctionRef..': Is tPotentialSurfaceThreats empty='..tostring(M27Utilities.IsTableEmpty(tPotentialSurfaceThreats))..'; tOurBase='..repru(tOurBase)..'; iSearchRange='..iSearchRange) end
+            if M27Utilities.IsTableEmpty(tPotentialSurfaceThreats) == false then
+                --Update actual naval threats based on which of these is not underwater
+                for iUnit, oUnit in tPotentialSurfaceThreats do
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Is underwtaer='..tostring(M27UnitInfo.IsUnitUnderwater(oUnit))) end
+                    if not(M27UnitInfo.IsUnitUnderwater(oUnit)) then
+                        table.insert(tNavalFactorySurfaceThreats, oUnit)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Adding unit to list of surface threats') end
+                    end
+                end
+
+                if M27Utilities.IsTableEmpty(tNavalFactorySurfaceThreats) == false then
+                    --Select the unit(s) for base defence based on which ones are closest to our base
+                    local tiDistToBaseByFriendlyDefenderRef = {}
+                    for iUnit, oUnit in tFriendlyPotentialDefenders do
+                        tiDistToBaseByFriendlyDefenderRef[iUnit] = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tOurBase)
+                    end
+                    tBaseDefenceUnits = {}
+                    for iUnitRef, iDistance in M27Utilities.SortTableByValue(tiDistToBaseByFriendlyDefenderRef, false) do
+                        table.insert(tBaseDefenceUnits, tFriendlyPotentialDefenders[iUnitRef])
+                        tFriendlyPotentialDefenders[iUnitRef][refbBaseDefenceUnit] = true
+                        iUnitsWanted = iUnitsWanted - 1
+                        if bDebugMessages == true then LOG(sFunctionRef..': Added unit '..tFriendlyPotentialDefenders[iUnitRef].UnitId..M27UnitInfo.GetUnitLifetimeCount(tFriendlyPotentialDefenders[iUnitRef])..' to tBaseDefenceUnits. iDistance='..iDistance..'; refbBaseDefenceUnit='..tostring(tFriendlyPotentialDefenders[iUnitRef][refbBaseDefenceUnit])) end
+                        if iUnitsWanted <= 0 then break end
+                    end
+                end
+            end
+        end
+    end
+
+
+    --If no threats to naval fac then clear the flag of any defenders so next cycle theyll be made available
+    if M27Utilities.IsTableEmpty(tNavalFactorySurfaceThreats) then
+        if bDebugMessages == true then LOG(sFunctionRef..': No surface threats so if have any base defence units will clear the flag, is tBaseDefenceUnits empty='..tostring(M27Utilities.IsTableEmpty(tBaseDefenceUnits))) end
+        if M27Utilities.IsTableEmpty(tBaseDefenceUnits) == false then
+            for iUnit, oUnit in tBaseDefenceUnits do
+                oUnit[refbBaseDefenceUnit] = false
+                if bDebugMessages == true then LOG(sFunctionRef..': Clearing oUnit of defence flag, oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+            end
+            tBaseDefenceUnits = nil
+        end
+    else
+        if bDebugMessages == true then LOG(sFunctionRef..': Have surface threats, si table of base defence units empty='..tostring(M27Utilities.IsTableEmpty(tBaseDefenceUnits))) end
+        if M27Utilities.IsTableEmpty(tBaseDefenceUnits) == false then
+            --Attack move to the closest enemy unit
+            local oClosestEnemy = M27Utilities.GetNearestUnit(tNavalFactorySurfaceThreats, tOurBase)
+            local iAngleFromEnemyToBase = M27Utilities.GetAngleFromAToB(oClosestEnemy:GetPosition(), tOurBase)
+            local iDistFromEnemyToBase = M27Utilities.GetDistanceBetweenPositions(oClosestEnemy:GetPosition(), tOurBase)
+            local tPositionToMoveTo
+            if bDebugMessages == true then LOG(sFunctionRef..': Closest land enemy to our naval fac='..oClosestEnemy.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestEnemy)..'; iAngleFromEnemyToBase='..iAngleFromEnemyToBase..'; iDistFromEnemyToBase='..iDistFromEnemyToBase) end
+            for iUnit, oUnit in tBaseDefenceUnits do
+                oUnit[refbBaseDefenceUnit] = true --redundancy
+                tPositionToMoveTo = M27Utilities.MoveInDirection(oClosestEnemy:GetPosition(), iAngleFromEnemyToBase, math.min(iDistFromEnemyToBase + 10, M27UnitInfo.GetNavalDirectAndSubRange(oUnit) - 5), true, false)
+                if oUnit[M27UnitInfo.refbLastShotBlocked] then
+                    MoveUnitTowardsTarget(oUnit, tPositionToMoveTo, true, 'MDefend')
+                    if bDebugMessages == true then LOG(sFunctionRef..': Ordering unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to move to '..repru(tPositionToMoveTo)) end
+                else
+                    MoveUnitTowardsTarget(oUnit, tPositionToMoveTo, true, 'ADefend')
+                    if bDebugMessages == true then LOG(sFunctionRef..': Ordering unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to attack move to '..repru(tPositionToMoveTo)) end
+                end
+            end
+        end
+    end
+
     if bDebugMessages == true then LOG(sFunctionRef..': About to update list of enemy units in pond nad calculate closest enemy unit. Is the table empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond]))) end
 
     if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond]) == false then
@@ -1851,8 +1966,8 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     tFriendlyNavalExcludingIntercept = {}
     if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false then
         for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond] do
-            if not(oUnit[refbMiniFriendlyUnit]) then
-                if bDebugMessages == true then LOG(sFunctionRef..': Friendly unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' isnt being used by mini response so adding it to main table') end
+            if not(oUnit[refbMiniFriendlyUnit]) and not(oUnit[refbBaseDefenceUnit]) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Friendly unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' isnt being used by mini response or base defence so adding it to main table') end
                 table.insert(tFriendlyNavalExcludingIntercept, oUnit)
             end
         end
@@ -2554,6 +2669,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                 if bDebugMessages == true then LOG(sFunctionRef..': Finished determining tDestinationForShortRangeUnits='..repru(tDestinationForShortRangeUnits)) end
 
                 if bAllOutAttack then
+                    iNavalStrategy = M27Team.refiNavalStrategyAttack
                     local oNearestThreatToConsider
                     local bAttackNearestThreatInstead = false
 
@@ -2853,7 +2969,9 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                         if M27Utilities.IsTableEmpty(tPotentialGroundFireTargets) == false and M27UnitInfo.IsUnitValid(oClosestEnemyCombatUnit) and M27UnitInfo.IsUnitUnderwater(oClosestEnemyCombatUnit) then
                             bConsiderGroundFiring = true
                         end
-                        if bDebugMessages == true then LOG(sFunctionRef..': Is Potential ground fire targets empty='..tostring(M27Utilities.IsTableEmpty(tPotentialGroundFireTargets))..'; Is closest enemy combat unit underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oClosestEnemyCombatUnit))..'; Closest enemy combat unit='..oClosestEnemyCombatUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestEnemyCombatUnit)..'; bConsiderGroundFiring='..tostring(bConsiderGroundFiring)) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Is Potential ground fire targets empty='..tostring(M27Utilities.IsTableEmpty(tPotentialGroundFireTargets))..'; Is closest enemy combat unit underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oClosestEnemyCombatUnit))..'; bConsiderGroundFiring='..tostring(bConsiderGroundFiring))
+                            if oClosestEnemyCombatUnit then LOG('Closest enemy combat unit='..oClosestEnemyCombatUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestEnemyCombatUnit)) end
+                        end
 
                         function ConsiderIssuingGroundFireOrder(oUnit)
                             --Returns true if gives a ground-fire order to the unit
@@ -3010,6 +3128,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                             local sOrderDesc = 'MainRetreat'
                             if bConsolidateForces then
                                 sOrderDesc = 'Consolidate'
+                                iNavalStrategy = M27Team.refiNavalStrategyConsolidate
                             end
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': About to order navy to go to tGlobalNavalDestination=' .. repru(tGlobalNavalDestination) .. '; bConsolidateForces=' .. tostring(bConsolidateForces))
@@ -3061,7 +3180,9 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     end
     if bDebugMessages == true then LOG(sFunctionRef..': About to consider bombardment. bConsiderBombardment='..tostring((bConsiderBombardment or false))) end
     if bConsiderBombardment then
+        iNavalStrategy = M27Team.refiNavalStrategyBombard
         --Get the mex closest to our front unit that is within bombardment range
+
 
         local tFrontPosition = oClosestFriendlyUnitToEnemyBase:GetPosition()
         local iClosestMexDist = 100000
@@ -3727,6 +3848,8 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
         end
 
     end
+    --Update naval strategy
+    M27Team.tTeamData[iTeam][M27Team.refiLastNavalStrategy][iPond] = iNavalStrategy
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
