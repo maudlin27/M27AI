@@ -671,15 +671,15 @@ function GetAngleFromAToB(tLocA, tLocB)
     local iTheta
     if tLocA[1] == tLocB[1] then
         --Will get infinite if try and use this; is [3] the same?
-        if tLocA[3] > tLocB[3] then --going south
-            iTheta = 180
-        else
-            --Either LocA == locB (so want 0) or going north (which is 0)
+        if tLocA[3] >= tLocB[3] then --Start is below end, so End is north of start (or LocA == LocB and want 0)
             iTheta = 0
+        else
+            --Start Z value is lower than end, so start is above end, so if facing end from start we are facing south
+            iTheta = 180
         end
     elseif tLocA[3] == tLocB[3] then
         --Have dif in X values but not Z values, so moving in straight line east or west:
-        if tLocA[1] < tLocB[1] then --Moving east
+        if tLocA[1] < tLocB[1] then --Start is to left of end, so if facing end from start we are facing 90 degrees (Moving east)
             iTheta = 90
         else --must be moving west
             iTheta = 270

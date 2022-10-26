@@ -1448,7 +1448,7 @@ function OnConstructed(oEngineer, oJustBuilt)
                     end
                 end
 
-                --Have we just built a T3 naval unit? If so then send it to an open stretch of water if we have nearby land that is closer to us than the naval factory
+                --Workaround to reduce risk naval units self destruct - Have we just built a T3 naval unit? If so then send it to an open stretch of water if we have nearby land that is closer to us than the naval factory
                 if EntityCategoryContains(M27UnitInfo.refCategoryNavalSurface * categories.TECH3, oJustBuilt.UnitId) then
                     if not(oEngineer[M27Navy.refbCheckedFactoryForNearbyLand]) then
                         --Check if have nearby land and need a detour
@@ -1532,7 +1532,10 @@ function OnConstructed(oEngineer, oJustBuilt)
 
             --Update pond
             if not(oJustBuilt[M27Navy.refiAssignedPond]) and (EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, oEngineer.UnitId) or EntityCategoryContains(categories.NAVAL + M27UnitInfo.refCategorySonar + M27UnitInfo.refCategoryNavalFactory + M27UnitInfo.refCategoryTorpedoLauncher, oJustBuilt.UnitId)) then
-                M27Navy.UpdateUnitPond(oJustBuilt, oJustBuilt:GetAIBrain().M27Team, false)
+                --Exception for 1st engineer of current tech level (as want this used by normal logic)
+                if not(EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oJustBuilt.UnitId) and M27UnitInfo.GetUnitLifetimeCount(oJustBuilt) <= 1) then
+                    M27Navy.UpdateUnitPond(oJustBuilt, oJustBuilt:GetAIBrain().M27Team, false)
+                end
             end
 
             --If have just upgraded a shield then clear tracking (redundancy as should also trigger from 'death' of old shield)

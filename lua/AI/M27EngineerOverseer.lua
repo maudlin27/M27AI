@@ -9724,7 +9724,7 @@ end--]]
             bThresholdPreReclaimEngineerCondition = false
 
             --if iEngineersToConsider >= 5 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 then bDebugMessages = true end
-            if tiAvailableEngineersByTech[1] + tiAvailableEngineersByTech[2] + tiAvailableEngineersByTech[3] > 0 and GetGameTimeSeconds() >= 600 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship) > 0 then bDebugMessages = true end
+            --if tiAvailableEngineersByTech[1] + tiAvailableEngineersByTech[2] + tiAvailableEngineersByTech[3] > 0 and GetGameTimeSeconds() >= 600 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship) > 0 then bDebugMessages = true end
 
             --if GetGameTimeSeconds() >= 1620 and aiBrain:GetArmyIndex() == 2 and tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
 
