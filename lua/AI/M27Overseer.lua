@@ -7013,7 +7013,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 end
             end
 
-            ForkThread(M27Team.UpdateTeamDataForEnemyUnits, aiBrain) --Currently updates number of wall units but could add other logic to this
+            ForkThread(M27Team.UpdateTeamDataForEnemyUnits, aiBrain, true) --Currently updates number of wall units but could add other logic to this
 
             --Below should be updated as part of the SetWhetherCanPathToEnemy function in M27MapInfo now
             --[[local iNearestEnemyArmyIndex = M27Logic.GetNearestEnemyIndex(aiBrain)
@@ -8074,7 +8074,9 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating health for ACU to run on. aiBrain[refiACUHealthToRunOn]='..aiBrain[refiACUHealthToRunOn]..'; refbACUVulnerableToAirSnipe='..tostring(aiBrain[refbACUVulnerableToAirSnipe])) end
 
 
-
+        else
+            --Still want AirAA to update every second
+            ForkThread(M27Team.UpdateTeamDataForEnemyUnits, aiBrain, false) --Currently updates number of wall units but could add other logic to this
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

@@ -355,7 +355,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                     if M27Utilities.IsTableEmpty(M27Overseer.tAllActiveM27Brains) == false then
                         for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
                             if IsEnemy(oBrain:GetArmyIndex(), oKilledBrain:GetArmyIndex()) then
-                                oBrain[M27AirOverseer.refiEnemyAirAAThreat] = math.max(oBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] * 0.5, oBrain[M27AirOverseer.refiEnemyAirAAThreat] - oUnitKilled:GetBlueprint().Economy.BuildCostMass / 3)
+                                oBrain[M27AirOverseer.refiEnemyAirAAThreat] = math.max(oBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] * 0.5, oBrain[M27AirOverseer.refiEnemyAirAAThreat] - oUnitKilled:GetBlueprint().Economy.BuildCostMass / 2)
                             end
                         end
                     end

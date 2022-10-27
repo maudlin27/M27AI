@@ -1835,7 +1835,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
         if bSubmersibleOnly then iThreatRef = iThreatRef .. '1' else iThreatRef = iThreatRef .. '0' end
         if bLongRangeThreatOnly then iThreatRef = iThreatRef..'1' else iThreatRef = iThreatRef .. '0' end
 
-        if not(tiThreatRefsCalculated[iThreatRef]) then M27Utilities.ErrorHandler('Havent calculated threat values for iThreatRef='..iThreatRef) end
+        if not(tiThreatRefsCalculated[iThreatRef]) then M27Utilities.ErrorHandler('Havent calculated threat values for iThreatRef='..iThreatRef..' refer to CalculateUnitThreatsByType') end
 
         local iBaseThreat = 0
 
@@ -2206,7 +2206,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
         if bIncludeNonCombatAir then iThreatRef = iThreatRef..'1' else iThreatRef = iThreatRef..'0' end
         if bIncludeAirTorpedo then iThreatRef = iThreatRef..'1' else iThreatRef = iThreatRef..'0' end
         if not(tiThreatRefsCalculated[iThreatRef]) then
-            M27Utilities.ErrorHandler('Dont have a thraat ref '..iThreatRef..' So threat calculation likely wrong')
+            M27Utilities.ErrorHandler('Dont have a thraat ref '..iThreatRef..' So CalculateUnitThreatsByType threat calculation likely wrong')
         end
 
 
@@ -5761,6 +5761,7 @@ function CalculateUnitThreatsByType()
             ['210110'] = { true, false, true, true, false }, --Air threat (general)
             ['210111'] = { true, false, true, true, true }, --Air threat (general)
             ['200101'] = { true, false, true, true, true }, --Bombers and torpedo bombers
+            --['211000'] = { true, true, false, false, false} --GroundAA and AirAA combined - was thinking of using this for recording IMAP air version but decided to stick to just airaa
         }
 
         for iRef, tValue in tiLandAndNavyThreatTypes do
