@@ -1343,6 +1343,8 @@ function OnConstructed(oEngineer, oJustBuilt)
                 ForkThread(M27UnitInfo.SetUnitTargetPriorities, oJustBuilt, M27UnitInfo.refWeaponPriorityBattleShip)
             elseif EntityCategoryContains(M27UnitInfo.refCategorySniperBot, oJustBuilt.UnitId) then
                 ForkThread(M27UnitInfo.SetUnitTargetPriorities, oJustBuilt, M27UnitInfo.refWeaponPrioritySniperBot)
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryDestroyer, oJustBuilt.UnitId) then
+                ForkThread(M27UnitInfo.SetUnitTargetPriorities, oJustBuilt, M27UnitInfo.refWeaponPriorityDestroyer)
             end
 
             --Firebase tracking

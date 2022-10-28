@@ -1582,11 +1582,13 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
         local iSearchRange = 90
         local iUnitsWanted = 1
         local tFriendlyPotentialDefenders = {}
+        local bUsedExistingDestroyer = false
         if bDebugMessages == true then LOG(sFunctionRef..': Is filtered table of base defence units for destroyers empty='..tostring(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryDestroyer, tBaseDefenceUnits)))) end
         if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryDestroyer, tBaseDefenceUnits)) == false then
             --Use destroyer already assigned to defend
             for iUnit, oUnit in tBaseDefenceUnits do
                 table.insert(tFriendlyPotentialDefenders, oUnit)
+                bUsedExistingDestroyer = true
                 if bDebugMessages == true then LOG(sFunctionRef..': Adding destroyer unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to tFriendlyPotentialDefenders') end
             end
         else
@@ -1623,6 +1625,25 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                 end
 
                 if M27Utilities.IsTableEmpty(tNavalFactorySurfaceThreats) == false then
+                    local iThreatValue = M27Logic.GetCombatThreatRating(aiBrain, tNavalFactorySurfaceThreats, false, nil, nil, false, false, false, false, true, false, false)
+
+                    if bDebugMessages == true then LOG(sFunctionRef..': Threat around naval fac iThreatValue='..iThreatValue..'; Size of enemy threat table='..table.getn(tNavalFactorySurfaceThreats)..'; size of friendly defenders='..table.getn(tFriendlyPotentialDefenders)) end
+                    if iThreatValue >= 1200 or table.getn(tNavalFactorySurfaceThreats) >= 12 then
+                        --Want more than 1 unit - do we only ahve 1u nit assigned atm?
+                        if bDebugMessages == true then LOG(sFunctionRef..': bUsedExistingDestroyer='..tostring(bUsedExistingDestroyer)) end
+                        if bUsedExistingDestroyer and table.getn(tFriendlyPotentialDefenders) == 1 then
+                            local tExtraPotentialDefenders = EntityCategoryFilterDown(M27UnitInfo.refCategoryDestroyer, tFriendlyNavalExcludingIntercept)
+
+                            if M27Utilities.IsTableEmpty(tExtraPotentialDefenders) == false then
+                                for iUnit, oUnit in tExtraPotentialDefenders do
+                                    table.insert(tFriendlyPotentialDefenders, oUnit)
+                                end
+                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Size of tFriendlyPotentialDefenders after including any other destroyers='..table.getn(tFriendlyPotentialDefenders)..'; Is tExtraPotentialDefenders empty='..tostring(M27Utilities.IsTableEmpty(tExtraPotentialDefenders))) end
+                        end
+
+                        iUnitsWanted = math.min(table.getn(tFriendlyPotentialDefenders), 2)
+                    end
                     --Select the unit(s) for base defence based on which ones are closest to our base
                     local tiDistToBaseByFriendlyDefenderRef = {}
                     for iUnit, oUnit in tFriendlyPotentialDefenders do

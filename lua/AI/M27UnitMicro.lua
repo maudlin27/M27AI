@@ -550,8 +550,8 @@ function ConsiderDodgingShot(oUnit, oWeapon)
             LOG(sFunctionRef..': Dont have a current target for this weapon')
         end
     end
-
-    if oWeapon.GetCurrentTarget and (oWeapon.Blueprint.WeaponCategory == 'Direct Fire' or oWeapon.Blueprint.WeaponCategory == 'Direct Fire Naval' or (oWeapon.Blueprint.WeaponCategory == 'Artillery' and EntityCategoryContains(categories.TECH1, oUnit.UnitId))) then
+    --Direct fire, t1 mobile arti, and t2 mobile missile launchers
+    if oWeapon.GetCurrentTarget and (oWeapon.Blueprint.WeaponCategory == 'Direct Fire' or oWeapon.Blueprint.WeaponCategory == 'Direct Fire Naval' or (oWeapon.Blueprint.WeaponCategory == 'Artillery' and EntityCategoryContains(categories.TECH1, oUnit.UnitId)) or (oWeapon.Blueprint.WeaponCategory == 'Missile' and oWeapon.Blueprint.MaxRadius <= 80)) then
         if bDebugMessages == true then LOG(sFunctionRef..': Have a valid weapon category, will see if have targets to consider dodging') end
         local oWeaponTarget = oWeapon:GetCurrentTarget()
         local bConsiderUnitsInArea = false

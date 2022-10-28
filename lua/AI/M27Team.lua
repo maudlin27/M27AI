@@ -219,6 +219,7 @@ function UpdateTeamDataForEnemyUnits(aiBrain, bUpdateSlowData)
             local iAirSegmentX, iAirSegmentZ
             for iUnit, oUnit in tEnemyMobileAndAirAA do
                 iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(oUnit:GetPosition())
+                if not(tiActiveThreatBySegment[iAirSegmentX]) then tiActiveThreatBySegment[iAirSegmentX] = {} end
                 tiActiveThreatBySegment[iAirSegmentX][iAirSegmentZ] = (tiActiveThreatBySegment[iAirSegmentX][iAirSegmentZ] or 0) + M27Logic.GetAirThreatLevel(aiBrain, { oUnit }, false, true, false, false, false)
             end
 
