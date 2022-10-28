@@ -967,7 +967,7 @@ function OnWeaponFired(oWeapon)
 
                         oUnit[M27UnitInfo.refiTimeOfLastCheck] = GetGameTimeSeconds()
                         oUnit[M27UnitInfo.refbLastShotBlocked] = M27Logic.IsShotBlocked(oUnit, oTarget)
-                        if bDebugMessages == true then LOG(sFunctionRef..': oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Is shot blocked='..tostring(oUnit[M27UnitInfo.refbLastShotBlocked])) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Is shot blocked='..tostring(oUnit[M27UnitInfo.refbLastShotBlocked])..'; built in blocking terrain result for low profile='..tostring(oUnit:GetAIBrain():CheckBlockingTerrain(oUnit:GetPosition(), oTarget:GetPosition(), 'Low'))..'; High profile='..tostring(oUnit:GetAIBrain():CheckBlockingTerrain(oUnit:GetPosition(), oTarget:GetPosition(), 'High'))) end
 
                         if oUnit[M27UnitInfo.refbLastShotBlocked] then
                             --Reset after 20s if we havent fired any more shots at the target

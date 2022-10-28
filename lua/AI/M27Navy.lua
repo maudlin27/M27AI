@@ -1454,7 +1454,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     local sFunctionRef = 'ManageTeamNavy'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if GetGameTimeSeconds() >= 600 and M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.TECH3 * M27UnitInfo.refCategoryBattleship, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])) == false then bDebugMessages = true end
-    --if GetGameTimeSeconds() >= 1200 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 480 then bDebugMessages = true end
     --if GetGameTimeSeconds() >= 840 and (aiBrain:GetArmyIndex() == 2 or aiBrain:GetArmyIndex() == 4) then bDebugMessages = true end
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code for iTeam='..iTeam..'; Brain='..aiBrain.Nickname..'; Index='..aiBrain:GetArmyIndex()..'; GameTime='..GetGameTimeSeconds()) end
@@ -1487,10 +1487,26 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     local tEnemyNavalExcludingMiniThreats = {} --All enemy units in pond except for those classified as mini threats
     local tFriendlyNavalExcludingIntercept = {} --all units except those that are dealing with mini threats
     local tMiniThreatFriendlyUnits = {} --Units assigned to deal with enemy mini threat
+    local refbMiniFriendlyUnit = 'M27NavyMinimalThreatFriendlyUnit' --true if unit has been assigned previously as part of a mini threat intercept force
+
+    function ClearMiniThreatFlagFromAllAssignedUnits()
+        if M27Utilities.IsTableEmpty(tMiniThreatFriendlyUnits) == false then
+            if bDebugMessages == true then LOG(sFunctionRef..': Not attacking with mini response so will clear the flag from friendly units') end
+            for iUnit, oUnit in tMiniThreatFriendlyUnits do
+                table.insert(tFriendlyNavalExcludingIntercept, oUnit)
+                oUnit[refbMiniFriendlyUnit] = false
+            end
+            tMiniThreatFriendlyUnits = nil
+        end
+    end
+
+
+
+
+
     local tBaseDefenceUnits = {} --Units assigned to deal with enemy threat that is near our naval factory
     local iEnemyMiniThreatCumulativeThreat = 0 --Cumulative threat value of units that are being ignored as mini threats
     local refbIgnoreUnit = 'M27NavyMinimalThreatEnemyUnit'
-    local refbMiniFriendlyUnit = 'M27NavyMinimalThreatFriendlyUnit' --true if unit has been assigned previously as part of a mini threat intercept force
     local refbBaseDefenceUnit = 'M27NavyBaseDefenceUnit' --true if unit has been assigned previously to defend our naval factory
 
 
@@ -1648,8 +1664,8 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
             for iUnit, oUnit in tBaseDefenceUnits do
                 oUnit[refbBaseDefenceUnit] = true --redundancy
                 tPositionToMoveTo = M27Utilities.MoveInDirection(oClosestEnemy:GetPosition(), iAngleFromEnemyToBase, math.min(iDistFromEnemyToBase + 10, M27UnitInfo.GetNavalDirectAndSubRange(oUnit) - 5), true, false)
-                if oUnit[M27UnitInfo.refbLastShotBlocked] then
-                    MoveUnitTowardsTarget(oUnit, tPositionToMoveTo, true, 'MDefend')
+                if oUnit[M27UnitInfo.refbLastShotBlocked] or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tOurBase) >= 50 then
+                    MoveUnitTowardsTarget(oUnit, tPositionToMoveTo, false, 'MDefend')
                     if bDebugMessages == true then LOG(sFunctionRef..': Ordering unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to move to '..repru(tPositionToMoveTo)) end
                 else
                     MoveUnitTowardsTarget(oUnit, tPositionToMoveTo, true, 'ADefend')
@@ -1875,7 +1891,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
 
                     --Assign orders to the mini navy intercept force - do this based on lower threat to above (so if e.g. we take a bit of damage we dont turn and run and wait for a new unit)
                     if bDebugMessages == true then LOG(sFunctionRef..': Finished assigning units to mini navy response, will consider whether to attack with it. iMiniNavyFriendlySurfaceThreat='..iMiniNavyFriendlySurfaceThreat..'; iMiniEnemySurfaceThreat='..iMiniEnemySurfaceThreat..'; iMiniNavyFriendlyAntiNavyThreat='..iMiniNavyFriendlyAntiNavyThreat..'; iMiniEnemySubmersibleThreat='..iMiniEnemySubmersibleThreat) end
-                    if iMiniNavyFriendlySurfaceThreat > iMiniEnemySurfaceThreat and iMiniNavyFriendlyAntiNavyThreat > iMiniEnemySubmersibleThreat then
+                    if iMiniNavyFriendlySurfaceThreat >= iMiniEnemySurfaceThreat and iMiniNavyFriendlyAntiNavyThreat >= iMiniEnemySubmersibleThreat then
                         --Attack nearest enemy mini naval threat
                         local oNearestEnemyMiniThreat = M27Utilities.GetNearestUnit(tMiniThreatEnemyUnits, tOurBase)
                         local tClosestEnemyTargetToUse = M27Utilities.MoveTowardsTarget(oNearestEnemyMiniThreat:GetPosition(), tOurBase, 5, M27Utilities.GetAngleFromAToB(oNearestEnemyMiniThreat:GetPosition(), tOurBase))
@@ -1888,14 +1904,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                     end
                 else
                     --Clear the mini threat flag from all friendly units
-                    if M27Utilities.IsTableEmpty(tMiniThreatFriendlyUnits) == false then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Not attacking with mini response so will clear the flag from friendly units') end
-                        for iUnit, oUnit in tMiniThreatFriendlyUnits do
-                            table.insert(tFriendlyNavalExcludingIntercept, oUnit)
-                            oUnit[refbMiniFriendlyUnit] = false
-                        end
-                        tMiniThreatFriendlyUnits = nil
-                    end
+                    ClearMiniThreatFlagFromAllAssignedUnits()
                 end
 
                 --Record nearest enemy threat (ignoring mini threats)
@@ -1934,7 +1943,11 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                     end
                 end
                 if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating nearest enemy unit (ignoring mini threats)='..oClosestEnemyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestEnemyUnit)..'; iClosestDistance='..iClosestDistance..'; Position of closest enemy unit='..repru(oClosestEnemyUnit:GetPosition())) end
+            else
+                ClearMiniThreatFlagFromAllAssignedUnits()
             end
+        else
+            ClearMiniThreatFlagFromAllAssignedUnits()
         end
     end
     M27Team.tTeamData[iTeam][M27Team.refoClosestEnemyNavalUnitByPond][iPond] = oClosestEnemyUnit --sets to nil if have none
@@ -3580,13 +3593,11 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                                         end
                                     end
                                 end
-                                if (bIgnoreLowThreats or oUnit[M27UnitInfo.refbLastShotBlocked]) and not(bEnemyUnitsNearlyInRange) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will bombard the target wit hthis unit.  Considering whether to move or attack for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; bIgnoreLowThreats='..tostring(bIgnoreLowThreats)..'; oUnit[M27UnitInfo.refbLastShotBlocked]='..tostring(oUnit[M27UnitInfo.refbLastShotBlocked])..'; bEnemyUnitsNearlyInRange='..tostring(bEnemyUnitsNearlyInRange)..'; M27UnitInfo.GetUnitHealthPercent(oUnit)='..M27UnitInfo.GetUnitHealthPercent(oUnit)) end
+                                if (bIgnoreLowThreats or oUnit[M27UnitInfo.refbLastShotBlocked]) and (not(bEnemyUnitsNearlyInRange) or M27UnitInfo.GetUnitHealthPercent(oUnit) >= 0.75) then
                                     MoveUnitTowardsTarget(oUnit, tBombardmentMainTarget, false, 'MBombard')
                                 else
                                     MoveUnitTowardsTarget(oUnit, tBombardmentMainTarget, true, 'ABombard')
-                                end
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Will bombard the target with this unit')
                                 end
                             end
                         else
