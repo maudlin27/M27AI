@@ -269,6 +269,7 @@ refWeaponPrioritySniperBot = {'EXPERIMENTAL MOBILE LAND', 'TECH3 MOBILE LAND DIR
 
 refWeaponPriorityMissileShip = {'SHIELD STRUCTURE, ANTIMISSILE STRUCTURE', 'STRUCTURE INDIRECTFIRE ARTILLERY TECH2', 'EXPERIMENTAL STRUCTURE, STRUCTURE ARTILLERY TECH3, STRUCTURE TECH3 SILO', 'STRUCTURE TECH3 VOLATILE', 'STRUCTURE TECH3 ECONOMIC', 'STRUCTURE NAVAL TECH3, STRUCTURE NAVAL TECH2', 'STRUCTURE TECH3', 'STRUCTURE TECH2 ECONOMIC', 'STRUCTURE TECH2', 'STRUCTURE VOLATILE, STRUCTURE DEFENSE, STRUCTURE FACTORY, STRUCTURE INTELLIGENCE', 'STRUCTURE', 'NAVAL SHIELD', 'SHIELD', 'EXPERIMENTAL NAVAL', 'EXPERIMENTAL', 'TECH3 NAVAL', 'TECH2 NAVAL', 'INDIRECTFIRE NAVAL', 'TECH3', 'TECH2', 'ALLUNITS'}
 refWeaponPriorityBattleShip = {'EXPERIMENTAL NAVAL, TECH3 NAVAL', 'TECH2 NAVAL', 'STRUCTURE SHIELD', 'STRUCTURE INDIRECTFIRE ARTILLERY', 'EXPERIMENTAL STRUCTURE, STRUCTURE TECH3 SILO, STRUCTURE TECH3 VOLATILE', 'MOBILE LAND EXPERIMENTAL, MOBILE LAND TECH3 DIRECTFIRE, MOBILE LAND TECH3 INDIRECTFIRE', 'EXPERIMENTAL', 'NAVAL', 'STRUCTURE', 'ALLUNITS'}
+refWeaponPriorityDestroyer = {'SUBMERSIBLE', 'EXPERIMENTAL NAVAL, TECH3 NAVAL', 'TECH2 NAVAL', 'STRUCTURE SHIELD', 'STRUCTURE INDIRECTFIRE ARTILLERY', 'EXPERIMENTAL STRUCTURE, STRUCTURE TECH3 SILO, STRUCTURE TECH3 VOLATILE', 'MOBILE LAND EXPERIMENTAL, MOBILE LAND HOVER DIRECTFIRE', 'MASSPRODUCTION TECH2, MASSPRODUCTION TECH3', 'MOBILE LAND TECH3 DIRECTFIRE, MOBILE LAND TECH3 INDIRECTFIRE', 'EXPERIMENTAL', 'NAVAL', 'STRUCTURE', 'ALLUNITS'}
 
 
 function GetUnitLifetimeCount(oUnit)
@@ -754,7 +755,7 @@ function GetBlueprintMaxGroundRange(oBP)
         for iCurWeapon, oCurWeapon in oBP.Weapon do
             if oCurWeapon.MaxRadius > iMaxRange and not(oCurWeapon.EnabledByEnhancement) and oCurWeapon.Damage > 0 then
                 if oCurWeapon.FireTargetLayerCapsTable and oCurWeapon.FireTargetLayerCapsTable['Land'] == 'Land|Water|Seabed' then
-                    iMaxRange = oCurWeapon.MaxRadius
+                    iMaxRange = math.max(iMaxRange, oCurWeapon.MaxRadius)
                 end
             end
         end
@@ -764,7 +765,32 @@ end
 
 function GetUnitMaxGroundRange(oUnit)
     if oUnit.GetBlueprint then
-        return GetBlueprintMaxGroundRange(oUnit:GetBlueprint())
+        if EntityCategoryContains(categories.COMMAND + categories.SUBCOMMANDER, oUnit.UnitId) then
+            local iMaxRange = 0
+            --Factor in enhancements
+            local oBP = oUnit:GetBlueprint()
+
+            if oBP.Weapon then
+                for sUpgrade, tEnhancement in oBP.Enhancements or {} do
+                    if oUnit:HasEnhancement(sUpgrade) then
+                        if tEnhancement['NewMaxRadius'] then
+                            iMaxRange = math.max(tEnhancement['NewMaxRadius'], iMaxRange)
+                        end
+                    end
+                end
+
+                for iCurWeapon, oCurWeapon in oBP.Weapon do
+                    if oCurWeapon.MaxRadius > iMaxRange and not(oCurWeapon.EnabledByEnhancement) and oCurWeapon.Damage > 0 then
+                        if oCurWeapon.FireTargetLayerCapsTable and oCurWeapon.FireTargetLayerCapsTable['Land'] == 'Land|Water|Seabed' then
+                            iMaxRange = math.max(oCurWeapon.MaxRadius, iMaxRange)
+                        end
+                    end
+                end
+            end
+            return iMaxRange
+        else
+            return GetBlueprintMaxGroundRange(oUnit:GetBlueprint())
+        end
     else
         return 0
     end
@@ -784,6 +810,10 @@ function GetNavalDirectAndSubRange(oUnit)
                     iMaxAntiNavyRange = math.max(iMaxAntiNavyRange, oCurWeapon.MaxRadius)
                 end
             end
+        end
+        if EntityCategoryContains(categories.COMMAND + categories.SUBCOMMANDER, oUnit.UnitId) then
+            --factor in enhancements
+            iMaxDFRange = math.max(iMaxDFRange, GetUnitMaxGroundRange(oUnit))
         end
         oUnit[refiDFRange] = iMaxDFRange
         oUnit[refiAntiNavyRange] = iMaxAntiNavyRange

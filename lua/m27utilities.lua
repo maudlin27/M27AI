@@ -671,15 +671,15 @@ function GetAngleFromAToB(tLocA, tLocB)
     local iTheta
     if tLocA[1] == tLocB[1] then
         --Will get infinite if try and use this; is [3] the same?
-        if tLocA[3] > tLocB[3] then --going south
-            iTheta = 180
-        else
-            --Either LocA == locB (so want 0) or going north (which is 0)
+        if tLocA[3] >= tLocB[3] then --Start is below end, so End is north of start (or LocA == LocB and want 0)
             iTheta = 0
+        else
+            --Start Z value is lower than end, so start is above end, so if facing end from start we are facing south
+            iTheta = 180
         end
     elseif tLocA[3] == tLocB[3] then
         --Have dif in X values but not Z values, so moving in straight line east or west:
-        if tLocA[1] < tLocB[1] then --Moving east
+        if tLocA[1] < tLocB[1] then --Start is to left of end, so if facing end from start we are facing 90 degrees (Moving east)
             iTheta = 90
         else --must be moving west
             iTheta = 270
@@ -1285,7 +1285,7 @@ function EveryFunctionHook()
     end
 end
 
-function OutputRecentFunctionCalls()
+function OutputRecentFunctionCalls(sRef, iCycleSize)
 --NOTE: Insert below commented out code into e.g. the overseer for the second that want it.  Also can adjust the threshold for iFunctionCurCount from 10000, but if setting to 1 then only do for an individual tick or likely will crash the game
     --[[if not(bSetHook) and GetGameTimeSeconds() >= 1459 then
         bDebugMessages = true
@@ -1298,7 +1298,7 @@ function OutputRecentFunctionCalls()
     local sName = tostring(debug.getinfo(2, "n").name)
     if sName then tFunctionCallByName[sName] = (tFunctionCallByName[sName] or 0) + 1 end
     iFunctionCurCount = iFunctionCurCount + 1
-    if iFunctionCurCount >= 10000 then
+    if iFunctionCurCount >= iCycleSize then
         iFunctionCurCount = 0
         LOG('Every function hook: tFunctionCallByName='..repru(tFunctionCallByName))
         tFunctionCallByName = {}

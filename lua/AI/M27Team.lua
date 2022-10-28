@@ -14,6 +14,7 @@ local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27Navy = import('/mods/M27AI/lua/AI/M27Navy.lua')
+local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 
 
 tTeamData = {} --[x] is the aiBrain.M27Team number - stores certain team-wide information
@@ -21,7 +22,8 @@ reftFriendlyActiveM27Brains = 'M27TeamFriendlyM27Brains' --Stored against tTeamD
 iTotalTeamCount = 0 --Number o teams in the game
 subrefNukeLaunchLocations = 'M27TeamNukeTargets' --stored against tTeamData[brain.M27Team], [x] is gametimeseconds, returns the location of a nuke target
 refiEnemyWalls = 'M27TeamEnemyWallCount' --stored against tTeamData[brain.M27Team], returns the ntotal number of enemy wall units; used as threshold to enable engineers to start looking for wall segments to reclaim
-refiTimeOfLastEnemyTeamDataUpdate = 'M27TeamEnemyLastUpdate' --as above, returns the gametimeseconds of hte last update
+refiTimeOfLastEnemyTeamSlowDataUpdate = 'M27TeamEnemyLastUpdate' --as above, returns the gametimeseconds of hte last update
+refiTimeOfLastEnemyTeamFastDataUpdate = 'M27TeamEnemyLastFastUpdate' --As above, but for functions that we want to update more often
 reftEnemyArtiToAvoid = 'M27TeamEnemyArtiToAvoid' --against tTeamData[aiBrain.M27Team], [x] is a count (so table.getn works), returns T2 arti units that has got enough mass kills to want to avoid
 reftEnemyAAToAvoid = 'M27TeamEnemyAAToAvoid' --Against tTeamData[aiBrain.M27Team], [x] is a count (so table.getn works), returns AA units that have got enough mass kills that we want to avoid them
 refiFriendlyFatboyCount = 'M27TeamFriendlyFatboys' --against tTeamData[aiBrain.M27Team], returns the number of friendly fatboys on the team
@@ -30,6 +32,12 @@ reftUnseenPD = 'M27TeamUnseenPD' --against tTeamData[aiBrain.M27Team], table of 
 refbEnemyTeamHasUpgrade = 'M27TeamEnemeyHasUpgrade' --against tTeamData[aiBrain.M27Team], true if enemy has started ACU upgrade or has ACU upgrade
 reftiTeamMessages = 'M27TeamMessages' --against tTeamData[aiBrain.M27Team], [x] is the message type string, returns the gametime that last sent a message of this type to the team
 reftEnemyTorpBombers = 'M27TeamTorpBombers' --against tTeamData[aiBrain.M27Team], [x] is a count so table.getn works
+
+--Air based:
+reftAirSegmentTracker = 'M27TeamAirSegmentTracker' --against tTeamData[aiBrain.M27Team], [x],[z], [subref]; [x] is the Air segmentX, [z] air segment Z, subref is then currently either the cur AirAA threat value or the max AirAA threat value
+subrefEnemyAACurThreat = 1 --AirAA current (net of decay) threat (decided not to do MAA since risk running from small number of T1 MAA)
+subrefEnemyAAMaxThreat = 2 --Original threat (i.e. no decay)
+refiTimeOfLastVisualUpdate = 'M27TeamLastVisualUpdate' --against tTeamData, Similar to refiTimeOfLastEnemyTeamSlowDataUpdate
 
 --Naval team data:
 refbActiveNavalManager = 'NavalActiveManager' --True/false
@@ -53,13 +61,18 @@ refbLastBombardmentSearchRangeSuccessByPond = 'NavalM27LastBombardmentSuccess'
 refiEnemyNavalThreatByPond = 'NavalM27NavalThreatByPond'
 refiFriendlyNavalThreatByPond = 'NavalM27OurNavalThreatByPond'
 
+refiLastNavalStrategy = 'NavalM27LastStrategy'
+refiNavalStrategyAttack = 1
+refiNavalStrategyConsolidate = 2
+refiNavalStrategyRetreat = 3
+refiNavalStrategyBombard = 4
+
 reftTimeOfTransportLastLocationAttempt = 'M27TeamTimeOfLastTransportAttempt' --against tTeamData[aiBrain.M27Team], returns a table with [x] being the string location ref, and the value being the game time in seconds that we last tried to land a transport there
 tScoutAssignedToMexLocation = 'M27ScoutsAssignedByMex' --tTeamData[aiBrain.M27Team][this]: returns a table, with key [sLocationRef], that returns a scout object, e.g. [X1Z1] = oScout; only returns scout unit if one has been assigned to that location; used to track scouts assigned by mex
 
 refbActiveNovaxCoordinator = 'M27TeamNovaxCoordinator'
 refbActiveLandExperimentalCoordinator = 'M27TeamExperimentalCoordinator' --Used to decide actions involving multiple experimentals
 
-refiTimeOfLastVisualUpdate = 'M27TeamLastVisualUpdate' --against tTeamData, Similar to refiTimeOfLastEnemyTeamDataUpdate
 
 
 --Variables recorded elsewhere relating to team data:
@@ -72,14 +85,14 @@ includes chokepoint locations, the average team and enemy team start positions f
 --]]
 
 
-function UpdateTeamDataForEnemyUnits(aiBrain)
+function UpdateTeamDataForEnemyUnits(aiBrain, bUpdateSlowData)
+    --bUpdateSlowData - if true then will update things that are meant to update more slowly, if false then will only update things that we want to update every second (like airaa threat tracker)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateTeamDataForEnemyUnits'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-
-    if GetGameTimeSeconds() - (tTeamData[aiBrain.M27Team][refiTimeOfLastEnemyTeamDataUpdate] or 0) >= 9.9 then
+    if bUpdateSlowData and GetGameTimeSeconds() - (tTeamData[aiBrain.M27Team][refiTimeOfLastEnemyTeamSlowDataUpdate] or 0) >= 9.9 then
         --Record number of wall segments
-        tTeamData[aiBrain.M27Team][refiTimeOfLastEnemyTeamDataUpdate] = GetGameTimeSeconds()
+        tTeamData[aiBrain.M27Team][refiTimeOfLastEnemyTeamSlowDataUpdate] = GetGameTimeSeconds()
         local iWallCount = 0
         for iBrain, oBrain in aiBrain[M27Overseer.toEnemyBrains] do
             iWallCount = iWallCount + oBrain:GetCurrentUnits(M27UnitInfo.refCategoryWall)
@@ -164,7 +177,83 @@ function UpdateTeamDataForEnemyUnits(aiBrain)
                 end
             end
         end
+    end
 
+    --Logic to update faster:
+    if GetGameTimeSeconds() - (tTeamData[aiBrain.M27Team][refiTimeOfLastEnemyTeamFastDataUpdate] or 0) >= 0.9 then
+        tTeamData[aiBrain.M27Team][refiTimeOfLastEnemyTeamFastDataUpdate] = math.ceil(GetGameTimeSeconds() * 10)/10
+        --Record enemy mobile AA units (ground and air)
+        local tEnemyMobileAndAirAA = aiBrain:GetUnitsAroundPoint(categories.AIR * categories.MOBILE * categories.ANTIAIR, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 10000, 'Enemy')
+        local tiActiveThreatBySegment = {}
+
+        for iAirSegmentX = 1, M27AirOverseer.iMapMaxAirSegmentX do
+            tiActiveThreatBySegment[iAirSegmentX] = {}
+        end
+
+        --Decay existing entries
+        local iDelayFactor = 1 / 180 --Over 3 minutes
+        local iLastScoutedTimeWanted = tTeamData[aiBrain.M27Team][refiTimeOfLastVisualUpdate]
+
+
+        if M27Utilities.IsTableEmpty(tTeamData[aiBrain.M27Team][reftAirSegmentTracker]) == false then
+            for iAirSegmentX, tSubtable in tTeamData[aiBrain.M27Team][reftAirSegmentTracker] do
+                for iAirSegmentZ, tThreatSubtable in tSubtable do
+                    if tThreatSubtable then
+                        --Clear vlaue if we have intel (will update in later function)
+                        if (aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted] or 0) >= iLastScoutedTimeWanted then
+                            tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ] = nil
+                            --if M27Utilities.IsTableEmpty(tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX]) then tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX] = nil end
+                        else
+                            tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][subrefEnemyAACurThreat] = math.max(0, (tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][subrefEnemyAACurThreat] or 0) - (tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][subrefEnemyAAMaxThreat] or 0) * iDelayFactor)
+                            if tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][subrefEnemyAACurThreat] == 0 then
+                                tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ] = nil
+                                --if M27Utilities.IsTableEmpty(tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX]) then tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX] = nil end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        if M27Utilities.IsTableEmpty(tEnemyMobileAndAirAA) == false then
+            local iAirSegmentX, iAirSegmentZ
+            for iUnit, oUnit in tEnemyMobileAndAirAA do
+                iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(oUnit:GetPosition())
+                if not(tiActiveThreatBySegment[iAirSegmentX]) then tiActiveThreatBySegment[iAirSegmentX] = {} end
+                tiActiveThreatBySegment[iAirSegmentX][iAirSegmentZ] = (tiActiveThreatBySegment[iAirSegmentX][iAirSegmentZ] or 0) + M27Logic.GetAirThreatLevel(aiBrain, { oUnit }, false, true, false, false, false)
+            end
+
+            --Record new threat values
+            if not(tTeamData[aiBrain.M27Team][reftAirSegmentTracker]) then tTeamData[aiBrain.M27Team][reftAirSegmentTracker] = {} end
+            for iAirSegmentX, tSubtable in tiActiveThreatBySegment do
+                if not(tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX]) then
+                    tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX] = {}
+                end
+                for iAirSegmentZ, iThreat in tSubtable do
+                    if not(tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ]) then
+                        tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ] = {[subrefEnemyAACurThreat] = 0, [subrefEnemyAAMaxThreat] = 0}
+                    end
+                    if iThreat > tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][subrefEnemyAACurThreat] then
+                        tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][subrefEnemyAACurThreat] = iThreat
+                        tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][subrefEnemyAAMaxThreat] = iThreat
+                    end
+                end
+            end
+        elseif bDebugMessages == true then LOG(sFunctionRef..': No enemy air units identified so not recording any additional values')
+        end
+        if bDebugMessages == true then
+            LOG(sFunctionRef..': GameTime='..GetGameTimeSeconds()..'; Enemy mobile AA threat by segment='..repru(tTeamData[aiBrain.M27Team][reftAirSegmentTracker])..'; Size of tEnemyMobileAndAirAA='..table.getn(tEnemyMobileAndAirAA)..'; Total threat of all of tEnemyMobileAndAirAA='..M27Logic.GetAirThreatLevel(aiBrain, tEnemyMobileAndAirAA, false, true, false, false, false)..'; will draw segments with AiraAA threat of at least 1 intie in red')
+            if M27Utilities.IsTableEmpty(tTeamData[aiBrain.M27Team][reftAirSegmentTracker]) == false then
+                for iAirSegmentX, tSubtable in tTeamData[aiBrain.M27Team][reftAirSegmentTracker] do
+                    for iAirSegmentZ, tThreatValues in  tSubtable do
+                        if tTeamData[aiBrain.M27Team][reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][subrefEnemyAACurThreat] >= 50 then
+                            M27Utilities.DrawLocation(aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.reftMidpointPosition], false, 2, nil, 10)
+                            LOG(sFunctionRef..': Drawing blue for position '..repru(aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.reftMidpointPosition])..'; SegmentX='..iAirSegmentX..'; iAirSegmentZ='..iAirSegmentZ)
+                        end
+                    end
+                end
+            end
+        end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -693,8 +782,10 @@ function RecordDangerousAA(oKilledBrain, oDangerousAA)
 end
 
 function RecordSegmentsThatTeamHasVisualOf(aiBrain)
+    --NOTE - not sure when drafted this/if was meant to replace the current M27AirOverseer.RecordSegmentsThatHaveVisualOf function, or if decided it wouldnt work and kept the air overseer function; refiTimeOfLastVisualUpdate gets updated in air overseer fucntion in addition to below though so it is reliable
     if GetGameTimeSeconds() - (tTeamData[aiBrain.M27Team][refiTimeOfLastVisualUpdate] or -1) >= 0.99 then
-        local iTimeStamp = GetGameTimeSeconds()
+        local iTimeStamp = math.ceil(GetGameTimeSeconds() * 10) / 10 --Rounded to 1 decimal place
+        tTeamData[aiBrain.M27Team][refiTimeOfLastVisualUpdate] = iTimeStamp
 
         local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
         local tAirScouts = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirScout * categories.TECH1, tStartPosition, 10000, 'Ally')
@@ -755,6 +846,7 @@ function TeamInitialisation(iTeamRef)
     tTeamData[iTeamRef][refbLastBombardmentSearchRangeSuccessByPond] = {}
     tTeamData[iTeamRef][refiEnemyNavalThreatByPond] = {}
     tTeamData[iTeamRef][refiFriendlyNavalThreatByPond] = {}
+    tTeamData[iTeamRef][refiLastNavalStrategy] = {}
 
 
 

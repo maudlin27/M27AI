@@ -1498,7 +1498,8 @@ function GetACUCombatMassRating(oACU)
     return iTotalMassValue
 end
 
-function GetACUMaxDFRange(oACU)
+--v61 - removed the below so everything uses GetUnitMaxGroundRange(oUnit) instead
+--[[function GetACUMaxDFRange(oACU)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetACUMaxDFRange'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -1516,10 +1517,12 @@ function GetACUMaxDFRange(oACU)
                 end
             end
         end
+    else    --redundancy, e.g. in case have ACU or SACU with no upgrade list
+        return M27UnitInfo.GetUnitMaxGroundRange(oUnit)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iRange
-end
+end--]]
 
 
 
@@ -1548,7 +1551,7 @@ function GetDFAndT1ArtiUnitMinOrMaxRange(tUnits, iReturnRangeType)
     for i, oUnit in tAllUnits do
         --if EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId) then bDebugMessages = true end
         if not(oUnit.Dead) then
-            if M27Utilities.IsACU(oUnit) == false then
+            if M27Utilities.IsACU(oUnit) == false and not(EntityCategoryContains(categories.SUBCOMMANDER, oUnit.UnitId)) then
                 if oUnit.GetBlueprint then
                     if EntityCategoryContains(M27UnitInfo.refCategorySniperBot * categories.SERAPHIM, oUnit.UnitId) and oUnit:GetAIBrain().M27AI then
                         if oUnit[M27UnitInfo.refbSniperRifleEnabled] then iMaxRange = 75 iMinRange = 75
@@ -1564,7 +1567,9 @@ function GetDFAndT1ArtiUnitMinOrMaxRange(tUnits, iReturnRangeType)
                 end
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': Have an ACU blueprint, using custom logic to work out DF range') end
-                iMaxRange = GetACUMaxDFRange(oUnit)
+                iMaxRange = M27UnitInfo.GetUnitMaxGroundRange(oUnit)
+                if bDebugMessages == true then LOG(sFunctionRef..': iMaxRange='..(iMaxRange or 'nil')) end
+                --iMaxRange = GetACUMaxDFRange(oUnit)
                 iMinRange = iMaxRange
             end
         end
@@ -1830,7 +1835,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
         if bSubmersibleOnly then iThreatRef = iThreatRef .. '1' else iThreatRef = iThreatRef .. '0' end
         if bLongRangeThreatOnly then iThreatRef = iThreatRef..'1' else iThreatRef = iThreatRef .. '0' end
 
-        if not(tiThreatRefsCalculated[iThreatRef]) then M27Utilities.ErrorHandler('Havent calculated threat values for iThreatRef='..iThreatRef) end
+        if not(tiThreatRefsCalculated[iThreatRef]) then M27Utilities.ErrorHandler('Havent calculated threat values for iThreatRef='..iThreatRef..' refer to CalculateUnitThreatsByType') end
 
         local iBaseThreat = 0
 
@@ -2201,7 +2206,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
         if bIncludeNonCombatAir then iThreatRef = iThreatRef..'1' else iThreatRef = iThreatRef..'0' end
         if bIncludeAirTorpedo then iThreatRef = iThreatRef..'1' else iThreatRef = iThreatRef..'0' end
         if not(tiThreatRefsCalculated[iThreatRef]) then
-            M27Utilities.ErrorHandler('Dont have a thraat ref '..iThreatRef..' So threat calculation likely wrong')
+            M27Utilities.ErrorHandler('Dont have a thraat ref '..iThreatRef..' So CalculateUnitThreatsByType threat calculation likely wrong')
         end
 
 
@@ -4631,10 +4636,12 @@ function CheckIfWantToBuildAnotherMissile(oUnit)
     ForkThread(ForkedCheckForAnotherMissile, oUnit)
 end
 
-function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck)
+function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck, iOptionalSizeAdjust, iOptionalModIfNeedMultipleShots)
     --iFriendlyUnitDamageReductionFactor - optional, assumed to be 0 if not specified; will reduce the damage from the bomb by any friendly units in the aoe
     --iFriendlyUnitAOEFactor - e.g. if 2, then will search for friendly units in 2x the aoe
     --bCumulativeShieldHealthCheck - if true, then will treat a unit as unshielded if its cumulative shield health check is below the damage
+    --iOptionalSizeAdjust - Defaults to 1, % of value to assign to a normal (mex sized) target; if this isn't 1 then will adjust values accordingly, with T3 power given a value of 1, larger buildings given a greater value, and T1 PD sized buildings given half of iOptionalSizeAdjust
+    --iOptionalModIfNeedMultipleShots - Defaults to 0.1; % of value to assign if we wont kill the target with a single shot (experimentals will always give at least 0.5 value)
 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetDamageFromBomb'
@@ -4647,7 +4654,33 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitD
     local iMassFactor
     local iCurHealth, iMaxHealth, iCurShield, iMaxShield
     local tFriendlyUnits
+    local iSizeAdjustFactor = iOptionalSizeAdjust or 1
+    local iDifBetweenSize8And2 = 0
+
+    local tiSizeAdjustFactors
+    local iFactorIfWontKill = iOptionalModIfNeedMultipleShots or 0.1
+    if not(iSizeAdjustFactor == 1) then
+        iDifBetweenSize8And2 = iSizeAdjustFactor - 1
+        --Key values are 1, 2 (Mex), 6 (T2 pgen), 8 (T3 PGen), 10 (rapidfire arti); could potentially go up to 20 (czar)
+        tiSizeAdjustFactors = {[1] = 2, [2] = 1, [3] = 0.9, [4] = 0.75, [5] = 0.6, [6] = 0.5, [7] = 0.3, [8] = 0, [9] = -0.1, [10] = -0.25}
+
+    end
+
+    function GetBuildingSizeFactor(sBlueprint)
+        if iSizeAdjustFactor == 1 then
+            return 1
+        else
+            local tSize = M27UnitInfo.GetBuildingSize(sBlueprint)
+            local iCurSize = math.floor(tSize[1], tSize[2])
+            if bDebugMessages == true then LOG(sFunctionRef..': iCurSize='..iCurSize..'; tiSizeAdjustFactors[iCurSize]='..(tiSizeAdjustFactors[iCurSize] or 'nil')..'; expected factor='..1 + (tiSizeAdjustFactors[iCurSize] or -0.35) * iDifBetweenSize8And2) end
+
+            return 1 + (tiSizeAdjustFactors[iCurSize] or -0.35) * iDifBetweenSize8And2
+        end
+    end
+
     if iFriendlyUnitDamageReductionFactor then
+        --Reduce damage dealt based on nearby friendly units
+
         tFriendlyUnits = aiBrain:GetUnitsAroundPoint(categories.ALLUNITS - categories.BENIGN - M27UnitInfo.refCategorySatellite, tBaseLocation, iAOE * (iFriendlyUnitAOEFactor or 1), 'Ally')
         if M27Utilities.IsTableEmpty(tFriendlyUnits) == false then
             for iUnit, oUnit in tFriendlyUnits do
@@ -4670,6 +4703,7 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitD
         local iShieldThreshold = math.max(iDamage * 0.9, iDamage - 500)
         for iUnit, oUnit in tEnemiesInRange do
             if oUnit.GetBlueprint and not(oUnit.Dead) then
+                iMassFactor = 1
                 oCurBP = oUnit:GetBlueprint()
                 --Is the unit within range of the aoe?
                 if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBaseLocation) <= iAOE then
@@ -4680,18 +4714,26 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitD
                         iCurHealth = iCurShield + oUnit:GetHealth()
                         iMaxHealth = iMaxShield + oUnit:GetMaxHealth()
                         --Set base mass value based on health
-                        if iDamage >= iMaxHealth or iDamage >= math.min(iCurHealth * 3, iCurHealth + 1000) then iMassFactor = 1
-                        else
-                            --Still some value in damaging a unit (as might get a second strike), but far less than killing it
-                            iMassFactor = 0.1
-                            if EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId) then iMassFactor = 0.5 end
+                        if not(iFactorIfWontKill == 1) then
+                            if iDamage >= iMaxHealth or iDamage >= math.min(iCurHealth * 3, iCurHealth + 1000) then iMassFactor = 1
+                            else
+                                --Still some value in damaging a unit (as might get a second strike), but far less than killing it
+
+                                if EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId) then
+                                    iMassFactor = math.max(0.5, iFactorIfWontKill)
+                                else
+                                    iMassFactor = iFactorIfWontKill
+                                end
+                            end
                         end
-                        if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iMassFactor after considering if will kill it='..iMassFactor) end
+                        --Adjust for building size if specified (e.g. useful for if firing from unit with randomness factor)
+                        iMassFactor = iMassFactor * GetBuildingSizeFactor(oUnit.UnitId)
+                        if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iMassFactor after considering if will kill it and how large it is='..iMassFactor..'; iFactorIfWontKill='..iFactorIfWontKill..'; Building size factor='..GetBuildingSizeFactor(oUnit.UnitId)) end
                         --Is the target mobile and not under construction? Then reduce to 20% as unit might dodge or not be there when bomb lands
                         if oUnit:GetFractionComplete() == 1 then
                             if EntityCategoryContains(categories.MOBILE, oUnit.UnitId) then iMassFactor = iMassFactor * 0.2
-                                --Is it a mex that will be killed outright? Then increase the value of killing it
-                            elseif iMassFactor >= 1 and EntityCategoryContains(categories.MASSEXTRACTION, oUnit.UnitId) then iMassFactor = iMassFactor * 2
+                                --Is it a mex that will be killed outright and/or a volatile structure? Then increase the value of killing it
+                            elseif iMassFactor >= 1 and EntityCategoryContains(categories.MASSEXTRACTION + categories.VOLATILE, oUnit.UnitId) then iMassFactor = iMassFactor * 2
                             end
                         end
                         iTotalDamage = iTotalDamage + oCurBP.Economy.BuildCostMass * oUnit:GetFractionComplete() * iMassFactor
@@ -5361,7 +5403,9 @@ function GetT3ArtiTarget(oT3Arti)
 
         --First get the best location if just target the start position; note bleow uses similar code to choosing best nuke target
         tTarget = {M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[1], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[2], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[3]}
-        iBestTargetValue = GetDamageFromBomb(aiBrain, tTarget, iAOE, iDamage, nil, nil, true)
+        --GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck, iOptionalSizeAdjust, iOptionalModIfNeedMultipleShots)
+        iBestTargetValue = GetDamageFromBomb(aiBrain, tTarget, iAOE, iDamage, nil, nil, true, 0.25, 1)
+
 
         --Check we dont have key friendly units close to here
         if M27Utilities.IsTableEmpty(categories.COMMAND + categories.EXPERIMENTAL - M27UnitInfo.refCategorySatellite, tTarget, iAOE * 2, 'Ally') == false then
@@ -5377,7 +5421,8 @@ function GetT3ArtiTarget(oT3Arti)
                 tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oT3Arti:GetPosition(), iMaxRange, 'Enemy')
                 if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
                     for iUnit, oUnit in tEnemyUnitsOfInterest do
-                        iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
+                        --GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck, iOptionalSizeAdjust, iOptionalModIfNeedMultipleShots)
+                        iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage, nil, nil, true, 0.25, 1)
                         if bDebugMessages == true then LOG(sFunctionRef..': CategoryRef='..iRef..'; target oUnit='..oUnit.UnitId..'; iCurTargetValue='..iCurTargetValue..'; location='..repru(oUnit:GetPosition())) end
                         --Stop looking if tried >=10 targets and have one that is at least 20k of value
                         if iCurTargetValue > iBestTargetValue then
@@ -5716,6 +5761,7 @@ function CalculateUnitThreatsByType()
             ['210110'] = { true, false, true, true, false }, --Air threat (general)
             ['210111'] = { true, false, true, true, true }, --Air threat (general)
             ['200101'] = { true, false, true, true, true }, --Bombers and torpedo bombers
+            --['211000'] = { true, true, false, false, false} --GroundAA and AirAA combined - was thinking of using this for recording IMAP air version but decided to stick to just airaa
         }
 
         for iRef, tValue in tiLandAndNavyThreatTypes do

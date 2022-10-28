@@ -13,6 +13,7 @@ M27ShowPathingGraphically = false --(also turns on log showing map name) - Will 
 M27AllowDebugWithMultipleHumans = false --Some options like draw circle are disabled with >1 human in the game due to desync risk.  This can be used to enable them
 
 --Profiling options:
+M27StatTracking = false --Records data for all players, even if M27 isnt playing in the game
 M27RunProfiling = false --Records data on how long most functions are taking; if setting to true part-way through game then need to also run ForkThread(M27Utilities.ProfilerActualTimePerTick)
 M27ProfilingIgnoreFirst2Seconds = true --Means logic relating to pathing generation gets ignored
 --M27ProfilingIgnoreFirstMin = true --Means logic relating to pathing generation gets ignored

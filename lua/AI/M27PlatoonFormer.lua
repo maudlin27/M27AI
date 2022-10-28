@@ -331,7 +331,7 @@ function CombatPlatoonFormer(aiBrain)
     end
 
 
-    if M27Utilities.IsTableEmpty(tUnitsWaiting) == false then
+    if M27Utilities.IsTableEmpty(tUnitsWaiting) == false and not(aiBrain.M27IsDefeated) then
         --if GetGameTimeSeconds() >= 450 and table.getn(tUnitsWaiting) >= 3 then bDebugMessages = true end
 
         --Exclude ACU and experimentals - now done above
