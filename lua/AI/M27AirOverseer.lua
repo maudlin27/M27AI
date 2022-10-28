@@ -5778,7 +5778,7 @@ function AirBomberManager(aiBrain)
                                     LOG(sFunctionRef .. ': CurPriority=' .. iCurPriority .. '; Considering whether to add enemy ACU to bomber target. Mod distance for enemy ACU=' .. iCurModDistance .. '; aiBrain[refiBomberDefenceModDistance]=' .. aiBrain[refiBomberDefenceModDistance])
                                 end
                                 if iCurModDistance <= aiBrain[refiBomberDefenceModDistance] then
-                                    if iCurModDistance <= aiBrain[refiBomberDefenceCriticalThreatDistance] or (aiBrain[M27Overseer.refiLastNearestACUDistance] <= 150 and (not(bCheckForDangerousAA) or iCurModDistance <= aiBrain[refiBomberDefenceCriticalThreatDistance] or not (IsTargetCoveredByAA(oUnit, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyAAToAvoid], 4, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], false)))) then
+                                    if iCurModDistance <= aiBrain[refiBomberDefenceCriticalThreatDistance] or (aiBrain[M27Overseer.refiLastNearestACUDistance] <= 150 and (not(bCheckForDangerousAA) or iCurModDistance <= aiBrain[refiBomberDefenceCriticalThreatDistance] or not (IsTargetCoveredByAA(aiBrain[M27Overseer.refoLastNearestACU], M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyAAToAvoid], 4, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], false)))) then
                                         AddUnitToShortlist(aiBrain[M27Overseer.refoLastNearestACU], iTechLevel, iCurModDistance)
                                     else
                                         --Only add ACU if it has no shield under it and no T3+ AA

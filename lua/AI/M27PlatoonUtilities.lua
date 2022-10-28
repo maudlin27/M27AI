@@ -8595,8 +8595,8 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                             end
                                         end
                                         if M27Utilities.IsTableEmpty(tNearbyAssignedMAA) == false then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Threat of nearby assigned MAA='..M27Logic.GetAirThreatLevel(aiBrain, tNearbyAssignedMAA, false, false, true, false, false)..'; iMAAMinExperimentalLevelWithoutAir * 0.75='..iMAAMinExperimentalLevelWithoutAir * 0.75) end
-                                            if M27Logic.GetAirThreatLevel(aiBrain, tNearbyAssignedMAA, false, false, true, false, false) >=  iMAAMinExperimentalLevelWithoutAir * 0.75 then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Threat of nearby assigned MAA='..M27Logic.GetAirThreatLevel(aiBrain, tNearbyAssignedMAA, false, false, true, false, false)..'; iMAAMinExperimentalLevelWithoutAir * 0.75='..M27Overseer.iMAAMinExperimentalLevelWithoutAir * 0.75) end
+                                            if M27Logic.GetAirThreatLevel(aiBrain, tNearbyAssignedMAA, false, false, true, false, false) >=  M27Overseer.iMAAMinExperimentalLevelWithoutAir * 0.75 then
                                                 bDefend = false
                                             end
                                         end
