@@ -355,7 +355,9 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                     if M27Utilities.IsTableEmpty(M27Overseer.tAllActiveM27Brains) == false then
                         for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
                             if IsEnemy(oBrain:GetArmyIndex(), oKilledBrain:GetArmyIndex()) then
-                                oBrain[M27AirOverseer.refiEnemyAirAAThreat] = math.max(oBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] * 0.5, oBrain[M27AirOverseer.refiEnemyAirAAThreat] - oUnitKilled:GetBlueprint().Economy.BuildCostMass / 2)
+                                local iThreatReductionMod = 0.5
+                                if EntityCategoryContains(categories.EXPERIMENTAL, oUnitKilled.UnitId) then iThreatReductionMod = 0.6 end
+                                oBrain[M27AirOverseer.refiEnemyAirAAThreat] = math.max(oBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] * (1 - iThreatReductionMod), oBrain[M27AirOverseer.refiEnemyAirAAThreat] - oUnitKilled:GetBlueprint().Economy.BuildCostMass * iThreatReductionMod)
                             end
                         end
                     end

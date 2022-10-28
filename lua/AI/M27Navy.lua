@@ -1961,6 +1961,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     local bAANotNearFrontUnit = false
     local oClosestFriendlyAA
     local tFriendlyAA
+    local tEnemyExperimentalAir
 
     --Update naval units based on those being used for mini intercept
     tFriendlyNavalExcludingIntercept = {}
@@ -1974,49 +1975,52 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     end
 
     --If torp bombers are near our front unit then want to retreat navy
-    if M27UnitInfo.IsUnitValid(oClosestFriendlyUnitToEnemyBase) and aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] then
+    if M27UnitInfo.IsUnitValid(oClosestFriendlyUnitToEnemyBase) and (aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] or aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 5000) then
 
         --Update list of enemy torp bombers
-        local tActiveTorpBombers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTorpBomber, oClosestFriendlyUnitToEnemyBase:GetPosition(), 200, 'Enemy')
-        if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers]) then
-            M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers] = tActiveTorpBombers
-            if M27Utilities.IsTableEmpty(tActiveTorpBombers) == false then
+        local tActiveTorpBombers
+        if aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] then
+            tActiveTorpBombers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTorpBomber, oClosestFriendlyUnitToEnemyBase:GetPosition(), 200, 'Enemy')
+            if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers]) then
+                M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers] = tActiveTorpBombers
+                if M27Utilities.IsTableEmpty(tActiveTorpBombers) == false then
+                    local tUnitPos
+                    for iUnit, oUnit in  M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers] do
+                        tUnitPos = oUnit:GetPosition()
+                        oUnit[M27UnitInfo.reftLastKnownPosition] = {tUnitPos[1], tUnitPos[2], tUnitPos[3]}
+                    end
+                end
+            else
+                local bKeepUpdating = true
                 local tUnitPos
-                for iUnit, oUnit in  M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers] do
-                    tUnitPos = oUnit:GetPosition()
-                    oUnit[M27UnitInfo.reftLastKnownPosition] = {tUnitPos[1], tUnitPos[2], tUnitPos[3]}
-                end
-            end
-        else
-            local bKeepUpdating = true
-            local tUnitPos
-            while bKeepUpdating do
-                bKeepUpdating = false
+                while bKeepUpdating do
+                    bKeepUpdating = false
 
-                for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers] do
-                    if not(M27UnitInfo.IsUnitValid(oUnit)) then
-                        table.remove(M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers], iUnit)
-                        if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers]) == false then
-                            bKeepUpdating = true
+                    for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers] do
+                        if not(M27UnitInfo.IsUnitValid(oUnit)) then
+                            table.remove(M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers], iUnit)
+                            if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers]) == false then
+                                bKeepUpdating = true
+                            end
+                            break
+                        elseif M27Utilities.CanSeeUnit(aiBrain, oUnit, true) then
+                            tUnitPos = oUnit:GetPosition()
+                            oUnit[M27UnitInfo.reftLastKnownPosition] = {tUnitPos[1], tUnitPos[2], tUnitPos[3]}
                         end
-                        break
-                    elseif M27Utilities.CanSeeUnit(aiBrain, oUnit, true) then
-                        tUnitPos = oUnit:GetPosition()
-                        oUnit[M27UnitInfo.reftLastKnownPosition] = {tUnitPos[1], tUnitPos[2], tUnitPos[3]}
                     end
                 end
-            end
-            if M27Utilities.IsTableEmpty(tActiveTorpBombers) == false then
-                local bIncludeUnit
-                for iUnit, oUnit in tActiveTorpBombers do
-                    bIncludeUnit = true
-                    for iExistingBomber, oExistingBomber in M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers] do
-                        if oExistingBomber == oUnit then bIncludeUnit = false break end
-                    end
-                    if bIncludeUnit then
-                        table.insert(M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers], oUnit)
-                        tUnitPos = oUnit:GetPosition()
-                        oUnit[M27UnitInfo.reftLastKnownPosition] = {tUnitPos[1], tUnitPos[2], tUnitPos[3]}
+                if M27Utilities.IsTableEmpty(tActiveTorpBombers) == false then
+                    local bIncludeUnit
+                    for iUnit, oUnit in tActiveTorpBombers do
+                        bIncludeUnit = true
+                        for iExistingBomber, oExistingBomber in M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers] do
+                            if oExistingBomber == oUnit then bIncludeUnit = false break end
+                        end
+                        if bIncludeUnit then
+                            table.insert(M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers], oUnit)
+                            tUnitPos = oUnit:GetPosition()
+                            oUnit[M27UnitInfo.reftLastKnownPosition] = {tUnitPos[1], tUnitPos[2], tUnitPos[3]}
+                        end
                     end
                 end
             end
@@ -2024,7 +2028,33 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
 
         --Update AA if enemy has torp bombers
         if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy torp bombers empty after removing old entries='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers]))) end
+        local tEnemyRelevantAirThreats = {}
         if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers]) == false then
+            for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers] do
+                table.insert(tEnemyRelevantAirThreats, oUnit)
+            end
+        end
+        local tEnemyGunshipsNearFront = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGunship, oClosestFriendlyUnitToEnemyBase:GetPosition(), 100, 'Enemy')
+        if M27Utilities.IsTableEmpty(tEnemyGunshipsNearFront) == false then
+            for iUnit, oUnit in tEnemyGunshipsNearFront do
+                table.insert(tEnemyRelevantAirThreats, oUnit)
+            end
+        end
+
+
+        if bDebugMessages == true then LOG(sFunctionRef..': checking for enemy air experimentals, highest enemy air threat='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]) end
+        if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 20000 then
+            --Enemy might have experimental air - if we lack air control or enough of an air threat to deal with it, consider sending navy back
+            tEnemyExperimentalAir = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL, tOurBase, M27Utilities.GetDistanceBetweenPositions(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase) + 50, 'Enemy')
+            if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy experimental air empty='..tostring(M27Utilities.IsTableEmpty(tEnemyExperimentalAir))) end
+            if M27Utilities.IsTableEmpty(tEnemyExperimentalAir) == false then
+                for iUnit, oUnit in tEnemyExperimentalAir do
+                    table.insert(tEnemyRelevantAirThreats, oUnit)
+                end
+            end
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': Is tEnemyRelevantAirThreats empty='..tostring(M27Utilities.IsTableEmpty(tEnemyRelevantAirThreats))) end
+        if M27Utilities.IsTableEmpty(tEnemyRelevantAirThreats) == false then
             tFriendlyAA = EntityCategoryFilterDown(categories.ANTIAIR, tFriendlyNavalExcludingIntercept)
             local iClosestTorpToFront = 10000
             if M27Utilities.IsTableEmpty(tFriendlyAA) == false then
@@ -2056,24 +2086,28 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                 local iTorpBomberRangeThreshold = M27UnitInfo.GetUnitAARange(oClosestFriendlyAA)
                 if bDebugMessages == true then LOG(sFunctionRef..': iTorpBomberRangeThreshold='..iTorpBomberRangeThreshold..'; oClosestFriendlyAA used to determine this='..oClosestFriendlyAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestFriendlyAA)..'; AA range of this unit='..M27UnitInfo.GetUnitAARange(oClosestFriendlyAA)) end
 
-                for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftEnemyTorpBombers] do
-                    iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit[M27UnitInfo.reftLastKnownPosition], oClosestFriendlyUnitToEnemyBase:GetPosition())
+                for iUnit, oUnit in tEnemyRelevantAirThreats do
+
+                    iCurDist = M27Utilities.GetDistanceBetweenPositions((oUnit[M27UnitInfo.reftLastKnownPosition] or oUnit:GetPosition()), oClosestFriendlyUnitToEnemyBase:GetPosition())
                     if iCurDist < iClosestTorpToFront then
                         iClosestTorpToFront = iCurDist
                     end
                     if oClosestFriendlyUnitToEnemyBase == oClosestFriendlyAA then iClosestTorpToAA = iClosestTorpToFront
                     else
-                        iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit[M27UnitInfo.reftLastKnownPosition], oClosestFriendlyAA:GetPosition())
+                        iCurDist = M27Utilities.GetDistanceBetweenPositions((oUnit[M27UnitInfo.reftLastKnownPosition] or oUnit:GetPosition()), oClosestFriendlyAA:GetPosition())
                         if iCurDist < iClosestTorpToAA then
                             iClosestTorpToAA = iCurDist
                             if iClosestTorpToAA <= iTorpBomberRangeThreshold then break end
                         end
                     end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering relevant air threat '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurDist='..iCurDist..'; iClosestTorpToAA='..iClosestTorpToAA) end
                 end
+                local iCloseToFrontDistance = 100
+                if M27Utilities.IsTableEmpty(tEnemyExperimentalAir) == false then iCloseToFrontDistance = 150 end
                 if iClosestTorpToAA <= iTorpBomberRangeThreshold then
                     bTorpsInRangeOfFrontAA = true
                     bTorpsCloseToFrontUnit = true
-                elseif iClosestTorpToFront <= 100 then
+                elseif iClosestTorpToFront <= iCloseToFrontDistance then
                     bTorpsCloseToFrontUnit = true
                 end
                 if bDebugMessages == true then LOG(sFunctionRef..': oClosestFriendlyAA='..oClosestFriendlyAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestFriendlyAA)..'; iTorpBomberRangeThreshold='..iTorpBomberRangeThreshold..'; iClosestTorpToAA='..iClosestTorpToAA..'; iClosestTorpToFront='..iClosestTorpToFront..'; bTorpsInRangeOfFrontAA='..tostring(bTorpsInRangeOfFrontAA)..'; bTorpsCloseToFrontUnit='..tostring(bTorpsCloseToFrontUnit)..'; iTorpBomberRangeThreshold='..iTorpBomberRangeThreshold) end
@@ -2111,18 +2145,39 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
 
     --Logic when under torp attack - ignore normal appraoch and move units based on where AA is, unless we are already within 75 of our base
     if bDebugMessages == true then LOG(sFunctionRef..': Checking if under torp attack. bTorpsInRangeOfFrontAA='..tostring(bTorpsInRangeOfFrontAA)..'; bTorpsCloseToFrontUnit='..tostring(bTorpsCloseToFrontUnit)..'; bAANotNearFrontUnit='..tostring(bAANotNearFrontUnit)..'; Distance of closest friendly unit to enemy base='..M27Utilities.GetDistanceBetweenPositions(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase)) end
-    if (bTorpsInRangeOfFrontAA or (bTorpsCloseToFrontUnit and bAANotNearFrontUnit)) and M27Utilities.GetDistanceBetweenPositions(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase) > 75 then
+    if (bTorpsInRangeOfFrontAA or (bTorpsCloseToFrontUnit and (bAANotNearFrontUnit or M27Utilities.IsTableEmpty(tEnemyExperimentalAir) == false))) and M27Utilities.GetDistanceBetweenPositions(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase) > 75 then
         bConsiderBombardment = false --redundancy
-        local tNonAACombatAndSupport = EntityCategoryFilterDown(M27UnitInfo.refCategoryAllAmphibiousAndNavy - categories.ANTIAIR - categories.STRUCTURE - M27UnitInfo.refCategoryEngineer, tFriendlyNavalExcludingIntercept)
+        local tNonAACombatAndSupport = EntityCategoryFilterDown(M27UnitInfo.refCategoryAllAmphibiousAndNavy - categories.ANTIAIR - categories.STRUCTURE - M27UnitInfo.refCategoryEngineer - categories.SHIELD, tFriendlyNavalExcludingIntercept)
         local tCombatDestination
         local tOtherAADestination
         if oClosestFriendlyAA then
             --Enemy has nearby torp bombers but we have AA unit, so consolidate main forces by AA, and either move closest friendly AA unit forwards if not in range, or back if in range
             tCombatDestination = M27Utilities.MoveInDirection(oClosestFriendlyAA:GetPosition(), M27Utilities.GetAngleFromAToB(oClosestFriendlyAA:GetPosition(), tOurBase), 15, true)
             tOtherAADestination = M27Utilities.MoveInDirection(oClosestFriendlyAA:GetPosition(), M27Utilities.GetAngleFromAToB(oClosestFriendlyAA:GetPosition(), tOurBase), 10, true)
+
+            local bChaseExperimental = false
+            local oExperimentalToChase
+            if M27Utilities.IsTableEmpty(tEnemyExperimentalAir) == false then
+                local iClosestExperimentalDistToBase = 10000
+                local iCurDist
+                for iUnit, oUnit in tEnemyExperimentalAir do
+                    iCurDist = M27Utilities.GetDistanceBetweenPositions(tOurBase, oUnit:GetPosition())
+                    if iCurDist < iClosestExperimentalDistToBase then
+                        iClosestExperimentalDistToBase = iCurDist
+                        oExperimentalToChase = oUnit
+                    end
+                end
+                local iOurDistToBase = M27Utilities.GetDistanceBetweenPositions(tOurBase, oClosestFriendlyAA:GetPosition())
+                if iOurDistToBase < iClosestExperimentalDistToBase and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oExperimentalToChase:GetPosition()) == iPond and M27Utilities.GetDistanceBetweenPositions(oClosestFriendlyAA:GetPosition(), oExperimentalToChase:GetPosition()) <= 125 then
+                    bChaseExperimental = true
+                end
+            end
+
             if bDebugMessages == true then LOG(sFunctionRef..': Have oClosestFriendlyAA so will set tOtherAADestination and tCombatDestination to near here. tCombatDestination='..repru(tCombatDestination)..'; Distance to our base for tCombatDestination='..M27Utilities.GetDistanceBetweenPositions(tCombatDestination, tOurBase)) end
             if bTorpsInRangeOfFrontAA then
                 MoveUnitTowardsTarget(oClosestFriendlyAA, tOurBase, false, 'FrontAAToBase')
+            elseif bChaseExperimental then
+                MoveUnitTowardsTarget(oClosestFriendlyAA, oExperimentalToChase:GetPosition(), false, 'FrontAAExpChase')
             else
                 MoveUnitTowardsTarget(oClosestFriendlyAA, oClosestFriendlyUnitToEnemyBase:GetPosition(), false, 'FrontAAToFront')
             end

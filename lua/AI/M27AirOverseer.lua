@@ -187,6 +187,7 @@ reftAvailableTorpBombers = 'M27AirAvailableTorpBombers' --Determined by threat o
 reftAvailableAirAA = 'M27AirAvailableAirAA'
 reftAvailableTransports = 'M27AirAvailableTransports'
 reftAvailableGunships = 'M27AirAvailableGunships' --For T1-T3 gunships (T4 are handled via their own logic)
+refoFrontGunship = 'M27AirFrontGunship' --Location of our front gunship
 --local reftLowFuelAir = 'M27AirScoutsWithLowFuel'
 local reftLowFuelAir = 'M27AirLowFuelAir'
 
@@ -7317,23 +7318,32 @@ function AirAAManager(aiBrain)
                             bShouldAttackThreat = true
                             iCurTargetModDistanceFromStart = iCurDistanceToStartOrACU
                         else
-                            --Ignore enemy AA if near another type of unit to defend
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Will ignore enemy AA if near another type of unit we want to defend. bCheckForOtherUnitsToDefend=' .. tostring((bCheckForOtherUnitsToDefend or false)) .. '; iOtherUnitDefenceRange=' .. (iOtherUnitDefenceRange or 'nil'))
-                            end
-                            if bCheckForOtherUnitsToDefend then
-                                tOtherUnitsToDefend = aiBrain:GetUnitsAroundPoint(iOtherUnitCategoriesToDefend, oUnit:GetPosition(), iOtherUnitDefenceRange, 'Ally')
-                                if M27Utilities.IsTableEmpty(tOtherUnitsToDefend) == false then
-                                    if bIgnoreUnlessEmergencyThreat == false then
-                                        bShouldAttackThreat = true
-                                    else
-                                        --Only help out if we have groundAA nearby
-                                        local tFriendlyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA - categories.TECH1, oUnit:GetPosition(), iOtherUnitDefenceRange, 'Ally')
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': Enemy air threat near unit we want to protect but we dont have air control; is table of nearby ground units empty=' .. tostring(M27Utilities.IsTableEmpty(tFriendlyGroundAA)))
-                                        end
-                                        if M27Utilities.IsTableEmpty(tFriendlyGroundAA) == false then
+                            --AirAA Near our gunships?
+                            if M27UnitInfo.IsUnitValid(aiBrain[refoFrontGunship]) and EntityCategoryContains(M27UnitInfo.refCategoryAirAA + M27UnitInfo.refCategoryGunship, oUnit.UnitId) and M27Utilities.GetDistanceBetweenPositions(aiBrain[refoFrontGunship]:GetPosition(), oUnit:GetPosition()) <= 60 then
+                                bShouldAttackThreat = true
+                                if bDebugMessages == true then LOG(sFunctionRef..': Air unit is close to our front gunship '..aiBrain[refoFrontGunship].UnitId..M27UnitInfo.GetUnitLifetimeCount(aiBrain[refoFrontGunship])..', distance='..M27Utilities.GetDistanceBetweenPositions(aiBrain[refoFrontGunship]:GetPosition(), oUnit:GetPosition())) end
+                            else
+
+
+                                --Ignore enemy AA if near another type of unit to defend
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': Will ignore enemy AA if near another type of unit we want to defend. bCheckForOtherUnitsToDefend=' .. tostring((bCheckForOtherUnitsToDefend or false)) .. '; iOtherUnitDefenceRange=' .. (iOtherUnitDefenceRange or 'nil'))
+                                end
+                                if bCheckForOtherUnitsToDefend then
+                                    tOtherUnitsToDefend = aiBrain:GetUnitsAroundPoint(iOtherUnitCategoriesToDefend, oUnit:GetPosition(), iOtherUnitDefenceRange, 'Ally')
+
+                                    if M27Utilities.IsTableEmpty(tOtherUnitsToDefend) == false then
+                                        if bIgnoreUnlessEmergencyThreat == false then
                                             bShouldAttackThreat = true
+                                        else
+                                            --Only help out if we have groundAA nearby
+                                            local tFriendlyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA - categories.TECH1, oUnit:GetPosition(), iOtherUnitDefenceRange, 'Ally')
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef .. ': Enemy air threat near unit we want to protect but we dont have air control; is table of nearby ground units empty=' .. tostring(M27Utilities.IsTableEmpty(tFriendlyGroundAA)))
+                                            end
+                                            if M27Utilities.IsTableEmpty(tFriendlyGroundAA) == false then
+                                                bShouldAttackThreat = true
+                                            end
                                         end
                                     end
                                 end
@@ -9819,6 +9829,7 @@ function GunshipManager(aiBrain)
                 end
             end
         end
+        aiBrain[refoFrontGunship] = oFrontGunship
 
         --Does the enemy have AirAA near our front gunship? If so then retreat unless are in ACU kill/protect mode
         local bRetreatFromAA = false
@@ -9976,6 +9987,8 @@ function GunshipManager(aiBrain)
             local tDestination = GetAirRallyPoint(aiBrain)
             SendGunshipMoveOrder(aiBrain[reftAvailableGunships], tDestination)
         end
+    else
+        aiBrain[refoFrontGunship] = nil
     end
 end
 
