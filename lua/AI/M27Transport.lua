@@ -366,62 +366,66 @@ function TransportManager(aiBrain)
         local bUnloadFirst
         for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableTransports] do
             --Does the transport have any units loaded? If so then unload them
-            bUnloadFirst = false
-            if not(oUnit[refbMoreUnitsWanted]) then
-                if oUnit.GetCargo and M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(oUnit:GetCargo()) == false then
-                    bUnloadFirst = true
-                end
-            end
-            --[[if oUnit[refiUnitsLoaded] > 0 then
-                for iEngi, oEngi in oUnit[reftUnitsToldToLoadOntoTransport] do
-                    if M27UnitInfo.IsUnitValid(oEngi) and oEngi:IsUnitState('Attached') then
+            if M27UnitInfo.IsUnitValid(oUnit) then --Redundancy
+
+                bUnloadFirst = false
+                if not(oUnit[refbMoreUnitsWanted]) then
+                    if oUnit.GetCargo and M27Utilities.IsTableEmpty(oUnit:GetCargo()) == false then
                         bUnloadFirst = true
-                        break
                     end
                 end
-            end--]]
-            if bDebugMessages == true then LOG(sFunctionRef..': Considering available transport '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oUnit[refiUnitsLoaded]='..(oUnit[refiUnitsLoaded] or 0)..'; bUnloadFirst='..tostring(bUnloadFirst)) end
-
-            if bUnloadFirst then
-                M27Utilities.IssueTrackedClearCommands({oUnit})
-                M27AirOverseer.ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
-                oUnit[M27AirOverseer.refbOnAssignment] = true
-                IssueTransportUnload({oUnit}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                if bDebugMessages == true then LOG(sFunctionRef..': Told transport to unload at the start position') end
-            else
-                --Check if want to send the transport - e.g. in case we have changed the plateau we want to go to
-                local bSendTransportToPlateau = false
-                if (oUnit[refiUnitsLoaded] or 0) >= math.max(1, iMaxEngisWantedForPlateau) then
-                    bSendTransportToPlateau = true
-                    SendTransportToPlateau(aiBrain, oUnit)
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have sent transport '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to go to a plateau') end
-                end
-                if not(bSendTransportToPlateau) then
-
-
-                    bSendToRallyPoint = false
-                    if oUnit.GetNavigator then
-                        oNavigator = oUnit:GetNavigator()
-                        if oNavigator and oNavigator.GetCurrentTargetPos then
-                            tCurTarget = oNavigator:GetCurrentTargetPos()
-                            if M27Utilities.GetDistanceBetweenPositions(tCurTarget, tRallyPoint) >= 30 then
-                                bSendToRallyPoint = true
-                            end
+                --[[if oUnit[refiUnitsLoaded] > 0 then
+                    for iEngi, oEngi in oUnit[reftUnitsToldToLoadOntoTransport] do
+                        if M27UnitInfo.IsUnitValid(oEngi) and oEngi:IsUnitState('Attached') then
+                            bUnloadFirst = true
+                            break
                         end
                     end
+                end--]]
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering available transport '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oUnit[refiUnitsLoaded]='..(oUnit[refiUnitsLoaded] or 0)..'; bUnloadFirst='..tostring(bUnloadFirst)) end
 
-                    if bSendToRallyPoint then
-                        M27Utilities.IssueTrackedClearCommands({oUnit})
-                        M27AirOverseer.ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
-                        IssueMove({oUnit}, tRallyPoint)
-                        if bDebugMessages == true then LOG(sFunctionRef..': Telling transport to return to rally point '..repru(tRallyPoint)) end
-                    else
-                        --Low fuel or health transport with no units?
-                        if (oUnit[refiUnitsLoaded] or 0) == 0 and (M27UnitInfo.GetUnitHealthPercent(oUnit) <= 0.35 or oUnit:GetFuelRatio() <= 0.2) then
-                            if not(oUnit.GetCargo) or M27Utilities.IsTableEmpty(oUnit:GetCargo()) then
-                                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tRallyPoint) <= 30 or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPosition]) <= 60 then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Will kill transport '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' as it has low fuel or health') end
-                                    oUnit:Kill()
+                if bUnloadFirst then
+                    M27Utilities.IssueTrackedClearCommands({oUnit})
+                    M27AirOverseer.ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
+                    oUnit[M27AirOverseer.refbOnAssignment] = true
+                    IssueTransportUnload({oUnit}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                    if bDebugMessages == true then LOG(sFunctionRef..': Told transport to unload at the start position') end
+                else
+                    --Check if want to send the transport - e.g. in case we have changed the plateau we want to go to
+                    local bSendTransportToPlateau = false
+                    if (oUnit[refiUnitsLoaded] or 0) >= math.max(1, iMaxEngisWantedForPlateau) then
+                        bSendTransportToPlateau = true
+                        SendTransportToPlateau(aiBrain, oUnit)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have sent transport '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to go to a plateau') end
+                    end
+                    if not(bSendTransportToPlateau) then
+
+
+                        bSendToRallyPoint = false
+                        if oUnit.GetNavigator then
+                            oNavigator = oUnit:GetNavigator()
+                            if oNavigator and oNavigator.GetCurrentTargetPos then
+                                tCurTarget = oNavigator:GetCurrentTargetPos()
+                                if M27Utilities.GetDistanceBetweenPositions(tCurTarget, tRallyPoint) >= 30 then
+                                    bSendToRallyPoint = true
+                                end
+                            end
+                        end
+
+                        if bSendToRallyPoint then
+                            M27Utilities.IssueTrackedClearCommands({oUnit})
+                            M27AirOverseer.ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
+                            IssueMove({oUnit}, tRallyPoint)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Telling transport to return to rally point '..repru(tRallyPoint)) end
+                        else
+                            --Low fuel or health transport with no units?
+                            if (oUnit[refiUnitsLoaded] or 0) == 0 and (M27UnitInfo.GetUnitHealthPercent(oUnit) <= 0.35 or oUnit:GetFuelRatio() <= 0.2) then
+                                if not(oUnit.GetCargo) or M27Utilities.IsTableEmpty(oUnit:GetCargo()) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is low health with no cargo, Rally point='..repru(tRallyPoint)..'; Unit position='..repru(oUnit:GetPosition())..'; Start position='..repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
+                                    if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tRallyPoint) <= 30 or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 60 then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Will kill transport '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' as it has low fuel or health') end
+                                        oUnit:Kill()
+                                    end
                                 end
                             end
                         end

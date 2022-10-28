@@ -2868,8 +2868,20 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                                     end
                                 end
+                            elseif iCurrentConditionToTry == 16 then --2 destroyers or 1 battlecruiser even if low on mass
+                                if iFactoryTechLevel >= 2 and M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false then
+                                    local tCurDestroyers = EntityCategoryFilterDown(M27UnitInfo.refCategoryDestroyer, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                                    local iCurDestroyers = 0
+                                    if M27Utilities.IsTableEmpty(tCurDestroyers) == false then
+                                        iCurDestroyers = table.getn(tCurDestroyers)
+                                    end
+                                    if iCurDestroyers < 2 then
+                                        iCategoryToBuild = M27UnitInfo.refCategoryDestroyer
+                                        iTotalWanted = 1
+                                    end
+                                end
                             elseif not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] > 3 then
-                                if iCurrentConditionToTry == 16 then
+                                if iCurrentConditionToTry == 17 then
                                     --Upgrade to T3 in some cases: Do we have control of the pond, and are Aeon or Cybran (who need T3 for better range), or alternatively already have 6 cruisers?
                                     local iCurCruisers = 0
                                     local tCurCruisers = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiserCarrier, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
@@ -2882,7 +2894,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy has no navy or we have built lots of T2 navy, and we have lots of mass so will upgrade to T2 or T3') end
                                         bUpgradeFactoryInstead = true
                                     end
-                                elseif iCurrentConditionToTry == 17 then
+                                elseif iCurrentConditionToTry == 18 then
                                     --T1 factory - only build if our primary factory is T1 or we are about to overflow
                                     if iFactoryTechLevel == 1 then
                                         if aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 or M27UnitInfo.GetUnitTechLevel(M27Navy.GetPrimaryNavalFactory(aiBrain, oFactory[M27Navy.refiAssignedPond])) == 1 then
@@ -2890,7 +2902,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             iCategoryToBuild = M27UnitInfo.refCategoryFrigate
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 18 then
+                                elseif iCurrentConditionToTry == 19 then
                                     --Get more AA if we have a shortfall vs enemy air to ground threat (higher thresholds than before)
                                     local iAirThreatWanted = aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] * 0.85
                                     local iOurNavalSurfaceThreat = M27Logic.GetCombatThreatRating(aiBrain, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]], false, nil, nil, false, false, false, false, true, false, false)
@@ -2914,7 +2926,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     end
 
                                 elseif iFactoryTechLevel >= 2 then
-                                    if iCurrentConditionToTry == 19 then --More bombardment units based on number of mexes in range
+                                    if iCurrentConditionToTry == 20 then --More bombardment units based on number of mexes in range
                                         local iPotentialBombardmentRange = 60
                                         local iBombardmentCategory = M27UnitInfo.refCategoryDestroyer + categories.BATTLESHIP - M27UnitInfo.refCategoryMissileShip
                                         local iUnitsPerMexInRange = 1
@@ -3022,12 +3034,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 end
                                             end
                                         end
-                                    elseif iCurrentConditionToTry == 20 then
+                                    elseif iCurrentConditionToTry == 21 then
                                         --Upgrade to t2 or T3 (lower priority)
                                         if iFactoryTechLevel < 3 and (oFactory == M27Navy.GetPrimaryNavalFactory(aiBrain, oFactory[M27Navy.refiAssignedPond]) or aiBrain:GetEconomyStored('MASS') >= 2000 * iFactoryTechLevel or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 10 * iFactoryTechLevel) and (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 10 or (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 7 and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAllNavy * categories.TECH2) >= 10)) then
                                             bUpgradeFactoryInstead = true
                                         end
-                                    elseif iCurrentConditionToTry == 21 then
+                                    elseif iCurrentConditionToTry == 22 then
                                         --Minimum level of bombardment units
                                         local iExistingLongRange = 0
                                         local iCategoryWanted
