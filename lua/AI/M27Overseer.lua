@@ -6532,7 +6532,6 @@ function DetermineInitialBuildOrder(aiBrain)
             else iLandSpamThreshold = 1 - (1 - iLandSpamThreshold) * (1 - iLandSpamThreshold) end
         end
         iLandSpamThreshold = iLandSpamThreshold * 100
-        LOG('Land spam threshold='..iLandSpamThreshold)
         if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[refiDistanceToNearestEnemyBase] <= 380 and iNearbyMexCount <= 8 and math.random(1, 100) <= iLandSpamThreshold then
             aiBrain[refiDefaultStrategy] = refStrategyLandRush
             aiBrain[refiAIBrainCurrentStrategy] = refStrategyLandRush
