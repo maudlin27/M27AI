@@ -678,7 +678,7 @@ function ACUShouldRunFromBigThreat(aiBrain)
             local iDistToBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
             if iDistToBase <= M27Overseer.iDistanceFromBaseWhenVeryLowHealthToBeSafe then
                 bRun = false
-            elseif iDistToBase <= M27Overseer.iDistanceFromBaseToBeSafe then
+            elseif iDistToBase <= M27Overseer.iDistanceFromBaseToBeSafe + 100 or (oACU:GetWorkProgress() >= 0.35 and iDistToBase <= math.min(250, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4)) then
                 if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) then
                     --Not a ground experimental so just want to stay near base
                     bRun = false

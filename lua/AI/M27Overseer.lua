@@ -4801,6 +4801,7 @@ function ACUManager(aiBrain)
 
     if not (aiBrain.M27IsDefeated) and M27Logic.iTimeOfLastBrainAllDefeated < 10 then
         local oACU = M27Utilities.GetACU(aiBrain)
+        if oACU:IsUnitState('Upgrading') then bDebugMessages = true end
 
         --Track ACU health over time
         if not (oACU[reftACURecentHealth]) then
@@ -6408,9 +6409,12 @@ function DetermineInitialBuildOrder(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --Distance to enemy base examples:
+    --Floraris: 200
     --Theta passage: 321
     --Open palms: 361
     --Astro craters: 362
+    --Polar depression: 361
+    --Forbidden pass: 570
     --Eye of the storm: 598
     --Burial mounds: 832
 
@@ -6522,7 +6526,14 @@ function DetermineInitialBuildOrder(aiBrain)
 
         --Override all of the above if are adopting land spam strategy
         --Land spam strategy
-        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[refiDistanceToNearestEnemyBase] <= 370 and iNearbyMexCount <= 8 and math.random(1, 100) <= M27Config.iLandSpamChance * 100 then
+        local iLandSpamThreshold = M27Config.iLandSpamChance
+        if aiBrain[refiDistanceToNearestEnemyBase] <= 325 then
+            if aiBrain[refiDistanceToNearestEnemyBase] <= 225 then iLandSpamThreshold = 1 - (1 - iLandSpamThreshold) * (1 - iLandSpamThreshold) * (1 - iLandSpamThreshold)
+            else iLandSpamThreshold = 1 - (1 - iLandSpamThreshold) * (1 - iLandSpamThreshold) end
+        end
+        iLandSpamThreshold = iLandSpamThreshold * 100
+        LOG('Land spam threshold='..iLandSpamThreshold)
+        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[refiDistanceToNearestEnemyBase] <= 380 and iNearbyMexCount <= 8 and math.random(1, 100) <= iLandSpamThreshold then
             aiBrain[refiDefaultStrategy] = refStrategyLandRush
             aiBrain[refiAIBrainCurrentStrategy] = refStrategyLandRush
             aiBrain[refiMinLandFactoryBeforeOtherTypes] = 4

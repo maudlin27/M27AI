@@ -704,7 +704,7 @@ function DodgeBomb(oBomber, oWeapon, projectile)
                                             else
                                                 --Is it a T2 bomber, and there arent many bombers nearby?
                                                 if EntityCategoryContains(categories.TECH2, oBomber.UnitId) then
-                                                    local tNearbyBombers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryGunship, oUnit:GetPosition(), 100, 'Enemy')
+                                                    local tNearbyBombers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryGunship - categories.TECH1, oUnit:GetPosition(), 100, 'Enemy')
                                                     if M27Utilities.IsTableEmpty(tNearbyBombers) == true then
                                                         bDontTryAndDodge = true
                                                     else

@@ -7,7 +7,7 @@
 M27ShowUnitNames = true --(Overseer will set this to true if game settings are to show platoon names for all as well)
 M27ShowEnemyUnitNames = true --Will rename enemy units to reflect their ID and lifetime count
 M27RunVeryFast = true --Game starts off at +10 speed if set to adjustable
-M27StrategicLog = false --Affects the strategic overseer logs which give various stats re the AI's state during the game
+M27StrategicLog = true --Affects the strategic overseer logs which give various stats re the AI's state during the game
 M27ShowPathingGraphically = false --(also turns on log showing map name) - Will draw the pathing for land, amphibious and navy if set to true, but will make things very slow
 
 M27AllowDebugWithMultipleHumans = false --Some options like draw circle are disabled with >1 human in the game due to desync risk.  This can be used to enable them
@@ -22,4 +22,4 @@ M27RunGamePerformanceCheck = false --Runs regardless of whether M27 is active in
 
 
 --Randomness for alternative strategies
-iLandSpamChance = 0.7 --from 0 to 1.0 (being 0 to 100%) - where certain conditions are satisfied to consider this strategy, then it will be adopted with this % chance
+iLandSpamChance = 0.5 --from 0 to 1.0 (being 0 to 100%) - this is the value pre-weighting value, so will apply to medium sized maps; smaller maps will have an increased chance as a multiple of this - where certain conditions are satisfied to consider this strategy, then it will be adopted with this % chance subject to map modifiers; Current testing indicates land spam is marginally worse than normal approach (for M27)
