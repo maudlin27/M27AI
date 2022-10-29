@@ -1939,7 +1939,17 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
             if bDebugMessages == true then LOG(sFunctionRef..': Still have decent resources so wont pause upgrades') end
             bNormalLogic = true
         end
-
+    elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush then
+        bNormalLogic = false
+        if aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 and (iLandFactoryCount >= math.min(5, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand]) or aiBrain:GetEconomyStoredRatio('MASS') >= 0.9) then
+            if aiBrain:GetEconomyStoredRatio('MASS') >= 0.85 then
+                bNormalLogic = true
+            elseif aiBrain:GetEconomyStoredRatio('MASS') >= 0.7 and aiBrain[refiNetMassBaseIncome] > 0 then
+                bNormalLogic = true
+            elseif aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 and aiBrain[refiNetMassBaseIncome] > 0.4 then
+                bNormalLogic = true
+            end
+        end
     end
     if bNormalLogic then
         local tMassThresholds = {}

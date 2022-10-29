@@ -5773,7 +5773,7 @@ function DetermineIfACUShouldBuildPower(oPlatoon)
                     end
                 end
                 if bDebugMessages == true then LOG(sFunctionRef..': Are in turtle mode, dist tochokepoint from start position='..M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27MapInfo.reftChokepointBuildLocation])..'; energy wanted='..iGrossEnergyWanted) end
-            elseif aiBrain:GetEconomyStoredRatio('Energy') < 0.99 then
+            elseif aiBrain:GetEconomyStoredRatio('Energy') < 0.99 and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush) then
 
                 if not(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]) then
                     iGrossEnergyWanted = 40
@@ -5793,7 +5793,7 @@ function DetermineIfACUShouldBuildPower(oPlatoon)
                 iGrossEnergyWanted = math.max(iGrossEnergyWanted, 16)
                 iEneryBeforeSecondFac = 16
             end
-            if aiBrain:GetEconomyStoredRatio('MASS') >= 0.1 and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) then
+            if aiBrain:GetEconomyStoredRatio('MASS') >= 0.1 and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush) then
                 if aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes] <= 1 then iGrossEnergyWanted = math.min(45, iGrossEnergyWanted + 7) end
                 --Allow ACU to build power if its still not that far from our base, we have at least 2 factories, are high mass and low power, and dont ahve tech 2
                 if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 1 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] <= (iGrossEnergyWanted + 10) and aiBrain:GetEconomyStoredRatio('MASS') >= 0.2 and (aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.75 or aiBrain[M27EconomyOverseer.refbStallingEnergy]) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories) >= 2 and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
@@ -5883,7 +5883,7 @@ function DetermineIfACUShouldBuildFactory(oPlatoon)
                         else
                             if iFactoryCount < 2 then
                                 if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 10 then --Have at least 100 gross energy income per second
-                                    if aiBrain:GetEconomyTrend('MASS') >= 0.2 then --At least 2 net mass income per second
+                                    if aiBrain:GetEconomyTrend('MASS') >= 0.2 or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush and (aiBrain:GetEconomyStored('MASS') >= 60 or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 1.1)) then --At least 2 net mass income per second
                                         if iStoredEnergy >= 250 then
                                             if aiBrain:GetEconomyStored('MASS') >= 20 then
                                                 if bDebugMessages == true then LOG(sFunctionRef..': We have the resources to build a land factory so will try to') end
