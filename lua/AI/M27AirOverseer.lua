@@ -3059,7 +3059,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                             end
                             if bUnitIsUnassigned == true then
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Unit is unassigned, will treat as available unless it is a low health bomber or t3 air and we have air staging. iAirStaging=' .. iAirStaging .. '; M27UnitInfo.GetUnitHealthPercent(oUnit)=' .. M27UnitInfo.GetUnitHealthPercent(oUnit) .. '; Tech level=' .. M27UnitInfo.GetUnitTechLevel(oUnit) .. '; iUnitType=' .. iUnitType .. '; ')
+                                    LOG(sFunctionRef .. ': Unit is unassigned, will treat as available unless it is a low health bomber or t3 air or any tech gunship and we have air staging. iAirStaging=' .. iAirStaging .. '; M27UnitInfo.GetUnitHealthPercent(oUnit)=' .. M27UnitInfo.GetUnitHealthPercent(oUnit) .. '; Tech level=' .. M27UnitInfo.GetUnitTechLevel(oUnit) .. '; iUnitType=' .. iUnitType .. '; ')
                                 end
 
                                 --Torp bomber when in attackACU mode - attack ACU if its underwater
@@ -3070,7 +3070,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
 
                                     --Send low health bombers and T3 air to heal up provided no T2+ airAA units nearby
                                     if iCurTechLevel < 4 and iAirStaging > 0 and ((iUnitType == iTypeGunship and M27UnitInfo.GetUnitHealthPercent(oUnit) <= iGunshipLowHealthPercent) or M27UnitInfo.GetUnitHealthPercent(oUnit) <= iLowHealthPercent) and (iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber or iUnitType == iTypeGunship or iCurTechLevel == 3) and
-                                            ((M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA - categories.TECH1, oUnit:GetPosition(), 100, 'Enemy'))) or (M27UnitInfo.GetUnitTechLevel(oUnit) <= 2 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA, oUnit:GetPosition(), 100, 'Enemy')))) and
+                                            (iUnitType == iTypeGunship or ((M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA - categories.TECH1, oUnit:GetPosition(), 100, 'Enemy'))) or (M27UnitInfo.GetUnitTechLevel(oUnit) <= 2 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA, oUnit:GetPosition(), 100, 'Enemy'))))) and
                                             (oUnit[refiBombsDropped] >= 2 or not (iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber)) then
                                         iCurUnitsWithLowFuel = iCurUnitsWithLowFuel + 1
                                         aiBrain[reftLowFuelAir][iCurUnitsWithLowFuel] = oUnit

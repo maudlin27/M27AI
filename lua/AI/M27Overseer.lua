@@ -7497,29 +7497,33 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                 else
 
 
-                        -------LAND RUSH LOGIC-----------------------------------
+                                    -------LAND RUSH LOGIC-----------------------------------
                                     --Land rush strategy override
                                     if aiBrain[refiDefaultStrategy] == refStrategyLandRush then
                                         --Do we still want to land rush?
                                         local bCancelLandRush = false
-                                        if GetGameTimeSeconds() >= 720 then --Wont consider after minute 12
+                                        if GetGameTimeSeconds() >= 840 then --Wont consider after minute 14
                                             bCancelLandRush = true
                                         else
-                                            if aiBrain[refiEnemyHighestTechLevel] >= 3 or aiBrain[refiOurHighestFactoryTechLevel] >= 2 or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 6 then
+                                            if aiBrain[refiEnemyHighestTechLevel] >= 3 or aiBrain[refiOurHighestFactoryTechLevel] >= 3 or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 6 then
                                                 bCancelLandRush = true
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Either we have at least 6 mass income or enemy or us have t3. aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; aiBrain[refiEnemyHighestTechLevel]='..aiBrain[refiEnemyHighestTechLevel]..'; aiBrain[refiOurHighestFactoryTechLevel]='..aiBrain[refiOurHighestFactoryTechLevel]) end
                                             elseif aiBrain[refiEnemyHighestTechLevel] == 2 then
                                                 --Does enemy have at least 1 T2 PD, or >=5 T2 land combat units?
                                                 local tEnemyPD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy')
                                                 if M27Utilities.IsTableEmpty(tEnemyPD) == false then
                                                     bCancelLandRush = true
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Is tEnemyPD empty='..tostring(M27Utilities.IsTableEmpty(tEnemyPD))) end
                                                 else
                                                     local tEnemyT2Combat = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy')
                                                     if M27Utilities.IsTableEmpty(tEnemyT2Combat) == false and table.getn(tEnemyT2Combat) >= 5 then
                                                         bCancelLandRush = true
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy has '..table.getn(tEnemyT2Combat)..' T2 combat units so will cancel land rush mode') end
                                                     end
                                                 end
                                             end
                                         end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': bCancelLandRush='..tostring(bCancelLandRush)..'; Time='..GetGameTimeSeconds()..'; Enemy highest tech level='..aiBrain[refiEnemyHighestTechLevel]) end
                                         if bCancelLandRush then
                                             aiBrain[refiDefaultStrategy] = refStrategyLandMain
                                             aiBrain[refiAIBrainCurrentStrategy] = refStrategyLandMain --will be updated further on
@@ -7574,7 +7578,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                                 elseif bTemporaryTurtleMode then
                                                     bWantToEco = true
                                                 else
-                                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering mex control and if have lots of mass to use. Mexes available for upgrade='..aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade]..'; Stored mass%='..aiBrain:GetEconomyStoredRatio('MASS')..'; Stored mass val='..aiBrain:GetEconomyStored('MASS')) end
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering mex control and if have lots of mass to use. Mexes available for upgrade='..(aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] or 'nil')..'; Stored mass%='..aiBrain:GetEconomyStoredRatio('MASS')..'; Stored mass val='..aiBrain:GetEconomyStored('MASS')) end
                                                     if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStored('MASS') < 12000 then
                                                         if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy threat. Percentage outstanding threat='..aiBrain[refiPercentageOutstandingThreat]..'; bBigEnemyThreat='..tostring(bBigEnemyThreat or false)..'; aiBrain[refiModDistFromStartNearestThreat]='..aiBrain[refiModDistFromStartNearestThreat]..'; aiBrain[refiDistanceToNearestEnemyBase]='..aiBrain[refiDistanceToNearestEnemyBase]..'; iMexesInPathingGroupWeHaveClaimed='..iMexesInPathingGroupWeHaveClaimed..'; iOurTeamsShareOfMexesOnMap='..iOurTeamsShareOfMexesOnMap..'; iDistanceToEnemyEcoThreshold='..iDistanceToEnemyEcoThreshold..'; iT3Mexes='..iT3Mexes..'; aiBrain[refiOurHighestFactoryTechLevel]='..aiBrain[refiOurHighestFactoryTechLevel]) end
                                                         if aiBrain[refiPercentageOutstandingThreat] > 0.55 and (bBigEnemyThreat == false or aiBrain[refiModDistFromStartNearestThreat] >= aiBrain[refiDistanceToNearestEnemyBase] * 0.5) and (iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 0.8 or aiBrain[refiDistanceToNearestEnemyBase] >= iDistanceToEnemyEcoThreshold) and not (iT3Mexes >= math.min(iMexesNearStart, 7) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
@@ -8167,6 +8171,9 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
             --Increase health to run if we lack basic intel coverage
             if not(M27Logic.GetIntelCoverageOfPosition(aiBrain, oACU:GetPosition(), 30, false)) then aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], math.min(aiBrain[refiACUHealthToRunOn] + oACU:GetMaxHealth() * 0.05, oACU:GetMaxHealth() * 0.975)) end
+
+            --Decrease health to run if we are in land rush mode
+            if aiBrain[refiAIBrainCurrentStrategy] == refStrategyLandRush and aiBrain[refiACUHealthToRunOn] >= 4000 then aiBrain[refiACUHealthToRunOn] = math.max(4000, aiBrain[refiACUHealthToRunOn] * 0.8) end
 
             if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating health for ACU to run on. aiBrain[refiACUHealthToRunOn]='..aiBrain[refiACUHealthToRunOn]..'; refbACUVulnerableToAirSnipe='..tostring(aiBrain[refbACUVulnerableToAirSnipe])) end
 

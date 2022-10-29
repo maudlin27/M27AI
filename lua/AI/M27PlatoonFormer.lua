@@ -392,7 +392,7 @@ function CombatPlatoonFormer(aiBrain)
             oPlatoonOrUnitToEscort = nil
             iCount = iCount + 1 if iCount > 100 then M27Utilities.ErrorHandler('Infinite loop') break end
             aiBrain[refbUsingTanksForPlatoons] = true
-            if iStrategy == M27Overseer.refStrategyLandMain then
+            if iStrategy == M27Overseer.refStrategyLandMain or iStrategy == M27Overseer.refStrategyLandRush then
                 if bDebugMessages == true then LOG(sFunctionRef..'We are using early land strategy, decide what platoon to form. iCurrentConditionToTry='..iCurrentConditionToTry) end
                 if iCurrentConditionToTry == 1 then --Initial land raiders
                     if aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27MexRaiderAI'] < aiBrain[M27Overseer.refiInitialRaiderPlatoonsWanted] then

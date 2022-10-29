@@ -22,4 +22,4 @@ M27RunGamePerformanceCheck = false --Runs regardless of whether M27 is active in
 
 
 --Randomness for alternative strategies
-iLandSpamChance = 1.0 --from 0 to 1.0 (being 0 to 100%) - where certain conditions are satisfied to consider this strategy, then it will be adopted with this % chance
+iLandSpamChance = 0.7 --from 0 to 1.0 (being 0 to 100%) - where certain conditions are satisfied to consider this strategy, then it will be adopted with this % chance

@@ -3142,7 +3142,7 @@ function ManageEnergyStalls(aiBrain)
     local bChangeRequired = false
     local iUnitsAdjusted = 0
     local bHaveWeCappedUnpauseAmount = false
-    if GetGameTimeSeconds() >= 120 or (GetGameTimeSeconds() >= 40 and aiBrain[refiGrossEnergyBaseIncome] >= 15) then
+    if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush and GetGameTimeSeconds() >= 200) or (GetGameTimeSeconds() >= 120 or (GetGameTimeSeconds() >= 40 and aiBrain[refiGrossEnergyBaseIncome] >= 15)) then
         --Only consider power stall management after 2m, otherwise risk pausing things such as early microbots when we would probably be ok after a couple of seconds; lower time limit put in as a theroetical possibility due to AIX
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': About to consider if we have an energy stall or not. aiBrain:GetEconomyStoredRatio(ENERGY)=' .. aiBrain:GetEconomyStoredRatio('ENERGY') .. '; aiBrain[refiNetEnergyBaseIncome]=' .. aiBrain[refiNetEnergyBaseIncome] .. '; aiBrain:GetEconomyTrend(ENERGY)=' .. aiBrain:GetEconomyTrend('ENERGY') .. '; aiBrain[refbStallingEnergy]=' .. tostring(aiBrain[refbStallingEnergy]))
@@ -3175,7 +3175,12 @@ function ManageEnergyStalls(aiBrain)
             iPercentMod = iPercentMod -0.3
         end
 
-        if aiBrain[refbStallingEnergy] and (aiBrain[refiGrossEnergyBaseIncome] >= 100000 or (aiBrain:GetEconomyStoredRatio('ENERGY') > (0.8 + iPercentMod) or (aiBrain:GetEconomyStoredRatio('ENERGY') > (0.7 + iPercentMod) and aiBrain[refiNetEnergyBaseIncome] > (1 + iNetMod)) or (aiBrain:GetEconomyStoredRatio('ENERGY') > (0.5 + iPercentMod) and aiBrain[refiNetEnergyBaseIncome] > (4 + iNetMod)) or (GetGameTimeSeconds() <= 180 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.3))) then
+        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush then
+            iPercentMod = iPercentMod - 0.06
+            iNetMod = iNetMod - 2.5
+        end
+
+        if aiBrain[refbStallingEnergy] and (aiBrain[refiGrossEnergyBaseIncome] >= 100000 or (aiBrain:GetEconomyStoredRatio('ENERGY') > (0.8 + iPercentMod) or (aiBrain:GetEconomyStoredRatio('ENERGY') > (0.7 + iPercentMod) and aiBrain[refiNetEnergyBaseIncome] > (1 + iNetMod)) or (aiBrain:GetEconomyStoredRatio('ENERGY') > (0.5 + iPercentMod) and aiBrain[refiNetEnergyBaseIncome] > (4 + iNetMod)) or (GetGameTimeSeconds() <= 180 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.3)) or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.2 and aiBrain[refiNetEnergyBaseIncome] > 0)) then
             --aiBrain[refbStallingEnergy] = false
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Have enough energy stored or income to start unpausing things')
