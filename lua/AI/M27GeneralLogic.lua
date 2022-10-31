@@ -2160,7 +2160,12 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
 
     --Determine the amount that health impacts on threat
     local iHealthFactor = 1 --if unit has 40% health, then threat reduced by (1-40%)*iHealthFactor
-    if bIncludeAirToAir == true then iHealthFactor = 0.4
+    if bIncludeAirToAir == true then
+        if not(bBlueprintThreat) and tUnits[1] and tUnits[1].GetAIBrain and not(IsEnemy(tUnits[1]:GetAIBrain():GetArmyIndex(), aiBrain:GetArmyIndex())) then
+            iHealthFactor = 0.5
+        else
+            iHealthFactor = 0.15
+        end
     elseif bIncludeAirToGround == true then iHealthFactor = 0.5
     else iHealthFactor = 0 end
 

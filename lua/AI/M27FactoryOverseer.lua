@@ -2163,7 +2163,11 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 if bDebugMessages == true then
                                                     LOG(sFunctionRef .. ': T3 factory so considering if want a first T3 spy plane or strat')
                                                 end
-                                                if (bHavePowerForAir or aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 250) and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAirScout * categories.TECH3, 1) == true and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) then
+                                                --If enemy has T3 air factory then build asf as top priority in case they try rushing a strat
+                                                if (bHavePowerForAir or aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 300) and aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0 and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAirAA * categories.TECH3, 1) then
+                                                    iCategoryToBuild = M27UnitInfo.refCategoryAirAA * categories.TECH3
+                                                    iTotalWanted = 1
+                                                elseif (bHavePowerForAir or aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 250) and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAirScout * categories.TECH3, 1) == true and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) then
                                                     if bDebugMessages == true then
                                                         LOG(sFunctionRef .. ': Never built spy plane so building as high priority')
                                                     end

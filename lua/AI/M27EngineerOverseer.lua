@@ -9188,31 +9188,36 @@ function ReleaseLowerPriorityEngineerIfHaveEmergency(aiBrain)
 
     if aiBrain[refiBOInitialEngineersWanted] > 0 and aiBrain[reftiBOActiveSpareEngineersByTechLevel][3] == 0 then
         local iT3Engineers = aiBrain:GetCurrentUnits(refCategoryEngineer * categories.TECH3)
+        local bReleaseForSMD = false
         local bReleaseToBuildArti = false
-        if aiBrain[refbEmergencyArtiNeeded] then
-            local iT2Engineers = aiBrain:GetCurrentUnits(refCategoryEngineer * categories.TECH2)
-            if iT2Engineers + iT3Engineers >= 3 then
-                --Do we have fewer than 2 engineers assigned?
-                local iCurAssigned = 0
-                if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildEmergencyArti]) == false then
-                    for iRef, tSubtable in aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildEmergencyArti] do
-                        iCurAssigned = iCurAssigned + 1
+        if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == false and aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySMD) == 0 then
+            bReleaseForSMD = true
+        else
+            if aiBrain[refbEmergencyArtiNeeded] then
+                local iT2Engineers = aiBrain:GetCurrentUnits(refCategoryEngineer * categories.TECH2)
+                if iT2Engineers + iT3Engineers >= 3 then
+                    --Do we have fewer than 2 engineers assigned?
+                    local iCurAssigned = 0
+                    if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildEmergencyArti]) == false then
+                        for iRef, tSubtable in aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildEmergencyArti] do
+                            iCurAssigned = iCurAssigned + 1
+                        end
                     end
-                end
-                local iMinWanted = 1
-                if iT2Engineers + iT3Engineers >= 6 and iT3Engineers >= 4 then
-                    iMinWanted = 2
-                    if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 7 then iMinWanted = 3 end
-                end
-                if iCurAssigned < iMinWanted then
-                    bReleaseToBuildArti = true
+                    local iMinWanted = 1
+                    if iT2Engineers + iT3Engineers >= 6 and iT3Engineers >= 4 then
+                        iMinWanted = 2
+                        if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 7 then iMinWanted = 3 end
+                    end
+                    if iCurAssigned < iMinWanted then
+                        bReleaseToBuildArti = true
+                    end
                 end
             end
         end
-        if bDebugMessages == true then LOG(sFunctionRef..': iT3Engineers='..iT3Engineers..'; bReleaseToBuildArti='..tostring(bReleaseToBuildArti or false)) end
-        if iT3Engineers >= 10 or bReleaseToBuildArti then
+        if bDebugMessages == true then LOG(sFunctionRef..': iT3Engineers='..iT3Engineers..'; bReleaseToBuildArti='..tostring(bReleaseToBuildArti or false)..'; bReleaseForSMD='..tostring(bReleaseForSMD or false)) end
+        if iT3Engineers >= 10 or bReleaseToBuildArti or bReleaseForSMD then
             local bReleaseEngineer = false
-            if bReleaseToBuildArti then bReleaseEngineer = true
+            if bReleaseToBuildArti or bReleaseForSMD then bReleaseEngineer = true
             else
 
                 --Nearby enemy air threat?
