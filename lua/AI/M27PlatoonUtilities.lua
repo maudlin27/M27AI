@@ -8610,7 +8610,9 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                 if oPlatoon[M27Overseer.refoUnitsMAAHelper] then
                                     --Want at least 1.5k threat in MAA assigned, and at least 75% of this nearby
                                     if bDebugMessages == true then LOG(sFunctionRef..': Assigned MAA units='..oPlatoon[M27Overseer.refoUnitsMAAHelper][refiCurrentUnits]..'; Mass value='..oPlatoon[M27Overseer.refoUnitsMAAHelper][refiPlatoonMassValue]) end
-                                    if oPlatoon[M27Overseer.refoUnitsMAAHelper][refiCurrentUnits] > 0 and oPlatoon[M27Overseer.refoUnitsMAAHelper][refiPlatoonMassValue] >= M27Overseer.iMAAMinExperimentalLevelWithoutAir then
+                                    local iMAAIncreaseFactor = M27Overseer.GetMAAFactoryAdjustForLargePlatoons(aiBrain)
+                                    if aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] == 0 then iMAAIncreaseFactor = 1 end
+                                    if oPlatoon[M27Overseer.refoUnitsMAAHelper][refiCurrentUnits] > 0 and oPlatoon[M27Overseer.refoUnitsMAAHelper][refiPlatoonMassValue] >= M27Overseer.iMAAMinExperimentalLevelWithoutAir * iMAAIncreaseFactor then
                                         local tNearbyAssignedMAA = {}
                                         for iUnit, oUnit in oPlatoon[M27Overseer.refoUnitsMAAHelper][reftCurrentUnits] do
                                             if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= 100 then
@@ -8618,8 +8620,8 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                             end
                                         end
                                         if M27Utilities.IsTableEmpty(tNearbyAssignedMAA) == false then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Threat of nearby assigned MAA='..M27Logic.GetAirThreatLevel(aiBrain, tNearbyAssignedMAA, false, false, true, false, false)..'; iMAAMinExperimentalLevelWithoutAir * 0.75='..M27Overseer.iMAAMinExperimentalLevelWithoutAir * 0.75) end
-                                            if M27Logic.GetAirThreatLevel(aiBrain, tNearbyAssignedMAA, false, false, true, false, false) >=  M27Overseer.iMAAMinExperimentalLevelWithoutAir * 0.75 then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Threat of nearby assigned MAA='..M27Logic.GetAirThreatLevel(aiBrain, tNearbyAssignedMAA, false, false, true, false, false)..'; iMAAIncreaseFactor='..iMAAIncreaseFactor..'; iMAAMinExperimentalLevelWithoutAir * 0.75 * iMAAIncreaseFactor='..M27Overseer.iMAAMinExperimentalLevelWithoutAir * 0.75 * iMAAIncreaseFactor) end
+                                            if M27Logic.GetAirThreatLevel(aiBrain, tNearbyAssignedMAA, false, false, true, false, false) >=  M27Overseer.iMAAMinExperimentalLevelWithoutAir * 0.75 * iMAAIncreaseFactor then
                                                 bDefend = false
                                             end
                                         end

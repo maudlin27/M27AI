@@ -1083,7 +1083,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         bConsiderUnderConstruction = false
                                         iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallInitialRaiderOrSkirmisher] + aiBrain[M27Overseer.refiScoutShortfallACU]
                                     end
-                                elseif iCurrentConditionToTry == 8 then --High priority T2 MAA for ACU if it doesnt have any and we dont have any to give it
+                                elseif iCurrentConditionToTry == 8 then --High priority T2 MAA for ACU if it doesnt have any and we dont have any to give it, and/or experimental needing MAA when enemy has large air threat
                                     if iFactoryTechLevel >= 2 then
                                         local oACU = M27Utilities.GetACU(aiBrain)
                                         if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 100 and not(M27UnitInfo.IsUnitUnderwater(oACU)) then
@@ -1092,6 +1092,14 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 iCategoryToBuild = M27UnitInfo.refCategoryMAA * categories.TECH2
                                                 iTotalWanted = 1
                                             end
+                                        end
+                                    end
+                                    if not(iCategoryToBuild) and not(aiBrain[M27AirOverseer.refbHaveAirControl]) and (aiBrain[M27AirOverseer.refbFarBehindOnAir] or aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 20000) and aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] > 0 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) > 0 then
+                                        iCategoryToBuild = refCategoryMAA
+                                        if aiBrain:GetEconomyStoredRatio('MASS') <= 0.4 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * categories.TECH3) > 10 then
+                                            iTotalWanted = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory - categories.TECH1)
+                                        else
+                                            iTotalWanted = math.max(aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory - categories.TECH1) - 1)
                                         end
                                     end
 
@@ -3252,7 +3260,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 bReachedLastOption = true
                                 break
                             end
-                                --=========QUANTUM GATEWAY======--
+                            --=========QUANTUM GATEWAY======--
                         elseif bIsQuantumGateway then
                             if iCurrentConditionToTry == 1 then
                                 --Do we have decent power and at least 7 mass per tick?
@@ -3428,7 +3436,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 iCategoryToBuild = refCategoryMAA * categories.TECH2
                             end--]]
                             if M27UnitInfo.GetUnitFaction(oFactory) == M27UnitInfo.refFactionCybran then
-                                if math.random(1, 8) < 8 then
+                                local iRandom = math.random(1, 8)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Deciding whether to get T2 or T3 MAA; iRandom='..iRandom) end
+                                if iRandom < 8 then
                                     iCategoryToBuild = refCategoryMAA * categories.TECH2
                                 end
                             elseif M27UnitInfo.GetUnitFaction(oFactory) == M27UnitInfo.refFactionAeon then

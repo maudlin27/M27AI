@@ -1164,6 +1164,23 @@ function AssignHelperToPlatoonOrUnit(oHelperToAssign, oPlatoonOrUnitNeedingHelp,
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function GetMAAFactoryAdjustForLargePlatoons(aiBrain)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetMAAFactoryAdjustForLargePlatoons'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local iMAAIncreaseFactor = 1
+    if bDebugMessages == true then LOG(sFunctionRef..': Enemy air to ground='..  aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]..'; Far behind on air='..tostring(aiBrain[M27AirOverseer.refbFarBehindOnAir] or false)) end
+    if aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 10000 then
+        iMAAIncreaseFactor = 1.7
+        if aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 20000 then
+            iMAAIncreaseFactor = 2.4
+        end
+    end
+    if aiBrain[M27AirOverseer.refbFarBehindOnAir] then iMAAIncreaseFactor = math.min(iMAAIncreaseFactor + 1.75, iMAAIncreaseFactor * 1.75) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return iMAAIncreaseFactor
+end
+
 function AssignMAAToPreferredPlatoons(aiBrain)
     --Similar to assigning scouts, but for MAA - for now just focus on having MAA helping ACU and any platoon of >20 size that doesnt contain MAA
     --===========ACU MAA helper--------------------------
@@ -1477,7 +1494,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
                                 if oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] or 0 <= 10000 then
                                     iMAAWanted = math.min(iMAAWanted, 8)
                                 else
-                                    iMAAWanted = math.max(iMAAWanted, iMAAMinExperimentalLevelWithoutAir)
+                                    iMAAWanted = math.max(iMAAWanted, iMAAMinExperimentalLevelWithoutAir * GetMAAFactoryAdjustForLargePlatoons(aiBrain))
                                 end
                                 tPlatoonCurrentMAAs = EntityCategoryFilterDown(refCategoryMAA, oPlatoon:GetPlatoonUnits())
                                 if M27Utilities.IsTableEmpty(tPlatoonCurrentMAAs) == true then
