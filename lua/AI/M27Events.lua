@@ -861,6 +861,10 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                 instigator[M27UnitInfo.refbRecentlyDealtDamage] = true
                 instigator[M27UnitInfo.refiGameTimeDamageLastDealt] = math.floor(GetGameTimeSeconds())
                 M27Utilities.DelayChangeVariable(instigator, M27UnitInfo.refbRecentlyDealtDamage, false, 5, M27UnitInfo.refiGameTimeDamageLastDealt, instigator[M27UnitInfo.refiGameTimeDamageLastDealt] + 1, nil, nil)
+                --If just damaged T2+ mex or high value building with surface naval unit then have it attack that unit specifically until it is dead
+                if EntityCategoryContains(M27UnitInfo.refCategoryNavalSurface, instigator.UnitId) and EntityCategoryContains(M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex + categories.VOLATILE * categories.STRUCTURE - M27UnitInfo.refCategoryT1Power + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + categories.EXPERIMENTAL * categories.STRUCTURE, self.UnitId) then
+                    ForkThread(M27UnitMicro.FocusDownTarget, instigator, self)
+                end
             end
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

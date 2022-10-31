@@ -22,4 +22,4 @@ M27RunGamePerformanceCheck = false --Runs regardless of whether M27 is active in
 
 
 --Randomness for alternative strategies
-iLandSpamChance = 0.5 --from 0 to 1.0 (being 0 to 100%) - this is the value pre-weighting value, so will apply to medium sized maps; smaller maps will have an increased chance as a multiple of this - where certain conditions are satisfied to consider this strategy, then it will be adopted with this % chance subject to map modifiers; Current testing indicates land spam is marginally worse than normal approach (for M27)
+iLandSpamChance = 0.4 --from 0 to 1.0 (being 0 to 100% pre adjust; 0.4 means medium will be 40%, small 70%, very small 85%) - this is the value pre-weighting value, so will apply to medium sized maps; smaller maps will have an increased chance as a multiple of this - where certain conditions are satisfied to consider this strategy, then it will be adopted with this % chance subject to map modifiers; Current testing indicates land spam is marginally worse than normal approach (for M27)

@@ -1941,15 +1941,19 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
         end
     elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush then
         bNormalLogic = false
+
         if aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 and (iLandFactoryCount >= math.min(5, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand]) or aiBrain:GetEconomyStoredRatio('MASS') >= 0.9) then
-            if aiBrain:GetEconomyStoredRatio('MASS') >= 0.85 then
+            if aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 then
                 bNormalLogic = true
             elseif aiBrain:GetEconomyStoredRatio('MASS') >= 0.7 and aiBrain[refiNetMassBaseIncome] > 0 then
                 bNormalLogic = true
             elseif aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 and aiBrain[refiNetMassBaseIncome] > 0.4 then
                 bNormalLogic = true
             end
+        elseif iLandFactoryCount >= 3 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.85 and aiBrain[refiNetEnergyBaseIncome] >= 6 and (not(aiBrain[refbStallingEnergy]) or aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.5) then
+            bNormalLogic = true
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': In land rush, bNormalLogic='..tostring(bNormalLogic)..'; Energy stored='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; Mass stored ratio='..aiBrain:GetEconomyStoredRatio('MASS')..'; Net mass income='.. aiBrain[refiNetMassBaseIncome]..'; Land Factory count='..iLandFactoryCount..'; Energy net income='..aiBrain[refiNetEnergyBaseIncome]..'; Are power stalling='..tostring(aiBrain[refbStallingEnergy])) end
     end
     if bNormalLogic then
         local tMassThresholds = {}
@@ -2255,6 +2259,8 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                             elseif iEnergyNetIncome > 5 and iEnergyStored > 2500 and iEnergyPercentStorage > 0.8 then
                                 bHaveEnoughEnergy = true
                             elseif iEnergyPercentStorage >= 0.99 then
+                                bHaveEnoughEnergy = true
+                            elseif  aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 1 and iEnergyNetIncome >= 6 then
                                 bHaveEnoughEnergy = true
                             end
                         end

@@ -2053,3 +2053,39 @@ function ConsiderT2ArtiGroundFire(oArti)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
 end
+
+function FocusDownTarget(oUnit, oTarget)
+    local sFocusDownTargetActive = 'M27MicroFocusDownTargetActive' --against unit, true if are focusing down the unit
+    if not(oUnit[sFocusDownTargetActive]) then
+        oUnit[sFocusDownTargetActive] = true
+        oUnit[M27UnitInfo.refbSpecialMicroActive] = true
+        local iReloadRate = 5 --default; will hard code exceptions as cant be bothered to figure out code
+        if EntityCategoryContains(M27UnitInfo.refCategoryDestroyer * categories.AEON, oUnit.UnitId) then
+            iReloadRate = 7 --allows time for shot to hit
+        elseif EntityCategoryContains(M27UnitInfo.refCategoryBattleship * categories.UEF, oUnit.UnitId) then
+            iReloadRate = 20
+        elseif EntityCategoryContains(M27UnitInfo.refCategoryBattleship, oUnit.UnitId) then
+            iReloadRate = 6
+        end
+
+        if not(oUnit[M27PlatoonUtilities.refiLastOrderType] == M27PlatoonUtilities.refiOrderIssueAttack) or not(oUnit[M27UnitInfo.refoLastOrderUnitTarget] == oTarget) then
+            M27Utilities.IssueTrackedClearCommands({oUnit})
+            IssueAttack({oUnit}, oTarget)
+            oUnit[M27PlatoonUtilities.refiLastOrderType] = M27PlatoonUtilities.refiOrderIssueAttack
+            oUnit[M27UnitInfo.refoLastOrderUnitTarget] = oTarget
+        end
+
+        while M27UnitInfo.IsUnitValid(oUnit) and M27UnitInfo.IsUnitValid(oTarget) do
+            if oUnit[M27UnitInfo.refbRecentlyDealtDamage] or (iReloadRate >= 5 and GetGameTimeSeconds() - oUnit[M27UnitInfo.refiGameTimeDamageLastDealt] < iReloadRate) then
+                --Keep firing
+            else
+                break
+            end
+            WaitSeconds(1)
+        end
+        if M27UnitInfo.IsUnitValid(oUnit) then
+            oUnit[sFocusDownTargetActive] = false
+            oUnit[M27UnitInfo.refbSpecialMicroActive] = false
+        end
+    end
+end

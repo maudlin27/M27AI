@@ -4801,7 +4801,7 @@ function ACUManager(aiBrain)
 
     if not (aiBrain.M27IsDefeated) and M27Logic.iTimeOfLastBrainAllDefeated < 10 then
         local oACU = M27Utilities.GetACU(aiBrain)
-        if oACU:IsUnitState('Upgrading') then bDebugMessages = true end
+        --if oACU:IsUnitState('Upgrading') then bDebugMessages = true end
 
         --Track ACU health over time
         if not (oACU[reftACURecentHealth]) then

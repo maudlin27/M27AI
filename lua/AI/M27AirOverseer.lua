@@ -10031,7 +10031,7 @@ end
 
 function GetAirAAThreatAroundPosition(aiBrain, tPosition, iAdjacentSegmentSize)
     --Returns the airaa threat around the position and iAdjacentSegmentSize air segments
-    local iStartX, iStartZ = GetAirSegmentFromPosition(tStartPoint)
+    local iStartX, iStartZ = GetAirSegmentFromPosition(tPosition)
     local iMinX = math.max(aiBrain[refiMinSegmentX], iStartX - iAdjacentSegmentSize)
     local iMaxX = math.min(aiBrain[refiMaxSegmentX], iStartX + iAdjacentSegmentSize)
     local iMinZ = math.max(aiBrain[refiMinSegmentZ], iStartZ - iAdjacentSegmentSize)
