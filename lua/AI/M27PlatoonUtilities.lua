@@ -2427,7 +2427,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if oPlatoon[refbACUInPlatoon] == true and aiBrain:GetArmyIndex() == 7 and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 950 then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
-    --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) then bDebugMessages = true end
+    if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 937 and aiBrain:GetArmyIndex() == 4 and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
@@ -7262,7 +7262,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
             --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 660 then bDebugMessages = true end
-            --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refiPlatoonMaxRange] >= 60 then bDebugMessages = true end
+            if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 937 and aiBrain:GetArmyIndex() == 4 and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
@@ -10809,7 +10809,7 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 780  then bDebugMessages = true end
-            --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refiPlatoonMaxRange] >= 60 then bDebugMessages = true end
+            if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
@@ -11205,14 +11205,21 @@ function ProcessPlatoonAction(oPlatoon)
                                     if M27Utilities.IsTableEmpty(tDFTargetPosition) and not (oUnitToAttackInstead) and not (oNearestUnitOfInterest) then
                                         --Nearby T3 land (or T2+ surface navy if we have the range)?
                                         if oPlatoon[refiEnemiesInRange] > 0 then
-                                            local iCategoriesOfInterest = M27UnitInfo.refCategoryMobileLand * categories.TECH3 * categories.DIRECTFIRE + M27UnitInfo.refCategoryMobileLand * categories.TECH3 * categories.INDIRECTFIRE
+                                            local iCategoriesOfInterest = M27UnitInfo.refCategoryMobileLand * categories.TECH3 * categories.DIRECTFIRE + M27UnitInfo.refCategoryMobileLand * categories.TECH3 * categories.INDIRECTFIRE + categories.SUBCOMMANDER
                                             if oPlatoon[refiPlatoonMaxRange] >= 60 then iCategoriesOfInterest = iCategoriesOfInterest + M27UnitInfo.refCategoryNavalSurface - categories.TECH1 end
-                                            tNearbyEnemiesOfInterest = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileLand * categories.TECH3 * categories.DIRECTFIRE + M27UnitInfo.refCategoryMobileLand * categories.TECH3 * categories.INDIRECTFIRE, oPlatoon[reftEnemiesInRange])
+                                            tNearbyEnemiesOfInterest = EntityCategoryFilterDown(iCategoriesOfInterest, oPlatoon[reftEnemiesInRange])
                                             if M27Utilities.IsTableEmpty(tNearbyEnemiesOfInterest) == false then
                                                 if bDebugMessages == true then
                                                     LOG(sFunctionRef .. ': Have nearby T3 mobile land')
                                                 end
                                                 oNearestUnitOfInterest = M27Utilities.GetNearestUnit(tNearbyEnemiesOfInterest, GetPlatoonFrontPosition(oPlatoon), aiBrain, nil, nil)
+                                            elseif bDebugMessages == true then
+                                                LOG(sFunctionRef..': No nearby T3 mobile land, will list out each unit in range')
+                                                if oPlatoon[refiEnemiesInRange] > 0 then
+                                                    for iUnit, oUnit in oPlatoon[reftEnemiesInRange] do
+                                                        LOG(sFunctionRef..': EnemiesInRange: iUnit='..iUnit..'; oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                                                    end
+                                                end
                                             end
                                         end
 

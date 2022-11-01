@@ -7226,15 +7226,17 @@ function AirAAManager(aiBrain)
                         iCloseToBaseRange = math.min(180, math.max(iCloseToBaseRange, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.3, aiBrain[refiBomberDefenceModDistance]))
                     end
                 end
-            elseif iCloseToBaseRange > 70 and aiBrain[refiTeamMassInAirAA] < 0.75 * aiBrain[refiEnemyAirAAThreat] and aiBrain[refiOurMassInAirAA] <= 6000 then
+            elseif aiBrain[refiTeamMassInAirAA] < 0.75 * aiBrain[refiEnemyAirAAThreat] and aiBrain[refiOurMassInAirAA] <= 6000 then
                 --Enemy significantly outnumbers us and we dont have many airaa units, so want to keep air units close to base
+                if iCloseToBaseRange > 70 then
+                    iCloseToBaseRange = math.min(iCloseToBaseRange, math.max(70, iFurthestAAFromBase))
+                end
 
-
+                --Also set flag that are far behind from air if relevant
                 if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to limit the close to base range based on our AA structures. iCloseToBaseRange pre adjust='..iCloseToBaseRange..'; iFurthestAAFromBase='..iFurthestAAFromBase) end
-                if not(aiBrain[refbHaveAirControl]) and iFurthestAAFromBase <= 120 and aiBrain[refiTeamMassInAirAA] < 0.7 * aiBrain[refiEnemyAirAAThreat] then
+                if not(aiBrain[refbHaveAirControl]) and aiBrain[refiTeamMassInAirAA] < 0.75 * aiBrain[refiEnemyAirAAThreat] then
                     aiBrain[refbFarBehindOnAir] = true
                 end
-                iCloseToBaseRange = math.min(iCloseToBaseRange, math.max(70, iFurthestAAFromBase))
             end
 
 
@@ -7454,7 +7456,7 @@ function AirAAManager(aiBrain)
                         tValidEnemyAirThreats[iEnemyUnitCount][refoUnit] = oUnit
                         tValidEnemyAirThreats[iEnemyUnitCount][refiDistance] = iCurTargetModDistanceFromStart
                         if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Air threat that we should attack, recording in tValidEnemyAirThreats, iEnemyUnitCount=' .. iEnemyUnitCount .. '; refiDistance=' .. tValidEnemyAirThreats[iEnemyUnitCount][refiDistance])
+                            LOG(sFunctionRef .. ': Want to attack target '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' as it is a threat that we should attack, recording in tValidEnemyAirThreats, iEnemyUnitCount=' .. iEnemyUnitCount .. '; refiDistance=' .. tValidEnemyAirThreats[iEnemyUnitCount][refiDistance])
                         end
                     end
                 elseif bDebugMessages == true then
