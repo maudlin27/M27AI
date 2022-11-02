@@ -104,6 +104,10 @@ reftEnemyArtiAndExpStructure = 'M27OverseerEnemyT3Arti' --T3 arti, and experimen
 reftEnemyNukeLaunchers = 'M27OverseerEnemyNukeLaunchers'
 reftEnemySMD = 'M27OverseerEnemySMD'
 reftEnemyTML = 'M27OverseerEnemyTML'
+tEnemyBigThreatCategories = { [reftEnemyLandExperimentals] = M27UnitInfo.refCategoryLandExperimental, [reftEnemyArtiAndExpStructure] = M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalStructure, [reftEnemyNukeLaunchers] = M27UnitInfo.refCategorySML, [reftEnemyTML] = M27UnitInfo.refCategoryTML + M27UnitInfo.refCategoryMissileShip, [reftEnemySMD] = M27UnitInfo.refCategorySMD }
+iAllBigThreatCategories = M27UnitInfo.refCategoryLandExperimental + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryTML + M27UnitInfo.refCategoryMissileShip + M27UnitInfo.refCategorySMD
+
+
 refbEnemyTMLSightedBefore = 'M27OverseerEnemyTMLSightedBefore'
 refiEnemyHighestTechLevel = 'M27OverseerEnemyHighestTech'
 refbAreBigThreats = 'M27OverseerAreBigThreats'
@@ -6787,6 +6791,71 @@ function UpdateFurthestBuildingDistances(aiBrain)
     end
 end
 
+function AddUnitToBigThreatTable(aiBrain, oUnit)
+    local bDebugMessages = false
+    if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    --local bDebugMessages = M27Config.M27StrategicLog
+    local sFunctionRef = 'AddUnitToBigThreatTable'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+
+
+
+    local bAlreadyInTable = false
+    local bConsiderChatWarning = true
+    local bWantACUToReturnToBase = false
+
+
+    for sReferenceTable, iCategory in tEnemyBigThreatCategories do
+        if EntityCategoryContains(iCategory, oUnit.UnitId) then
+            for iExistingUnit, oExistingUnit in aiBrain[sReferenceTable] do
+                if oExistingUnit == oUnit then
+                    bAlreadyInTable = true
+                    break
+                end
+            end
+            if not(bAlreadyInTable) then
+                if bDebugMessages == true then LOG(sFunctionRef..': About to add unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to reference table. Is table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[sReferenceTable]))..'; bConsiderChatWarning='..tostring(bConsiderChatWarning)..'; Unit fraction complete='..oUnit:GetFractionComplete()..'; T3 resource generation units held by owner='..oUnit:GetAIBrain():GetCurrentUnits(M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryRASSACU + M27UnitInfo.refCategoryParagon)) end
+                if sReferenceTable == reftEnemySMD or sReferenceTable == reftEnemyTML then
+                    bConsiderChatWarning = false
+                elseif sReferenceTable == reftEnemyLandExperimentals then
+                    bWantACUToReturnToBase = true
+                end
+
+                if bConsiderChatWarning and M27Utilities.IsTableEmpty(aiBrain[sReferenceTable]) then
+                    if sReferenceTable == reftEnemyArtiAndExpStructure then
+                        if EntityCategoryContains(M27UnitInfo.refCategoryNovaxCentre, oUnit.UnitId) then
+                            M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy Novax detected', 0, 1000, true)
+                        elseif EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oUnitId) then
+                            M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy T3 arti detected', 0, 1000, true)
+                        elseif EntityCategoryContains(M27UnitInfo.refCategoryExperimentalStructure, oUnit.UnitId) then
+                            if oUnit:GetFractionComplete() <= 0.2 and oUnit:GetAIBrain():GetCurrentUnits(M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryRASSACU + M27UnitInfo.refCategoryParagon) <= 20 then
+                                M27Chat.SendMessage(aiBrain, sReferenceTable, 'LOL theyre building a '..LOCF(oUnit:GetBlueprint().General.UnitName), 0, 1000, true)
+                            else
+                                M27Chat.SendMessage(aiBrain, sReferenceTable, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 0, 1000, true)
+                            end
+                        end
+                    elseif sReferenceTable == reftEnemyLandExperimentals then
+                        M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 0, 1000, true)
+                    else
+                        M27Chat.SendMessage(aiBrain, sReferenceTable, 'Enemy '..sReferenceTable..' detected', 0, 1000, true)
+                    end
+                end
+
+                table.insert(aiBrain[sReferenceTable], oUnit)
+                if bWantACUToReturnToBase and M27Utilities.IsTableEmpty(aiBrain[sReferenceTable]) == false then
+                    aiBrain[refbAreBigThreats] = true
+                end
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Have some units for experimental threat category sReferenceTable=' .. sReferenceTable .. '; is tReferenceTableEmpty after considering if civilian or pathable to us='..tostring(M27Utilities.IsTableEmpty(aiBrain[sReferenceTable]))..'; aiBrain[refbAreBigThreats]='..tostring(aiBrain[refbAreBigThreats]))
+                end
+            end
+            break
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
 
 function StrategicOverseer(aiBrain, iCurCycleCount)
     --also features 'state of game' logs
@@ -6800,7 +6869,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
         local iBigThreatSearchRange = 10000
 
-        local tEnemyBigThreatCategories = { ['Land experimental'] = M27UnitInfo.refCategoryLandExperimental, ['T3 arti'] = M27UnitInfo.refCategoryFixedT3Arti, ['Experimental building'] = M27UnitInfo.refCategoryExperimentalStructure, ['Nuke'] = M27UnitInfo.refCategorySML, ['TML'] = M27UnitInfo.refCategoryTML, ['Missile ships'] = M27UnitInfo.refCategoryMissileShip, ['SMD'] = M27UnitInfo.refCategorySMD }
+        --local tEnemyBigThreatCategories = { ['Land experimental'] = M27UnitInfo.refCategoryLandExperimental, ['T3 arti'] = M27UnitInfo.refCategoryFixedT3Arti, ['Experimental building'] = M27UnitInfo.refCategoryExperimentalStructure, ['Nuke'] = M27UnitInfo.refCategorySML, ['TML'] = M27UnitInfo.refCategoryTML, ['Missile ships'] = M27UnitInfo.refCategoryMissileShip, ['SMD'] = M27UnitInfo.refCategorySMD }
         local tCurCategoryUnits
         local tReferenceTable, bRemovedUnit
         local sUnitUniqueRef
@@ -6809,11 +6878,46 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         local iPathingGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
         local bConsiderChatWarning = false
 
-        for sCategoryDesc, iCategory in tEnemyBigThreatCategories do
-            bWantACUToReturnToBase = false
+        if GetGameTimeSeconds() >= 790 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
+
+
+
+
+
+        for sReferenceTable, iCategory in tEnemyBigThreatCategories do
+            --Update the table in case any existing entries have been killed, and to remove civilians
+            if M27Utilities.IsTableEmpty(aiBrain[sReferenceTable]) == false then
+                bRemovedUnit = true
+                while bRemovedUnit == true do
+                    bRemovedUnit = false
+                    for iUnit, oUnit in aiBrain[sReferenceTable] do
+                        if not (oUnit.GetUnitId) or oUnit.Dead or oUnit.IsCivilian then
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': iUnit=' .. iUnit .. ': No longer alive or has unit ID so removing from the reference table')
+                            end
+                            table.remove(aiBrain[sReferenceTable], iUnit)
+                            bRemovedUnit = true
+                            break
+                        end
+                    end
+                end
+            end
+
+
+
+            --[[bWantACUToReturnToBase = false
             bConsiderChatWarning = false
             tCurCategoryUnits = aiBrain:GetUnitsAroundPoint(iCategory, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iBigThreatSearchRange, 'Enemy')
-            if iCategory == M27UnitInfo.refCategoryExperimentalStructure or iCategory == M27UnitInfo.refCategoryFixedT3Arti then
+            if bDebugMessages == true then LOG(sFunctionRef..': sCategoryDesc='..sCategoryDesc..'; Is table of enemy units in a range of '..iBigThreatSearchRange..' empty='..tostring(M27Utilities.IsTableEmpty(tCurCategoryUnits))) end
+            tReferenceTable = aiBrain[sCategoryDesc]
+            bConsiderChatWarning = true
+            if sCategoryDesc == reftEnemySMD or sCategoryDesc == reftEnemyTML then
+                bConsiderChatWarning = false
+            elseif sCategoryDesc == reftEnemyLandExperimentals then
+                bWantACUToReturnToBase = true
+            end
+
+            if sCategoryDesc ==  == M27UnitInfo.refCategoryExperimentalStructure or iCategory == M27UnitInfo.refCategoryFixedT3Arti then
                 tReferenceTable = aiBrain[reftEnemyArtiAndExpStructure]
                 bConsiderChatWarning = true
             elseif iCategory == M27UnitInfo.refCategorySML then
@@ -6841,23 +6945,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 M27Utilities.ErrorHandler('Unrecognised enemy super threat category, wont be recorded')
                 break
             end
-            --Update the table in case any existing entries have been killed, and to remove civilians
-            if M27Utilities.IsTableEmpty(tReferenceTable) == false then
-                bRemovedUnit = true
-                while bRemovedUnit == true do
-                    bRemovedUnit = false
-                    for iUnit, oUnit in tReferenceTable do
-                        if not (oUnit.GetUnitId) or oUnit.Dead or oUnit.IsCivilian then
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': iUnit=' .. iUnit .. ': No longer alive or has unit ID so removing from the reference table')
-                            end
-                            table.remove(tReferenceTable, iUnit)
-                            bRemovedUnit = true
-                            break
-                        end
-                    end
-                end
-            end
+
 
             if M27Utilities.IsTableEmpty(tCurCategoryUnits) == false then
                 for iUnit, oUnit in tCurCategoryUnits do
@@ -6898,11 +6986,11 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
                             table.insert(tReferenceTable, oUnit)
                         end
-                        --[[sUnitUniqueRef = oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)
+                        sUnitUniqueRef = oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)
                         if tReferenceTable[sUnitUniqueRef] == nil then
                             tReferenceTable[sUnitUniqueRef] = oUnit
                             if bDebugMessages == true then LOG(sFunctionRef..': Added Unit with uniqueref='..sUnitUniqueRef..' to the threat table') end
-                        end--]]
+                        end
                     end
                 end
                 if bWantACUToReturnToBase and M27Utilities.IsTableEmpty(tReferenceTable) == false then
@@ -6914,17 +7002,34 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             end
 
         end
+        --]]
+        end
+        local tBigThreats = aiBrain:GetUnitsAroundPoint(iAllBigThreatCategories, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iBigThreatSearchRange, 'Enemy')
+        if M27Utilities.IsTableEmpty(tBigThreats) == false then
+            for iUnit, oUnit in tBigThreats do
+                AddUnitToBigThreatTable(aiBrain, oUnit)
+            end
+        end
 
         --TML - also update ACUs and SACUs with TML upgrade
         local tEnemyACUAndSACUs = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryUnitsWithTMLUpgrade, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iBigThreatSearchRange, 'Enemy')
         if M27Utilities.IsTableEmpty(tEnemyACUAndSACUs) == false then
             for iUnit, oUnit in tEnemyACUAndSACUs do
+                bAlreadyInTable = false
                 for iUpgrade, sUpgrade in M27Conditions.tTMLUpgrades do
                     if oUnit:HasEnhancement(sUpgrade) then
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Enemy has an ACU or SACU with TML upgrade, unit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; sUpgrade=' .. sUpgrade)
                         end
-                        table.insert(aiBrain[reftEnemyTML], oUnit)
+                        for iExistingUnit, oExistingUnit in aiBrain[sReferenceTable] do
+                            if oExistingUnit == oUnit then
+                                bAlreadyInTable = true
+                                break
+                            end
+                        end
+                        if not(bAlreadyInTable) then
+                            table.insert(aiBrain[reftEnemyTML], oUnit)
+                        end
                         --aiBrain[reftEnemyTML][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
                         break
                     end

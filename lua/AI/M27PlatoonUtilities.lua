@@ -6299,6 +6299,7 @@ function ConsiderConstructionForACU(aiBrain, oPlatoon, oACU) --Intended to be ru
 
 
     if oACU:HasEnhancement('AdvancedEngineering') or oACU:HasEnhancement('T3Engineering') then
+        if GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
         if bDebugMessages == true then LOG(sFunctionRef..': ACU has access to T2 tech, if strategy is turtle will consider what to build. aiBrain[M27Overseer.refiAIBrainCurrentStrategy]='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; M27Logic.IsTargetUnderShield(aiBrain, oACU, 8000, nil, false, false)='..tostring(M27Logic.IsTargetUnderShield(aiBrain, oACU, 8000, nil, false, false))) end
         --First check if we want emergency AA to be built
         if oPlatoon[refiEnemiesInRange] == 0 then
@@ -6320,7 +6321,7 @@ function ConsiderConstructionForACU(aiBrain, oPlatoon, oACU) --Intended to be ru
                     oPlatoon[refoConstructionToAssist] = oBuildingToAssist
                     if bDebugMessages == true then LOG(sFunctionRef..': Have AA building to assist that is under construction='..oBuildingToAssist.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBuildingToAssist)) end
                 elseif not(bHaveNearbyAA) then
-                oPlatoon[refiCurrentAction] = refActionBuildStructure
+                    oPlatoon[refiCurrentAction] = refActionBuildStructure
                     if M27Logic.GetAirThreatLevel(aiBrain, tNearbyEnemyThreat, true, false, false, true, true, nil, nil, nil, nil, true) >= 400 then
                         oPlatoon[refiStructureCategoryToBuild] = M27UnitInfo.refCategoryStructureAA
                     else
@@ -6422,16 +6423,19 @@ function ConsiderConstructionForACU(aiBrain, oPlatoon, oACU) --Intended to be ru
 
                                     if iNearbyT1PD <= 1 and iNearestEnemy <= 25 then
                                         oPlatoon[refiStructureCategoryToBuild] = M27UnitInfo.refCategoryPD * categories.TECH1
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Near enemy want t1 pd') end
                                         bBuildBehindACU = false
                                     else
                                         --Do we want PD or T2 arti more urgently?
                                         if bBuildBehindACU or iDistToFirebase > 30 or iNearbyT2PlusPD <= 3 or aiBrain[M27Overseer.refiTotalEnemyLongRangeThreat] > 0 then
                                             oPlatoon[refiStructureCategoryToBuild] = M27UnitInfo.refCategoryPD * categories.TECH2
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Nearby enemy, Want T2 PD') end
                                         else
                                             --Are there indirect fire or surface naval units nearby? If so want 1 T2 arti to every 2 T2 PD
                                             local tNearbyEnemyLongRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLongRangeMobile + M27UnitInfo.refCategoryFrigate, oACU:GetPosition(), 135, 'Enemy')
                                             if M27Utilities.IsTableEmpty(tNearbyEnemyLongRange) then
                                                 oPlatoon[refiStructureCategoryToBuild] = M27UnitInfo.refCategoryPD * categories.TECH2
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Enemy doesnt have long range so want T2 PD') end
                                             else
                                                 local iNearbyT2Arti = 0
                                                 local oUnderConstructionArti
@@ -6451,6 +6455,7 @@ function ConsiderConstructionForACU(aiBrain, oPlatoon, oACU) --Intended to be ru
                                                         oPlatoon[refoConstructionToAssist] = oUnderConstructionPD
                                                     else
                                                         oPlatoon[refiStructureCategoryToBuild] = M27UnitInfo.refCategoryFixedT2Arti
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Dont have arti being built so want to build our own. iNearbyT2Arti='..iNearbyT2Arti..'; iNearbyT2PlusPD='..iNearbyT2PlusPD..'; Long range enemy table empty?='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyLongRange))) end
                                                     end
                                                 end
 
@@ -6568,7 +6573,7 @@ function ConsiderConstructionForACU(aiBrain, oPlatoon, oACU) --Intended to be ru
                                                                 oPlatoon[refiCurrentAction] = refActionBuildStructure
                                                                 oPlatoon[refiStructureCategoryToBuild] = aiBrain[M27EngineerOverseer.refiFirebaseCategoryWanted][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]]
                                                                 --Are we trying to build a non-PD building and have nearby enemies? If so adjust the build location unless the build location is under shield
-                                                                if bDebugMessages == true then LOG(sFunctionRef..': Is the firebase position under a shield='..tostring(M27Logic.IsLocationUnderFriendlyFixedShield(aiBrain, tFirebasePosition))) end
+                                                                if bDebugMessages == true then LOG(sFunctionRef..': Want to build whatever is assigned to the firebase to be built. Is the firebase position under a shield='..tostring(M27Logic.IsLocationUnderFriendlyFixedShield(aiBrain, tFirebasePosition))) end
                                                                 if not(M27Logic.IsLocationUnderFriendlyFixedShield(aiBrain, tFirebasePosition)) then
                                                                     --Do we have a nearby shield? If so then make build location this
                                                                     local tNearbyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, tFirebasePosition, 30, 'Ally')
@@ -7261,8 +7266,8 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
-            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 660 then bDebugMessages = true end
-            --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
+            if GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
+            --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refiPlatoonMaxRange] >= 60 then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 937 and aiBrain:GetArmyIndex() == 4 and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
@@ -10804,7 +10809,7 @@ function ProcessPlatoonAction(oPlatoon)
             local sPlatoonName = oPlatoon:GetPlan()
             --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
             --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
-            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            if GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
@@ -12606,7 +12611,11 @@ function ProcessPlatoonAction(oPlatoon)
                         local oNearbyUnderConstruction = M27EngineerOverseer.GetPartCompleteBuilding(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, 30)
                         if oNearbyUnderConstruction == nil then
                             --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, tAlternativePositionToLookFrom)
-                            if bDebugMessages == true then LOG(sFunctionRef..': About to tell ACU to build structure') end
+                            if bDebugMessages == true then LOG(sFunctionRef..': About to tell ACU to build structure; will list out every valid blueprint of the category to build')
+                                for iBlueprint, sBlueprint in EntityCategoryGetUnitList(iCategoryToBuild) do
+                                    LOG(sBlueprint)
+                                end
+                            end
                             oPlatoon[reftLastBuildLocation] = M27EngineerOverseer.BuildStructureAtLocation(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, oPlatoon[reftStructureLocationToBuild])
                             if M27Utilities.IsTableEmpty(oPlatoon[reftLastBuildLocation]) then
                                 M27Utilities.ErrorHandler('Couldnt find location to build power at', true)

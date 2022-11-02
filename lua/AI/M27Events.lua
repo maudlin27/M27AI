@@ -838,6 +838,9 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                             if not(oUnitCausingDamage[M27UnitInfo.reftLastKnownPosition]) and EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitCausingDamage.UnitId) then
                                 M27Navy.UpdateUnitPond(oUnitCausingDamage, aiBrain.M27Team, IsEnemy(aiBrain:GetArmyIndex(), oUnitCausingDamage:GetAIBrain():GetArmyIndex()))
                             end
+
+                            --Big threat
+                            if EntityCategoryContains(M27Overseer.iAllBigThreatCategories, oUnitCausingDamage.UnitId) then ForkThread(M27Overseer.AddUnitToBigThreatTable, aiBrain, oUnitCausingDamage) end
                         end
                         --General logic for shields so are very responsive with micro
                         if self.MyShield and self.MyShield.GetHealth and self.MyShield:GetHealth() < 100 and EntityCategoryContains((M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryPersonalShield) * categories.MOBILE, self) then

@@ -8162,7 +8162,7 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RefreshListOfFirebases'
 
-    --if GetGameTimeSeconds() >= 360 then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 785 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
 
     --if aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 20000 then bDebugMessages = true end
 
@@ -8405,6 +8405,7 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                     if not(bWantFortification) then
                         local tEnemyIndirectMissile
                         if iEnemyT2PlusIndirect > 0 then tEnemyIndirectMissile = EntityCategoryFilterDown(categories.SILO, tEnemyT2PlusIndirect) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Checking if want TMD. Is table of enemy TML empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]))..'; iEnemyT2PlusIndirect='..iEnemyT2PlusIndirect) end
 
                         if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false or (iEnemyT2PlusIndirect > 0 and M27Utilities.IsTableEmpty(tEnemyIndirectMissile) == false) then
                             if bDebugMessages == true then LOG(sFunctionRef..': Enemy has missile units, so checking if have TMD near base.  Is table of TMD empty='..tostring(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryTMD, tFirebaseUnits)))) end
