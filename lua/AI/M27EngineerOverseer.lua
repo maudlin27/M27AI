@@ -9830,7 +9830,7 @@ end--]]
             bThresholdPreReclaimEngineerCondition = false
 
             --if iEngineersToConsider >= 5 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 then bDebugMessages = true end
-            --if tiAvailableEngineersByTech[1] + tiAvailableEngineersByTech[2] + tiAvailableEngineersByTech[3] > 0 and GetGameTimeSeconds() >= 600 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship) > 0 then bDebugMessages = true end
+            if tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
 
             --if GetGameTimeSeconds() >= 1620 and aiBrain:GetArmyIndex() == 2 and tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
 
@@ -13277,9 +13277,39 @@ end--]]
                                 end
                             end
                         end
+                    elseif iCurrentConditionToTry == 40 then --Second air fac builder if are very behind on air
+                        if bDebugMessages == true then LOG(sFunctionRef..': Second air fac builder if far behind on air; bHaveVeryLowPower='..tostring(bHaveVeryLowPower)..'; refbFarBehindOnAir='..tostring(aiBrain[M27AirOverseer.refbFarBehindOnAir])..'; Energy%='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; Gross mass='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; Stored mass='..aiBrain:GetEconomyStored('MASS')..'; bHaveLowMass='..tostring(bHaveLowMass)) end
+                        if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 and not(bHaveVeryLowPower) and aiBrain[M27AirOverseer.refbFarBehindOnAir] and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.95 and (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 15 or aiBrain:GetEconomyStored('MASS') >= 1500 or not(bHaveLowMass)) then
+                            local iT3AirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory * categories.TECH3)
+                            if bDebugMessages == true then LOG(sFunctionRef..': iT3AirFactories='..iT3AirFactories..'; Max air factories='..aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir]..'; bHaveLowPower='..tostring(bHaveLowPower)) end
+                            if iT3AirFactories < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] or (not(bHaveLowMass) and not(bHaveLowPower)) then
+                                iMaxEngisWanted = 2
+                                if not(bHaveLowMass) then iMaxEngisWanted = iMaxEngisWanted + 1 end
+                                if not(bHaveLowPower) then
+                                    iMaxEngisWanted = iMaxEngisWanted + 1
+                                    if not(bHaveLowMass) then iMaxEngisWanted = iMaxEngisWanted + 1 end
+                                    if aiBrain:GetEconomyStoredRatio('MASS') >= 1500 then iMaxEngisWanted = iMaxEngisWanted + 1 end
+                                end
+                                if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildAirFactory]) then
+                                    iActionToAssign = refActionBuildAirFactory
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Not currently building air fac so will build one') end
+                                else
+                                    local iCurAssigned = 0
+                                    for iRef, tSubtable in aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildAirFactory] do
+                                        iCurAssigned = iCurAssigned + 1
+                                    end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iCurAssigned for existing air fac='..iCurAssigned..'; iMaxEngisWanted='..iMaxEngisWanted) end
+                                    if iCurAssigned < iMaxEngisWanted then
+                                        iActionToAssign = refActionBuildAirFactory
+                                    else
+                                        iActionToAssign = refActionBuildSecondAirFactory
+                                    end
+                                end
 
+                            end
+                        end
 
-                    elseif iCurrentConditionToTry == 40 then
+                    elseif iCurrentConditionToTry == 41 then
                         --High priority experimental builders, for if enemy has land experimental or t3 arti, or (UEF specific) sniper bots
                         if aiBrain[M27Overseer.refbDefendAgainstArti] and iHighestFactoryOrEngineerTechAvailable >= 3 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 4 and not (bHaveVeryLowPower) then
                             if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildExperimental]) or (aiBrain[refiLastExperimentalReference] == refiExperimentalArti or aiBrain[refiLastExperimentalReference] == refiExperimentalT3Arti) then
@@ -13315,7 +13345,7 @@ end--]]
                             iMinEngiTechLevelWanted = 3
                         end
 
-                    elseif iCurrentConditionToTry == 41 then
+                    elseif iCurrentConditionToTry == 42 then
                         --Hive near firebase T3 shield that has reclaim nearby
                         if M27Utilities.IsTableEmpty(aiBrain[reftShieldsWantingHives]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.CYBRAN - categories.TECH1, tIdleEngineers)) == false then
                             RefreshShieldsWantingHives(aiBrain)
@@ -13346,33 +13376,11 @@ end--]]
                                         iActionToAssign = refActionBuildHive
                                         iMinEngiTechLevelWanted = 2
                                         iMaxEngisWanted = 2
+                                        iMaxEngisWanted = 2
                                         if bDebugMessages == true then
                                             LOG(sFunctionRef .. ': Will try and build a hive at ' .. repru(tExistingLocationsToPickFrom[1]))
                                         end
                                     end
-                                end
-                            end
-                        end
-                    elseif iCurrentConditionToTry == 42 then --Second air fac builder if are very behind on air
-                        if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 and not(bHaveVeryLowPower) and aiBrain[M27AirOverseer.refbFarBehindOnAir] and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 15 or aiBrain:GetEconomyStored('MASS') >= 2000) then
-                            if iAirFactories == nil then
-                                iAirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory)
-                                if iAirFactories == nil then
-                                    iAirFactories = 0
-                                end
-                            end
-                            if iAirFactories < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] or (not(bHaveLowMass) and not(bHaveLowPower)) then
-                                if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildAirFactory]) then
-                                    iActionToAssign = refActionBuildAirFactory
-                                    iMaxEngisWanted = 2
-                                else
-                                    iActionToAssign = refActionBuildSecondAirFactory
-                                    iMaxEngisWanted = 2
-                                end
-                                if not(bHaveLowMass) then iMaxEngisWanted = iMaxEngisWanted + 1 end
-                                if not(bHaveLowPower) then
-                                    iMaxEngisWanted = iMaxEngisWanted + 1
-                                    if not(bHaveLowMass) then iMaxEngisWanted = iMaxEngisWanted + 1 end
                                 end
                             end
                         end

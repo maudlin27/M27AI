@@ -8203,6 +8203,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             if aiBrain[refiAIBrainCurrentStrategy] == refStrategyLandRush and aiBrain[refiACUHealthToRunOn] >= 4000 then aiBrain[refiACUHealthToRunOn] = math.max(4000, aiBrain[refiACUHealthToRunOn] * 0.8) end
 
             if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating health for ACU to run on. aiBrain[refiACUHealthToRunOn]='..aiBrain[refiACUHealthToRunOn]..'; refbACUVulnerableToAirSnipe='..tostring(aiBrain[refbACUVulnerableToAirSnipe])) end
+            aiBrain[refiACUHealthToRunOn] = 100000
 
 
         else
