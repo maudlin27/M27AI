@@ -9830,7 +9830,7 @@ end--]]
             bThresholdPreReclaimEngineerCondition = false
 
             --if iEngineersToConsider >= 5 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 then bDebugMessages = true end
-            if tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
+            --if tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
 
             --if GetGameTimeSeconds() >= 1620 and aiBrain:GetArmyIndex() == 2 and tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
 
