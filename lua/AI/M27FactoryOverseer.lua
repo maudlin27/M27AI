@@ -2063,6 +2063,15 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         bIgnoreTechDifferences = true
                                         iTotalWanted = 10
                                     end
+                                elseif iCurrentConditionToTry == 5 then --Upgrade air factory regardless of the separate overseer if we are far behind on air and arent mass stalling
+                                    if iFactoryTechLevel < 3 and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 and bHavePowerForAir and not(aiBrain[M27EconomyOverseer.refbStallingMass]) and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 300 then
+                                        local iCurT3Air = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory * categories.TECH3)
+                                        local iNonT3Air = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory - categories.TECH3)
+                                        local iAirFactoryUpgrading, iAirFactoryAvailable, bAlreadyUpgradingAirHQ = M27EconomyOverseer.GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, M27UnitInfo.refCategoryAirFactory)
+                                        if iNonT3Air == 1 or iCurT3Air >= 3 or (iCurT3Air >= 1 and iAirFactoryUpgrading == 0 and not(M27Conditions.HaveLowMass(aiBrain))) then
+                                            bUpgradeFactoryInstead = true
+                                        end
+                                    end
                                 elseif iCurrentConditionToTry == 5 then
                                     --Emergency AA needed, or AirAA due to ACU air snipe concern, or 1-off intie if enemy has air and we dont
                                     if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refbEmergencyMAANeeded]='..tostring(aiBrain[M27Overseer.refbEmergencyMAANeeded])..'; aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; iFactoryTechLevel='..iFactoryTechLevel..'; aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]='..aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]) end
