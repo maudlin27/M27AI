@@ -773,6 +773,7 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
 
                                 if self.IsUnitState and self:IsUnitState('Upgrading') and EntityCategoryContains(categories.INDIRECTFIRE, oUnitCausingDamage.UnitId) and not(M27Conditions.DoesACUHaveGun(aiBrain, false, self)) then
                                     --ACU - consider cancelling
+                                    if aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
                                     if EntityCategoryContains(categories.COMMAND, self) then
                                         if self:GetWorkProgress() <= 0.25 then
 
@@ -785,7 +786,9 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                                                 if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, self:GetPosition(), 40, 'Ally')) == true then
                                                     --Is the unit within range of us?
                                                     local iOurMaxRange = M27Logic.GetUnitMaxGroundRange({self})
+                                                    if bDebugMessgaes == true then LOG(sFunctionRef..': iOurMaxRange='..iOurMaxRange..'; Dist to enemy causing damage='..M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition())) end
                                                     if M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition()) > iOurMaxRange then
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Will cancel upgrade and start moving towards base') end
                                                         M27Utilities.IssueTrackedClearCommands({self})
                                                         IssueMove({self}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                                                     end
@@ -982,7 +985,8 @@ function OnWeaponFired(oWeapon)
                             M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbLastShotBlocked, false, 20, M27UnitInfo.refiTimeOfLastCheck, GetGameTimeSeconds() + 0.01)
                         end
                     end
-                    if EntityCategoryContains(M27UnitInfo.refCategorySniperBot - categories.EXPERIMENTAL, oUnit.UnitId) then
+                    --Track time of last shot firing for sniperbots and ACU:
+                    if EntityCategoryContains(M27UnitInfo.refCategorySniperBot - categories.EXPERIMENTAL + categories.COMMAND, oUnit.UnitId) then
                         oUnit[M27UnitInfo.refiTimeLastFired] = GetGameTimeSeconds()
                     end
                     --SMD, TML and SML backup to ensure missile is built

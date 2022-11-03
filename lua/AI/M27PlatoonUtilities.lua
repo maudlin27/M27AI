@@ -7520,6 +7520,7 @@ function DeterminePlatoonAction(oPlatoon)
                                                     local bRun = false
 
                                                     if oACU:IsUnitState('Upgrading') then
+                                                        if aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
                                                         if bDebugMessages == true then LOG(sFunctionRef..': ACU unit state is upgrading') end
                                                         local iUpgradePercent = oACU:GetWorkProgress()
                                                         if iHealthPercentage <= 0.5 and iUpgradePercent < (1 - iHealthPercentage) and M27Conditions.SafeToGetACUUpgrade(aiBrain) == false then

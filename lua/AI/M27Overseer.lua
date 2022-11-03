@@ -4822,7 +4822,7 @@ function ACUManager(aiBrain)
 
     if not (aiBrain.M27IsDefeated) and M27Logic.iTimeOfLastBrainAllDefeated < 10 then
         local oACU = M27Utilities.GetACU(aiBrain)
-        --if oACU:IsUnitState('Upgrading') then bDebugMessages = true end
+        --if oACU:IsUnitState('Upgrading') and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
 
         --Track ACU health over time
         if not (oACU[reftACURecentHealth]) then
@@ -5650,10 +5650,14 @@ function ACUManager(aiBrain)
                                 local iTurtleFurtherAdjust = 1
                                 if aiBrain[refiDefaultStrategy] == refStrategyTurtle and M27UnitInfo.GetNumberOfUpgradesObtained(oACU) == 0 then
                                     iHealthReduction = iHealthReduction - 2000
-                                    iTurtleFurtherAdjust = 0.75
+                                    iTurtleFurtherAdjust = 0.75 --This just acts as a true/false flag currently based on whether it is less than 1
+                                    if GetGameTimeSeconds() - (oACU[M27UnitInfo.refiTimeLastFired] or 0) <= 8 and iOurACUDistToOurBase <= 225 then
+                                        iHealthReduction = iHealthReduction - 1500
+                                    end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Are turtling and have no upgrade so really want to complete, iHealthReduction='..(iHealthReduction or 'nil')..'; iTurtleFurtherAdjust='..(iTurtleFurtherAdjust or 'nil')..'; Time since our ACU last fired='..GetGameTimeSeconds() - (oACU[M27UnitInfo.refiTimeLastFired] or 0)..'; Dist to our base='..iOurACUDistToOurBase) end
                                 end --If are turtling then really important we get the upgrade, will also get a health boost from T2
                                 if iOurACUDistToOurBase <= 125 then
-                                    iHealthReduction = math.max(0, iHealthReduction * 0.5)
+                                    iHealthReduction = math.max(math.min(iHealthReduction, 0), iHealthReduction * 0.5)
                                 end
                                 if iTimeToComplete * iHealthLossPerSec > math.min(oACU[reftACURecentHealth][iCurTime] * 0.9 - iHealthReduction, oACU:GetMaxHealth() * 0.7 - iHealthReduction) then
                                     --ACU will be really low health or die if it keeps upgrading
@@ -5685,7 +5689,7 @@ function ACUManager(aiBrain)
                                     end
                                 end
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': iHealthLossPerSec=' .. iHealthLossPerSec .. '; iTimeToComplete=' .. iTimeToComplete .. '; iTimeToComplete * iHealthLossPerSec=' .. iTimeToComplete * iHealthLossPerSec .. '; oACU[reftACURecentHealth][iCurTime - 10]=' .. oACU[reftACURecentHealth][iCurTime - 10] .. '; oACU[reftACURecentHealth][iCurTime]=' .. oACU[reftACURecentHealth][iCurTime] .. '; oACU[reftACURecentUpgradeProgress][iCurTime]=' .. oACU[reftACURecentUpgradeProgress][iCurTime] .. '; bCancelUpgradeAndRun=' .. tostring(bCancelUpgradeAndRun) .. ';  aiBrain[refiDistanceToNearestEnemyBase]=' .. aiBrain[refiDistanceToNearestEnemyBase])
+                                    LOG(sFunctionRef .. ': iHealthLossPerSec=' .. (iHealthLossPerSec or 'nil') .. '; iTimeToComplete=' .. (iTimeToComplete or 'nil') .. '; iTimeToComplete * iHealthLossPerSec=' .. (iTimeToComplete or 0) * (iHealthLossPerSec or 0) .. '; oACU[reftACURecentHealth][iCurTime - 10]=' .. (oACU[reftACURecentHealth][iCurTime - 10] or 'nil') .. '; oACU[reftACURecentHealth][iCurTime]=' .. (oACU[reftACURecentHealth][iCurTime] or 'nil') .. '; oACU[reftACURecentUpgradeProgress][iCurTime]=' .. (oACU[reftACURecentUpgradeProgress][iCurTime] or 'nil') .. '; bCancelUpgradeAndRun=' .. tostring(bCancelUpgradeAndRun) .. ';  aiBrain[refiDistanceToNearestEnemyBase]=' .. (aiBrain[refiDistanceToNearestEnemyBase] or 'nil'))
                                 end
                             elseif bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Health loss less than 50 so wont cancel for this. iHealthLossPerSec=' .. iHealthLossPerSec)
@@ -5969,7 +5973,10 @@ function ACUManager(aiBrain)
 
             if bAllInAttack == true then
                 if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Are doing all in attack, will consider if want to suicide our ACU')
+                    LOG(sFunctionRef .. ': Are doing all in attack, will consider if want to suicide our ACU. bIncludeACUInAttack before upgrade override='..tostring(bIncludeACUInAttack)..'; ACU unit state='..M27Logic.GetUnitState(oACU))
+                end
+                if bIncludeACUInAttack and oACU:IsUnitState('Upgrading') and (oACU:GetWorkProgress() >= 0.5 or (not(M27Conditions.DoesACUHaveUpgrade(aiBrain, oACU)) and oACU:GetWorkProgress() >= 0.25)) then
+                    bIncludeACUInAttack = false
                 end
                 if not(oEnemyACUToConsiderAttacking) then oEnemyACUToConsiderAttacking = aiBrain[refoLastNearestACU] end
 
