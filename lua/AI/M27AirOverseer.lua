@@ -7190,25 +7190,37 @@ function AirAAManager(aiBrain)
                 local tRevisedList = {}
                 local iCurDist
                 for iUnit, oUnit in tUnits do
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to keep unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' in the list of units to defend. bIgnoreUnlessEmergencyThreat='..tostring(bIgnoreUnlessEmergencyThreat)..'; aiBrain[refbFarBehindOnAir]='..tostring(aiBrain[refbFarBehindOnAir])..'; aiBrain[refiEnemyAirAAThreat]='..aiBrain[refiEnemyAirAAThreat]) end
                     if not(bIgnoreUnlessEmergencyThreat) or not(aiBrain[refbFarBehindOnAir]) or aiBrain[refiEnemyAirAAThreat] <= 500 or EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then
                         --Do we have significant AA threat nearby?
                         local tFriendlyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA - categories.TECH1, oUnit:GetPosition(), iFriendlyMAASearchRange, 'Ally')
+                        if bDebugMessages == true then LOG(sFunctionRef..': iFriendlyMAASearchRange='..iFriendlyMAASearchRange..'; Total friendly ground AA threat nearby='..M27Logic.GetAirThreatLevel(aiBrain, tFriendlyGroundAA, false, false, true, false, false, nil, nil, nil, nil, false, false)) end
                         if M27Utilities.IsTableEmpty(tFriendlyGroundAA) == false then
                             if M27Logic.GetAirThreatLevel(aiBrain, tFriendlyGroundAA, false, false, true, false, false, nil, nil, nil, nil, false, false) >= 1600 then
                                 table.insert(tRevisedList, oUnit)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Added unit to revised list') end
                             end
                         end
                     end
                 end
-                tUnits = tRevisedList
+                if bDebugMessages == true then
+                    if M27Utilities.IsTableEmpty(tRevisedList) then LOG(sFunctionRef..': tRevisedList is empty')
+                    else
+                        LOG(sFunctionRef..': Size of tRevisedList='..table.getn(tRevisedList))
+                    end
+                end
+                return tRevisedList
             end
             if M27Utilities.IsTableEmpty(tFriendlyPriorityDefence) == false then
-                RefineListOfUnitsToDefend(tFriendlyPriorityDefence)
+                tFriendlyPriorityDefence = RefineListOfUnitsToDefend(tFriendlyPriorityDefence)
             end
 
             if M27Utilities.IsTableEmpty(tOtherUnitsToDefend) == false then
-                RefineListOfUnitsToDefend(tOtherUnitsToDefend)
+                if bDebugMessages == true then LOG(sFunctionRef..': Size of tOtherUnitsToDefend before refinement='..table.getn(tOtherUnitsToDefend)) end
+                tOtherUnitsToDefend = RefineListOfUnitsToDefend(tOtherUnitsToDefend)
+
                 if M27Utilities.IsTableEmpty(tOtherUnitsToDefend) == false then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Size of tOtherUnitsToDefend after refinement='..table.getn(tOtherUnitsToDefend)) end
                     bCheckForOtherUnitsToDefend = true
                 end
             end
