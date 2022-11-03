@@ -643,7 +643,6 @@ function ConsiderDodgingShot(oUnit, oWeapon)
                             if not(M27UnitInfo.IsUnitUnderwater(oUnit)) then
                                 --If dealing with an ACU then drastically reduce the dodge time so we can overcharge if we havent recently and have enemies in range and enough power
                                 if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and CanUnitUseOvercharge(oUnit:GetAIBrain(), oUnit) and (GetGameTimeSeconds() - (oUnit[refiTimeOfLastOverchargeShot] or 0)) > 5 and oUnit.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] > 0 and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27Utilities.GetNearestUnit(oUnit.PlatoonHandle[M27PlatoonUtilities.reftEnemiesInRange], oUnit:GetPosition()):GetPosition()) <= oUnit.PlatoonHandle[M27PlatoonUtilities.refiPlatoonMaxRange] then
-                                    bDebugMessages = true
                                     if bDebugMessages == true then LOG(sFunctionRef..': Reducing dodge time drastically as have ACU that can overcharge enemies in range but it also wants to dodge a shot; will cancel if damage is very low that are dodging. oWeapon.Blueprint.Damage='..oWeapon.Blueprint.Damage) end
                                     if oWeapon.Blueprint.Damage <= 100 then
                                         bCancelDodge = true

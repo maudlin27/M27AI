@@ -773,13 +773,14 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker, bDontUpdateHQTracker
         if bDebugMessages == true then LOG(sFunctionRef..': About to issue ugprade to unit '..oUnitToUpgrade.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)..'; Current state='..M27Logic.GetUnitState(oUnitToUpgrade)..'; Work progress='..(oUnitToUpgrade:GetWorkProgress() or 'nil')..'; Is unit upgrading='..tostring(oUnitToUpgrade:IsUnitState('Upgrading'))) end
 
         if not(oUnitToUpgrade:IsUnitState('Upgrading')) then
+            local refsQueuedTransport = 'M27EconomyHaveQueuedTransport'
 
 
 
             --Factory specific - if work progress is <=5% then cancel so can do the upgrade
             if EntityCategoryContains(M27UnitInfo.refCategoryAllFactories, oUnitToUpgrade.UnitId) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Are upgrading a factory '..oUnitToUpgrade.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)..'; work progress='..oUnitToUpgrade:GetWorkProgress()) end
-                if oUnitToUpgrade.GetWorkProgress and oUnitToUpgrade:GetWorkProgress() <= 0.05 then
+                if oUnitToUpgrade.GetWorkProgress and oUnitToUpgrade:GetWorkProgress() <= 0.05 and not(oUnitToUpgrade[refsQueuedTransport]) then
                     M27Utilities.IssueTrackedClearCommands({ oUnitToUpgrade })
                     if bDebugMessages == true then LOG(sFunctionRef..': Have barely started with current construction so will cancel so can get upgrade sooner') end
                 end
@@ -789,10 +790,16 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker, bDontUpdateHQTracker
             if EntityCategoryContains(M27UnitInfo.refCategoryAirFactory * categories.TECH1, oUnitToUpgrade.UnitId) and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 1 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory * categories.TECH1) == 1 then
                 M27MapInfo.UpdatePlateausToExpandTo(aiBrain)
                 if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]) == false and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryTransport) == 0 then
-                    --Havent built any transports yet so build a T1 transport before we upgrade to T2 air
-                    local sTransportID = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, M27UnitInfo.refCategoryTransport, oUnitToUpgrade)
-                    if sTransportID then
-                        IssueBuildFactory({ oUnitToUpgrade }, sTransportID, 1)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if we have already queued up transport for this unit='..tostring(oUnitToUpgrade[refsQueuedTransport] or false)) end
+                    if not(oUnitToUpgrade[refsQueuedTransport]) then
+                        --Havent built any transports yet so build a T1 transport before we upgrade to T2 air
+
+                        local sTransportID = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, M27UnitInfo.refCategoryTransport, oUnitToUpgrade)
+                        if sTransportID then
+                            oUnitToUpgrade[refsQueuedTransport] = true
+                            IssueBuildFactory({ oUnitToUpgrade }, sTransportID, 1)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will queue up a transport for factory '..oUnitToUpgrade.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)) end
+                        end
                     end
                 end
             elseif EntityCategoryContains(M27UnitInfo.refCategoryLandFactory * categories.TECH2 + M27UnitInfo.refCategoryAirFactory * categories.TECH2, oUnitToUpgrade.UnitId) and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] <= 2 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer - categories.TECH1) <= 5 then
