@@ -841,7 +841,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
     if iIgnoreDistanceFromOwnStart == nil then iIgnoreDistanceFromOwnStart = iIgnoreDistanceFromStartLocation end
     if bOnlyTargetEndDestination == nil then bOnlyTargetEndDestination = false end
 
-    if oPlatoonHandle:GetPlan() == 'M27DefenderAI' and oPlatoonHandle[refiPlatoonCount] == 25 then bDebugMessages = true end
+    --if oPlatoonHandle:GetPlan() == 'M27DefenderAI' and oPlatoonHandle[refiPlatoonCount] == 25 then bDebugMessages = true end
 
     local iMinDistanceFromPlatoon = 30 --To help stop rare error where platoon gets a new path that is near where it currently is
     local bMexNotByUs --true if mex is by us
@@ -1889,7 +1889,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                             elseif oUnit.GetBlueprint and oBP.Physics.MaxSpeed == 1.7 then
                                                 --Unit is same speed as ACU so more likely than not its an ACU; if gametime is >10m then assume will also know if the ACU is upgraded
                                                 iBaseThreat = 800
-                                                if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and GetGameTimeSeconds() >= 600 then iBaseThreat = GetACUCombatMassRating(oUnit) end
+                                                if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and GetGameTimeSeconds() >= 720 then iBaseThreat = GetACUCombatMassRating(oUnit) end
                                             elseif oUnit.GetBlueprint and oBP.Physics.MaxSpeed == aiBrain[refiEnemyScoutSpeed] then
                                                 iBaseThreat = 10
                                             else

@@ -3172,14 +3172,14 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             else
                                                 --If we already have 2+ battleships and 2+ of the desired bombardment category, enemy has a significant naval threat, we have T3 navy, and the bombardment category contains tech3 units, then get naval combat instead
                                                 local bGetSurfaceCombatInstead = false
-                                                if iExistingBombardmentUnits >= 2 and iFactoryTechLevel >= 3 and M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond] >= 4000 then
+                                                if iExistingBombardmentUnits >= 2 and iFactoryTechLevel >= 3 and M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][oFactory[M27Navy.refiAssignedPond]] >= 4000 then
                                                     local tFriendlyBattleships = EntityCategoryFilterDown(M27UnitInfo.refCategoryBattleship,  M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
                                                     if M27Utilities.IsTableEmpty(tFriendlyBattleships) == false then
                                                         if table.getn(tFriendlyBattleships) >= 2 then
 
-                                                            local iOurThreatExcludingBattleships = M27Team.tTeamData[aiBrain.M27Team][M27Team.refiFriendlyNavalThreatByPond] - M27Logic.GetCombatThreatRating(aiBrain, tFriendlyBattleships, false, nil, nil, nil, false, false, false, true, false, false)
+                                                            local iOurThreatExcludingBattleships = (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiFriendlyNavalThreatByPond][oFactory[M27Navy.refiAssignedPond]] or 0) - (M27Logic.GetCombatThreatRating(aiBrain, tFriendlyBattleships, false, nil, nil, nil, false, false, false, true, false, false) or 0)
                                                             if bDebugMessages == true then LOG(sFunctionRef..': We have at least 2 battleships, and enemy has notable naval combat threat; if we dont have at least twice the enemy naval threat excluding our battleships, then will use logic to get combat unit. Threat of friendly battleships='..M27Logic.GetCombatThreatRating(aiBrain, tFriendlyBattleships, false, nil, nil, nil, false, false, false, true, false, false)..'; iOurThreatExcludingBattleships='..iOurThreatExcludingBattleships) end
-                                                            if iOurThreatExcludingBattleships < math.max(10000, M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond] * 2) then
+                                                            if iOurThreatExcludingBattleships < math.max(10000, (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][oFactory[M27Navy.refiAssignedPond]] or 0) * 2) then
                                                                 bGetSurfaceCombatInstead = true
                                                             end
                                                         end

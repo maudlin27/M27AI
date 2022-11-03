@@ -6973,7 +6973,7 @@ end
 --AirBomberManagerOld - removed from v42 (wasnt being used for some time before)
 
 function AirAAManager(aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirAAManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if M27Utilities.IsTableEmpty(aiBrain[reftAvailableAirAA]) == false then bDebugMessages = true end
