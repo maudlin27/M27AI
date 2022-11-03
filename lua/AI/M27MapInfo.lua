@@ -2721,7 +2721,7 @@ function RecordStartingPathingGroups(aiBrain)
 end
 
 function GetMexPatrolLocations(aiBrain, iMexRallyPointsToAdd, bIncludeRallyPoint)
-    --Returns a table of mexes on our side of the map near middle of map to patrol; will add up to iMexRallyPointsToAdd, and also if bIncludeRallyPoint is true will include the last rally point
+    --Returns a table of land pathable mexes on our side of the map near middle of map to patrol; will add up to iMexRallyPointsToAdd, and also if bIncludeRallyPoint is true will include the last rally point
 
     --If are turtling, then instead will return the chokepoint location and a random point near it
 
@@ -2744,9 +2744,9 @@ function GetMexPatrolLocations(aiBrain, iMexRallyPointsToAdd, bIncludeRallyPoint
         else
             --Cycle through mexes on our side of the map:
             local tStartPosition = PlayerStartPoints[aiBrain.M27StartPositionNumber]
-            local oACU = M27Utilities.GetACU(aiBrain)
-            local sPathing = M27UnitInfo.GetUnitPathingType(oACU)
-            if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
+            --local oACU = M27Utilities.GetACU(aiBrain)
+            local sPathing = M27UnitInfo.refPathingTypeLand
+            --if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
             local iSegmentGroup = GetSegmentGroupOfLocation(sPathing, tStartPosition)
             local iCurDistanceToEnemy, iCurDistanceToStart
 

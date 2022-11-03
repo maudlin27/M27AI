@@ -9070,10 +9070,11 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                             oPlatoon[reftMovementPath] = {}
                             oPlatoon[reftMovementPath][1] = {}
                             oPlatoon[refiCurrentPathTarget] = 1
-                            if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftHighPriorityMexes]) == false then
-                                local iMaxMexPriorityTargets = table.getn(aiBrain[M27MapInfo.reftHighPriorityMexes])
-                                oPlatoon[reftMovementPath][1] = aiBrain[M27MapInfo.reftHighPriorityMexes][math.random(1, iMaxMexPriorityTargets)]
-                            else
+                            local sPathing = M27UnitInfo.GetUnitPathingType(oPlatoon[refoPathingUnit])
+                            local iPathingGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(sPathing, GetPlatoonFrontPosition(oPlatoon))
+                            oPlatoon[reftMovementPath][1] = M27MapInfo.GetRandomPathablePriorityMex(aiBrain, sPathing, iPathingGroupWanted)
+
+                            if M27Utilities.IsTableEmpty(oPlatoon[reftMovementPath][1]) then
                                 if M27Logic.GetNearestEnemyStartNumber(aiBrain) == nil then
                                     LOG(sFunctionRef..': '..sPlatoonName..oPlatoon[refiPlatoonCount]..':ERROR - enemy start number is nil if theyre not dead then something is wrong')
                                     oPlatoon[reftMovementPath][1] = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]

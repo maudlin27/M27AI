@@ -8163,7 +8163,7 @@ function UpdateMexScoutingPriorities(aiBrain)
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': Mex location is either unclaimed or has enemy mex on it, location=' .. repru(tMexLocation) .. '; iPriorityCount=' .. iPriorityCount)
                     end
-                    if iPriorityCount <= iMaxHighPriorityTargets then
+                    if iPriorityCount <= iMaxHighPriorityTargets and not(M27MapInfo.IsUnderwater(tMexLocation, false, nil)) then
                         iPriorityValue = aiBrain[refiIntervaPriorityMex]
                         aiBrain[M27MapInfo.reftHighPriorityMexes][iPriorityCount] = tMexLocation
                     else

@@ -9852,11 +9852,11 @@ end--]]
                 if M27Logic.iTimeOfLastBrainAllDefeated > 10 then
                     break
                 end
-                if iCount > 100 then
+                if iCount > 150 then
                     if iEngineersToConsider < 40 then
-                        M27Utilities.ErrorHandler('Possible infinite loop - have done more than 100 cycles.  Remaining engineers to consider=' .. (iEngineersToConsider or 'nil') .. '.  If we have large number of engineers being reassigned at once then this could cause this message to trigger')
+                        M27Utilities.ErrorHandler('Possible infinite loop - have done more than 150 cycles.  Remaining engineers to consider=' .. (iEngineersToConsider or 'nil') .. '.  If we have large number of engineers being reassigned at once then this could cause this message to trigger')
                         break
-                    elseif iCount > 110 then
+                    elseif iCount > 170 then
                         --abort for performance reasons anyway
                         break
                     end
