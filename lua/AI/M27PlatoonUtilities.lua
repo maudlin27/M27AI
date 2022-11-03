@@ -7262,7 +7262,7 @@ function DeterminePlatoonAction(oPlatoon)
         --if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then --Removed this check as we do it already as part of the parent function
 
             local sPlatoonName = oPlatoon:GetPlan()
-            --if sPlatoonName == 'M27Defender' and oPlatoon[refiPlatoonCount] == 7 and GetGameTimeSeconds() >= 570 then bDebugMessages = true end
+            if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 25 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
@@ -8482,6 +8482,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
             --if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
             --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
             --if sPlatoonName == 'M27PlateauLandCombat' then bDebugMessages = true end
+            if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 25 then bDebugMessages = true end
 
             local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
             --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Start of code') end
@@ -9005,8 +9006,14 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                         if bDebugMessages == true then LOG(sFunctionRef..': RAS platoon so will return to base') end
                     else
                         if bDisbandAsNoUnits == false and oPlatoon[refbACUInPlatoon] == false then
-                            --Backup in case we dont have any high priority mexes yet
-                            if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftHighPriorityMexes]) then
+                            --local tPathablePriorityMexes = {}
+                            local sPathing = M27UnitInfo.GetUnitPathingType(oPlatoon[refoPathingUnit])
+                            local iPathingGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(sPathing, GetPlatoonFrontPosition(oPlatoon))
+                            local tPriorityMex = M27MapInfo.GetRandomPathablePriorityMex(aiBrain, sPathing, iPathingGroupWanted)
+
+
+                            --Backup in case we dont have any high priority mexes yet or none are pathable
+                            if M27Utilities.IsTableEmpty(tPriorityMex) then
                                 if GetGameTimeSeconds() >= 15 and not(aiBrain[M27Overseer.refbNoEnemies]) then M27Utilities.ErrorHandler('Dont have any high priority mexes recorded, so platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..' cant get a target and will move towards enemy base instead') end
                                 --Just move towards the enemy by 20
 
@@ -9020,10 +9027,8 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                 oPlatoon[reftMovementPath][1] = tBackupLocation
 
                             else
-                                local iCurrentMexPriorities = table.getn(aiBrain[M27MapInfo.reftHighPriorityMexes])
-                                local iMexWanted = math.random(1, iCurrentMexPriorities)
-                                local tTargetMex = aiBrain[M27MapInfo.reftHighPriorityMexes][iMexWanted]
-                                oPlatoon[reftMovementPath][1] = {tTargetMex[1], tTargetMex[2], tTargetMex[3]}
+                                oPlatoon[reftMovementPath][1] = tPriorityMex
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will target priority mex at '..repru(tPriorityMex)) end
 
                                 --oPlatoon[reftMovementPath] = M27MapInfo.GetMexPatrolLocations(aiBrain, 3, true)
 
@@ -10807,7 +10812,7 @@ function ProcessPlatoonAction(oPlatoon)
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
 
             local sPlatoonName = oPlatoon:GetPlan()
-            --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
+            if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 25 then bDebugMessages = true end
             --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
             --if GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end

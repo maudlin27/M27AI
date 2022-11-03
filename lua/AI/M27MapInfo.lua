@@ -6074,3 +6074,24 @@ function IdentifyTeamChokepoints(aiBrain)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
+
+
+function GetRandomPathablePriorityMex(aiBrain, sPathing, iPathingGroupWanted)
+    local tPathablePriorityMexes = {}
+
+    if M27Utilities.IsTableEmpty(aiBrain[reftHighPriorityMexes]) == false then
+        for iMex, tMex in aiBrain[reftHighPriorityMexes] do
+            if GetSegmentGroupOfLocation(sPathing, tMex) == iPathingGroupWanted then
+                table.insert(tPathablePriorityMexes, tMex)
+            end
+        end
+    end
+    local tPriorityMex
+    if M27Utilities.IsTableEmpty(tPathablePriorityMexes) == false then
+        local iCurrentMexPriorities = table.getn(tPathablePriorityMexes)
+        local iMexWanted = math.random(1, iCurrentMexPriorities)
+        tPriorityMex = {tPathablePriorityMexes[iMexWanted][1], tPathablePriorityMexes[iMexWanted][2], tPathablePriorityMexes[iMexWanted][3]}
+    end
+    return tPriorityMex
+
+end

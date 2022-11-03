@@ -841,6 +841,8 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
     if iIgnoreDistanceFromOwnStart == nil then iIgnoreDistanceFromOwnStart = iIgnoreDistanceFromStartLocation end
     if bOnlyTargetEndDestination == nil then bOnlyTargetEndDestination = false end
 
+    if oPlatoonHandle:GetPlan() == 'M27DefenderAI' and oPlatoonHandle[refiPlatoonCount] == 25 then bDebugMessages = true end
+
     local iMinDistanceFromPlatoon = 30 --To help stop rare error where platoon gets a new path that is near where it currently is
     local bMexNotByUs --true if mex is by us
     local iLoopCount = 0 --Used for debugging
