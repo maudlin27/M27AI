@@ -8162,7 +8162,7 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RefreshListOfFirebases'
 
-    if GetGameTimeSeconds() >= 785 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 785 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
 
     --if aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 20000 then bDebugMessages = true end
 

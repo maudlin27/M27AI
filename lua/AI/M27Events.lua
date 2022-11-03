@@ -773,7 +773,6 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
 
                                 if self.IsUnitState and self:IsUnitState('Upgrading') and EntityCategoryContains(categories.INDIRECTFIRE, oUnitCausingDamage.UnitId) and not(M27Conditions.DoesACUHaveGun(aiBrain, false, self)) then
                                     --ACU - consider cancelling
-                                    if aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
                                     if EntityCategoryContains(categories.COMMAND, self) then
                                         if self:GetWorkProgress() <= 0.25 then
 

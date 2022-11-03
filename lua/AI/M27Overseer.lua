@@ -6885,7 +6885,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         local iPathingGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
         local bConsiderChatWarning = false
 
-        if GetGameTimeSeconds() >= 790 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
+        --if GetGameTimeSeconds() >= 790 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
 
 
 
