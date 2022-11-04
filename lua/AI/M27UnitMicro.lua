@@ -630,6 +630,7 @@ function ConsiderDodgingShot(oUnit, oWeapon)
             if bDebugMessages == true then LOG(sFunctionRef..': Dist to target='..iDistToTarget..'; Shot speed='..iShotSpeed..'; iTimeUntilImpact='..iTimeUntilImpact) end
             if iTimeUntilImpact > 0.8 then
                 for iTarget, oTarget in tUnitsToConsiderDodgeFor do
+                    bCancelDodge = false
                     if bDebugMessages == true then LOG(sFunctionRef..': oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Weapon damage='..oWeapon.Blueprint.Damage..'; Target health='..oTarget:GetHealth()) end
                     --Does the shot do enough damage that we want to try and doge it?
                     if oWeapon.Blueprint.Damage / oTarget:GetHealth() >= 0.01 then
@@ -642,7 +643,7 @@ function ConsiderDodgingShot(oUnit, oWeapon)
                             --Are we not underwater?
                             if not(M27UnitInfo.IsUnitUnderwater(oUnit)) then
                                 --If dealing with an ACU then drastically reduce the dodge time so we can overcharge if we havent recently and have enemies in range and enough power
-                                if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and CanUnitUseOvercharge(oUnit:GetAIBrain(), oUnit) and (GetGameTimeSeconds() - (oUnit[refiTimeOfLastOverchargeShot] or 0)) > 5 and oUnit.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] > 0 and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27Utilities.GetNearestUnit(oUnit.PlatoonHandle[M27PlatoonUtilities.reftEnemiesInRange], oUnit:GetPosition()):GetPosition()) <= oUnit.PlatoonHandle[M27PlatoonUtilities.refiPlatoonMaxRange] then
+                                if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and M27Conditions.CanUnitUseOvercharge(oUnit:GetAIBrain(), oUnit) and (GetGameTimeSeconds() - (oUnit[M27UnitInfo.refiTimeOfLastOverchargeShot] or 0)) > 5 and oUnit.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] > 0 and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27Utilities.GetNearestUnit(oUnit.PlatoonHandle[M27PlatoonUtilities.reftEnemiesInRange], oUnit:GetPosition()):GetPosition()) <= oUnit.PlatoonHandle[M27PlatoonUtilities.refiPlatoonMaxRange] then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Reducing dodge time drastically as have ACU that can overcharge enemies in range but it also wants to dodge a shot; will cancel if damage is very low that are dodging. oWeapon.Blueprint.Damage='..oWeapon.Blueprint.Damage) end
                                     if oWeapon.Blueprint.Damage <= 100 then
                                         bCancelDodge = true
@@ -651,9 +652,12 @@ function ConsiderDodgingShot(oUnit, oWeapon)
                                     end
                                 end
 
+                                if not(bCancelDodge) then
 
-                                if bDebugMessages == true then LOG(sFunctionRef..': Will try to dodge shot. iTimeUntilImpact='..iTimeUntilImpact..'; iMaxTimeToRun='..iMaxTimeToRun) end
-                                DodgeShot(oTarget, oUnit, oWeapon, math.min(iTimeUntilImpact, iMaxTimeToRun))
+
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will try to dodge shot. iTimeUntilImpact='..iTimeUntilImpact..'; iMaxTimeToRun='..iMaxTimeToRun) end
+                                    DodgeShot(oTarget, oUnit, oWeapon, math.min(iTimeUntilImpact, iMaxTimeToRun))
+                                end
                             end
                         end
                     end

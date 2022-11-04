@@ -6833,7 +6833,7 @@ function AddUnitToBigThreatTable(aiBrain, oUnit)
                     if sReferenceTable == reftEnemyArtiAndExpStructure then
                         if EntityCategoryContains(M27UnitInfo.refCategoryNovaxCentre, oUnit.UnitId) then
                             M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy Novax detected', 0, 1000, true)
-                        elseif EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oUnitId) then
+                        elseif EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oUnit.UnitId) then
                             M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy T3 arti detected', 0, 1000, true)
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryExperimentalStructure, oUnit.UnitId) then
                             if oUnit:GetFractionComplete() <= 0.2 and oUnit:GetAIBrain():GetCurrentUnits(M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryRASSACU + M27UnitInfo.refCategoryParagon) <= 20 then
