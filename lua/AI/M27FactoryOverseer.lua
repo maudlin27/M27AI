@@ -1035,8 +1035,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     if bNeedEngiOfTechLevel == true then
                                         iCategoryToBuild = refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)
                                         iTotalWanted = 2
-                                    elseif iFactoryTechLevel >= 3 and aiBrain:GetEconomyStored('MASS') > 0 and (aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] > 0 or (aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted] > 0 and not(M27Conditions.HaveLowMass(aiBrain)))) and iT3LandFactories >= 3 then
-                                        iCategoryToBuild = refCategoryEngineer
+                                    elseif iFactoryTechLevel >= 3 and aiBrain:GetEconomyStored('MASS') > 0 and (aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] > 0 or (aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted] > 0 and not(M27Conditions.HaveLowMass(aiBrain)))) and (iT3LandFactories >= 3 or (aiBrain:GetEconomyStoredRatio('MASS') >= 0.3 and not(M27Conditions.HaveLowMass(aiBrain))) or aiBrain:GetEconomyStoredRatio('MASS') >= 0.45) then
+                                        iCategoryToBuild = refCategoryEngineer * categories.TECH3
                                         local iCurT3Factories = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH3)
 
                                         if aiBrain:GetEconomyStoredRatio('MASS') >= 0.4 or (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 200 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.1) then
@@ -1862,6 +1862,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             else
                                                 iTotalWanted = math.max(iTotalWanted, math.ceil(iT3AirFactories / 3))
                                             end
+                                        end
+                                    elseif iFactoryTechLevel >= 3 and (aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] > 0 or (aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted] > 0 and not(M27Conditions.HaveLowMass(aiBrain)))) and (aiBrain:GetEconomyStoredRatio('MASS') >= 0.4 or aiBrain:GetEconomyStoredRatio('MASS') >= 0.2 and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] <= 2) and (aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 or aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > 0 or aiBrain[M27EconomyOverseer.refiMexesUpgrading] >= 4) then
+                                        iCategoryToBuild = refCategoryEngineer * categories.TECH3
+                                        if aiBrain:GetEconomyStoredRatio('MASS') >= 0.6 or aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > 0 or aiBrain[M27EconomyOverseer.refiMexesUpgrading] >= 4 then
+                                            iTotalWanted = math.max(1, math.floor(iT3AirFactories * 0.6))
+                                        else
+                                            iTotalWanted = 1
                                         end
                                     end
                                 elseif iCurrentConditionToTry == 2 then

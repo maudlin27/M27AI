@@ -6182,7 +6182,12 @@ function SetMaximumFactoryLevels(aiBrain)
             local iPrimaryFactoryType = refFactoryTypeLand
             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == false then
                 iPrimaryFactoryType = refFactoryTypeAir
-                aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
+                if aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] > 0 then
+                    aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
+                else
+                    aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(3, math.max(1, math.ceil(aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 17)))
+                end
+
             elseif aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance then
                 iPrimaryFactoryType = refFactoryTypeAir
                 aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
@@ -6191,7 +6196,7 @@ function SetMaximumFactoryLevels(aiBrain)
                 if aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] > 0 then
                     aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
                 else
-                    aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(4, math.max(1, math.ceil(aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 10)))
+                    aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(5, math.max(1, math.ceil(aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 10)))
                 end
             end
             --local iMexCount = aiBrain:GetCurrentUnits(refCategoryMex)
