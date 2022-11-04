@@ -2737,7 +2737,7 @@ function ManageMassStalls(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ManageMassStalls'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if GetGameTimeSeconds() >= 1800 and aiBrain:GetEconomyStoredRatio('MASS') <= 0.01 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 960 and (aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.05 or aiBrain[refbStallingEnergy]) then bDebugMessages = true end
 
     local bPauseNotUnpause = true
     local bChangeRequired = false
@@ -3033,6 +3033,8 @@ function ManageMassStalls(aiBrain)
                                         end
                                         if oBP.Economy.BuildRate then
                                             iCurUnitMassUsage = oBP.Economy.BuildRate * iMassPerBP
+                                            --Reduce this massively if unit isn't actually building anything
+                                            if bPauseNotUnpause and (not(oUnit:IsUnitState('Building')) and not(oUnit:IsUnitState('Repairing')) and not(oUnit.GetWorkProgress and oUnit:GetWorkProgress() > 0)) then iCurUnitMassUsage = iCurUnitMassUsage * 0.05 end
                                         end
                                     end
                                 end
@@ -3167,7 +3169,7 @@ function ManageEnergyStalls(aiBrain)
     local sFunctionRef = 'ManageEnergyStalls'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if GetGameTimeSeconds() >= 1200 and aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.5 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 1080 and (aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.05 or aiBrain[refbStallingEnergy]) then bDebugMessages = true end
 
     local bPauseNotUnpause = true
     local bChangeRequired = false
@@ -3202,6 +3204,8 @@ function ManageEnergyStalls(aiBrain)
         end
         if bDebugMessages == true then LOG(sFunctionRef..': If are in stall mode will check if want to come out. aiBrain[refbStallingEnergy]='..tostring(aiBrain[refbStallingEnergy])..'; Gross income='..aiBrain[refiGrossEnergyBaseIncome]..'; Stored ratio='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; Net income='..aiBrain[refiNetEnergyBaseIncome]..'; iNetMod='..iNetMod..'; iPercentMod='..iPercentMod..'; GameTime='..GetGameTimeSeconds()..'; aiBrain[refiGrossEnergyWhenStalled]='..aiBrain[refiGrossEnergyWhenStalled]..'; Changei n power since then='..aiBrain[refiGrossEnergyBaseIncome] - aiBrain[refiGrossEnergyWhenStalled]) end
 
+        if aiBrain[refiGrossEnergyBaseIncome] >= 800 then iPercentMod = math.max(iPercentMod,  math.min(iPercentMod + 0.2, 0.275)) end
+
         if aiBrain[refbStallingEnergy] and aiBrain[refiGrossEnergyBaseIncome] - aiBrain[refiGrossEnergyWhenStalled] >= 45 then
             iPercentMod = iPercentMod -0.3
         end
@@ -3211,7 +3215,7 @@ function ManageEnergyStalls(aiBrain)
             iNetMod = iNetMod - 2.5
         end
 
-        if aiBrain[refbStallingEnergy] and (aiBrain[refiGrossEnergyBaseIncome] >= 100000 or (aiBrain:GetEconomyStoredRatio('ENERGY') > (0.8 + iPercentMod) or (aiBrain:GetEconomyStoredRatio('ENERGY') > (0.7 + iPercentMod) and aiBrain[refiNetEnergyBaseIncome] > (1 + iNetMod)) or (aiBrain:GetEconomyStoredRatio('ENERGY') > (0.5 + iPercentMod) and aiBrain[refiNetEnergyBaseIncome] > (4 + iNetMod)) or (GetGameTimeSeconds() <= 180 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.3)) or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.2 and aiBrain[refiNetEnergyBaseIncome] > 0)) then
+        if aiBrain[refbStallingEnergy] and (aiBrain[refiGrossEnergyBaseIncome] >= 100000 or (aiBrain:GetEconomyStoredRatio('ENERGY') > math.min(0.95, (0.8 + iPercentMod)) or (aiBrain:GetEconomyStoredRatio('ENERGY') > (0.7 + iPercentMod) and aiBrain[refiNetEnergyBaseIncome] > (1 + iNetMod)) or (aiBrain:GetEconomyStoredRatio('ENERGY') > (0.5 + iPercentMod) and aiBrain[refiNetEnergyBaseIncome] > (4 + iNetMod)) or (GetGameTimeSeconds() <= 180 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.3)) or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.2 and aiBrain[refiNetEnergyBaseIncome] > 0)) then
             --aiBrain[refbStallingEnergy] = false
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Have enough energy stored or income to start unpausing things')
@@ -3249,10 +3253,16 @@ function ManageEnergyStalls(aiBrain)
 
             local iEnergyPerTickSavingNeeded
             if aiBrain[refbStallingEnergy] then
-                iEnergyPerTickSavingNeeded = math.max(1, -aiBrain[refiNetEnergyBaseIncome] + iNetMod * 0.5)
+                iEnergyPerTickSavingNeeded = math.max(1, -aiBrain[refiNetEnergyBaseIncome] + iNetMod * 0.5 + aiBrain[refiGrossEnergyBaseIncome] * 0.02)
                 if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.15 then
-                    iEnergyPerTickSavingNeeded = iEnergyPerTickSavingNeeded * 1.3
-                    iEnergyPerTickSavingNeeded = math.max(iEnergyPerTickSavingNeeded, aiBrain[refiGrossEnergyBaseIncome] * 0.05, math.min(aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEnergyStorage) * 50, aiBrain[refiGrossEnergyBaseIncome]*0.1))
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have less than 15% energy stored so increasing the energy saving wanted. iEnergyPerTickSavingNeeded pre increase='..iEnergyPerTickSavingNeeded..'; Gross base income='..aiBrain[refiGrossEnergyBaseIncome]..'; Cur energy storage units='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEnergyStorage)) end
+                    local iStorageFactor = 50
+                    if aiBrain[refiGrossEnergyBaseIncome] >= 1000 then iStorageFactor = 100 end
+                    iEnergyPerTickSavingNeeded = math.max(iEnergyPerTickSavingNeeded * 1.3, iEnergyPerTickSavingNeeded + aiBrain[refiGrossEnergyBaseIncome] * 0.03)
+                    iEnergyPerTickSavingNeeded = math.max(iEnergyPerTickSavingNeeded, aiBrain[refiGrossEnergyBaseIncome] * 0.06, math.min(aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEnergyStorage) * iStorageFactor, aiBrain[refiGrossEnergyBaseIncome]*0.15))
+                elseif aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.225 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Less than 22.5% energy stored so increasing energy saving slightly') end
+                    iEnergyPerTickSavingNeeded = math.max(iEnergyPerTickSavingNeeded * 1.15, iEnergyPerTickSavingNeeded + aiBrain[refiGrossEnergyBaseIncome] * 0.015)
                 end
             else
                 iEnergyPerTickSavingNeeded = math.min(-1, -aiBrain[refiNetEnergyBaseIncome])
@@ -3449,6 +3459,7 @@ function ManageEnergyStalls(aiBrain)
                                             iEnergyPerBP = M27UnitInfo.GetUpgradeEnergyCost(oUnit, oUnit[M27UnitInfo.refsUpgradeRef]) / (M27UnitInfo.GetUpgradeBuildTime(oUnit, oUnit[M27UnitInfo.refsUpgradeRef]) or 1)
                                         else
                                             --Engineer - adjust energy consumption based on what are building
+                                            iEnergyPerBP = 3
                                             if oUnit[M27EngineerOverseer.refiEngineerCurrentAction] and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit.UnitId) then
                                                 if oUnit[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionAssistAirFactory then
                                                     iEnergyPerBP = 13
@@ -3484,23 +3495,49 @@ function ManageEnergyStalls(aiBrain)
                                                     elseif aiBrain[M27EngineerOverseer.refiLastSecondExperimentalRef] == M27EngineerOverseer.refiExperimentalParagon then
                                                         iEnergyPerBP = 23
                                                     end
+                                                else
+                                                    if oUnit.GetFocusUnit then
+                                                        local oFocusUnit = oUnit:GetFocusUnit()
+                                                        if M27UnitInfo.IsUnitValid(oFocusUnit) then
+                                                            if oFocusUnit:GetFractionComplete() < 1 then
+                                                                local oBP = oFocusUnit:GetBlueprint()
+                                                                iEnergyPerBP = (oBP.Economy.BuildCostEnergy or 1) / (oBP.Economy.BuildTime or 10000000)
+                                                                if bDebugMessages == true then LOG(sFunctionRef..': Engineer is assisting unit '..oFocusUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFocusUnit)..'; iEnergyPerBP='..iEnergyPerBP) end
+                                                            else
+                                                                iEnergyPerBP = 1 --The unit might be building something so dont want it as low as others
+                                                            end
+                                                        else
+                                                            iEnergyPerBP = 0.1
+                                                        end
+                                                    else
+                                                        iEnergyPerBP = 0.1
+                                                    end
                                                 end
                                             end
                                         end
                                         if oBP.Economy.BuildRate then
                                             iCurUnitEnergyUsage = oBP.Economy.BuildRate * iEnergyPerBP
                                             --Reduce this massively if unit isn't actually building anything
-                                            if not(oUnit:IsUnitState('Building')) and not(oUnit:IsUnitState('Repairing')) and not(oUnit:IsUnitState('Guarding')) and not(oUnit.GetWorkProgress and oUnit:GetWorkProgress() > 0) then iCurUnitEnergyUsage = iCurUnitEnergyUsage * 0.1 end
+                                            if bPauseNotUnpause and (not(oUnit:IsUnitState('Building')) and not(oUnit:IsUnitState('Repairing')) and not(oUnit.GetWorkProgress and oUnit:GetWorkProgress() > 0)) then iCurUnitEnergyUsage = iCurUnitEnergyUsage * 0.01 end
                                         end
                                     end
                                 end
                                 --We're working in ticks so adjust energy usage accordingly
                                 iCurUnitEnergyUsage = iCurUnitEnergyUsage * 0.1
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Estimated energy usage=' .. iCurUnitEnergyUsage..'; About to call the function PauseOrUnpauseEnergyUsage on unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; bPauseNotUnpause='..tostring(bPauseNotUnpause)..'; iUnitsAdjusted where expected to save energy='..iUnitsAdjusted)
+                                    LOG(sFunctionRef .. ': Estimated energy usage before factoring in unit state=' .. iCurUnitEnergyUsage..'; About to call the function PauseOrUnpauseEnergyUsage on unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; bPauseNotUnpause='..tostring(bPauseNotUnpause)..'; iUnitsAdjusted where expected to save energy='..iUnitsAdjusted)
                                 end
 
-                                if not((iCurUnitEnergyUsage or 0) == 0) then iUnitsAdjusted = iUnitsAdjusted + 1 end
+                                if not((iCurUnitEnergyUsage or 0) == 0) then
+                                    iUnitsAdjusted = iUnitsAdjusted + 1
+                                    if bPauseNotUnpause and EntityCategoryContains(M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategoryAllFactories, oUnit.UnitId) then
+                                        if not(oUnit:IsUnitState('Upgrading') or oUnit:IsUnitState('Repairing') or oUnit:IsUnitState('Building')) then
+                                            iCurUnitEnergyUsage = iCurUnitEnergyUsage * 0.01
+                                            LOG(sFunctionRef..': Unit state='..M27Logic.GetUnitState(oUnit)..' so will set the amount of energy saved equal to just 1% of the actual value, so it is now '..iCurUnitEnergyUsage)
+
+                                        end
+                                    end
+                                end
                                 M27UnitInfo.PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
                                 --Cant move the below into unitinfo as get a crash if unitinfo tries to refernce the table of paused units
                                 if bPauseNotUnpause then
@@ -3690,6 +3727,7 @@ function UpgradeManager(aiBrain)
                 iCurCycleTime = iShortestWaitTime
             end
         end
+        if iCurCycleTime >= 11 and aiBrain[refbStallingEnergy] and aiBrain:GetEconomyStoredRatio('ENERGY') < 0.99 then iCurCycleTime = iShortestWaitTime end
 
         ForkThread(GetMassStorageTargets, aiBrain)
         ForkThread(GetUnitReclaimTargets, aiBrain)
