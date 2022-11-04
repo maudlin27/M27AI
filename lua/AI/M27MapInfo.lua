@@ -2721,7 +2721,7 @@ function RecordStartingPathingGroups(aiBrain)
 end
 
 function GetMexPatrolLocations(aiBrain, iMexRallyPointsToAdd, bIncludeRallyPoint)
-    --Returns a table of mexes on our side of the map near middle of map to patrol; will add up to iMexRallyPointsToAdd, and also if bIncludeRallyPoint is true will include the last rally point
+    --Returns a table of land pathable mexes on our side of the map near middle of map to patrol; will add up to iMexRallyPointsToAdd, and also if bIncludeRallyPoint is true will include the last rally point
 
     --If are turtling, then instead will return the chokepoint location and a random point near it
 
@@ -2744,9 +2744,9 @@ function GetMexPatrolLocations(aiBrain, iMexRallyPointsToAdd, bIncludeRallyPoint
         else
             --Cycle through mexes on our side of the map:
             local tStartPosition = PlayerStartPoints[aiBrain.M27StartPositionNumber]
-            local oACU = M27Utilities.GetACU(aiBrain)
-            local sPathing = M27UnitInfo.GetUnitPathingType(oACU)
-            if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
+            --local oACU = M27Utilities.GetACU(aiBrain)
+            local sPathing = M27UnitInfo.refPathingTypeLand
+            --if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
             local iSegmentGroup = GetSegmentGroupOfLocation(sPathing, tStartPosition)
             local iCurDistanceToEnemy, iCurDistanceToStart
 
@@ -6073,4 +6073,25 @@ function IdentifyTeamChokepoints(aiBrain)
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+
+function GetRandomPathablePriorityMex(aiBrain, sPathing, iPathingGroupWanted)
+    local tPathablePriorityMexes = {}
+
+    if M27Utilities.IsTableEmpty(aiBrain[reftHighPriorityMexes]) == false then
+        for iMex, tMex in aiBrain[reftHighPriorityMexes] do
+            if GetSegmentGroupOfLocation(sPathing, tMex) == iPathingGroupWanted then
+                table.insert(tPathablePriorityMexes, tMex)
+            end
+        end
+    end
+    local tPriorityMex
+    if M27Utilities.IsTableEmpty(tPathablePriorityMexes) == false then
+        local iCurrentMexPriorities = table.getn(tPathablePriorityMexes)
+        local iMexWanted = math.random(1, iCurrentMexPriorities)
+        tPriorityMex = {tPathablePriorityMexes[iMexWanted][1], tPathablePriorityMexes[iMexWanted][2], tPathablePriorityMexes[iMexWanted][3]}
+    end
+    return tPriorityMex
+
 end

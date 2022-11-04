@@ -3059,7 +3059,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                             end
                             if bUnitIsUnassigned == true then
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Unit is unassigned, will treat as available unless it is a low health bomber or t3 air and we have air staging. iAirStaging=' .. iAirStaging .. '; M27UnitInfo.GetUnitHealthPercent(oUnit)=' .. M27UnitInfo.GetUnitHealthPercent(oUnit) .. '; Tech level=' .. M27UnitInfo.GetUnitTechLevel(oUnit) .. '; iUnitType=' .. iUnitType .. '; ')
+                                    LOG(sFunctionRef .. ': Unit is unassigned, will treat as available unless it is a low health bomber or t3 air or any tech gunship and we have air staging. iAirStaging=' .. iAirStaging .. '; M27UnitInfo.GetUnitHealthPercent(oUnit)=' .. M27UnitInfo.GetUnitHealthPercent(oUnit) .. '; Tech level=' .. M27UnitInfo.GetUnitTechLevel(oUnit) .. '; iUnitType=' .. iUnitType .. '; ')
                                 end
 
                                 --Torp bomber when in attackACU mode - attack ACU if its underwater
@@ -3070,7 +3070,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
 
                                     --Send low health bombers and T3 air to heal up provided no T2+ airAA units nearby
                                     if iCurTechLevel < 4 and iAirStaging > 0 and ((iUnitType == iTypeGunship and M27UnitInfo.GetUnitHealthPercent(oUnit) <= iGunshipLowHealthPercent) or M27UnitInfo.GetUnitHealthPercent(oUnit) <= iLowHealthPercent) and (iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber or iUnitType == iTypeGunship or iCurTechLevel == 3) and
-                                            ((M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA - categories.TECH1, oUnit:GetPosition(), 100, 'Enemy'))) or (M27UnitInfo.GetUnitTechLevel(oUnit) <= 2 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA, oUnit:GetPosition(), 100, 'Enemy')))) and
+                                            (iUnitType == iTypeGunship or ((M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA - categories.TECH1, oUnit:GetPosition(), 100, 'Enemy'))) or (M27UnitInfo.GetUnitTechLevel(oUnit) <= 2 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA, oUnit:GetPosition(), 100, 'Enemy'))))) and
                                             (oUnit[refiBombsDropped] >= 2 or not (iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber)) then
                                         iCurUnitsWithLowFuel = iCurUnitsWithLowFuel + 1
                                         aiBrain[reftLowFuelAir][iCurUnitsWithLowFuel] = oUnit
@@ -7015,9 +7015,11 @@ function AirAAManager(aiBrain)
         local iAACategory
 
         if aiBrain[refiEnemyAirAAThreat] <= 600 then iAACategory = M27UnitInfo.refCategoryStructureAA
+        elseif aiBrain[refiEnemyAirAAThreat] <= 6000 then
+            iAACategory = M27UnitInfo.refCategoryStructureAA * categories.TECH3 + M27UnitInfo.refCategoryStructureAA * categories.TECH2
         else
             --Need AOE base air defence to help fight off enemy air threat
-            iAACategory = M27UnitInfo.refCategoryStructureAA * categories.TECH3 + M27UnitInfo.refCategoryStructureAA * categories.TECH2
+            iAACategory = M27UnitInfo.refCategoryStructureAA * categories.TECH3
         end
         local tOurFixedAA = aiBrain:GetListOfUnits(iAACategory, false, true)
 
@@ -7168,16 +7170,61 @@ function AirAAManager(aiBrain)
             local bCloseEnoughToConsider
             local tFriendlyGroundUnits
             local tFriendlyPriorityDefence = aiBrain:GetUnitsAroundPoint(categories.COMMAND + categories.EXPERIMENTAL - M27UnitInfo.refCategorySatellite, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiMaxScoutRadius], 'Ally')
+            local iOtherUnitMaxDistFromBase = aiBrain[refiMaxScoutRadius]
+            if bIgnoreUnlessEmergencyThreat and aiBrain[refbFarBehindOnAir] and aiBrain[refiEnemyAirAAThreat] <= 500 then iOtherUnitMaxDistFromBase = math.max(75, aiBrain[refiOurFurthestAAStructureFromBase]) end
             local iOtherUnitCategoriesToDefend = M27UnitInfo.refCategoryIndirectT3 + categories.STRUCTURE * categories.TECH3 + M27UnitInfo.refCategoryBomber * categories.TECH3
-            local tOtherUnitsToDefend = aiBrain:GetUnitsAroundPoint(iOtherUnitCategoriesToDefend, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiMaxScoutRadius], 'Ally')
+            local tOtherUnitsToDefend = aiBrain:GetUnitsAroundPoint(iOtherUnitCategoriesToDefend, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iOtherUnitMaxDistFromBase, 'Ally')
             local bCheckForOtherUnitsToDefend = false
-            if M27Utilities.IsTableEmpty(tOtherUnitsToDefend) == false then
-                bCheckForOtherUnitsToDefend = true
-            end
+
             local iOtherUnitDefenceRange = 70
             if bIgnoreUnlessEmergencyThreat then
                 iOtherUnitDefenceRange = 50
             end
+
+            local iMinMAAFriendlyThreatNeeded = math.max(150, math.min(1600, aiBrain[refiEnemyAirAAThreat] * 0.1))
+            local iFriendlyMAASearchRange = math.max(80, iOtherUnitDefenceRange)
+
+
+            function RefineListOfUnitsToDefend(tUnits)
+                local bKeepUpdating = true
+                local tRevisedList = {}
+                local iCurDist
+                for iUnit, oUnit in tUnits do
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to keep unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' in the list of units to defend. bIgnoreUnlessEmergencyThreat='..tostring(bIgnoreUnlessEmergencyThreat)..'; aiBrain[refbFarBehindOnAir]='..tostring(aiBrain[refbFarBehindOnAir])..'; aiBrain[refiEnemyAirAAThreat]='..aiBrain[refiEnemyAirAAThreat]) end
+                    if not(bIgnoreUnlessEmergencyThreat) or not(aiBrain[refbFarBehindOnAir]) or aiBrain[refiEnemyAirAAThreat] <= 500 or EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then
+                        --Do we have significant AA threat nearby?
+                        local tFriendlyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA - categories.TECH1, oUnit:GetPosition(), iFriendlyMAASearchRange, 'Ally')
+                        if bDebugMessages == true then LOG(sFunctionRef..': iFriendlyMAASearchRange='..iFriendlyMAASearchRange..'; Total friendly ground AA threat nearby='..M27Logic.GetAirThreatLevel(aiBrain, tFriendlyGroundAA, false, false, true, false, false, nil, nil, nil, nil, false, false)) end
+                        if M27Utilities.IsTableEmpty(tFriendlyGroundAA) == false then
+                            if M27Logic.GetAirThreatLevel(aiBrain, tFriendlyGroundAA, false, false, true, false, false, nil, nil, nil, nil, false, false) >= 1600 then
+                                table.insert(tRevisedList, oUnit)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Added unit to revised list') end
+                            end
+                        end
+                    end
+                end
+                if bDebugMessages == true then
+                    if M27Utilities.IsTableEmpty(tRevisedList) then LOG(sFunctionRef..': tRevisedList is empty')
+                    else
+                        LOG(sFunctionRef..': Size of tRevisedList='..table.getn(tRevisedList))
+                    end
+                end
+                return tRevisedList
+            end
+            if M27Utilities.IsTableEmpty(tFriendlyPriorityDefence) == false then
+                tFriendlyPriorityDefence = RefineListOfUnitsToDefend(tFriendlyPriorityDefence)
+            end
+
+            if M27Utilities.IsTableEmpty(tOtherUnitsToDefend) == false then
+                if bDebugMessages == true then LOG(sFunctionRef..': Size of tOtherUnitsToDefend before refinement='..table.getn(tOtherUnitsToDefend)) end
+                tOtherUnitsToDefend = RefineListOfUnitsToDefend(tOtherUnitsToDefend)
+
+                if M27Utilities.IsTableEmpty(tOtherUnitsToDefend) == false then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Size of tOtherUnitsToDefend after refinement='..table.getn(tOtherUnitsToDefend)) end
+                    bCheckForOtherUnitsToDefend = true
+                end
+            end
+
 
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': total enemy threats=' .. table.getn(tEnemyAirUnits) .. '; total vailable inties=' .. table.getn(aiBrain[reftAvailableAirAA]))
@@ -7226,15 +7273,17 @@ function AirAAManager(aiBrain)
                         iCloseToBaseRange = math.min(180, math.max(iCloseToBaseRange, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.3, aiBrain[refiBomberDefenceModDistance]))
                     end
                 end
-            elseif iCloseToBaseRange > 70 and aiBrain[refiTeamMassInAirAA] < 0.75 * aiBrain[refiEnemyAirAAThreat] and aiBrain[refiOurMassInAirAA] <= 6000 then
+            elseif aiBrain[refiTeamMassInAirAA] < 0.75 * aiBrain[refiEnemyAirAAThreat] and aiBrain[refiOurMassInAirAA] <= 6000 then
                 --Enemy significantly outnumbers us and we dont have many airaa units, so want to keep air units close to base
+                if iCloseToBaseRange > 70 then
+                    iCloseToBaseRange = math.min(iCloseToBaseRange, math.max(70, iFurthestAAFromBase))
+                end
 
-
+                --Also set flag that are far behind from air if relevant
                 if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to limit the close to base range based on our AA structures. iCloseToBaseRange pre adjust='..iCloseToBaseRange..'; iFurthestAAFromBase='..iFurthestAAFromBase) end
-                if not(aiBrain[refbHaveAirControl]) and iFurthestAAFromBase <= 120 and aiBrain[refiTeamMassInAirAA] < 0.7 * aiBrain[refiEnemyAirAAThreat] then
+                if not(aiBrain[refbHaveAirControl]) and aiBrain[refiTeamMassInAirAA] < 0.75 * aiBrain[refiEnemyAirAAThreat] then
                     aiBrain[refbFarBehindOnAir] = true
                 end
-                iCloseToBaseRange = math.min(iCloseToBaseRange, math.max(70, iFurthestAAFromBase))
             end
 
 
@@ -7289,7 +7338,9 @@ function AirAAManager(aiBrain)
                         --Check if enemy air is near allied ACU or experimental (but prioritise enemies really close to our base instead)
                         if M27Utilities.IsTableEmpty(tFriendlyPriorityDefence) == false then
                             for iPriorityDefence, oPriorityDefence in tFriendlyPriorityDefence do
+                                --(have already checked if have friedly AA nearby above in order to generate tFriendlyPriorityDefence)
                                 iCurDistanceToStartOrACU = math.min(iCurDistanceToStartOrACU, 60 + M27Utilities.GetDistanceBetweenPositions(tUnitCurPosition, oPriorityDefence:GetPosition()))
+
                                 --Note - hardcoded adj - will increase dist on enemy near ally ACU by 60, and will consider helping against air units near ally ACU if within 130 (so within 70) without doing AA check at all
                             end
                         end
@@ -7330,22 +7381,34 @@ function AirAAManager(aiBrain)
                                     LOG(sFunctionRef .. ': Will ignore enemy AA if near another type of unit we want to defend. bCheckForOtherUnitsToDefend=' .. tostring((bCheckForOtherUnitsToDefend or false)) .. '; iOtherUnitDefenceRange=' .. (iOtherUnitDefenceRange or 'nil'))
                                 end
                                 if bCheckForOtherUnitsToDefend then
-                                    tOtherUnitsToDefend = aiBrain:GetUnitsAroundPoint(iOtherUnitCategoriesToDefend, oUnit:GetPosition(), iOtherUnitDefenceRange, 'Ally')
+                                    for iDefend, oDefend in tOtherUnitsToDefend do
+                                        if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oDefend:GetPosition()) <= iOtherUnitDefenceRange then
+                                            bShouldAttackThreat = true
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Enemy air unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is distance '..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oDefend:GetPosition())..' from oDefend='..oDefend.UnitId..M27UnitInfo.GetUnitLifetimeCount(oDefend)..' so will attack it') end
+                                            break
+                                        end
+                                    end
+                                    --v62 - replaced getunitsaroundpoint approach with going through the predefined table so we arent calculating MAA threat each time
+                                    --[[tOtherUnitsToDefend = aiBrain:GetUnitsAroundPoint(iOtherUnitCategoriesToDefend, oUnit:GetPosition(), iOtherUnitDefenceRange, 'Ally')
 
                                     if M27Utilities.IsTableEmpty(tOtherUnitsToDefend) == false then
                                         if bIgnoreUnlessEmergencyThreat == false then
                                             bShouldAttackThreat = true
                                         else
-                                            --Only help out if we have groundAA nearby
-                                            local tFriendlyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA - categories.TECH1, oUnit:GetPosition(), iOtherUnitDefenceRange, 'Ally')
-                                            if bDebugMessages == true then
-                                                LOG(sFunctionRef .. ': Enemy air threat near unit we want to protect but we dont have air control; is table of nearby ground units empty=' .. tostring(M27Utilities.IsTableEmpty(tFriendlyGroundAA)))
-                                            end
-                                            if M27Utilities.IsTableEmpty(tFriendlyGroundAA) == false then
-                                                bShouldAttackThreat = true
+                                            --Only help out if we have enough AA threat nearby, and we are within the range of the nearest fixed AA
+                                            if not(aiBrain[refbFarBehindOnAir]) or iCurTargetModDistanceFromStart <= 40 + aiBrain[refiOurFurthestAAStructureFromBase] then
+                                                local tFriendlyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA - categories.TECH1, oUnit:GetPosition(), iOtherUnitDefenceRange, 'Ally')
+                                                if bDebugMessages == true then
+                                                    LOG(sFunctionRef .. ': Enemy air threat near unit we want to protect but we dont have air control; is table of nearby ground units empty=' .. tostring(M27Utilities.IsTableEmpty(tFriendlyGroundAA)))
+                                                end
+                                                if M27Utilities.IsTableEmpty(tFriendlyGroundAA) == false then
+                                                    if aiBrain[refiEnemyAirAAThreat] <= 500 or M27Logic.GetAirThreatLevel(aiBrain, tFriendlyGroundAA, false, false, true, false, false, nil, nil, nil, nil, false, false) >= 1600 then
+                                                        bShouldAttackThreat = true
+                                                    end
+                                                end
                                             end
                                         end
-                                    end
+                                    end--]]
                                 end
                             end
 
@@ -7454,7 +7517,7 @@ function AirAAManager(aiBrain)
                         tValidEnemyAirThreats[iEnemyUnitCount][refoUnit] = oUnit
                         tValidEnemyAirThreats[iEnemyUnitCount][refiDistance] = iCurTargetModDistanceFromStart
                         if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Air threat that we should attack, recording in tValidEnemyAirThreats, iEnemyUnitCount=' .. iEnemyUnitCount .. '; refiDistance=' .. tValidEnemyAirThreats[iEnemyUnitCount][refiDistance])
+                            LOG(sFunctionRef .. ': Want to attack target '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' as it is a threat that we should attack, recording in tValidEnemyAirThreats, iEnemyUnitCount=' .. iEnemyUnitCount .. '; refiDistance=' .. tValidEnemyAirThreats[iEnemyUnitCount][refiDistance])
                         end
                     end
                 elseif bDebugMessages == true then
@@ -8100,7 +8163,7 @@ function UpdateMexScoutingPriorities(aiBrain)
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': Mex location is either unclaimed or has enemy mex on it, location=' .. repru(tMexLocation) .. '; iPriorityCount=' .. iPriorityCount)
                     end
-                    if iPriorityCount <= iMaxHighPriorityTargets then
+                    if iPriorityCount <= iMaxHighPriorityTargets and not(M27MapInfo.IsUnderwater(tMexLocation, false, nil)) then
                         iPriorityValue = aiBrain[refiIntervaPriorityMex]
                         aiBrain[M27MapInfo.reftHighPriorityMexes][iPriorityCount] = tMexLocation
                     else
@@ -10031,7 +10094,7 @@ end
 
 function GetAirAAThreatAroundPosition(aiBrain, tPosition, iAdjacentSegmentSize)
     --Returns the airaa threat around the position and iAdjacentSegmentSize air segments
-    local iStartX, iStartZ = GetAirSegmentFromPosition(tStartPoint)
+    local iStartX, iStartZ = GetAirSegmentFromPosition(tPosition)
     local iMinX = math.max(aiBrain[refiMinSegmentX], iStartX - iAdjacentSegmentSize)
     local iMaxX = math.min(aiBrain[refiMaxSegmentX], iStartX + iAdjacentSegmentSize)
     local iMinZ = math.max(aiBrain[refiMinSegmentZ], iStartZ - iAdjacentSegmentSize)

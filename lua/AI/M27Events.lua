@@ -785,7 +785,9 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                                                 if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, self:GetPosition(), 40, 'Ally')) == true then
                                                     --Is the unit within range of us?
                                                     local iOurMaxRange = M27Logic.GetUnitMaxGroundRange({self})
+                                                    if bDebugMessgaes == true then LOG(sFunctionRef..': iOurMaxRange='..iOurMaxRange..'; Dist to enemy causing damage='..M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition())) end
                                                     if M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition()) > iOurMaxRange then
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Will cancel upgrade and start moving towards base') end
                                                         M27Utilities.IssueTrackedClearCommands({self})
                                                         IssueMove({self}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                                                     end
@@ -838,6 +840,9 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                             if not(oUnitCausingDamage[M27UnitInfo.reftLastKnownPosition]) and EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitCausingDamage.UnitId) then
                                 M27Navy.UpdateUnitPond(oUnitCausingDamage, aiBrain.M27Team, IsEnemy(aiBrain:GetArmyIndex(), oUnitCausingDamage:GetAIBrain():GetArmyIndex()))
                             end
+
+                            --Big threat
+                            if EntityCategoryContains(M27Overseer.iAllBigThreatCategories, oUnitCausingDamage.UnitId) then ForkThread(M27Overseer.AddUnitToBigThreatTable, aiBrain, oUnitCausingDamage) end
                         end
                         --General logic for shields so are very responsive with micro
                         if self.MyShield and self.MyShield.GetHealth and self.MyShield:GetHealth() < 100 and EntityCategoryContains((M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryPersonalShield) * categories.MOBILE, self) then
@@ -861,6 +866,10 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                 instigator[M27UnitInfo.refbRecentlyDealtDamage] = true
                 instigator[M27UnitInfo.refiGameTimeDamageLastDealt] = math.floor(GetGameTimeSeconds())
                 M27Utilities.DelayChangeVariable(instigator, M27UnitInfo.refbRecentlyDealtDamage, false, 5, M27UnitInfo.refiGameTimeDamageLastDealt, instigator[M27UnitInfo.refiGameTimeDamageLastDealt] + 1, nil, nil)
+                --If just damaged T2+ mex or high value building with surface naval unit then have it attack that unit specifically until it is dead
+                if EntityCategoryContains(M27UnitInfo.refCategoryNavalSurface, instigator.UnitId) and EntityCategoryContains(M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex + categories.VOLATILE * categories.STRUCTURE - M27UnitInfo.refCategoryT1Power + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + categories.EXPERIMENTAL * categories.STRUCTURE, self.UnitId) then
+                    ForkThread(M27UnitMicro.FocusDownTarget, instigator, self)
+                end
             end
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -975,7 +984,8 @@ function OnWeaponFired(oWeapon)
                             M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbLastShotBlocked, false, 20, M27UnitInfo.refiTimeOfLastCheck, GetGameTimeSeconds() + 0.01)
                         end
                     end
-                    if EntityCategoryContains(M27UnitInfo.refCategorySniperBot - categories.EXPERIMENTAL, oUnit.UnitId) then
+                    --Track time of last shot firing for sniperbots and ACU:
+                    if EntityCategoryContains(M27UnitInfo.refCategorySniperBot - categories.EXPERIMENTAL + categories.COMMAND, oUnit.UnitId) then
                         oUnit[M27UnitInfo.refiTimeLastFired] = GetGameTimeSeconds()
                     end
                     --SMD, TML and SML backup to ensure missile is built

@@ -1,8 +1,8 @@
 name = "M27AI"
-uid = "f27c55b4-v061-55b4-92b6-64398e75e23f"
-version = 61 --REMINDER: before release: Update M27Config; Version reference in uid updated; Tested offline vs AI it should beat to check for any last minute errors introduced
+uid = "f27c55b4-v062-55b4-92b6-64398e75e23f"
+version = 62 --REMINDER: before release: Update M27Config; Version reference in uid updated; Tested offline vs AI it should beat to check for any last minute errors introduced
 copyright = "GNU GENERAL PUBLIC LICENSE 3.0"
-description = "Adaptive AI, Suitable for 20km and smaller maps.  Est 500 1v1 ladder / 800 global rating.  Report bugs to maudlin27 (discord or M27AI forum thread, which has more info on M27AI).  v59-Gunships; v60-Navy enhancements; v61-Stats"
+description = "Adaptive AI, Suitable for 20km and smaller maps.  Est 500 1v1 ladder / 800 global rating.  Report bugs to maudlin27 (discord or M27AI forum thread, which has more info on M27AI).  v60-Navy enhancements; v61-Stats; v62-LandSpam"
 author = "maudlin27" --With thanks to Softles/Softlnoob for original Micro AI that was used as a starting point as I learned how to code AI
 --Also thanks to Softles for work scheduling code to help improve CPU performance
 url = "https://forum.faforever.com/topic/2373/ai-development-guide-and-m27ai-v1-devlog"

@@ -43,7 +43,7 @@ reftAdjacencyPGensWanted = 'M27UnitAdjacentPGensWanted' --Table, [x] = subref: 1
 refiSubrefCategory = 1 --for reftAdjacencyPGensWanted
 refiSubrefBuildLocation = 2 --for reftAdjacencyPGensWanted
 refiTimeOfLastCheck = 'M27UnitTimeOfLastCheck' --Currently used for T3 arti adjacency, when first detected enemy SMD, when last checked if shot was blocked, but could be used for other things if want
-refiTimeLastFired = 'M27UnitTimeLastFired' --currently used for sniperbots, but could expand if wanted
+refiTimeLastFired = 'M27UnitTimeLastFired' --currently used for sniperbots and ACU, but could expand if wanted
 refbLastShotBlocked = 'M27UnitLastShotBlocked' --Used for DF units to indicate if last shot was blocked
 refiTimeOfLastSMDCheck = 'M27UnitTimeOfLastSMDCheck'
 refbLastCoveredBySMD = 'M27UnitCoveredBySMD' --Used to record if unit was last covered by SMD

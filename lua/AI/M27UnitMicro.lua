@@ -616,12 +616,21 @@ function ConsiderDodgingShot(oUnit, oWeapon)
         if M27Utilities.IsTableEmpty(tUnitsToConsiderDodgeFor) == false then
             --Calculate time to impact
             local iDistToTarget = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oWeapon:GetCurrentTargetPos())
-            if oWeapon.Blueprint.WeaponCategory == 'Artillery' then iDistToTarget = iDistToTarget + 15 end
+            local iMaxTimeToRun = 3
+            if oWeapon.Blueprint.WeaponCategory == 'Artillery' then
+                iDistToTarget = iDistToTarget + 15
+                iMaxTimeToRun = 0.8
+            elseif oWeapon.Blueprint.WeaponCategory == 'Missile' then
+                iDistToTarget = iDistToTarget + 10
+                iMaxTimeToRun = 0.8
+            end
             local iShotSpeed = oWeapon.Blueprint.MuzzleVelocity
             local iTimeUntilImpact = iDistToTarget / iShotSpeed
+            local bCancelDodge = false
             if bDebugMessages == true then LOG(sFunctionRef..': Dist to target='..iDistToTarget..'; Shot speed='..iShotSpeed..'; iTimeUntilImpact='..iTimeUntilImpact) end
             if iTimeUntilImpact > 0.8 then
                 for iTarget, oTarget in tUnitsToConsiderDodgeFor do
+                    bCancelDodge = false
                     if bDebugMessages == true then LOG(sFunctionRef..': oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Weapon damage='..oWeapon.Blueprint.Damage..'; Target health='..oTarget:GetHealth()) end
                     --Does the shot do enough damage that we want to try and doge it?
                     if oWeapon.Blueprint.Damage / oTarget:GetHealth() >= 0.01 then
@@ -633,8 +642,22 @@ function ConsiderDodgingShot(oUnit, oWeapon)
                         if iTimeUntilImpact > 0.4 + iAverageSize * 1.5 / oBP.Physics.MaxSpeed then
                             --Are we not underwater?
                             if not(M27UnitInfo.IsUnitUnderwater(oUnit)) then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Will try to dodge shot') end
-                                DodgeShot(oTarget, oUnit, oWeapon, iTimeUntilImpact)
+                                --If dealing with an ACU then drastically reduce the dodge time so we can overcharge if we havent recently and have enemies in range and enough power
+                                if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and M27Conditions.CanUnitUseOvercharge(oUnit:GetAIBrain(), oUnit) and (GetGameTimeSeconds() - (oUnit[M27UnitInfo.refiTimeOfLastOverchargeShot] or 0)) > 5 and oUnit.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] > 0 and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27Utilities.GetNearestUnit(oUnit.PlatoonHandle[M27PlatoonUtilities.reftEnemiesInRange], oUnit:GetPosition()):GetPosition()) <= oUnit.PlatoonHandle[M27PlatoonUtilities.refiPlatoonMaxRange] then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Reducing dodge time drastically as have ACU that can overcharge enemies in range but it also wants to dodge a shot; will cancel if damage is very low that are dodging. oWeapon.Blueprint.Damage='..oWeapon.Blueprint.Damage) end
+                                    if oWeapon.Blueprint.Damage <= 100 then
+                                        bCancelDodge = true
+                                    else
+                                        iMaxTimeToRun = math.min(0.7, iMaxTimeToRun)
+                                    end
+                                end
+
+                                if not(bCancelDodge) then
+
+
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will try to dodge shot. iTimeUntilImpact='..iTimeUntilImpact..'; iMaxTimeToRun='..iMaxTimeToRun) end
+                                    DodgeShot(oTarget, oUnit, oWeapon, math.min(iTimeUntilImpact, iMaxTimeToRun))
+                                end
                             end
                         end
                     end
@@ -704,7 +727,7 @@ function DodgeBomb(oBomber, oWeapon, projectile)
                                             else
                                                 --Is it a T2 bomber, and there arent many bombers nearby?
                                                 if EntityCategoryContains(categories.TECH2, oBomber.UnitId) then
-                                                    local tNearbyBombers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryGunship, oUnit:GetPosition(), 100, 'Enemy')
+                                                    local tNearbyBombers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryGunship - categories.TECH1, oUnit:GetPosition(), 100, 'Enemy')
                                                     if M27Utilities.IsTableEmpty(tNearbyBombers) == true then
                                                         bDontTryAndDodge = true
                                                     else
@@ -2052,4 +2075,52 @@ function ConsiderT2ArtiGroundFire(oArti)
         WaitSeconds(iTimeToWait)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
+end
+
+function FocusDownTarget(oUnit, oTarget)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'FocusDownTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if M27UnitInfo.IsUnitValid(oUnit) and M27UnitInfo.IsUnitValid(oTarget) then
+
+
+        local sFocusDownTargetActive = 'M27MicroFocusDownTargetActive' --against unit, true if are focusing down the unit
+        if not(oUnit[sFocusDownTargetActive]) then
+            oUnit[sFocusDownTargetActive] = true
+            oUnit[M27UnitInfo.refbSpecialMicroActive] = true
+            local iReloadRate = 5 --default; will hard code exceptions as cant be bothered to figure out code
+            if EntityCategoryContains(M27UnitInfo.refCategoryDestroyer * categories.AEON, oUnit.UnitId) then
+                iReloadRate = 7 --allows time for shot to hit
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryBattleship * categories.UEF, oUnit.UnitId) then
+                iReloadRate = 20
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryBattleship, oUnit.UnitId) then
+                iReloadRate = 6
+            end
+
+            if not(oUnit[M27PlatoonUtilities.refiLastOrderType] == M27PlatoonUtilities.refiOrderIssueAttack) or not(oUnit[M27UnitInfo.refoLastOrderUnitTarget] == oTarget) then
+                --bDebugMessages = true if bDebugMessages == true then LOG('Repr of oTarget='..reprs(oTarget)..'; repr of oUnit='..reprs(oUnit)..'; Is unit valid(oUnit)='..tostring(M27UnitInfo.IsUnitValid(oUnit))..'; Is unit valid(oTarget)='..tostring(M27UnitInfo.IsUnitValid(oTarget))) end
+                M27Utilities.IssueTrackedClearCommands({oUnit})
+                IssueAttack({oUnit}, oTarget)
+                oUnit[M27PlatoonUtilities.refiLastOrderType] = M27PlatoonUtilities.refiOrderIssueAttack
+                oUnit[M27UnitInfo.refoLastOrderUnitTarget] = oTarget
+            end
+
+            while M27UnitInfo.IsUnitValid(oUnit) and M27UnitInfo.IsUnitValid(oTarget) do
+                if oUnit[M27UnitInfo.refbRecentlyDealtDamage] or (iReloadRate >= 5 and GetGameTimeSeconds() - oUnit[M27UnitInfo.refiGameTimeDamageLastDealt] < iReloadRate) then
+                    --Keep firing
+                else
+                    break
+                end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                WaitSeconds(1)
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+            end
+            if M27UnitInfo.IsUnitValid(oUnit) then
+                oUnit[sFocusDownTargetActive] = false
+                oUnit[M27UnitInfo.refbSpecialMicroActive] = false
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

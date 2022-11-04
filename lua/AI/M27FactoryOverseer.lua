@@ -405,82 +405,167 @@ function GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, bEmergency)
     return iCategoryToBuild
 end
 
+function GetNavalAntiAirCategory(aiBrain, oFactory, iFactoryTechLevel)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetNavalAntiAirCategory'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if iFactoryTechLevel == 1 then
+        if EntityCategoryContains(categories.AEON, oFactory.UnitId) then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return M27UnitInfo.refCategoryNavalAA
+        else
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return M27UnitInfo.refCategoryFrigate
+        end
+    else
+        if iFactoryTechLevel == 2 then
+            return M27UnitInfo.refCategoryNavalAA
+        else
+            --T3+ - want to get mix of cruisers and aircraft carriers
+            if EntityCategoryContains(categories.UEF, oFactory.UnitId) then
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return M27UnitInfo.refCategoryNavalAA
+            else
+                local tT2PlusNavalAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalAA - categories.TECH1, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                if bDebugMessages == true then LOG(sFunctionRef..': Is table of existing tT2PlusNavy empty='..tostring(M27Utilities.IsTableEmpty(tT2PlusNavalAA))) end
+                if M27Utilities.IsTableEmpty(tT2PlusNavalAA) == false then
+                    local iCurCruisers = 0
+                    local iCurT3AANavy = 0
+                    local tCurT3AANavy = EntityCategoryFilterDown(categories.TECH3 + categories.EXPERIMENTAL, tT2PlusNavalAA)
+                    if M27Utilities.IsTableEmpty(tCurT3AANavy) == false then
+                        iCurT3AANavy = table.getn(tCurT3AANavy)
+                    end
+                    iCurCruisers = table.getn(tT2PlusNavalAA) - iCurT3AANavy
+                    if bDebugMessages == true then LOG(sFunctionRef..': iCurCruisers='..iCurCruisers..'; iCurT3AANavy='..iCurT3AANavy) end
+                    if EntityCategoryContains(categories.CYBRAN, oFactory.UnitId) then
+                        if iCurCruisers < iCurT3AANavy * 3 + 1 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': want more cybran cruisers') end
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                            return M27UnitInfo.refCategoryCruiser
+                        else
+                            if bDebugMessages == true then LOG(sFunctionRef..': Want aircraft carrier') end
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                            return M27UnitInfo.refCategoryNavalAA
+                        end
+                    elseif iCurCruisers < iCurT3AANavy * 2 + 1 then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Wnat more cruisers to go with aircraft carrier') end
+                        return M27UnitInfo.refCategoryCruiser
+                    else
+                        if EntityCategoryContains(categories.SERAPHIM, oFactory.UnitId) then
+                            --Dont want T3 subs
+                            if bDebugMessages == true then LOG(sFunctionRef..': Want searpahim carrier or cruiser but not sub') end
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                            return M27UnitInfo.refCategoryCruiserCarrier
+                        else
+                            if bDebugMessages == true then LOG(sFunctionRef..': Want carrier/cruiser') end
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                            return M27UnitInfo.refCategoryNavalAA
+                        end
+                    end
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': No T2+ navy so want cruiser') end
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                    return M27UnitInfo.refCategoryCruiser
+                end
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
 function GetNavalSurfaceCombatCategory(aiBrain, oFactory, iFactoryTechLevel)
     --Do we have unit restrictions active? If so then just build any naval unit possible in case some of the ones we want have been restricted
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetNavalSurfaceCombatCategory'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     if M27Utilities.IsTableEmpty(ScenarioInfo.Options.RestrictedCategories) == false then
+        if bDebugMessages == true then LOG(sFunctionRef..': Unit restrictions active so getting direct fire navy') end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return M27UnitInfo.refCategoryFrigate + M27UnitInfo.refCategoryDestroyer + categories.TECH3 * categories.DIRECTFIRE * M27UnitInfo.refCategoryNavalSurface
     else
         if iFactoryTechLevel == 1 then
+            if bDebugMessages == true then LOG(sFunctionRef..': T1 so getting frigate') end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return M27UnitInfo.refCategoryFrigate
-        elseif iFactoryTechLevel == 2 then
-            --Want 1 frigate for every destroyer unless are aeon (in which case just want destroyers)
-            if EntityCategoryContains(categories.AEON, oFactory.UnitId) then
-                return M27UnitInfo.refCategoryDestroyer
-            else
-                local iCurFrigates = 0
-                local iCurHigherTierCombat = 0
-                if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false then
-                    local tCurFrigates = EntityCategoryFilterDown(M27UnitInfo.refCategoryFrigate, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
-                    local tCurHigherTierCombat = EntityCategoryFilterDown(categories.DESTROYER + categories.BATTLESHIP - M27UnitInfo.refCategoryMissileShip, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
-                    if M27Utilities.IsTableEmpty(tCurFrigates) == false then iCurFrigates = table.getn(tCurFrigates) end
-                    if M27Utilities.IsTableEmpty(tCurHigherTierCombat) == false then iCurHigherTierCombat = table.getn(tCurHigherTierCombat) end
+        else
+            local iCurFrigates = 0
+            local iCurHigherTierCombat = 0
+            if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false then
+                local tCurFrigates = EntityCategoryFilterDown(M27UnitInfo.refCategoryFrigate, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                local tCurHigherTierCombat = EntityCategoryFilterDown(categories.DESTROYER + categories.BATTLESHIP - M27UnitInfo.refCategoryMissileShip, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                if M27Utilities.IsTableEmpty(tCurFrigates) == false then iCurFrigates = table.getn(tCurFrigates) end
+                if M27Utilities.IsTableEmpty(tCurHigherTierCombat) == false then iCurHigherTierCombat = table.getn(tCurHigherTierCombat) end
+            end
+
+
+            --Special case - enemy has significant enemy hover threat and we are cybran - want to get more frigates (other factions can kite with destroyers better)
+            if EntityCategoryContains(categories.CYBRAN, oFactory.UnitId) then
+                local tEnemyHoverCombat = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat * categories.HOVER, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                local iEnemyHoverThreat = 0
+                if M27Utilities.IsTableEmpty(tEnemyHoverCombat) == false then
+                    iEnemyHoverThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyHoverCombat, false, nil, nil, false, false, false, false, true, false, false)
                 end
-                if iCurFrigates < iCurHigherTierCombat then
-                    return M27UnitInfo.refCategoryFrigate
-                else
-                    return M27UnitInfo.refCategoryDestroyer
+                if bDebugMessages == true then LOG(sFunctionRef..': iCurFrigates='..iCurFrigates..'; iCurHigherTierCombat='..iCurHigherTierCombat..'; iEnemyHoverThreat='..iEnemyHoverThreat) end
+                if iEnemyHoverThreat >= 500 then
+                    --Sera T2+ and UEF T3 - use normal logic (as destroyers and battlecruisers should be good
+                    if iEnemyHoverThreat > iCurFrigates * 350 then
+                        --Do we have any destroyers (as still want the range)
+                        if iCurHigherTierCombat >= 1 and iCurHigherTierCombat * 8 > iCurFrigates then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Want more frigates to help with enemy hover force') end
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                            return M27UnitInfo.refCategoryFrigate
+                        end
+                    end
                 end
             end
-        elseif iFactoryTechLevel >= 3 then
-            --T3+ factory - for uef just build battleships and battlecruisers, for other factions want a mix
-            if EntityCategoryContains(categories.UEF, oFactory.UnitId) then
-                local iCurBattlecruisers = 0
-                local iCurBattleships = 0
-                if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false then
-                    local tCurBattlecruisers = EntityCategoryFilterDown(M27UnitInfo.refCategoryBattlecruiser, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
-                    if M27Utilities.IsTableEmpty(tCurBattlecruisers) == false then
-                        --No point checking number of battleships unless have >0 battlecruisers as want battlecruisers first
-                        iCurBattlecruisers = table.getn(tCurBattlecruisers)
-                        local tCurBattleships = EntityCategoryFilterDown(M27UnitInfo.refCategoryBattleship, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
-                        if M27Utilities.IsTableEmpty(tCurBattleships) == false then
-                            iCurBattleships = table.getn(tCurBattleships)
-                        end
-                    end
-                end
-                if iCurBattlecruisers <= iCurBattleships then
-                    return M27UnitInfo.refCategoryBattlecruiser
-                else
-                    return M27UnitInfo.refCategoryBattleship --this category excludes battlecruisers
-                end
-            elseif EntityCategoryContains(categories.AEON, oFactory.UnitId) then
-                --Aeon - only want to consider destroyers and battleships
-                local iCurDestroyers = 0
-                local iCurBattleships = 0
-                if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false then
-                    local tCurDestroyers = EntityCategoryFilterDown(M27UnitInfo.refCategoryDestroyer, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
-                    if M27Utilities.IsTableEmpty(tCurDestroyers) == false then
-                        --Want destroyer before battleship so no point getting battleship numbers if empty
-                        iCurDestroyers = table.getn(tCurDestroyers)
-                        local tCurBattleships = EntityCategoryFilterDown(M27UnitInfo.refCategoryBattleship, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
-                        if M27Utilities.IsTableEmpty(tCurBattleships) == false then
-                            iCurBattleships = table.getn(tCurBattleships)
-                        end
-                    end
-                end
-                if iCurDestroyers <= iCurBattleships then
+
+            if iFactoryTechLevel == 2 then
+
+
+                --Want 1 frigate for every destroyer unless are aeon (in which case just want destroyers)
+                if EntityCategoryContains(categories.AEON, oFactory.UnitId) then
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     return M27UnitInfo.refCategoryDestroyer
                 else
-                    return M27UnitInfo.refCategoryBattleship
+
+                    if iCurFrigates < iCurHigherTierCombat then
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        return M27UnitInfo.refCategoryFrigate
+                    else
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        return M27UnitInfo.refCategoryDestroyer
+                    end
                 end
-            else
-                --Sera and Cybran - mix of frigates, destroyers and battleships
-                local iCurFrigates = 0
-                local iCurDestroyers = 0
-                local iCurBattleships = 0
-                if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false then
-                    local tCurFrigates = EntityCategoryFilterDown(M27UnitInfo.refCategoryFrigate, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
-                    if M27Utilities.IsTableEmpty(tCurFrigates) == false then
-                        iCurFrigates = table.getn(tCurFrigates)
+            elseif iFactoryTechLevel >= 3 then
+                --T3+ factory - for uef just build battleships and battlecruisers, for other factions want a mix
+                if EntityCategoryContains(categories.UEF, oFactory.UnitId) then
+                    local iCurBattlecruisers = 0
+                    local iCurBattleships = 0
+                    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false then
+                        local tCurBattlecruisers = EntityCategoryFilterDown(M27UnitInfo.refCategoryBattlecruiser, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                        if M27Utilities.IsTableEmpty(tCurBattlecruisers) == false then
+                            --No point checking number of battleships unless have >0 battlecruisers as want battlecruisers first
+                            iCurBattlecruisers = table.getn(tCurBattlecruisers)
+                            local tCurBattleships = EntityCategoryFilterDown(M27UnitInfo.refCategoryBattleship, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                            if M27Utilities.IsTableEmpty(tCurBattleships) == false then
+                                iCurBattleships = table.getn(tCurBattleships)
+                            end
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': UEF T3, iCurBattlecruisers='..iCurBattlecruisers..'; iCurBattleships='..iCurBattleships) end
+                    if iCurBattlecruisers <= iCurBattleships then
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        return M27UnitInfo.refCategoryBattlecruiser
+                    else
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        return M27UnitInfo.refCategoryBattleship --this category excludes battlecruisers
+                    end
+                elseif EntityCategoryContains(categories.AEON, oFactory.UnitId) then
+                    --Aeon - only want to consider destroyers and battleships
+                    local iCurDestroyers = 0
+                    local iCurBattleships = 0
+                    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false then
                         local tCurDestroyers = EntityCategoryFilterDown(M27UnitInfo.refCategoryDestroyer, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
                         if M27Utilities.IsTableEmpty(tCurDestroyers) == false then
                             --Want destroyer before battleship so no point getting battleship numbers if empty
@@ -491,20 +576,54 @@ function GetNavalSurfaceCombatCategory(aiBrain, oFactory, iFactoryTechLevel)
                             end
                         end
                     end
-                end
-                if iCurFrigates <= iCurDestroyers then
-                    return M27UnitInfo.refCategoryFrigate
-                elseif iCurDestroyers <= iCurBattleships then
-                    return M27UnitInfo.refCategoryDestroyer
+                    if bDebugMessages == true then LOG(sFunctionRef..': Are aeon, cur destroyers='..iCurDestroyers..'; iCurBattleships='..iCurBattleships) end
+                    if iCurDestroyers <= iCurBattleships then
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        return M27UnitInfo.refCategoryDestroyer
+                    else
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        return M27UnitInfo.refCategoryBattleship
+                    end
                 else
-                    return M27UnitInfo.refCategoryBattleship
+                    --Sera and Cybran - mix of frigates, destroyers and battleships
+                    local iCurFrigates = 0
+                    local iCurDestroyers = 0
+                    local iCurBattleships = 0
+                    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false then
+                        local tCurFrigates = EntityCategoryFilterDown(M27UnitInfo.refCategoryFrigate, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                        if M27Utilities.IsTableEmpty(tCurFrigates) == false then
+                            iCurFrigates = table.getn(tCurFrigates)
+                            local tCurDestroyers = EntityCategoryFilterDown(M27UnitInfo.refCategoryDestroyer, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                            if M27Utilities.IsTableEmpty(tCurDestroyers) == false then
+                                --Want destroyer before battleship so no point getting battleship numbers if empty
+                                iCurDestroyers = table.getn(tCurDestroyers)
+                                local tCurBattleships = EntityCategoryFilterDown(M27UnitInfo.refCategoryBattleship, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                                if M27Utilities.IsTableEmpty(tCurBattleships) == false then
+                                    iCurBattleships = table.getn(tCurBattleships)
+                                end
+                            end
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Cybran T3 navy, iCurFrigates='..iCurFrigates..'; iCurDestroyers='..iCurDestroyers..'; iCurBattleships='..iCurBattleships) end
+                    if iCurFrigates <= iCurDestroyers then
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        return M27UnitInfo.refCategoryFrigate
+                    elseif iCurDestroyers <= iCurBattleships then
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        return M27UnitInfo.refCategoryDestroyer
+                    else
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        return M27UnitInfo.refCategoryBattleship
+                    end
                 end
+            else
+                M27Utilities.ErrorHandler('Unexpected tech level for factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory))
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return M27UnitInfo.refCategoryFrigate + M27UnitInfo.refCategoryDestroyer + categories.TECH3 * categories.DIRECTFIRE * M27UnitInfo.refCategoryNavalSurface
             end
-        else
-            M27Utilities.ErrorHandler('Unexpected tech level for factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory))
-            return M27UnitInfo.refCategoryFrigate + M27UnitInfo.refCategoryDestroyer + categories.TECH3 * categories.DIRECTFIRE * M27UnitInfo.refCategoryNavalSurface
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DetermineWhatToBuild(aiBrain, oFactory)
@@ -894,7 +1013,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             --Land factory logic
                             --if aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 and iFactoryTechLevel == 3 then bDebugMessages = true end
                             --v30 - merged eco and air strategies with landearly strategy given overlap (just added conditions for the strategy within the individual conditiontotry
-                            if iStrategy == M27Overseer.refStrategyLandMain or iStrategy == M27Overseer.refStrategyEcoAndTech or iStrategy == M27Overseer.refStrategyAirDominance or iStrategy == M27Overseer.refStrategyTurtle then
+                            if iStrategy == M27Overseer.refStrategyLandMain or iStrategy == M27Overseer.refStrategyLandRush or iStrategy == M27Overseer.refStrategyEcoAndTech or iStrategy == M27Overseer.refStrategyAirDominance or iStrategy == M27Overseer.refStrategyTurtle then
                                 if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; iFactoryTechLevel='..iFactoryTechLevel..'; aiBrain[M27Overseer.refiOurHighestLandFactoryTech]='..aiBrain[M27Overseer.refiOurHighestLandFactoryTech]..'; iStrategy='..iStrategy..'; HaveLowMass='..tostring(M27Conditions.HaveLowMass(aiBrain))) end
                                 if iCurrentConditionToTry == 1 then --Build tank if nearby enemies, unless have no engineers and already have 2 tanks
                                     if bDebugMessages == true then LOG(sFunctionRef..': Emergency defence - iNearbyEnemies='..iNearbyEnemies) end
@@ -964,7 +1083,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         bConsiderUnderConstruction = false
                                         iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallInitialRaiderOrSkirmisher] + aiBrain[M27Overseer.refiScoutShortfallACU]
                                     end
-                                elseif iCurrentConditionToTry == 8 then --High priority T2 MAA for ACU if it doesnt have any and we dont have any to give it
+                                elseif iCurrentConditionToTry == 8 then --High priority T2 MAA for ACU if it doesnt have any and we dont have any to give it, and/or experimental needing MAA when enemy has large air threat
                                     if iFactoryTechLevel >= 2 then
                                         local oACU = M27Utilities.GetACU(aiBrain)
                                         if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 100 and not(M27UnitInfo.IsUnitUnderwater(oACU)) then
@@ -973,6 +1092,14 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 iCategoryToBuild = M27UnitInfo.refCategoryMAA * categories.TECH2
                                                 iTotalWanted = 1
                                             end
+                                        end
+                                    end
+                                    if not(iCategoryToBuild) and not(aiBrain[M27AirOverseer.refbHaveAirControl]) and (aiBrain[M27AirOverseer.refbFarBehindOnAir] or aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 20000) and aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] > 0 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) > 0 then
+                                        iCategoryToBuild = refCategoryMAA
+                                        if aiBrain:GetEconomyStoredRatio('MASS') <= 0.4 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * categories.TECH3) > 10 then
+                                            iTotalWanted = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory - categories.TECH1)
+                                        else
+                                            iTotalWanted = math.max(aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory - categories.TECH1) - 1)
                                         end
                                     end
 
@@ -990,6 +1117,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             iCategoryToBuild = refCategoryIndirect
                                         else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true) end
                                     end
+                                    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush then iTotalWanted = 5 end
                                 elseif iCurrentConditionToTry == 11 then --High priority ACU MAA builder
                                     if not(aiBrain[M27AirOverseer.refbHaveAirControl]) and aiBrain[M27Overseer.refiMAAShortfallACUCore] >= 2 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 200 and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27Utilities.GetACU(aiBrain):GetPosition()) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
                                         iCategoryToBuild = refCategoryMAA
@@ -1014,6 +1142,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         end
                                     end
+                                    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush then iTotalWanted = 5 end
                                 elseif iCurrentConditionToTry == 13 then --Build engineer if have just gained a new tech level or have engis waiting for transport
                                     if M27Utilities.IsTableEmpty(aiBrain[M27Transport.reftTransportsWaitingForEngi]) == false then
                                         iCategoryToBuild = refCategoryEngineer
@@ -1078,7 +1207,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             iTotalWanted = math.min(3, aiBrain[M27Overseer.refiMAAShortfallHighMass])
                                         end
                                     elseif iCurrentConditionToTry == 16 then --Initial engis
-                                        if aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] > 0 and (not(iStrategy == M27Overseer.refStrategyLandMain) or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 200 or aiBrain:GetCurrentUnits(refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(aiBrain[M27Overseer.refiOurHighestLandFactoryTech]))) <= 8 then
+                                        if aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] > 0 and (not(iStrategy == M27Overseer.refStrategyLandMain or iStrategy == M27Overseer.refStrategyLandRush) or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 200 or aiBrain:GetCurrentUnits(refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(aiBrain[M27Overseer.refiOurHighestLandFactoryTech]))) <= 8 then
                                             iCategoryToBuild = refCategoryEngineer
                                             iTotalWanted = 1
                                         end
@@ -1112,14 +1241,16 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         end
                                     elseif iCurrentConditionToTry == 19 then --Further initialEngiBO, and also Engis if small number of land factories (land attack mode) so engis can get more factories
-                                        if aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] > 0 or (iStrategy == M27Overseer.refStrategyLandMain and aiBrain:GetListOfUnits(refCategoryLandFactory, false, true) < math.min(4, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand]) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and (aiBrain:GetEconomyStored('MASS') > 0 or aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > -0.3)) then
+                                        if aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] > 0 or ((iStrategy == M27Overseer.refStrategyLandMain or iStrategy == M27Overseer.refStrategyLandRush) and aiBrain:GetListOfUnits(refCategoryLandFactory, false, true) < math.min(4, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand]) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and (aiBrain:GetEconomyStored('MASS') > 0 or aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > -0.3)) then
                                             if aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] + aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted] > 0 then
-                                                iCategoryToBuild = refCategoryEngineer
-                                                iTotalWanted = aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] + aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted]
+                                                if not(iStrategy == M27Overseer.refStrategyLandRush) or aiBrain:GetEconomyStoredRatio('MASS') >= 0.25 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer) < math.max(5, aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandCombat)) then
+                                                    iCategoryToBuild = refCategoryEngineer
+                                                    iTotalWanted = aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] + aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted]
+                                                end
                                             end
                                         end
-                                        --Also build engineers if are upgrading lots of mexes
-                                        if not(iCategoryToBuild) and aiBrain[M27EconomyOverseer.refiMexesUpgrading] >= 4 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.05 and (aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > 0 or aiBrain:GetEconomyStored('MASS') >= 1500) then
+                                        --Also build engineers if are upgrading lots of mexes or have lots of mass
+                                        if not(iCategoryToBuild) and ((aiBrain[M27EconomyOverseer.refiMexesUpgrading] >= 4 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.05) or (aiBrain:GetEconomyStoredRatio('MASS') >= 0.4)) and (aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > 0 or aiBrain:GetEconomyStored('MASS') >= 1500) then
                                             iCategoryToBuild = refCategoryEngineer
                                             iTotalWanted = math.min(2, math.max(aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] + aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted], 1))
                                         end
@@ -1169,6 +1300,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             if aiBrain[M27PlatoonUtilities.refbNeedEscortUnits] == true and (iStrategy == M27Overseer.refStrategyLandMain or not(M27Conditions.HaveLowMass(aiBrain))) then
                                                 iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false)
                                             end
+                                            if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush then iTotalWanted = 5 end
 
                                         elseif iCurrentConditionToTry == 23 then --MAA initial
                                             if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refbNeedMAABuilt]='..tostring(aiBrain[M27Overseer.refbNeedMAABuilt])..'; Current MAA+'..aiBrain:GetCurrentUnits(refCategoryMAA)) end
@@ -1197,6 +1329,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                     end
                                                 end
                                             end
+                                            if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush then iTotalWanted = 6 end
                                         elseif iCurrentConditionToTry == 25 then --Min of 3 engineers of the current tech level
                                             if iFactoryTechLevel >= 2 and iFactoryTechLevel >= aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)) < 3 then
                                                 iCategoryToBuild = refCategoryEngineer
@@ -1333,8 +1466,10 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 end
                                             elseif iCurrentConditionToTry == 35 then --Core engis
                                                 if aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted] > 0 then
-                                                    iCategoryToBuild = refCategoryEngineer
-                                                    iTotalWanted = aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted]
+                                                    if not(iStrategy == M27Overseer.refStrategyLandRush) or aiBrain:GetEconomyStored('MASS') >= 50 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer) < math.max(5, aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandCombat)) then
+                                                        iCategoryToBuild = refCategoryEngineer
+                                                        iTotalWanted = aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted]
+                                                    end
                                                 end
                                             elseif iCurrentConditionToTry == 36 then --MAA main
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Main MAA builder. bNeedMAABuild='..tostring(aiBrain[M27Overseer.refbNeedMAABuilt])..'; refiMAAShortfallACUCore='..aiBrain[M27Overseer.refiMAAShortfallACUCore]..'; aiBrain[M27Overseer.refiMAAShortfallACUPrecaution]='..aiBrain[M27Overseer.refiMAAShortfallACUPrecaution]..'; aiBrain[M27Overseer.refiMAAShortfallLargePlatoons]='..aiBrain[M27Overseer.refiMAAShortfallLargePlatoons]..'; aiBrain[M27Overseer.refiMAAShortfallHighMass]='..aiBrain[M27Overseer.refiMAAShortfallHighMass]) end
@@ -1343,7 +1478,10 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                     local iMAARatioWanted = 0.2
                                                     if iStrategy == M27Overseer.refStrategyLandMain then iMAARatioWanted = 0.25 end
                                                     if aiBrain[M27AirOverseer.refiAirAAWanted] >= 10 or aiBrain[M27AirOverseer.refiAirAANeeded] >= 3 then iMAARatioWanted = 0.3 end
+
+
                                                     iTotalWanted = math.max(1, aiBrain[M27Overseer.refiMAAShortfallACUCore] + aiBrain[M27Overseer.refiMAAShortfallACUPrecaution] + math.ceil(aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] * iMAARatioWanted) + aiBrain[M27Overseer.refiMAAShortfallHighMass])
+                                                    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush then iTotalWanted = math.min(2, iTotalWanted) end
                                                     if bDebugMessages == true then LOG(sFunctionRef..': Will build MAA. iTotalWanted='..iTotalWanted) end
                                                 end
 
@@ -1354,8 +1492,15 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 end
                                             elseif iCurrentConditionToTry == 38 then --Pre-spare engis
                                                 if aiBrain[M27Overseer.refiPercentageOutstandingThreat] >= 0.4 and aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted] > 0 then
-                                                    iCategoryToBuild = refCategoryEngineer
-                                                    iTotalWanted = aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted]
+                                                    if not(iStrategy == M27Overseer.refStrategyLandRush) or aiBrain:GetEconomyStored('MASS') >= 150 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer) < math.max(5, aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandCombat)) then
+                                                        iCategoryToBuild = refCategoryEngineer
+                                                        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush then
+                                                            iTotalWanted = 1
+                                                        else
+                                                            iTotalWanted = aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted]
+                                                        end
+
+                                                    end
                                                 end
                                             elseif iCurrentConditionToTry == 39 then --Threat range
                                                 if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= math.min(0.5, aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted]) then
@@ -1367,6 +1512,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                         if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true then iCategoryToBuild = M27UnitInfo.refCategoryAmphibiousCombat end
                                                     end
                                                 end
+                                                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush then iTotalWanted = 6 end
 
                                             elseif M27Conditions.HaveLowMass(aiBrain) == false then
                                                 if iCurrentConditionToTry == 40 then --Skirmishers if are effective
@@ -1391,11 +1537,17 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 elseif iCurrentConditionToTry == 41 then --More MAA
                                                     if aiBrain[M27Overseer.refbNeedMAABuilt] == true then
                                                         iCategoryToBuild = refCategoryMAA
+
+
                                                         if iStrategy == M27Overseer.refStrategyLandMain then
                                                             iTotalWanted = aiBrain[M27Overseer.refiMAAShortfallBase] + aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] + aiBrain[M27Overseer.refiMAAShortfallACUCore] + aiBrain[M27Overseer.refiMAAShortfallACUPrecaution]
                                                         else
                                                             iTotalWanted = math.ceil(aiBrain[M27Overseer.refiMAAShortfallBase] * 0.5 + aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] * 0.5 + aiBrain[M27Overseer.refiMAAShortfallACUCore] + aiBrain[M27Overseer.refiMAAShortfallACUPrecaution])
+                                                            if iStrategy == M27Overseer.refStrategyLandRush then
+                                                                iTotalWanted = math.min(2, iTotalWanted)
+                                                            end
                                                         end
+
                                                     end
                                                 elseif iCurrentConditionToTry == 42 then --Engis if lots of mass stored
                                                     if bDebugMessages == true then LOG(sFunctionRef..': Engi mass overflow builder. Mass stored%='..aiBrain:GetEconomyStoredRatio('MASS')..'; Mass stored='..aiBrain:GetEconomyStored('MASS')..'; Energy stored%='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; Nearest threat dist='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; 50% of enemy base dist='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5) end
@@ -1415,6 +1567,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                                 iCategoryToBuild = refCategoryIndirect
                                                             end
                                                         end
+                                                        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush then iTotalWanted = 3 end
                                                     end
                                                 elseif iCurrentConditionToTry == 44 then --Lots of mass or arent building an experimental
                                                     if aiBrain:GetEconomyStored('MASS') >= 3000 or M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) then
@@ -1433,7 +1586,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                         iTotalWanted = 5
                                                     end
                                                 elseif iCurrentConditionToTry == 45 then --Want at least 2 spare engis
-                                                    if iStrategy == M27Overseer.refStrategyLandMain or iStrategy == M27Overseer.refStrategyTurtle then
+                                                    if iStrategy == M27Overseer.refStrategyLandMain or iStrategy == M27Overseer.refStrategyTurtle or (iStrategy == M27Overseer.refStrategyLandRush and aiBrain:GetEconomyStored('MASS') >= 300) then
                                                         if aiBrain[M27EngineerOverseer.reftiBOActiveSpareEngineersByTechLevel][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]] < 2 then
                                                             iCategoryToBuild = refCategoryEngineer
                                                             iTotalWanted = 2 - aiBrain[M27EngineerOverseer.reftiBOActiveSpareEngineersByTechLevel][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]]
@@ -1447,12 +1600,17 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                             iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallAllPlatoons]
                                                         end
                                                     end
-                                                elseif iCurrentConditionToTry == 47 then --Scouts for mexes
+                                                elseif iCurrentConditionToTry == 47 then --Landrush tanks
+                                                    if iStrategy == M27Overseer.refStrategyLandRush then
+                                                        iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false)
+                                                        iTotalWanted = 20
+                                                    end
+                                                elseif iCurrentConditionToTry == 48 then --Scouts for mexes
                                                     if aiBrain[M27Overseer.refiScoutShortfallMexes] > 0 then
                                                         iCategoryToBuild = refCategoryLandScout
                                                         iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallMexes]
                                                     end
-                                                elseif iCurrentConditionToTry == 48 then --Spare engis
+                                                elseif iCurrentConditionToTry == 49 then --Spare engis
                                                     if aiBrain[M27EngineerOverseer.reftiBOActiveSpareEngineersByTechLevel][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]] < 5 then
                                                         iCategoryToBuild = refCategoryEngineer
                                                         iTotalWanted = 5 - aiBrain[M27EngineerOverseer.reftiBOActiveSpareEngineersByTechLevel][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]]
@@ -1462,7 +1620,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                     bReachedLastOption = true
 
                                                     --Are we about to overflow mass?
-                                                    if (aiBrain:GetEconomyStored('MASS') >= 3000 and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental])) or aiBrain:GetEconomyStoredRatio('MASS') >= 0.9 or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 200 or (aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 and aiBrain:GetEconomyStored('MASS') >= 1000 and aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > 0.1) then
+                                                    if (iStrategy == M27Overseer.refStrategyLandRush and aiBrain:GetEconomyStored('MASS') >= 400 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.4 and aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > -0.1) or (aiBrain:GetEconomyStored('MASS') >= 3000 and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental])) or aiBrain:GetEconomyStoredRatio('MASS') >= 0.9 or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 200 or (aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 and aiBrain:GetEconomyStored('MASS') >= 1000 and aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > 0.1) then
                                                         iCategoryToBuild = refCategoryEngineer
                                                         iTotalWanted = 100
                                                     else
@@ -1905,6 +2063,15 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         bIgnoreTechDifferences = true
                                         iTotalWanted = 10
                                     end
+                                elseif iCurrentConditionToTry == 5 then --Upgrade air factory regardless of the separate overseer if we are far behind on air and arent mass stalling
+                                    if iFactoryTechLevel < 3 and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 and bHavePowerForAir and not(aiBrain[M27EconomyOverseer.refbStallingMass]) and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 300 then
+                                        local iCurT3Air = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory * categories.TECH3)
+                                        local iNonT3Air = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory - categories.TECH3)
+                                        local iAirFactoryUpgrading, iAirFactoryAvailable, bAlreadyUpgradingAirHQ = M27EconomyOverseer.GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, M27UnitInfo.refCategoryAirFactory)
+                                        if iNonT3Air == 1 or iCurT3Air >= 3 or (iCurT3Air >= 1 and iAirFactoryUpgrading == 0 and not(M27Conditions.HaveLowMass(aiBrain))) then
+                                            bUpgradeFactoryInstead = true
+                                        end
+                                    end
                                 elseif iCurrentConditionToTry == 5 then
                                     --Emergency AA needed, or AirAA due to ACU air snipe concern, or 1-off intie if enemy has air and we dont
                                     if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refbEmergencyMAANeeded]='..tostring(aiBrain[M27Overseer.refbEmergencyMAANeeded])..'; aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; iFactoryTechLevel='..iFactoryTechLevel..'; aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]='..aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]) end
@@ -2013,7 +2180,11 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 if bDebugMessages == true then
                                                     LOG(sFunctionRef .. ': T3 factory so considering if want a first T3 spy plane or strat')
                                                 end
-                                                if (bHavePowerForAir or aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 250) and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAirScout * categories.TECH3, 1) == true and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) then
+                                                --If enemy has T3 air factory then build asf as top priority in case they try rushing a strat
+                                                if (bHavePowerForAir or aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 300) and aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0 and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAirAA * categories.TECH3, 1) then
+                                                    iCategoryToBuild = M27UnitInfo.refCategoryAirAA * categories.TECH3
+                                                    iTotalWanted = 1
+                                                elseif (bHavePowerForAir or aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 250) and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAirScout * categories.TECH3, 1) == true and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) then
                                                     if bDebugMessages == true then
                                                         LOG(sFunctionRef .. ': Never built spy plane so building as high priority')
                                                     end
@@ -2633,15 +2804,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     if bDebugMessages == true then LOG(sFunctionRef..': iAirThreatHave='..iAirThreatHave) end
                                     if iAirThreatWanted >= 150 then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Will get some naval AA') end
-                                        if iFactoryTechLevel == 1 then
-                                            if EntityCategoryContains(categories.AEON, oFactory.UnitId) then
-                                                iCategoryToBuild = M27UnitInfo.refCategoryNavalAA
-                                            else
-                                                iCategoryToBuild = M27UnitInfo.refCategoryFrigate
-                                            end
-                                        else
-                                            iCategoryToBuild = M27UnitInfo.refCategoryNavalAA
-                                        end
+                                        iCategoryToBuild = GetNavalAntiAirCategory(aiBrain, oFactory, iFactoryTechLevel)
                                     end
                                 end
                             elseif iCurrentConditionToTry == 4 then --Upgrade to t2 naval fac
@@ -2851,21 +3014,25 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Will work out which threat we are furthest behind on. iMaxThreatRatioWanted='..iMaxThreatRatioWanted..'; iOurAntiNavyThreat='..iOurAntiNavyThreat..'; iEnemySubmiersibleThreat='..iEnemySubmersibleThreat..'; iOurNavalThreat='..iOurNavalThreat..'; iEnemySurfaceThreat='..iEnemySurfaceThreat) end
                                 if iMaxThreatRatioWanted * iEnemySurfaceThreat < iOurNavalThreat and iMaxThreatRatioWanted * iEnemySubmersibleThreat < iOurAntiNavyThreat then
                                     --We have enough of each threat type so dont need to build any more
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have enough of each threat type so wont build something based on this') end
                                 else
                                     if iOurNavalThreat == 0 or iMaxThreatRatioWanted * iEnemySubmersibleThreat < iOurAntiNavyThreat then
                                         --Want to build surface category
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Getting naval surface combat category') end
                                         iCategoryToBuild = GetNavalSurfaceCombatCategory(aiBrain, oFactory, iFactoryTechLevel)
                                     elseif iOurAntiNavyThreat == 0 or iMaxThreatRatioWanted * iEnemySurfaceThreat < iOurNavalThreat then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Need antinavy combat') end
                                         GetAntiSubmersibleCategoryToBuild()
                                     else
                                         --Work out which one has the greatest shortfall
                                         if (iMaxThreatRatioWanted * iEnemySubmersibleThreat) / iOurAntiNavyThreat > (iMaxThreatRatioWanted * iEnemySurfaceThreat) / iOurNavalThreat then
                                             --Have greater submersible shortfall than surface shortfall
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Antinavy shortfall so getting antinavy combat category') end
                                             GetAntiSubmersibleCategoryToBuild()
                                         else
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Bigger surface shortafall tahn antinavy so getting naval surface combat category') end
                                             iCategoryToBuild = GetNavalSurfaceCombatCategory(aiBrain, oFactory, iFactoryTechLevel)
                                         end
-
                                     end
                                 end
                             elseif iCurrentConditionToTry == 16 then --2 destroyers or 1 battlecruiser even if low on mass
@@ -2913,15 +3080,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         iAirThreatWanted = iAirThreatWanted - iAirThreatHave
                                         if iAirThreatWanted >= 150 then
                                             if bDebugMessages == true then LOG(sFunctionRef..': Dont have low mass, and want more AA. iAirThreatWanted='..iAirThreatWanted..'; iOurNavalSurfaceThreat='..iOurNavalSurfaceThreat..'; Have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl])..'; Air to ground threat='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]..'; iAirThreatHave='..iAirThreatHave) end
-                                            if iFactoryTechLevel == 1 then
-                                                if EntityCategoryContains(categories.AEON, oFactory.UnitId) then
-                                                    iCategoryToBuild = M27UnitInfo.refCategoryNavalAA
-                                                else
-                                                    iCategoryToBuild = M27UnitInfo.refCategoryFrigate
-                                                end
-                                            else
-                                                iCategoryToBuild = M27UnitInfo.refCategoryNavalAA
-                                            end
+                                            iCategoryToBuild = GetNavalAntiAirCategory(aiBrain, oFactory, iFactoryTechLevel)
                                         end
                                     end
 
@@ -3011,6 +3170,23 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             if iExistingBombardmentUnits == 0 or iExistingBombardmentUnits <= math.max(iFactoryTechLevel - 1, (aiBrain[M27Navy.reftiPondValueToUs][oFactory[M27Navy.refiAssignedPond]] or 0) * 0.3) then
                                                 iCategoryToBuild = iBombardmentCategory
                                             else
+                                                --If we already have 2+ battleships and 2+ of the desired bombardment category, enemy has a significant naval threat, we have T3 navy, and the bombardment category contains tech3 units, then get naval combat instead
+                                                local bGetSurfaceCombatInstead = false
+                                                if iExistingBombardmentUnits >= 2 and iFactoryTechLevel >= 3 and M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][oFactory[M27Navy.refiAssignedPond]] >= 4000 then
+                                                    local tFriendlyBattleships = EntityCategoryFilterDown(M27UnitInfo.refCategoryBattleship,  M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                                                    if M27Utilities.IsTableEmpty(tFriendlyBattleships) == false then
+                                                        if table.getn(tFriendlyBattleships) >= 2 then
+
+                                                            local iOurThreatExcludingBattleships = (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiFriendlyNavalThreatByPond][oFactory[M27Navy.refiAssignedPond]] or 0) - (M27Logic.GetCombatThreatRating(aiBrain, tFriendlyBattleships, false, nil, nil, nil, false, false, false, true, false, false) or 0)
+                                                            if bDebugMessages == true then LOG(sFunctionRef..': We have at least 2 battleships, and enemy has notable naval combat threat; if we dont have at least twice the enemy naval threat excluding our battleships, then will use logic to get combat unit. Threat of friendly battleships='..M27Logic.GetCombatThreatRating(aiBrain, tFriendlyBattleships, false, nil, nil, nil, false, false, false, true, false, false)..'; iOurThreatExcludingBattleships='..iOurThreatExcludingBattleships) end
+                                                            if iOurThreatExcludingBattleships < math.max(10000, (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][oFactory[M27Navy.refiAssignedPond]] or 0) * 2) then
+                                                                bGetSurfaceCombatInstead = true
+                                                            end
+                                                        end
+                                                    end
+                                                end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': bGetSurfaceCombatInstead='..tostring(bGetSurfaceCombatInstead)) end
+
                                                 --Only set category to build to bombardment category if worth investing more in this pond (note that bombardment category may already be nil though)
 
                                                 --How many mexes are in range?
@@ -3059,6 +3235,25 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             iTotalWanted = 1
                                             iCategoryToBuild = iCategoryWanted
                                         end
+                                    elseif iCurrentConditionToTry == 23 then --as many destroyers as battleships; as many frigates as destroyers
+                                        local iCurFrigates = 0
+                                        local iCurDestroyers = 0
+                                        local iCurBattleships = 0
+                                        if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false then
+                                            local tCurFrigates = EntityCategoryFilterDown(M27UnitInfo.refCategoryFrigate, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                                            if M27Utilities.IsTableEmpty(tCurFrigates) == false then iCurFrigates = table.getn(tCurFrigates) end
+                                            local tCurDestroyers = EntityCategoryFilterDown(M27UnitInfo.refCategoryDestroyer, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                                            if M27Utilities.IsTableEmpty(tCurDestroyers) == false then iCurDestroyers = table.getn(tCurDestroyers) end
+                                            if iFactoryTechLevel == 3 then
+                                                local tCurBattleships = EntityCategoryFilterDown(M27UnitInfo.refCategoryBattleship, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                                                if M27Utilities.IsTableEmpty(tCurBattleships) == false then
+                                                    iCurBattleships = table.getn(tCurBattleships)
+                                                end
+                                            end
+                                            if iCurDestroyers <= iCurBattleships then iCategoryToBuild = M27UnitInfo.refCategoryDestroyer
+                                            elseif iCurFrigates <= iCurDestroyers then iCategoryToBuild = M27UnitInfo.refCategoryFrigate
+                                            end
+                                        end
                                     elseif aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 then
                                         --(dont use normal 'get surface combat category' to cover the hopefully unlikely scenario that the function returns something we cant build)
                                         iCategoryToBuild = M27UnitInfo.refCategoryFrigate + M27UnitInfo.refCategoryDestroyer + categories.BATTLESHIP
@@ -3074,7 +3269,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 bReachedLastOption = true
                                 break
                             end
-                                --=========QUANTUM GATEWAY======--
+                            --=========QUANTUM GATEWAY======--
                         elseif bIsQuantumGateway then
                             if iCurrentConditionToTry == 1 then
                                 --Do we have decent power and at least 7 mass per tick?
@@ -3250,7 +3445,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 iCategoryToBuild = refCategoryMAA * categories.TECH2
                             end--]]
                             if M27UnitInfo.GetUnitFaction(oFactory) == M27UnitInfo.refFactionCybran then
-                                if math.random(1, 8) < 8 then
+                                local iRandom = math.random(1, 8)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Deciding whether to get T2 or T3 MAA; iRandom='..iRandom) end
+                                if iRandom < 8 then
                                     iCategoryToBuild = refCategoryMAA * categories.TECH2
                                 end
                             elseif M27UnitInfo.GetUnitFaction(oFactory) == M27UnitInfo.refFactionAeon then
@@ -3311,9 +3508,10 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 if iFactoriesRecorded > 1 then
                                     for iFactory = 1, iFactoriesRecorded do
                                         oCurFactory = aiBrain[reftFactoryBuildQueue][iFactory][refoFactory]
-                                        if oCurFactory and not (oCurFactory.Dead) then
+                                        if M27UnitInfo.IsUnitValid(oCurFactory) and (not(oCurFactory:GetWorkProgress() == 0) or oCurFactory:IsUnitState('Building')) then
                                             if aiBrain[reftFactoryBuildQueue][iFactory][refiUnitCategoryToBuild] == iCategoryToBuild then
                                                 iAlreadyBuilding = iAlreadyBuilding + 1
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Factory '..oCurFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCurFactory)..' is already building a unit of this category; factory unit state='..M27Logic.GetUnitState(oCurFactory)..'; Factory work progress='..oCurFactory:GetWorkProgress()) end
                                             end
                                         end
                                     end
