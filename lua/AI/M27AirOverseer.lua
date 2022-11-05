@@ -7058,6 +7058,9 @@ function AirAAManager(aiBrain)
                 aiBrain[refiNearToACUThreshold] = 150
             end
         end
+        if aiBrain[refbFarBehindOnAir] and not(aiBrain[refbMercySightedRecently]) and aiBrain[refiNearToACUThreshold] >= 60 then
+            aiBrain[refiNearToACUThreshold] = math.max(50, math.min(aiBrain[refiNearToACUThreshold] - 20, 75))
+        end
 
         local iEnemyAirSearchRange = aiBrain[refiMaxScoutRadius]
         if M27MapInfo.bNoRushActive then

@@ -7033,7 +7033,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Enemy has an ACU or SACU with TML upgrade, unit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; sUpgrade=' .. sUpgrade)
                         end
-                        for iExistingUnit, oExistingUnit in aiBrain[sReferenceTable] do
+                        for iExistingUnit, oExistingUnit in aiBrain[reftEnemyTML] do
                             if oExistingUnit == oUnit then
                                 bAlreadyInTable = true
                                 break
