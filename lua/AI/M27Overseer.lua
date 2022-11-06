@@ -8581,7 +8581,7 @@ function RecordAllEnemiesAndAllies(aiBrain)
                 iNearestAngle = M27Utilities.GetAngleFromAToB(tOurBase, tNearestEnemyBase)
                 for iEnemy, oBrain in tBrainsNeedingAGroup do
                     iCurAngle = M27Utilities.GetAngleFromAToB(tOurBase, M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])
-                    if math.abs(iNearestAngle - iCurAngle) > 45 then
+                    if M27Utilities.GetAngleDifference(iNearestAngle, iCurAngle) > 45 then
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': oBrain with index ' .. oBrain:GetArmyIndex() .. ' has iCurAngle=' .. iCurAngle .. '; iNearestAngle=' .. iNearestAngle .. '; >45 so need another group after this one.  Cur group=' .. iLastGroup)
                         end
@@ -8610,6 +8610,68 @@ function RecordAllEnemiesAndAllies(aiBrain)
         if M27Utilities.IsTableEmpty(aiBrain[reftoNearestEnemyBrainByGroup]) then
             M27Utilities.ErrorHandler('No enemy brains detected for any group')
         end
+
+        bDebugMessages = true
+        --Group allies into subteams based on nearest enemy
+        if not(aiBrain.M27Subteam) then
+            M27Team.iTotalSubteamCount = M27Team.iTotalSubteamCount + 1
+            aiBrain.M27Subteam = M27Team.iTotalSubteamCount
+            M27Team.SubteamInitialisation(aiBrain.M27Subteam) --Dont fork thread
+
+            table.insert(M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subreftoFriendlyBrains], aiBrain)
+            if bDebugMessages == true then LOG(sFunctionRef..': Is table of allied brains empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[toAllyBrains]))) end
+            if M27Utilities.IsTableEmpty(aiBrain[toAllyBrains]) == false then
+                local tNearestEnemyBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                local iOurAngleToNearestEnemy = M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tNearestEnemyBase)
+                local bSameSubteam
+                --Low threshold - if within this dist will be grouped regardless of angle difference
+                --High threshold - if within certain angle differential then will group if satisfy this distance
+                local iDistThresholdLow = math.max(math.min(aiBrain[refiDistanceToNearestEnemyBase] * 0.8, 100), aiBrain[refiDistanceToNearestEnemyBase] * 0.3)
+                local iDistThresholdHigh = math.max(math.min(aiBrain[refiDistanceToNearestEnemyBase] * 0.9, 130), aiBrain[refiDistanceToNearestEnemyBase] * 0.5)
+                if bDebugMessages == true then LOG(sFunctionRef..': Our dist to enemy='..aiBrain[refiDistanceToNearestEnemyBase]..'; Low threshold='..iDistThresholdLow..'; High threshold='..iDistThresholdHigh..'; Angle to nearest enemy='..iOurAngleToNearestEnemy) end
+
+
+
+                for iBrain, oBrain in aiBrain[toAllyBrains] do
+                    if not(oBrain.M27Subteam) then
+                        bSameSubteam = false
+                        local iBaseDistDif = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering ally brain '..oBrain.Nickname..'; iBaseDistDif='..iBaseDistDif..'; iAngleDif='..M27Utilities.GetAngleDifference(iOurAngleToNearestEnemy, M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber], tNearestEnemyBase))) end
+                        if iBaseDistDif <= iDistThresholdLow then
+                            bSameSubteam = true
+                        else
+                            local iAngleDif = M27Utilities.GetAngleDifference(iOurAngleToNearestEnemy, M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber], tNearestEnemyBase))
+                            if iAngleDif <= 40 or (iAngleDif <= 60 and iBaseDistDif <= iDistThresholdHigh) then
+                                bSameSubteam = true
+                            else
+                                --Are we close to the start position of any of the other brains already recorded in this subteam?
+                                for iSubteamBrain, oSubteamBrain in M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subreftoFriendlyBrains] do
+                                    if not(oSubteamBrain == aiBrain) and not(oSubteamBrain == oBrain) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Dist to alternative subteam member '..oSubteamBrain.Nickname..' = '..M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[oSubteamBrain.M27StartPositionNumber])) end
+                                        if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[oSubteamBrain.M27StartPositionNumber]) <= iDistThresholdLow then
+                                            bSameSubteam = true
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': On same subteam='..tostring(bSameSubteam)) end
+                        if bSameSubteam then
+                            oBrain.M27Subteam = aiBrain.M27Subteam
+                            table.insert(M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subreftoFriendlyBrains], oBrain)
+                        end
+                    end
+                end
+            end
+        end
+
+        if bDebugMessages == true then
+            LOG(sFunctionRef..': Finished recording subteams, aiBrain '..aiBrain.Nickname..' subteam='..aiBrain.M27Subteam..'; Listing out every brain in the subteam')
+            for iBrain, oBrain in M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subreftoFriendlyBrains] do
+                LOG(sFunctionRef..': iBrain='..iBrain..'; oBrain Nickname='..oBrain.Nickname..'; Subteam='..oBrain.M27Subteam)
+            end
+        end
+        bDebugMessages = false
 
 
         --Set mod distance emergency range
@@ -10287,6 +10349,9 @@ function OverseerManager(aiBrain)
 
         --Update enemy unit names (only does if the config setting is set, and caps the number of units that will be updated; also ignores if are already in the process of updating)
         ForkThread(UpdateAllNonM27Names)
+
+        --Update team data (will check to avoid updating multiple times each cycle):
+        ForkThread(M27Team.UpdateSubteamDataForFriendlyUnits, aiBrain)
 
         --NOTE: We dont have the number of ticks below as 'available' for use, since on initialisation we're waiting ticks as well when initialising things such as the engineer and upgrade overseers which work off their own loops
         --therefore the actual available tick count will be the below number less the number of ticks we're already waiting

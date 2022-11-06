@@ -2262,8 +2262,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     end
 
                                 elseif iCurrentConditionToTry == 12 then --Signifcant AirAA shortfall
-                                    if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; aiBrain[M27AirOverseer.refiAirAAWanted]='..aiBrain[M27AirOverseer.refiAirAAWanted]..'; aiBrain[M27AirOverseer.refiTeamMassInAirAA]='..aiBrain[M27AirOverseer.refiTeamMassInAirAA]..'; aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]) end
-                                    if bHavePowerForAir and (aiBrain[M27AirOverseer.refiAirAANeeded] >= 2 or (aiBrain[M27AirOverseer.refiAirAAWanted] >= 10 and aiBrain[M27AirOverseer.refiTeamMassInAirAA] / math.max(aiBrain[M27AirOverseer.refiHighestEnemyAirThreat], 1) < 0.7)) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; aiBrain[M27AirOverseer.refiAirAAWanted]='..aiBrain[M27AirOverseer.refiAirAAWanted]..'; M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subrefiFriendlyAirAAThreat]='..M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subrefiFriendlyAirAAThreat]..'; aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]) end
+                                    if bHavePowerForAir and (aiBrain[M27AirOverseer.refiAirAANeeded] >= 2 or (aiBrain[M27AirOverseer.refiAirAAWanted] >= 10 and M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subrefiFriendlyAirAAThreat] / math.max(aiBrain[M27AirOverseer.refiHighestEnemyAirThreat], 1) < 0.7)) then
                                         --Do we have at least 2 air factories? Then ensure we are always building at least 1 AA unit from one of them
                                         if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory) >= 2 then
                                             iCategoryToBuild = refCategoryAirAA

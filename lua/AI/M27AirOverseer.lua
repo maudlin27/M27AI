@@ -2462,7 +2462,8 @@ function AirThreatChecker(aiBrain)
     local iFriendlyM27AirAA = 0
     local iFriendlyAirFactor
     local iFriendlyDistThreshold = math.max(500, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] + 50)
-    for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
+    --v63 - replaced with subteam:
+    --[[for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
         iFriendlyAirFactor = 1
         if not (oBrain:GetArmyIndex() == aiBrain:GetArmyIndex()) then
             --Do we want to consider the air power from this ally? Ignore if multiple teams and far away, and treat as much less valuable if only 2 teams but far away
@@ -2478,11 +2479,11 @@ function AirThreatChecker(aiBrain)
             end
         end
     end
-    aiBrain[refiTeamMassInAirAA] = iFriendlyM27AirAA + (aiBrain[refiOurMassInAirAA] or 0)
-    local iAirAAWantedBasedOnThreat = math.max(0, ((aiBrain[refiHighestEnemyAirThreat] or 0) - (aiBrain[refiOurMassInAirAA] or 0) - math.min(aiBrain[refiHighestEnemyAirThreat] * 0.5, iFriendlyM27AirAA * 0.5)) / tiAirAAThreatByTech[math.min(3, aiBrain[M27Overseer.refiOurHighestAirFactoryTech])])
+    M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subrefiFriendlyAirAAThreat] = iFriendlyM27AirAA + (aiBrain[refiOurMassInAirAA] or 0)--]]
+    local iAirAAWantedBasedOnThreat = math.max(0, ((aiBrain[refiHighestEnemyAirThreat] or 0) - (aiBrain[refiOurMassInAirAA] or 0) - math.min(aiBrain[refiHighestEnemyAirThreat] * 0.5, M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subrefiFriendlyAirAAThreat] * 0.5)) / tiAirAAThreatByTech[math.min(3, aiBrain[M27Overseer.refiOurHighestAirFactoryTech])])
 
     aiBrain[refbHaveAirControl] = true
-    if aiBrain[refiEnemyAirAAThreat] > 0 and aiBrain[refiTeamMassInAirAA] < aiBrain[refiEnemyAirAAThreat] then
+    if aiBrain[refiEnemyAirAAThreat] > 0 and M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subrefiFriendlyAirAAThreat] < aiBrain[refiEnemyAirAAThreat] then
         aiBrain[refbHaveAirControl] = false
     end
 
@@ -7090,7 +7091,7 @@ function AirAAManager(aiBrain)
                 end
             end--]]
 
-            if aiBrain[refiTeamMassInAirAA] < aiBrain[refiEnemyAirAAThreat] then
+            if M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subrefiFriendlyAirAAThreat] < aiBrain[refiEnemyAirAAThreat] then
                 --Have lost air control so only engage threats nearby
                 bIgnoreUnlessEmergencyThreat = true
             end
@@ -7265,8 +7266,8 @@ function AirAAManager(aiBrain)
 
             --Adjust base defence range further if is <=200 and have lots of available AirAA units
             aiBrain[refbFarBehindOnAir] = false --gets updated below if we are far behind
-            if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to adjust close to base range, aiBrain[refiEnemyAirAAThreat]='..aiBrain[refiEnemyAirAAThreat]..'; aiBrain[refiOurMassInAirAA]='..aiBrain[refiOurMassInAirAA]..'; iCloseToBaseRange pre adjust='..iCloseToBaseRange..'; aiBrain[refiTeamMassInAirAA]='..aiBrain[refiTeamMassInAirAA]) end
-            if aiBrain[refiOurMassInAirAA] >= 3000 and M27Utilities.IsTableEmpty(aiBrain[reftAvailableAirAA]) == false and (aiBrain[refiOurMassInAirAA] >= 6000 or aiBrain[refiTeamMassInAirAA] > 0.7 * aiBrain[refiEnemyAirAAThreat]) then
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to adjust close to base range, aiBrain[refiEnemyAirAAThreat]='..aiBrain[refiEnemyAirAAThreat]..'; aiBrain[refiOurMassInAirAA]='..aiBrain[refiOurMassInAirAA]..'; iCloseToBaseRange pre adjust='..iCloseToBaseRange..'; M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subrefiFriendlyAirAAThreat]='..M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subrefiFriendlyAirAAThreat]) end
+            if aiBrain[refiOurMassInAirAA] >= 3000 and M27Utilities.IsTableEmpty(aiBrain[reftAvailableAirAA]) == false and (aiBrain[refiOurMassInAirAA] >= 6000 or M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subrefiFriendlyAirAAThreat] > 0.7 * aiBrain[refiEnemyAirAAThreat]) then
                 if iCloseToBaseRange < 200 then
                     local iAvailableAirAA = 0
                     for iUnit, oUnit in aiBrain[reftAvailableAirAA] do
@@ -7276,7 +7277,7 @@ function AirAAManager(aiBrain)
                         iCloseToBaseRange = math.min(180, math.max(iCloseToBaseRange, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.3, aiBrain[refiBomberDefenceModDistance]))
                     end
                 end
-            elseif aiBrain[refiTeamMassInAirAA] < 0.75 * aiBrain[refiEnemyAirAAThreat] and aiBrain[refiOurMassInAirAA] <= 6000 then
+            elseif M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subrefiFriendlyAirAAThreat] < 0.75 * aiBrain[refiEnemyAirAAThreat] and aiBrain[refiOurMassInAirAA] <= 6000 then
                 --Enemy significantly outnumbers us and we dont have many airaa units, so want to keep air units close to base
                 if iCloseToBaseRange > 70 then
                     iCloseToBaseRange = math.min(iCloseToBaseRange, math.max(70, iFurthestAAFromBase))
@@ -7284,7 +7285,7 @@ function AirAAManager(aiBrain)
 
                 --Also set flag that are far behind from air if relevant
                 if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to limit the close to base range based on our AA structures. iCloseToBaseRange pre adjust='..iCloseToBaseRange..'; iFurthestAAFromBase='..iFurthestAAFromBase) end
-                if not(aiBrain[refbHaveAirControl]) and aiBrain[refiTeamMassInAirAA] < 0.75 * aiBrain[refiEnemyAirAAThreat] then
+                if not(aiBrain[refbHaveAirControl]) and M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subrefiFriendlyAirAAThreat] < 0.75 * aiBrain[refiEnemyAirAAThreat] then
                     aiBrain[refbFarBehindOnAir] = true
                 end
             end
@@ -7981,7 +7982,6 @@ function SetupAirOverseer(aiBrain)
     aiBrain[refiHighestEnemyAirThreat] = 0
     aiBrain[reftEngiHunterBombers] = {}
     aiBrain[reftMexHunterT1Bombers] = {}
-    aiBrain[refiTeamMassInAirAA] = 0
     aiBrain[refiOurMassInAirAA] = 0
     aiBrain[refiEnemyAirAAThreat] = 0
     aiBrain[refiHighestEverEnemyAirAAThreat] = 0

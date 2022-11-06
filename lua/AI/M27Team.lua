@@ -16,7 +16,14 @@ local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27Navy = import('/mods/M27AI/lua/AI/M27Navy.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 
+--Subteam varaibles
+iTotalSubteamCount = 0 --Number of subteams in the game
+tSubteamData = {} --[x] is the aiBrain.M27Subteam number, similar to tTeamData in how it works
+subrefiTimeOfLastFriendlyDataUpdate = 'M27SubteamTimeOfLastFriendlyUpdate' --Gametime in seconds that we last updated the subteamdata for friendly units/threat vlaues
+subreftoFriendlyBrains = 'M27SubteamFriendlyBrains' --Friendly brains in our subteam
+subrefiFriendlyAirAAThreat = 'M27SubteamFriendlyAirAA' --threat of our entire subteam's airaa
 
+--Team data
 tTeamData = {} --[x] is the aiBrain.M27Team number - stores certain team-wide information
 reftFriendlyActiveM27Brains = 'M27TeamFriendlyM27Brains' --Stored against tTeamData[brain.M27Team], returns table of all M27 brains on the same team (including this one), with a key of the army index
 iTotalTeamCount = 0 --Number o teams in the game
@@ -83,6 +90,31 @@ Various informatino about chokepoints, starting with the refbConsideredChokepoin
 includes chokepoint locations, the average team and enemy team start positions for the chokepoint line, angle and distances relating to chokepoints
 
 --]]
+
+function UpdateSubteamDataForFriendlyUnits(aiBrain)
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'UpdateSubteamDataForFriendlyUnits'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if GetGameTimeSeconds() - (tSubteamData[aiBrain.M27Subteam][subrefiTimeOfLastFriendlyDataUpdate] or 0) >= 0.9 then
+        tSubteamData[aiBrain.M27Subteam][subrefiTimeOfLastFriendlyDataUpdate] = GetGameTimeSeconds()
+
+        --Reset values
+        tSubteamData[aiBrain.M27Subteam][subrefiFriendlyAirAAThreat] = 0
+
+
+        --Record new values
+        for iBrain, oBrain in tSubteamData[aiBrain.M27Subteam][subreftoFriendlyBrains] do
+            if not(oBrain.M27IsDefeated) then
+                --AirAA threat
+                tSubteamData[aiBrain.M27Subteam][subrefiFriendlyAirAAThreat] = tSubteamData[aiBrain.M27Subteam][subrefiFriendlyAirAAThreat] + (oBrain[M27AirOverseer.refiOurMassInAirAA] or 0)
+            end
+        end
+    end
+
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code for subteam '..aiBrain.M27Subteam..'; tSubteamData[aiBrain.M27Subteam][subrefiFriendlyAirAAThreat]='..tSubteamData[aiBrain.M27Subteam][subrefiFriendlyAirAAThreat]) end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
 
 
 function UpdateTeamDataForEnemyUnits(aiBrain, bUpdateSlowData)
@@ -815,6 +847,12 @@ function RecordSegmentsThatTeamHasVisualOf(aiBrain)
             end
         end
     end
+end
+
+function SubteamInitialisation(iSubteamRef)
+    tSubteamData[iSubteamRef] = {}
+    tSubteamData[iSubteamRef][subreftoFriendlyBrains] = {}
+    tSubteamData[iSubteamRef][subrefiFriendlyAirAAThreat] = 0
 end
 
 function TeamInitialisation(iTeamRef)
