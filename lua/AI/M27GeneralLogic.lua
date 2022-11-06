@@ -4643,7 +4643,7 @@ function CheckIfWantToBuildAnotherMissile(oUnit)
     ForkThread(ForkedCheckForAnotherMissile, oUnit)
 end
 
-function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck, iOptionalSizeAdjust, iOptionalModIfNeedMultipleShots)
+function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck, iOptionalSizeAdjust, iOptionalModIfNeedMultipleShots, iMobileValueOverrideFactorWithin75Percent)
     --iFriendlyUnitDamageReductionFactor - optional, assumed to be 0 if not specified; will reduce the damage from the bomb by any friendly units in the aoe
     --iFriendlyUnitAOEFactor - e.g. if 2, then will search for friendly units in 2x the aoe
     --bCumulativeShieldHealthCheck - if true, then will treat a unit as unshielded if its cumulative shield health check is below the damage
@@ -4708,11 +4708,24 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitD
 
     if M27Utilities.IsTableEmpty(tEnemiesInRange) == false then
         local iShieldThreshold = math.max(iDamage * 0.9, iDamage - 500)
+        local iCurDist
+        local iMobileDamageDistThreshold = iAOE * 0.75
+        local iMobileDamageFactorWithinThreshold
+        local iMobileDamageFactorOutsideThreshold = 0.2
+        if iMobileValueOverrideFactorWithin75Percent then
+            iMobileDamageFactorWithinThreshold = math.max(iMobileDamageFactorOutsideThreshold, iMobileValueOverrideFactorWithin75Percent)
+        else
+            if iAOE >= 3.5 then iMobileDamageFactorWithinThreshold = iMobileDamageFactorOutsideThreshold * 1.25
+            else
+                iMobileDamageFactorWithinThreshold = iMobileDamageFactorOutsideThreshold
+            end
+        end
         for iUnit, oUnit in tEnemiesInRange do
             if oUnit.GetBlueprint and not(oUnit.Dead) then
                 iMassFactor = 1
                 oCurBP = oUnit:GetBlueprint()
                 --Is the unit within range of the aoe?
+                iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBaseLocation)
                 if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBaseLocation) <= iAOE then
                     --Is the unit shielded by more than 90% of our damage?
                     --IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead, bIgnoreMobileShields, bTreatPartCompleteAsComplete, bCumulativeShieldHealth)
@@ -4738,7 +4751,12 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitD
                         if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iMassFactor after considering if will kill it and how large it is='..iMassFactor..'; iFactorIfWontKill='..iFactorIfWontKill..'; Building size factor='..GetBuildingSizeFactor(oUnit.UnitId)) end
                         --Is the target mobile and not under construction? Then reduce to 20% as unit might dodge or not be there when bomb lands
                         if oUnit:GetFractionComplete() == 1 then
-                            if EntityCategoryContains(categories.MOBILE, oUnit.UnitId) then iMassFactor = iMassFactor * 0.2
+                            if EntityCategoryContains(categories.MOBILE, oUnit.UnitId) then
+                                if iCurDist <= iMobileDamageDistThreshold then
+                                    iMassFactor = iMassFactor * iMobileDamageFactorWithinThreshold
+                                else
+                                    iMassFactor = iMassFactor * iMobileDamageFactorOutsideThreshold
+                                end
                                 --Is it a mex that will be killed outright and/or a volatile structure? Then increase the value of killing it
                             elseif iMassFactor >= 1 and EntityCategoryContains(categories.MASSEXTRACTION + categories.VOLATILE, oUnit.UnitId) then iMassFactor = iMassFactor * 2
                             end
@@ -4825,9 +4843,10 @@ function GetDamageFromOvercharge(aiBrain, oTargetUnit, iAOE, iDamage, bTargetWal
     return iTotalDamage, iKillsExpected
 end
 
-function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage, bOptionalCheckForSMD, tSMLLocationForSMDCheck, iOptionalTimeSMDNeedsToHaveBeenBuiltFor, iSMDRangeAdjust, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor)
+function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage, bOptionalCheckForSMD, tSMLLocationForSMDCheck, iOptionalTimeSMDNeedsToHaveBeenBuiltFor, iSMDRangeAdjust, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, iOptionalMaxDistanceCheckOptions, iMobileValueOverrideFactorWithin75Percent)
     --Calcualtes the most damaging location for an aoe target; also returns the damage dealt
     --if bOptionalCheckForSMD is true then will ignore targest that are near an SMD
+    --iOptionalMaxDistanceCheckOptions - can use to limit hte nubmer of distance options that will choose
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetBestAOETarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -4838,6 +4857,7 @@ function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage, bOptionalCheckF
     local iCurTargetDamage = GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor)
     local iMaxTargetDamage = iCurTargetDamage
     local iMaxDistanceChecks = math.min(4, math.ceil(iAOE / 2))
+    if iOptionalMaxDistanceCheckOptions then iMaxDistanceChecks = math.min(iOptionalMaxDistanceCheckOptions, iMaxDistanceChecks) end
     local iDistanceFromBase = 0
     local tPossibleTarget
     if bOptionalCheckForSMD and IsSMDBlockingTarget(aiBrain, tBaseLocation, tSMLLocationForSMDCheck, (iOptionalTimeSMDNeedsToHaveBeenBuiltFor or 200), iSMDRangeAdjust) then iMaxTargetDamage = math.min(4000, iMaxTargetDamage) end
@@ -4846,7 +4866,8 @@ function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage, bOptionalCheckF
         iDistanceFromBase = iAOE / iCurDistanceCheck
         for iAngle = 0, 360, 45 do
             tPossibleTarget = M27Utilities.MoveInDirection(tBaseLocation, iAngle, iDistanceFromBase)
-            iCurTargetDamage = GetDamageFromBomb(aiBrain, tPossibleTarget, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor)
+                            --GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck, iOptionalSizeAdjust, iOptionalModIfNeedMultipleShots, iMobileValueOverrideFactorWithin75Percent)
+            iCurTargetDamage = GetDamageFromBomb(aiBrain, tPossibleTarget, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, nil, nil, nil, iMobileValueOverrideFactorWithin75Percent)
             if iCurTargetDamage > iMaxTargetDamage then
                 if bOptionalCheckForSMD and IsSMDBlockingTarget(aiBrain, tPossibleTarget, tSMLLocationForSMDCheck, (iOptionalTimeSMDNeedsToHaveBeenBuiltFor or 200), iSMDRangeAdjust) then iCurTargetDamage = math.min(4000, iCurTargetDamage) end
                 if iCurTargetDamage > iMaxTargetDamage then
