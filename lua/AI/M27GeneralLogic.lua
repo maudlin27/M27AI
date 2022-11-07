@@ -2103,6 +2103,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetAirThreatLevel'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if (tUnits.UnitId and EntityCategoryContains(categories.EXPERIMENTAL * categories.AIR * categories.AEON, tUnits.UnitId)) or (tUnits[1] and tUnits[1].UnitId and EntityCategoryContains(categories.EXPERIMENTAL * categories.AIR * categories.AEON, tUnits[1].UnitId)) or M27Utilities.IsTableEmpty(tUnits) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.EXPERIMENTAL * categories.AIR * categories.AEON, tUnits)) == false then bDebugMessages = true end
     local iStructureBlipThreat = 0 --Assumes an unrevealed structure has no threat rating
     if bMustBeVisibleToIntelOrSight == nil then bMustBeVisibleToIntelOrSight = true end
     if bIncludeAirTorpedo == nil then bIncludeAirTorpedo = bIncludeAirToGround end
@@ -2115,6 +2116,8 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
     local tiMobileGroundAABlip
     local tiNavyBlipAABlip
     local tBlipThreatByPathingType
+
+
 
     function UpdateBlipThreatToUse()
         --No point doing this calculation unless actually have blips that need their threat calculating
@@ -2234,7 +2237,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                     iBaseThreat = oUnit[reftBaseThreat][iThreatRef]
                     bCalcActualThreat = true
                 else
-                    if bDebugMessages == true then LOG(sFunctionRef..': Considering threat calculation for oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iThreatRef='..iThreatRef..'; Considering threat calculation for oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                     if oUnit:GetAIBrain() == aiBrain then
                         bOurUnits = true
                         if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and has same ai brain so will determine actual threat') end
@@ -2326,7 +2329,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                     elseif bIncludeGroundToAir == true then bUnitFitsDesiredCategory = true end
 
                     --Is unit still valid? If so then consider its weapons/categories more precisely:
-                    if bDebugMessages == true then LOG(sFunctionRef..': bUnitFitsDesiredCategory='..tostring(bUnitFitsDesiredCategory)) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': bUnitFitsDesiredCategory='..tostring(bUnitFitsDesiredCategory)..'; bIncludeAirToAir='..tostring(bIncludeAirToAir)..'; bIncludeAirToGround='..tostring(bIncludeAirToGround)..'; iThreatRef='..iThreatRef) end
                     if bUnitFitsDesiredCategory == true then
 
                         sCurUnitBP = oBP.BlueprintId
@@ -2349,7 +2352,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                                     if bDebugMessages == true then LOG(sFunctionRef..': bIncludeAirToAir='..tostring(bIncludeAirToAir)..'; iMassMod='..iMassMod..'; does BP contain airaa category='..tostring(EntityCategoryContains(categories.ANTIAIR * categories.AIR, sCurUnitBP))) end
                                     if EntityCategoryContains(categories.ANTIAIR * categories.AIR, sCurUnitBP) == true then
                                         iMassMod = 1
-                                        if EntityCategoryContains(categories.BOMBER, sCurUnitBP) or EntityCategoryContains(categories.GROUNDATTACK, sCurUnitBP) then
+                                        if EntityCategoryContains(categories.BOMBER + categories.GROUNDATTACK + categories.DIRECTFIRE, sCurUnitBP) then
                                             iMassMod = 0.75 --e.g. t2 bombers
                                             --Manual adjustments for units with good AA that also have direct fire
                                             if sCurUnitBP == 'xaa0305' then iMassMod = 0.8 --Restorer
