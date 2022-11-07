@@ -153,6 +153,10 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
 
 
                 if oKilledBrain.M27AI then
+                    --Flag for the platoon to update
+                    if oUnitKilled.PlatoonHandle then oUnitKilled.PlatoonHandle[M27PlatoonUtilities.refbPlatoonUnitDetailsChangedRecently] = true end
+
+
                     --were we killed by something?
                     local oKillerUnit
 
