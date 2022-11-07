@@ -5108,7 +5108,7 @@ end
 function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
     --Update oPlatoon's unittable and count variables
 
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordPlatoonUnitsByType'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -12817,7 +12817,6 @@ function ProcessPlatoonAction(oPlatoon)
                         end
                     end
                 elseif oPlatoon[refiCurrentAction] == refActionCoordinatedAttack then
-                    bDebugMessages = true
                     if bDebugMessages == true then LOG(sFunctionRef..': About to process coordinated attack at time '..GetGameTimeSeconds()..' for platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..' with current units='..oPlatoon[refiCurrentUnits]) end
 
 

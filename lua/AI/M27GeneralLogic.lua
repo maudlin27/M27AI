@@ -5170,8 +5170,8 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                         if not(iStartPoint == aiBrain.M27StartPositionNumber) and M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[iStartPoint], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) >= 30 then
                             --Have we scouted this location recently?
                             --iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[iStartPoint])
-                            if bDebugMessages == true then LOG(sFunctionRef..': Cycling through start points, iStartPoint='..iStartPoint..'; time last scouted='..M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint])) end
-                            if M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint]) <= 300 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Cycling through start points, iStartPoint='..iStartPoint..'; time last scouted='..M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint])..'; do we have intel coverage='..tostring(GetIntelCoverageOfPosition(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], 25, false))) end
+                            if M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint]) <= 300 or GetIntelCoverageOfPosition(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], 30, false) then
                                 if HaventRecentlyNukedLocation(M27MapInfo.PlayerStartPoints[iStartPoint]) then
                                     iCurTargetValue = GetDamageFromBomb(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], iAOE, iDamage, 2, 2.5)
                                     if bDebugMessages == true then LOG(sFunctionRef..': Considering the start position '..iStartPoint..'='..repru(M27MapInfo.PlayerStartPoints[iStartPoint])..'; value ignroign SMD='..iCurTargetValue) end
@@ -5230,7 +5230,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                                             end
                                         end
                                         --Note: Mass value of mexes is doubled, so 3 T3 mexes would give a value of 27600
-                                        if iEnemyUnitsConsidered >= 15 and iBestTargetValue >= 20000 and ((iBestTargetValue > 40000 and iEnemyUnitsConsidered >=15) or (iBestTargetValue > 30000 and iEnemyUnitsConsidered >= 30) or (iBestTargetValue >= 20000 and iEnemyUnitsConsidered >= 45)) then
+                                        if iEnemyUnitsConsidered >= 15 and iBestTargetValue >= 20000 and ((iBestTargetValue > 50000 and iEnemyUnitsConsidered >=15) or (iBestTargetValue > 40000 and iEnemyUnitsConsidered >= 30) or (iBestTargetValue >= 20000 and iEnemyUnitsConsidered >= 50)) then
                                             if bDebugMessages == true then LOG(sFunctionRef..': Have a target with a decent amount of value and have already tried quite a few units.  iBestTargetValue='..iBestTargetValue..'; iEnemyUnitsConsidered='..iEnemyUnitsConsidered) end
                                             break
                                         end

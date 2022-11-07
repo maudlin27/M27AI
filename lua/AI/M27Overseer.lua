@@ -8611,7 +8611,6 @@ function RecordAllEnemiesAndAllies(aiBrain)
             M27Utilities.ErrorHandler('No enemy brains detected for any group')
         end
 
-        bDebugMessages = true
         --Group allies into subteams based on nearest enemy
         if not(aiBrain.M27Subteam) then
             M27Team.iTotalSubteamCount = M27Team.iTotalSubteamCount + 1
@@ -8671,7 +8670,6 @@ function RecordAllEnemiesAndAllies(aiBrain)
                 LOG(sFunctionRef..': iBrain='..iBrain..'; oBrain Nickname='..oBrain.Nickname..'; Subteam='..oBrain.M27Subteam)
             end
         end
-        bDebugMessages = false
 
 
         --Set mod distance emergency range
@@ -9670,6 +9668,7 @@ end
 
 function TestCustom(aiBrain)
     local sFunctionRef = 'TestCustom'
+
 
     --Calc range of SACUs - test
     local tEnemySACU = aiBrain:GetUnitsAroundPoint(categories.SUBCOMMANDER, {0,0,0}, 1000, 'Enemy')

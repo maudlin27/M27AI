@@ -92,7 +92,7 @@ includes chokepoint locations, the average team and enemy team start positions f
 --]]
 
 function UpdateSubteamDataForFriendlyUnits(aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateSubteamDataForFriendlyUnits'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if GetGameTimeSeconds() - (tSubteamData[aiBrain.M27Subteam][subrefiTimeOfLastFriendlyDataUpdate] or 0) >= 0.9 then
