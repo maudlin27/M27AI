@@ -836,6 +836,7 @@ function HaveLowMass(aiBrain)
         else
             if iMassStoredRatio < 0.05 then bHaveLowMass = true
             elseif (iMassStoredRatio < 0.15 or aiBrain:GetEconomyStored('MASS') < 250) and aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] < 0.2 then bHaveLowMass = true
+            elseif iMassStoredRatio <= 0.175 and aiBrain[M27Overseer.refbDefendAgainstArti] then bHaveLowMass = true
             end
         end
     end
