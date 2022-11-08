@@ -8743,8 +8743,17 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                                         iMassPerAA = 1500
                                     end
                                 end
+                                local iTotalCap = 4
+                                if aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 30000 then
+                                    if aiBrain[M27AirOverseer.refbFarBehindOnAir] then iTotalCap = 10
+                                    elseif aiBrain[M27AirOverseer.refbHaveAirControl] then iTotalCap = 5
+                                    else
+                                        iTotalCap = 6
+                                    end
+                                end
 
-                                iAAWanted = math.min(16, math.max(aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] / iMassPerAA, iMassInvested / 8000))
+
+                                iAAWanted = math.min(iTotalCap, math.max(aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] / iMassPerAA, iMassInvested / 8000))
                                 if bDebugMessages == true then LOG(sFunctionRef..': Have access to T3, iMassPerAA wanted='..iMassPerAA..'; iAAWanted='..iAAWanted..'; Highest enemy air threat='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]..'; iMassInvested='..iMassInvested..'; AirAA Needed='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; AirAA Wanted='..aiBrain[M27AirOverseer.refiAirAAWanted]) end
                             end
                             CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], iAACategory, 40, iAAWanted)
