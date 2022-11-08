@@ -5,6 +5,7 @@ local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 
 tiM27VoiceTauntByType = {} --[x] = string for the type of voice taunt (functionref), returns gametimeseconds it was last issued
+bSentSpecificMessage = false --set to true by any AI
 
 function SendSuicideMessage(aiBrain)
     --See the taunt.lua for a full list of taunts
@@ -156,7 +157,6 @@ function ConsiderPlayerSpecificMessages(aiBrain)
     local sFunctionRef = 'ConsiderPlayerSpecificMessages'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy brains empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toEnemyBrains]))) end
-    local bSentSpecificMessage = false
     WaitSeconds(5)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy brains empty after waiting 5s='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toEnemyBrains]))) end
