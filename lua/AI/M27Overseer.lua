@@ -7858,10 +7858,11 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             if not(bChokepointsAreProtected) and aiBrain[refiDefaultStrategy] == refStrategyTurtle then
                 --Is it late enough that we should abort?
                 if GetGameTimeSeconds() >= 660 or (aiBrain[refiOurHighestFactoryTechLevel] >= 3 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 4 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 250) then
-
+                    if bDebugMessages == true then LOG(sFunctionRef..': Will give up on holding chokepoint') end
                     for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                         if oBrain[refiDefaultStrategy] == refStrategyTurtle then
                             oBrain[refiDefaultStrategy] = refStrategyLandMain
+                            if bDebugMessages == true then LOG(sFunctionRef..': Changed default strategy to land main for brain '..oBrain.Nickname) end
                         end
                     end
                 end
