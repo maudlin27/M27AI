@@ -169,16 +169,16 @@ function ConsiderPlayerSpecificMessages(aiBrain)
                     if bDebugMessages == true then LOG(sFunctionRef..': i='..(i or 'nil')..'; j='..(j or 'nil')) end
                     if i > 0 then
                         if bDebugMessages == true then LOG(sFunctionRef..': maudlin27 is playing') end
-                        if math.random(0, 2) == 2 then
+                        if math.random(0, 6) == 6 then
                             SendMessage(oBrain, 'Specific opponent', 'What is this, what are you doing, my son?', 10, 0)
                             SendMessage(aiBrain, 'Specific opponent', 'Succeeding you, father', 15, 0)
                             bSentSpecificMessage = true
                         end
-                    elseif (oBrain.Nickname == 'Jip' or oBrain.Nickname == 'FAF_Jip') and math.random(0,2) == 1 then
+                    elseif (oBrain.Nickname == 'Jip' or oBrain.Nickname == 'FAF_Jip') and math.random(0,5) == 1 then
                         SendMessage(aiBrain, 'Specific opponent', 'A fight against the game councillor? I hope my algorithms havent been sabotaged', 10, 10000)
                         bSentSpecificMessage = true
                     else
-                        if math.random(0,2) == 1 then
+                        if math.random(0,4) == 1 then
                             local tPrevPlayers = {'gunner1069', 'relentless', 'Azraeel', 'Babel', 'Wingflier', 'Radde', 'YungDookie', 'Spyro', 'Skinnydude', 'savinguptobebrok', 'Tomma', 'IgneusTempus', 'tyne141', 'Jip', 'Teralitha'}
                             for iPlayer, sPlayer in tPrevPlayers do
                                 if oBrain.Nickname == sPlayer or oBrain.Nickname == 'FAF_'..sPlayer then

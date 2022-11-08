@@ -279,7 +279,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                     if oKillerBrain.M27AI then
                         --Chat message for experimentals
                         if bDebugMessages == true then LOG(sFunctionRef..': Instigator='..instigator.UnitId..'; Time since last OC='..GetGameTimeSeconds() - (instigator[M27UnitInfo.refiTimeOfLastOverchargeShot] or -100)..'; oUnitKilled='..oUnitKilled.UnitId..'; killed nearby experimental value='..(M27Chat.tiM27VoiceTauntByType['Killed nearby experimental'] or 'nil')..'; Did we kill a land experimental='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, oUnitKilled.UnitId))..'; Did we kill it with an ACU='..tostring(EntityCategoryContains(categories.COMMAND, instigator.UnitId))..'; repru of M27Chat.tiM27VoiceTauntByType='..repru(M27Chat.tiM27VoiceTauntByType)) end
-                        if EntityCategoryContains(categories.EXPERIMENTAL, oUnitKilled.UnitId) and not(M27Chat.tiM27VoiceTauntByType['Killed nearby experimental']) and (oUnitKilled.Sync.totalMassKilled or 0) <= math.min(10000, oUnitKilled:GetBlueprint().Economy.BuildCostMass * 0.35) and M27Utilities.GetDistanceBetweenPositions(oUnitKilled:GetPosition(), M27MapInfo.PlayerStartPoints[oKillerBrain.M27StartPositionNumber]) <= 150 and M27Logic.GetCombatThreatRating(oKillerBrain, oKillerBrain:GetUnitsAroundPoint(categories.EXPERIMENTAL, oUnitKilled:GetPosition(), 80, 'Enemy')) <= 5000 then
+                        if EntityCategoryContains(categories.EXPERIMENTAL, oUnitKilled.UnitId) and not(M27Chat.tiM27VoiceTauntByType['Killed nearby experimental']) and (oUnitKilled.Sync.totalMassKilled or 0) <= math.min(10000, oUnitKilled:GetBlueprint().Economy.BuildCostMass * 0.35) and M27Utilities.GetDistanceBetweenPositions(oUnitKilled:GetPosition(), M27MapInfo.PlayerStartPoints[oKillerBrain.M27StartPositionNumber]) <= 150 and M27Logic.GetCombatThreatRating(oKillerBrain, oKillerBrain:GetUnitsAroundPoint(categories.EXPERIMENTAL, oUnitKilled:GetPosition(), 150, 'Enemy')) <= 5000 then
                             M27Chat.SendMessage(oKillerBrain, 'Killed nearby experimental', 'Thanks for the mass', 5, 10000)
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, oUnitKilled.UnitId) and EntityCategoryContains(categories.COMMAND, instigator.UnitId) and GetGameTimeSeconds() - (instigator[M27UnitInfo.refiTimeOfLastOverchargeShot] or -100) <= 5 then
                             if bDebugMessages == true then LOG(sFunctionRef..': About to send ACU OC message') end
@@ -294,15 +294,15 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                             local iMassKilled = (oUnitKilled.Sync.totalMassKilled or 0)
                             if bDebugMessages == true then LOG(sFunctionRef..': Just killed '..oUnitKilled.UnitId..'; Mass that unit had killed='..iMassKilled..'; Is this chat message empty='..(M27Chat.tiM27VoiceTauntByType['Killed deadly unit'] or 'nil')..'; BP mass cost='..(oUnitKilled:GetBlueprint().Economy.BuildCostMass or 'nil')..'; Vet level='..(oUnitKilled.Sync.VeteranLevel or 'nil')) end
                             --Dont send message unless the killer is still alive (to avoid e.g. ACU killing something via its death explosion)
-                            if iMassKilled >= 1000 and M27UnitInfo.IsUnitValid(instigator) and not(M27Chat.tiM27VoiceTauntByType['Killed deadly unit']) and not(EntityCategoryContains(categories.COMMAND, oUnitKilled.UnitId)) and oUnitKilled.Sync.VeteranLevel >= 5 and oUnitKilled.GetAIBrain and not(M27Logic.IsCivilianBrain(oUnitKilled:GetAIBrain())) then
+                            if iMassKilled >= 4000 and M27UnitInfo.IsUnitValid(instigator) and not(M27Chat.tiM27VoiceTauntByType['Killed deadly unit']) and not(EntityCategoryContains(categories.COMMAND, oUnitKilled.UnitId)) and oUnitKilled.Sync.VeteranLevel >= 5 and oUnitKilled.GetAIBrain and not(M27Logic.IsCivilianBrain(oUnitKilled:GetAIBrain())) then
                                 --local oBP = oUnitKilled:GetBlueprint()
                                 --if iMassKilled >= oBP.Economy.BuildCostMass * 7 then
                                 if not(EntityCategoryContains(categories.COMMAND, instigator.UnitId)) or M27UnitInfo.GetUnitHealthPercent(instigator) >= 0.9 then
 
-                                    local sMessage = 'FINALLY killed that annoying '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)
+                                    local sMessage = 'Wow, that  '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)..' managed '..math.floor(iMassKilled)..' in mass kills :('
                                     local iRandom = math.random(1,3)
                                     if iRandom == 1 then
-                                        sMessage = 'About time I killed that '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)
+                                        sMessage = 'Ah well, at least I managed to kill that '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)..' that did so much damage'
                                     elseif iRandom == 2 then
                                         sMessage = 'That '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)..' did way too much damage'
                                     end
