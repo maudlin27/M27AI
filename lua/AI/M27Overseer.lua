@@ -7854,6 +7854,19 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 end
             end
 
+            --Abort plan to try and hold chokepoitns if we no longer have them covered after a significant amount of time
+            if not(bChokepointsAreProtected) and aiBrain[refiDefaultStrategy] == refStrategyTurtle then
+                --Is it late enough that we should abort?
+                if GetGameTimeSeconds() >= 660 or (aiBrain[refiOurHighestFactoryTechLevel] >= 3 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 4 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 250) then
+
+                    for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
+                        if oBrain[refiDefaultStrategy] == refStrategyTurtle then
+                            oBrain[refiDefaultStrategy] = refStrategyLandMain
+                        end
+                    end
+                end
+            end
+
             --Are we no longer protecting the ACU? If so then disband any escort it has - decided to take this out and just rely on acu manager's flag for if ACU needs an escort
             --[[if iPrevStrategy == refStrategyProtectACU and not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyProtectACU) then
                     if oACU.PlatoonHandle then

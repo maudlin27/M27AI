@@ -7562,12 +7562,15 @@ function AirAAManager(aiBrain)
                     end
                 end
                 if iFurthestChokepointDistance >= iClosestChokepointDistance then
-                    iCloseToBaseRange = math.max(iFurthestChokepointDistance, iClosestChokepointDistance + 40)
-                    if aiBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and aiBrain[refiEnemyAirToGroundThreat] >= 12000 then
-                        if aiBrain[refiOurMassInAirAA] > aiBrain[refiEnemyAirAAThreat] * 0.75 then
-                            iCloseToBaseRange = math.max(iCloseToBaseRange, iClosestChokepointDistance + 120)
+                    iCloseToBaseRange = iClosestChokepointDistance
+                    if not(aiBrain[refbFarBehindOnAir]) then
+                        iCloseToBaseRange = math.max(iCloseToBaseRange, math.min(iFurthestChokepointDistance + 40, aiBrain[refiClosestEnemyDangerousAADistToOurBase] - 70))
+                    end
+                    if aiBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and aiBrain[refiEnemyAirToGroundThreat] >= 12000 and not(aiBrain[refbFarBehindOnAir]) then
+                        if aiBrain[refiOurMassInAirAA] > aiBrain[refiEnemyAirAAThreat] * 0.75 and aiBrain[refbHaveAirControl] then
+                            iCloseToBaseRange = math.max(iCloseToBaseRange, math.min(iClosestChokepointDistance + 90, math.max(iClosestChokepointDistance + 65, aiBrain[refiClosestEnemyDangerousAADistToOurBase] - 70)))
                         else
-                            iCloseToBaseRange = math.max(iCloseToBaseRange, iClosestChokepointDistance + 80)
+                            iCloseToBaseRange = math.max(iCloseToBaseRange, iClosestChokepointDistance + 65)
                         end
                     end
                 end
