@@ -2426,17 +2426,44 @@ function AirThreatChecker(aiBrain)
         LOG(sFunctionRef .. ': About to calcualte threat level of enemy antiair units.  Threat before this=' .. aiBrain[refiEnemyAirAAThreat])
     end
 
+    local iDecayThresholdFactor = 0.75 --If cur threat is less than this then will start to decay
+    local iDecayFactor
+    local iIntelCoverage = M27Logic.GetIntelCoverageOfPosition(aiBrain, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], nil, true)
+    if iIntelCoverage >= 450 then --Omni fairly close to our base
+        iDecayFactor = 0.008
+    elseif iIntelCoverage >= 350 then --we or an ally has omni with decent range
+        iDecayFactor = 0.004
+    elseif iIntelCoverage >= 170 then --T2 radar near our base
+        iDecayFactor = 0.002
+    else
+        iDecayFactor = 0.001
+    end
+    if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 550 then
+        iDecayFactor = iDecayFactor * 0.5
+        if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 1000 then iDecayFactor = iDecayFactor * 0.25 end
+    end
+
     --Reduce value of enemy air threat in team game since unlikely 1 team will have all the airaa
     local iCurAirAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirUnits, true, true, false, false, false, nil, 0, 0, 0) * 1.1
     if M27Team.iTotalTeamCount >= 3 then iCurAirAAThreat = iCurAirAAThreat / math.min(1.75, (M27Team.iTotalTeamCount - 1.5)) end
-    bDebugMessages = true
-    aiBrain[refiEnemyAirAAThreat] = math.max(aiBrain[refiEnemyAirAAThreat], iCurAirAAThreat)
-    aiBrain[refiHighestEverEnemyAirAAThreat] = math.max(aiBrain[refiHighestEverEnemyAirAAThreat], aiBrain[refiEnemyAirAAThreat]) --Unlike airaathreat it doesnt get reduced when enemy airaa dies
+
+    --Also decay enemy air threat
+    if iCurAirAAThreat > aiBrain[refiEnemyAirAAThreat] then
+        aiBrain[refiEnemyAirAAThreat] = iCurAirAAThreat
+    else
+        --add in decay to enemy threat
+        if iCurAirAAThreat < aiBrain[refiEnemyAirAAThreat] * iDecayThresholdFactor then
+            aiBrain[refiEnemyAirAAThreat] = aiBrain[refiEnemyAirAAThreat] - (aiBrain[refiEnemyAirAAThreat] - iCurAirAAThreat) * iDecayFactor
+        end
+    end
+
+
+    aiBrain[refiHighestEverEnemyAirAAThreat] = math.max(aiBrain[refiHighestEverEnemyAirAAThreat], aiBrain[refiEnemyAirAAThreat]) --Unlike airaathreat it doesnt get reduced when enemy airaa dies and doesnt suffer from decay
 
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': aiBrain[refiEnemyAirAAThreat] after update=' .. aiBrain[refiEnemyAirAAThreat])
     end
-    bDebugMessages = false
+
 
 
     --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo, bBlueprintThreat)
@@ -2491,19 +2518,31 @@ function AirThreatChecker(aiBrain)
         M27Chat.SendMessage(aiBrain, 'Enemy T3 Air', 'Enemy has T3 air', 0, 10000, true)
     end
 
+
+
     if aiBrain[refiHighestEnemyAirThreat] == nil then
         aiBrain[refiHighestEnemyAirThreat] = 0
     end
     if iAllAirThreat > aiBrain[refiHighestEnemyAirThreat] then
         aiBrain[refiHighestEnemyAirThreat] = iAllAirThreat
+    else
+        --add in decay to enemy threat
+        if iAllAirThreat < aiBrain[refiHighestEnemyAirThreat] * iDecayThresholdFactor then
+            aiBrain[refiHighestEnemyAirThreat] = aiBrain[refiHighestEnemyAirThreat] - (aiBrain[refiHighestEnemyAirThreat] - iAllAirThreat) * iDecayFactor
+        end
     end
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': iAllAirThreat=' .. iAllAirThreat .. '; aiBrain[refiHighestEnemyAirThreat]=' .. aiBrain[refiHighestEnemyAirThreat] .. '; size of tEnemyAirUnits=' .. table.getn(tEnemyAirUnits))
     end
     local tEnemyGroundAAUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiMaxScoutRadius], 'Enemy')
     local iGroundAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tEnemyGroundAAUnits, true, false, true, false, false)
-    if iGroundAAThreat > (aiBrain[refiEnemyMassInGroundAA] or 0) then
+    if iGroundAAThreat > aiBrain[refiEnemyMassInGroundAA] then
         aiBrain[refiEnemyMassInGroundAA] = iGroundAAThreat
+    else
+        --add in decay to enemy threat
+        if iGroundAAThreat < aiBrain[refiEnemyMassInGroundAA] * iDecayThresholdFactor then
+            aiBrain[refiEnemyMassInGroundAA] = aiBrain[refiEnemyMassInGroundAA] - (aiBrain[refiEnemyMassInGroundAA] - iGroundAAThreat) * iDecayFactor
+        end
     end
     --If enemy has any air units, set air threat to not equal 0, for purposes of air dominance strategy
     if aiBrain[refiHighestEnemyAirThreat] < 40 and M27Utilities.IsTableEmpty(tEnemyAirUnits) == false then
@@ -2567,7 +2606,7 @@ function AirThreatChecker(aiBrain)
             aiBrain[refiAirAAWanted] = math.max(aiBrain[refiAirAANeeded], 0)
         end
         if bDebugMessages == true then
-            LOG(sFunctionRef .. ': Finished calculating how much airAA we want. aiBrain[refiOurMassInAirAA]=' .. aiBrain[refiOurMassInAirAA] .. '; aiBrain[refiHighestEnemyAirThreat]=' .. aiBrain[refiHighestEnemyAirThreat] .. '; aiBrain[refiAirAANeeded]=' .. aiBrain[refiAirAANeeded])
+            LOG(sFunctionRef .. ': Finished calculating how much airAA we want for brain '..aiBrain.Nickname..'. aiBrain[refiOurMassInAirAA]=' .. aiBrain[refiOurMassInAirAA] .. '; aiBrain[refiHighestEnemyAirThreat]=' .. aiBrain[refiHighestEnemyAirThreat] .. '; aiBrain[refiAirAANeeded]=' .. aiBrain[refiAirAANeeded])
         end
     end
     --Emergency MAA checker
@@ -4703,8 +4742,9 @@ function DetermineBomberDefenceRange(aiBrain)
         aiBrain[refbBomberDefenceRestrictedByAA] = false
 
         aiBrain[refiBomberDefenceModDistance] = math.min(125, iMaxRange - 20)
+        local iClosestEnemyExperimental = 10000
         if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then
-            local iClosestEnemyExperimental = 10000
+
             local iCurDistance
             for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyLandExperimentals] do
                 if M27UnitInfo.IsUnitValid(oUnit) then
@@ -7238,7 +7278,7 @@ function AirAAManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirAAManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetGameTimeSeconds() >= 290 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 290 then bDebugMessages = true end
     --if M27Utilities.IsTableEmpty(aiBrain[reftAvailableAirAA]) == false then bDebugMessages = true end
 
     local iMAANearACURange = 25

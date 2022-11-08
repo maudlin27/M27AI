@@ -2302,7 +2302,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                     if iHealthFactor > 0 then
                         iHealthPercentage = M27UnitInfo.GetUnitHealthPercent(oUnit)
                         --Assume low health experimental is has more health than it does - e.g. might heal, or might be under construction
-                        if iHealthPercentage < 1 and EntityCategoryContains(categories.EXPERIMENTAL, oUnit) then iHealthPercentage = math.min(1, math.max(0.4, iHealthPercentage * 1.5)) end
+                        if iHealthPercentage < 1 and EntityCategoryContains(categories.EXPERIMENTAL, oUnit) and oUnit:GetFractionComplete() >= 0.2 then iHealthPercentage = math.min(1, math.max(0.4, iHealthPercentage * 1.5)) end
                         iHealthThreatFactor = (1 - (1-iHealthPercentage) * iHealthFactor) * iHealthThreatFactor
                     end
 

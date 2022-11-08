@@ -7453,6 +7453,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                         --We were trying to kill their ACU but aren't now - replace ACU's current movement destination with a new one
                         ForkThread(M27PlatoonUtilities.GetNewMovementPath, M27Utilities.GetACU(aiBrain).PlatoonHandle, true)
                     end
+                    M27Chat.SendMessage(aiBrain, 'No longer attacking ACU', 'Im giving up on attacking their ACU for now', 0, 150, true)
                 end
 
                 --Should we be in air dominance mode?
@@ -7473,9 +7474,9 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': iBaseScoutingTime=' .. iBaseScoutingTime .. '; CurTime=' .. GetGameTimeSeconds() .. '; Time last scouted enemy base=' .. M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)))
                 end
-                if math.max(iBaseScoutingTime + 30 - GetGameTimeSeconds(),0) + M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= iBaseScoutingTime then
+                if math.max(iBaseScoutingTime + 30 - GetGameTimeSeconds(),0) + M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= iBaseScoutingTime or M27Logic.GetIntelCoverageOfPosition(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), 30, true) then
                     if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Time since last scouted enemy base=' .. M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) .. '; Scouting interval=' .. iBaseScoutingTime .. '; therefore considering whether to switch to air dominance')
+                        LOG(sFunctionRef .. ': Time since last scouted enemy base=' .. M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) .. '; Scouting interval=' .. iBaseScoutingTime .. '; intel coverage='..M27Logic.GetIntelCoverageOfPosition(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), nil, true)..'; therefore considering whether to switch to air dominance')
                     end
                     --Have we either had no bombers die, or the last bomber was effective?
                     if bDebugMessages == true then
@@ -7502,12 +7503,12 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Enemy ever air AA threat=' .. aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat]..'; Cur airaa threat='..aiBrain[M27AirOverseer.refiEnemyAirAAThreat] .. '; our air threat=' .. aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl]))
                             end
-                            if aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] / 0.7 > aiBrain[M27AirOverseer.refiOurMassInAirAA] and not(aiBrain[M27AirOverseer.refbHaveAirControl] and aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] <= 3000 and aiBrain[M27AirOverseer.refiEnemyAirAAThreat] / 0.7 < aiBrain[M27AirOverseer.refiOurMassInAirAA]) then
+                            if aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] / 0.9 > aiBrain[M27AirOverseer.refiOurMassInAirAA] and not(aiBrain[M27AirOverseer.refbHaveAirControl] and aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] <= 3000 and aiBrain[M27AirOverseer.refiEnemyAirAAThreat] / 0.7 < aiBrain[M27AirOverseer.refiOurMassInAirAA]) then
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Dont want to go for air dominance due to enemy highest ever air threat being >75% of ours')
+                                    LOG(sFunctionRef .. ': Dont want to go for air dominance due to enemy highest ever air threat being >90% of ours')
                                 end
                                 bEnemyHasEnoughAA = true
-                            elseif not (aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and aiBrain[M27AirOverseer.refiAirAANeeded] > 0 and (aiBrain[M27AirOverseer.refiAirAANeeded] >= 5 or not(aiBrain[M27AirOverseer.refbHaveAirControl]) or aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] / 0.7 > aiBrain[M27AirOverseer.refiOurMassInAirAA]) then
+                            elseif not (aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and aiBrain[M27AirOverseer.refiAirAANeeded] > 0 and (aiBrain[M27AirOverseer.refiAirAANeeded] >= 5 or not(aiBrain[M27AirOverseer.refbHaveAirControl]) or aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] / 0.9 > aiBrain[M27AirOverseer.refiOurMassInAirAA] or aiBrain[M27AirOverseer.refiEnemyAirAAThreat] / 0.7 > aiBrain[M27AirOverseer.refiOurMassInAirAA]) then
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Dont want air dominance as still need airAA, aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded])
                                 end
@@ -7557,7 +7558,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                     end
                 else
                     if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Havent scouted enemy base recently so assuming they have some AA there')
+                        LOG(sFunctionRef .. ': Havent scouted enemy base recently so assuming they have some AA there. Intel coverage='..M27Logic.GetIntelCoverageOfPosition(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), nil, true))
                     end
                     bEnemyHasEnoughAA = true
                 end
@@ -7611,6 +7612,9 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                     aiBrain[refiAIBrainCurrentStrategy] = refStrategyAirDominance
                     M27Chat.SendMessage(aiBrain, 'Air domination', 'Im going to try and win with bombers', 0, 150, true)
                 else
+                    if aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance then
+                        M27Chat.SendMessage(aiBrain, 'Not Air domination', 'Nevermind, they have too much AA now so Im reducing the bomber attacks', 0, 150, true)
+                    end
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': Dont want air dom strategy so will consider alternatives')
                     end
