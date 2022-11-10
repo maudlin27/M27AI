@@ -25,6 +25,8 @@ refiNearestEnemyStartPoint = 'M27NearestEnemyStartPoint'
 tPlayerStartPointByIndex = {}
 iTimeOfLastBrainAllDefeated = 0 --Used to avoid massive error spamming if all brains defeated
 refbAllEnemiesDead = 'M27AllEnemiesDead' --true if flagged all brains are dead
+refiT3ArtiShotCount = 'M27T3ArtiShotCount' --Against a unit, the number of t3 arti shots fired near here recently
+iT3ArtiShotThreshold = 16 --Number of shots to be fired by t3 arti before we give up and try a different target
 
 refiEnemyScoutSpeed = 'M27LogicEnemyScoutSpeed' --expected speed of the nearest enemy's land scouts
 
@@ -4646,16 +4648,20 @@ function CheckIfWantToBuildAnotherMissile(oUnit)
     ForkThread(ForkedCheckForAnotherMissile, oUnit)
 end
 
-function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck, iOptionalSizeAdjust, iOptionalModIfNeedMultipleShots, iMobileValueOverrideFactorWithin75Percent)
+function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck, iOptionalSizeAdjust, iOptionalModIfNeedMultipleShots, iMobileValueOverrideFactorWithin75Percent, bT3ArtiShotReduction)
     --iFriendlyUnitDamageReductionFactor - optional, assumed to be 0 if not specified; will reduce the damage from the bomb by any friendly units in the aoe
     --iFriendlyUnitAOEFactor - e.g. if 2, then will search for friendly units in 2x the aoe
     --bCumulativeShieldHealthCheck - if true, then will treat a unit as unshielded if its cumulative shield health check is below the damage
     --iOptionalSizeAdjust - Defaults to 1, % of value to assign to a normal (mex sized) target; if this isn't 1 then will adjust values accordingly, with T3 power given a value of 1, larger buildings given a greater value, and T1 PD sized buildings given half of iOptionalSizeAdjust
     --iOptionalModIfNeedMultipleShots - Defaults to 0.1; % of value to assign if we wont kill the target with a single shot (experimentals will always give at least 0.5 value)
+    --bT3ArtiShotReduction - if true then will reduce value of targets where we have fired lots of shots at them
 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetDamageFromBomb'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local bIgnoreT3ArtiShotReduction = not(bT3ArtiShotReduction or false)
+
 
 
     local iTotalDamage = 0
@@ -4763,6 +4769,9 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitD
                                 --Is it a mex that will be killed outright and/or a volatile structure? Then increase the value of killing it
                             elseif iMassFactor >= 1 and EntityCategoryContains(categories.MASSEXTRACTION + categories.VOLATILE, oUnit.UnitId) then iMassFactor = iMassFactor * 2
                             end
+                        end
+                        if bT3ArtiShotReduction and oUnit[refiT3ArtiShotCount] >= iT3ArtiShotThreshold then
+                            iMassFactor = iMassFactor * 0.1
                         end
                         iTotalDamage = iTotalDamage + oCurBP.Economy.BuildCostMass * oUnit:GetFractionComplete() * iMassFactor
                         if bDebugMessages == true then LOG(sFunctionRef..': Finished considering the unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iTotalDamage='..iTotalDamage..'; oCurBP.Economy.BuildCostMass='..oCurBP.Economy.BuildCostMass..'; oUnit:GetFractionComplete()='..oUnit:GetFractionComplete()..'; iMassFactor after considering if unit is mobile='..iMassFactor..'; distance between unit and target='..M27Utilities.GetDistanceBetweenPositions(tBaseLocation, oUnit:GetPosition())) end
@@ -5319,6 +5328,9 @@ function GetT3ArtiTarget(oT3Arti)
     local iCurTargetValue
     local oTarget
 
+    local bDontConsiderShotCount = false
+    if oT3Arti.UnitId == 'ueb2401' then bDontConsiderShotCount = true end
+
     --First prioritise enemy T3 arti regardless of how well shielded, as if we dont kill them quickly we will die
     if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyArtiAndExpStructure]) == false then
         --Pick the one in range of the most t3 arti including this one; if there are multiple, then pick the one closest to this (since its accuracy will be best)
@@ -5341,7 +5353,7 @@ function GetT3ArtiTarget(oT3Arti)
             end
         end--]]
         for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyArtiAndExpStructure] do
-            if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetFractionComplete() >= 0.25 then
+            if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetFractionComplete() >= 0.25 and (bDontConsiderShotCount or (oUnit[refiT3ArtiShotCount] or 0) <= iT3ArtiShotThreshold) then
                 iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
                 --Use 15 above normal range due to inaccuracy of shots
                 if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurDistance='..iCurDistance) end
@@ -5379,7 +5391,7 @@ function GetT3ArtiTarget(oT3Arti)
             --Target enemy nukes and (if we hae a nuke) enemy SMDs whose fraction is complete
             if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == false then
                 for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyNukeLaunchers] do
-                    if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetFractionComplete() == 1 then
+                    if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetFractionComplete() == 1 and (bDontConsiderShotCount or (oUnit[refiT3ArtiShotCount] or 0) <= iT3ArtiShotThreshold) then
                         if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition()) <= iMaxRange then
                             iTargetShortlist = iTargetShortlist + 1
                             tTargetShortlist[iTargetShortlist] = oUnit
@@ -5391,7 +5403,7 @@ function GetT3ArtiTarget(oT3Arti)
                 local tEnemySMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySMD, oT3Arti:GetPosition(), iMaxRange, 'Enemy')
                 if M27Utilities.IsTableEmpty(tEnemySMD) == false then
                     for iUnit, oUnit in tEnemySMD do
-                        if oUnit:GetFractionComplete() >= 1 then
+                        if oUnit:GetFractionComplete() >= 1 and (bDontConsiderShotCount or (oUnit[refiT3ArtiShotCount] or 0) <= iT3ArtiShotThreshold) then
                             iTargetShortlist = iTargetShortlist + 1
                             tTargetShortlist[iTargetShortlist] = oUnit
                         end
@@ -5430,12 +5442,12 @@ function GetT3ArtiTarget(oT3Arti)
     end
     if not(tTarget) then
         if bDebugMessages == true then LOG(sFunctionRef..': Have no target so will try and get an alternative one') end
-        local tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllHQFactories * categories.TECH3, M27UnitInfo.refCategoryStructure * categories.TECH2, categories.COMMAND}
+        local tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllHQFactories * categories.TECH3 + M27UnitInfo.refCategoryFatboy, M27UnitInfo.refCategoryStructure * categories.TECH2 + M27UnitInfo.refCategoryNavalSurface * categories.TECH3, categories.COMMAND}
 
         --First get the best location if just target the start position; note bleow uses similar code to choosing best nuke target
         tTarget = {M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[1], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[2], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[3]}
-        --GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck, iOptionalSizeAdjust, iOptionalModIfNeedMultipleShots)
-        iBestTargetValue = GetDamageFromBomb(aiBrain, tTarget, iAOE, iDamage, nil, nil, true, 0.25, 1)
+                        --GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck, iOptionalSizeAdjust, iOptionalModIfNeedMultipleShots, iMobileValueOverrideFactorWithin75Percent, bT3ArtiShotReduction)
+        iBestTargetValue = GetDamageFromBomb(aiBrain, tTarget,      iAOE, iDamage, nil, nil, true, 0.25, 1          , nil, not(bDontConsiderShotCount))
 
 
         --Check we dont have key friendly units close to here
@@ -5452,8 +5464,8 @@ function GetT3ArtiTarget(oT3Arti)
                 tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oT3Arti:GetPosition(), iMaxRange, 'Enemy')
                 if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
                     for iUnit, oUnit in tEnemyUnitsOfInterest do
-                        --GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck, iOptionalSizeAdjust, iOptionalModIfNeedMultipleShots)
-                        iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage, nil, nil, true, 0.25, 1)
+                        --GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck, iOptionalSizeAdjust, iOptionalModIfNeedMultipleShots, iMobileValueOverrideFactorWithin75Percent, bT3ArtiShotReduction)
+                        iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage, nil, nil, true, 0.25, 1, nil, not(bDontConsiderShotCount))
                         if bDebugMessages == true then LOG(sFunctionRef..': CategoryRef='..iRef..'; target oUnit='..oUnit.UnitId..'; iCurTargetValue='..iCurTargetValue..'; location='..repru(oUnit:GetPosition())) end
                         --Stop looking if tried >=10 targets and have one that is at least 20k of value
                         if iCurTargetValue > iBestTargetValue then
@@ -5485,6 +5497,16 @@ function GetT3ArtiTarget(oT3Arti)
         IssueAttack({oT3Arti}, tTarget)
         if bDebugMessages == true then LOG(sFunctionRef..': Told oT3Arti '..oT3Arti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oT3Arti)..' to attack tTarget '..repru(tTarget)) end
         oT3Arti[M27UnitInfo.refoLastTargetUnit] = oTarget
+        --Update tracking for all nearby units
+        local tNearbyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure - categories.TECH1, tTarget, iAOE, 'Enemy')
+        if M27Utilities.IsTableEmpty(tNearbyUnits) == false then
+            for iUnit, oUnit in tNearbyUnits do
+                oUnit[refiT3ArtiShotCount] = (oUnit[refiT3ArtiShotCount] or 0) + 1
+                if oUnit[refiT3ArtiShotCount] >= iT3ArtiShotThreshold then
+                    M27Utilities.DelayChangeVariable(oUnit, refiT3ArtiShotCount, 0, 180)
+                end
+            end
+        end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location (will be nil if targeting t3 arti)='..(iBestTargetValue or 'nil')) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

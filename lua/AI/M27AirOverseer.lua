@@ -976,6 +976,10 @@ end
 
 function GetAirAAMainRallyPoint(aiBrain)
     --Allows most of our air to escort key units of interest
+    local sFunctionRef = 'GetAirAAMainRallyPoint'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+
     local tAirRallyPoint
 
     --First get the position of the nearest unit that we want to have our rally point by:
@@ -1002,14 +1006,17 @@ function GetAirAAMainRallyPoint(aiBrain)
         --Have we only built a few strat bombers? If so then escort the one closest to the enemy base
         if M27Conditions.GetLifetimeBuildCount(aiBrain, refCategoryBomber * categories.TECH3) <= 3 then
             local tStratBombers = aiBrain:GetListOfUnits(refCategoryBomber * categories.TECH3, false, true)
-            if M27Utilities.IsTableEmpty(tStratBombers) == false then
-                tAirRallyPoint = M27Utilities.GetNearestUnit(tStratBombers, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)):GetPosition()
+            local oNearestStrat = M27Utilities.GetNearestUnit(tStratBombers, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+            if oNearestStrat then
+                tAirRallyPoint = oNearestStrat:GetPosition()
+                if bDebugMessages == true then LOG(sFunctionRef..': Setting rally point baesd on the nearest strat to enemy base, strat='..oNearestStrat.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNearestStrat)..' at position '..repru(oNearestStrat:GetPosition())..'; will adjust position shortly') end
             end
         end
         if not(tAirRallyPoint) then
             --Do we have a gunship? If so then pick this as the air rally point
             if M27UnitInfo.IsUnitValid(aiBrain[refoFrontGunship]) then
                 tAirRallyPoint = aiBrain[refoFrontGunship]:GetPosition()
+                if bDebugMessages == true then LOG(sFunctionRef..': Setting rally point based on front gunship '..aiBrain[refoFrontGunship].UnitId..M27UnitInfo.GetUnitLifetimeCount(aiBrain[refoFrontGunship])) end
             end
         end
     end
@@ -1035,6 +1042,7 @@ function GetAirAAMainRallyPoint(aiBrain)
     if M27Utilities.IsTableEmpty(tAirRallyPoint) then
         tAirRallyPoint = GetAirRallyPoint(aiBrain)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tAirRallyPoint
 end
 

@@ -6559,12 +6559,35 @@ function DetermineInitialBuildOrder(aiBrain)
 
         --Override all of the above if are adopting land spam strategy
         --Land spam strategy
+        bDebugMessages = true
         local iLandSpamThreshold = M27Config.iLandSpamChance
         if aiBrain[refiDistanceToNearestEnemyBase] <= 325 then
             if aiBrain[refiDistanceToNearestEnemyBase] <= 225 then iLandSpamThreshold = 1 - (1 - iLandSpamThreshold) * (1 - iLandSpamThreshold) * (1 - iLandSpamThreshold)
             else iLandSpamThreshold = 1 - (1 - iLandSpamThreshold) * (1 - iLandSpamThreshold) end
         end
+        --Adjust for number of players and AiX
+        local iEnemyBrains = 0
+        local iAllyBrains = 1
+        if M27Utilities.IsTableEmpty(aiBrain[toEnemyBrains]) == false then
+            for iBrain, oBrain in aiBrain[toEnemyBrains] do
+                iEnemyBrains = iEnemyBrains + 1
+            end
+        end
+        if M27Utilities.IsTableEmpty(aiBrain[toAllyBrains]) == false then
+            for iBrain, oBrain in aiBrain[toAllyBrains] do
+                if not(oBrain == aiBrain) then
+                    iAllyBrains = iAllyBrains + 1
+                end
+            end
+        end
+        bDebugMessages = true
+        if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to increase land rush chance based on number of AI. iAllyBrains='..iAllyBrains..'; iEnemyBrains='..iEnemyBrains) end
+        if iAllyBrains > iEnemyBrains or (iAllyBrains == iEnemyBrains and aiBrain.CheatEnabled and tonumber(ScenarioInfo.Options.CheatMult) > 1) then
+            iLandSpamThreshold = 1 - (1 - iLandSpamThreshold) * (1 - iLandSpamThreshold)
+        end
+
         iLandSpamThreshold = iLandSpamThreshold * 100
+        if bDebugMessages == true then LOG(sFunctionRef..': iLandSpamThreshold chance% * 100='..iLandSpamThreshold) end
         if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[refiDistanceToNearestEnemyBase] <= 380 and iNearbyMexCount <= 8 and math.random(1, 100) <= iLandSpamThreshold then
             aiBrain[refiDefaultStrategy] = refStrategyLandRush
             aiBrain[refiAIBrainCurrentStrategy] = refStrategyLandRush

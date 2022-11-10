@@ -5,7 +5,8 @@ local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 
 tiM27VoiceTauntByType = {} --[x] = string for the type of voice taunt (functionref), returns gametimeseconds it was last issued
-bSentSpecificMessage = false --set to true by any AI
+bConsideredSpecificMessage = false --set to true by any AI
+bSentSpecificMessage = false
 
 function SendSuicideMessage(aiBrain)
     --See the taunt.lua for a full list of taunts
@@ -162,29 +163,32 @@ function ConsiderPlayerSpecificMessages(aiBrain)
     if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy brains empty after waiting 5s='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toEnemyBrains]))) end
     if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toEnemyBrains]) == false then
         if M27Utilities.IsTableEmpty(tiM27VoiceTauntByType['Specific opponent']) then
-            for iBrain, oBrain in aiBrain[M27Overseer.toEnemyBrains] do
-                if bDebugMessages == true then LOG(sFunctionRef..': oBrain.BrainType='..oBrain.BrainType..'; oBrain.Nickname='..oBrain.Nickname) end
-                if oBrain.BrainType == 'Human' then
-                    local i, j = string.find(oBrain.Nickname, 'maudlin27')
-                    if bDebugMessages == true then LOG(sFunctionRef..': i='..(i or 'nil')..'; j='..(j or 'nil')) end
-                    if i > 0 then
-                        if bDebugMessages == true then LOG(sFunctionRef..': maudlin27 is playing') end
-                        if math.random(0, 6) == 6 then
-                            SendMessage(oBrain, 'Specific opponent', 'What is this, what are you doing, my son?', 10, 0)
-                            SendMessage(aiBrain, 'Specific opponent', 'Succeeding you, father', 15, 0)
+            if not(bConsideredSpecificMessage) then
+                bConsideredSpecificMessage = true
+                for iBrain, oBrain in aiBrain[M27Overseer.toEnemyBrains] do
+                    if bDebugMessages == true then LOG(sFunctionRef..': oBrain.BrainType='..oBrain.BrainType..'; oBrain.Nickname='..oBrain.Nickname) end
+                    if oBrain.BrainType == 'Human' then
+                        local i, j = string.find(oBrain.Nickname, 'maudlin27')
+                        if bDebugMessages == true then LOG(sFunctionRef..': i='..(i or 'nil')..'; j='..(j or 'nil')) end
+                        if i > 0 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': maudlin27 is playing') end
+                            if math.random(0, 6) == 6 then
+                                SendMessage(oBrain, 'Specific opponent', 'What is this, what are you doing, my son?', 10, 0)
+                                SendMessage(aiBrain, 'Specific opponent', 'Succeeding you, father', 15, 0)
+                                bSentSpecificMessage = true
+                            end
+                        elseif (oBrain.Nickname == 'Jip' or oBrain.Nickname == 'FAF_Jip') and math.random(0,5) == 1 then
+                            SendMessage(aiBrain, 'Specific opponent', 'A fight against the game councillor? I hope my algorithms havent been sabotaged', 10, 10000)
                             bSentSpecificMessage = true
-                        end
-                    elseif (oBrain.Nickname == 'Jip' or oBrain.Nickname == 'FAF_Jip') and math.random(0,5) == 1 then
-                        SendMessage(aiBrain, 'Specific opponent', 'A fight against the game councillor? I hope my algorithms havent been sabotaged', 10, 10000)
-                        bSentSpecificMessage = true
-                    else
-                        if math.random(0,4) == 1 then
-                            local tPrevPlayers = {'gunner1069', 'relentless', 'Azraeel', 'Babel', 'Wingflier', 'Radde', 'YungDookie', 'Spyro', 'Skinnydude', 'savinguptobebrok', 'Tomma', 'IgneusTempus', 'tyne141', 'Jip', 'Teralitha', 'RottenBanana', 'Deribus', 'SpikeyNoob'}
-                            for iPlayer, sPlayer in tPrevPlayers do
-                                if oBrain.Nickname == sPlayer or oBrain.Nickname == 'FAF_'..sPlayer then
-                                    SendMessage(aiBrain, 'Specific opponent', '/83', 5, 10000) --QAI message re analysing prev subroutines
-                                    bSentSpecificMessage = true
-                                    break
+                        else
+                            if math.random(0,4) == 1 then
+                                local tPrevPlayers = {'gunner1069', 'relentless', 'Azraeel', 'Babel', 'Wingflier', 'Radde', 'YungDookie', 'Spyro', 'Skinnydude', 'savinguptobebrok', 'Tomma', 'IgneusTempus', 'tyne141', 'Jip', 'Teralitha', 'RottenBanana', 'Deribus', 'SpikeyNoob'}
+                                for iPlayer, sPlayer in tPrevPlayers do
+                                    if oBrain.Nickname == sPlayer or oBrain.Nickname == 'FAF_'..sPlayer then
+                                        SendMessage(aiBrain, 'Specific opponent', '/83', 5, 10000) --QAI message re analysing prev subroutines
+                                        bSentSpecificMessage = true
+                                        break
+                                    end
                                 end
                             end
                         end
@@ -204,6 +208,8 @@ function ConsiderPlayerSpecificMessages(aiBrain)
                         break
                     end
                 end
+            else
+                bConsideredSpecificMessage = true
             end
         end
     end

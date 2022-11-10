@@ -2342,6 +2342,8 @@ function HiveManager(oHive)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+
+
 function IssueSpareEngineerAction(aiBrain, oEngineer, bNavalSpareAction)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IssueSpareEngineerAction'
@@ -4880,6 +4882,8 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
     end
 
     if not(iCategoryRef) then
+-----------------RECORD KEY INFORMATION TO HELP MAKE A DECISION:
+
         local iPond = (M27Navy.GetPondToFocusOn(aiBrain) or 0)
 
         --Can we path to enemy base with amphibious unit, and is there a land unit withi n40% of our base? then build land experimental
@@ -4936,16 +4940,13 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
             end
         end
 
-        --MAIN LOGIC FOR DECIDING EXPERIMENTAL
-
-
         --If enemy has t3 arti or novax then make building our own t3 arti a top priority
-        local iEnemyArtiAndNovax = 0
+        local iEnemyArtiNovaxAndGameEnder = 0
         local iEnemyEarlyConstructionArti = 0
         if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyArtiAndExpStructure]) == false then
             for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyArtiAndExpStructure] do
                 if M27UnitInfo.IsUnitValid(oUnit) then
-                    iEnemyArtiAndNovax = iEnemyArtiAndNovax + 1
+                    iEnemyArtiNovaxAndGameEnder = iEnemyArtiNovaxAndGameEnder + 1
                     if oUnit:GetFractionComplete() <= 0.3 then iEnemyEarlyConstructionArti = iEnemyEarlyConstructionArti + 1 end
                 else
                     aiBrain[M27Overseer.reftEnemyArtiAndExpStructure][iUnit] = nil
@@ -4955,6 +4956,10 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
 
         local iT3ArtiWeOwn = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti)
         local iLifetimeLandExperimentalCount = M27Conditions.GetLifetimeBuildCount(aiBrain, ConvertExperimentalRefToCategory(refiExperimentalLand))
+
+----------------------------------------------MAIN LOGIC FOR DECIDING EXPERIMENTAL
+
+
 
         --UEF - high priority fatboy if enemy has sniper bots or land experimentals (even if enemy has T3 arti as well)
         if bDebugMessages == true then LOG(sFunctionRef..': Fatboy priority checker: Are we UEF='..tostring(iFactionIndex == M27UnitInfo.refFactionUEF)..'; Lifetime build count='..iLifetimeLandExperimentalCount..'; Existing experimentals='..iExistingLandExperimentals..'; Is table of enemy land experi empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]))..'; has enemy built sniperbots='..tostring(aiBrain[M27Overseer.refbEnemyHasBuiltSniperbots])) end
@@ -4966,10 +4971,15 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
         end
 
         if not(iCategoryRef) then
-            if iEnemyArtiAndNovax > 0 and bTargetsForT3Arti and iT3ArtiWeOwn < 4 then
+            if iEnemyArtiNovaxAndGameEnder > 0 and iT3ArtiWeOwn < 4 then
                 --Exception to prioritising T3 arti - if we already have 1 T3 arti, and enemy's only T3 arti is <30% complete
-                if iEnemyArtiAndNovax > iEnemyEarlyConstructionArti or iT3ArtiWeOwn == 0 then
-                    iCategoryRef = refiExperimentalT3Arti
+                if iEnemyArtiNovaxAndGameEnder > 0 or iT3ArtiWeOwn == 0 or (iEnemyArtiNovaxAndGameEnder + iEnemyEarlyConstructionArti) > 1 or (iT3ArtiWeOwn <= 1 and not(M27Conditions.HaveApproachingLandExperimentalThreat(aiBrain))) then
+                    if bTargetsForT3Arti then
+                        iCategoryRef = refiExperimentalT3Arti
+                    elseif aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 825 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 40 and iT3ArtiWeOwn == 0 then
+                        iCategoryRef = refiExperimentalArti
+                        if iFactionIndex == M27UnitInfo.refFactionSeraphim then iCategoryRef = refiExperimentalYolona end
+                    end
                 end
             end
         end
@@ -11449,7 +11459,7 @@ end--]]
                         if iCurRadarCount == nil then
                             iCurRadarCount = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryRadar)
                         end
-                        if iCurRadarCount == 0 and iEnergyStored >= 2000 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 6 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 75 then
+                        if iCurRadarCount == 0 and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) and iEnergyStored >= 2000 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 6 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 75 then
                             iActionToAssign = refActionBuildT1Radar
                             iMaxEngisWanted = 1
                         end
@@ -11830,7 +11840,7 @@ end--]]
                             end
                         end
                     elseif iCurrentConditionToTry == 12 then --High priority land fac builder for when we are about to overflow mass
-                        if (aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 or (not(bHaveLowMass) and aiBrain:GetEconomyStoredRatio('MASS') >= 0.3 and aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > 0)) and iHighestFactoryOrEngineerTechAvailable >= 3 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.7 then
+                        if (aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 or (not(bHaveLowMass) and aiBrain:GetEconomyStoredRatio('MASS') >= 0.3 and aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > 0)) and (iHighestFactoryOrEngineerTechAvailable >= 3 or aiBrain:GetEconomyStoredRatio('MASS') >= 0.7)  and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.7 then
                             if iLandFactories < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] or aiBrain:GetEconomyStoredRatio('MASS') >= 0.6 then
                                 if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildLandFactory]) then
                                     iActionToAssign = refActionBuildLandFactory
@@ -12582,7 +12592,7 @@ end--]]
                             end
                         end
                     elseif iCurrentConditionToTry == 24 then --High priority factory builder for if we are at risk of overflowing mass soon
-                        if iHighestFactoryOrEngineerTechAvailable >= 3 and not(bHaveLowMass) and not(bHaveVeryLowPower) then
+                        if iHighestFactoryOrEngineerTechAvailable >= 2 and not(bHaveLowMass) and not(bHaveVeryLowPower) then
                             if iAirFactories == nil then
                                 iAirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory)
                                 if iAirFactories == nil then
@@ -12600,6 +12610,7 @@ end--]]
                                 iMassStoredThreshold = math.max(0.1, 0.5 - aiBrain[M27EconomyOverseer.refiMexesUpgrading] * 0.04)
                                 if aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] < -1 then  iMassStoredThreshold = math.max(0.15, iMassStoredThreshold) end
                             end
+                            if iHighestFactoryOrEngineerTechAvailable == 2 then iMassStoredThreshold = iMassStoredThreshold + 0.1 end
 
 
                             if aiBrain:GetEconomyStoredRatio('MASS') >= iMassStoredThreshold then
@@ -12728,14 +12739,27 @@ end--]]
                                     for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyArtiAndExpStructure] do
                                         if M27UnitInfo.IsUnitValid(oUnit) then
                                             if EntityCategoryContains(M27UnitInfo.refCategoryNovaxCentre, oUnit.UnitId) then
-                                                iEnemyT3ArtiValue = iEnemyT3ArtiValue + 0.5
+                                                if oUnit:GetFractionComplete() >= 0.5 then
+                                                    iEnemyT3ArtiValue = iEnemyT3ArtiValue + 0.5
+                                                else
+                                                    iEnemyT3ArtiValue = iEnemyT3ArtiValue + 0.25
+                                                end
+
                                             elseif EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, oUnit.UnitId) then
-                                                iEnemyT3ArtiValue = iEnemyT3ArtiValue + 1
+                                                if oUnit:GetFractionComplete() >= 0.5 then
+                                                    iEnemyT3ArtiValue = iEnemyT3ArtiValue + 1
+                                                else
+                                                    if oUnit:GetFractionComplete() >= 0.25 then
+                                                        iEnemyT3ArtiValue = iEnemyT3ArtiValue + 0.5
+                                                    else
+                                                        iEnemyT3ArtiValue = iEnemyT3ArtiValue + 0.25
+                                                    end
+                                                end
                                             end
                                         end
                                     end
                                 end
-                                iMaxEngisWanted = table.getsize(aiBrain[reftPriorityShieldsToAssist]) * math.max(5, math.min(25, (10 * iEnemyT3ArtiValue)))
+                                iMaxEngisWanted = table.getsize(aiBrain[reftPriorityShieldsToAssist]) * math.max(4, math.min(26, (10 * iEnemyT3ArtiValue)))
                                 iActionToAssign = refActionAssistShield
                                 iMinEngiTechLevelWanted = 2 --T1 engis will do too little and could cause us to think we'll be ok when we wont be
                                 if bDebugMessages == true then

@@ -504,6 +504,33 @@ function AllocateTeamMassResources(iTeam, iFirstM27Brain)
 
     local iPriority
 
+    local oM27BrainWithT3ArtiMostComplete
+    local iTotalMassWantedForT3ArtiBuilder = 0
+    local iCumulativeMassToBeAvailable = 0
+    local iCurMassForT3ArtiBuilder = 0
+    local aiBrain = tTeamData[iTeam][reftFriendlyActiveM27Brains][iFirstM27Brain]
+    local tFriendlyT3Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti + M27UnitInfo.refCategorySML * categories.EXPERIMENTAL, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Ally')
+    if M27Utilities.IsTableEmpty(tFriendlyT3Arti) == false then
+        local iHighestCompletion = 0
+        local iCurCompletion
+        for iUnit, oUnit in tFriendlyT3Arti do
+            iCurCompletion = oUnit:GetFractionComplete()
+            if iCurCompletion < 1 and iCurCompletion > iHighestCompletion and oUnit:GetAIBrain().M27AI then
+                iHighestCompletion = iCurCompletion
+                oM27BrainWithT3ArtiMostComplete = oUnit:GetAIBrain()
+                if bDebugMessages == true then LOG(sFunctionRef..': oM27BrainWithT3ArtiMostComplete '..oM27BrainWithT3ArtiMostComplete.Nickname..' has unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' with fraction complete '..oUnit:GetFractionComplete()..'; brain mass stored ratio='..oM27BrainWithT3ArtiMostComplete:GetEconomyStoredRatio('MASS')) end
+            end
+        end
+    end
+    if oM27BrainWithT3ArtiMostComplete then --Dont prioritise t3 arti builder if they arent low on mass
+        if oM27BrainWithT3ArtiMostComplete:GetEconomyStoredRatio('MASS') > 0.05 then
+            oM27BrainWithT3ArtiMostComplete = nil
+        else
+            iTotalMassWantedForT3ArtiBuilder = M27EconomyOverseer.GetMassStorageMaximum(oM27BrainWithT3ArtiMostComplete) * (0.05 - oM27BrainWithT3ArtiMostComplete:GetEconomyStoredRatio('MASS'))
+        end
+    end
+
+
     for iBrain, oBrain in tTeamData[iTeam][reftFriendlyActiveM27Brains] do
         if oBrain.M27IsDefeated and (not(oBrain.GetCurrentUnits) or oBrain:GetCurrentUnits(categories.ALLUNITS - categories.BENIGN) <= 1) then tTeamData[iTeam][reftFriendlyActiveM27Brains][iBrain] = nil break
         else
@@ -514,22 +541,30 @@ function AllocateTeamMassResources(iTeam, iFirstM27Brain)
 
             --Do we have low mass?
             if oBrain:GetEconomyStoredRatio('MASS') < 0.05 then
-                if oBrain:GetEconomyStoredRatio('MASS') < 0.01 and oBrain:GetEconomyStoredRatio('ENERGY') == 1 then
+                if oM27BrainWithT3ArtiMostComplete and oM27BrainWithT3ArtiMostComplete == oBrain then
                     iPriority = 1
+                    if bDebugMessages == true then LOG(sFunctionRef..': Our T3 arti builder doesnt have much mass so setting as priority 1') end
+                elseif oBrain:GetEconomyStoredRatio('MASS') < 0.01 and oBrain:GetEconomyStoredRatio('ENERGY') == 1 then
+                    if oM27BrainWithT3ArtiMostComplete then iPriority = 2 else iPriority = 1 end
                 else
-                    iPriority = 2
+                    if oM27BrainWithT3ArtiMostComplete then iPriority = 3 else iPriority = 2 end
                 end
                 table.insert(tBrainsNeedingMassByPriority, {[subrefBrain] = oBrain, [subrefMassPriority] = iPriority, [subrefRemainingMassNeeded] = iMassStorageMax * (0.05 - oBrain:GetEconomyStoredRatio('MASS'))})
                 tiCountOfBrainsNeedingMassByPriority[iPriority] = (tiCountOfBrainsNeedingMassByPriority[iPriority] or 0) + 1
                 if bDebugMessages == true then LOG(sFunctionRef..': Not in combat, want Mass as priority '..iPriority) end
             else
                 --Do we have enough to offer some?
-                if oBrain:GetEconomyStoredRatio('MASS') > 0.25 and not(oBrain[M27EconomyOverseer.refbStallingMass]) and not(M27Conditions.HaveLowMass(oBrain)) then
-                    if oBrain[M27EconomyOverseer.refiNetMassBaseIncome] < 0 and oBrain:GetEconomyStoredRatio('MASS') >= 0.3 then
+                if (oM27BrainWithT3ArtiMostComplete and not(oM27BrainWithT3ArtiMostComplete == oBrain) and iTotalMassWantedForT3ArtiBuilder < iCumulativeMassToBeAvailable and aiBrain:GetEconomyStoredRatio('MASS') > 0.01 and not(oBrain[M27EconomyOverseer.refbStallingMass])) or (oBrain:GetEconomyStoredRatio('MASS') > 0.25 and not(oBrain[M27EconomyOverseer.refbStallingMass]) and not(M27Conditions.HaveLowMass(oBrain))) then
+                    if oM27BrainWithT3ArtiMostComplete and not(oM27BrainWithT3ArtiMostComplete == oBrain) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': We have mass to g ive to our t3 arti builder, our brain='..oBrain.Nickname..'; our mass stored ratio='..aiBrain:GetEconomyStoredRatio('MASS')..'; our mass stored='..aiBrain:GetEconomyStored('MASS')) end
+                        iCurMassForT3ArtiBuilder = math.min(oBrain:GetEconomyStored('MASS'), iMassStorageMax * 0.02)
+                        table.insert(tBrainsWithMassAndMassAvailable, {[subrefBrain] = oBrain, [subrefMassAvailable] = iCurMassForT3ArtiBuilder})
+                        iCumulativeMassToBeAvailable = iCumulativeMassToBeAvailable + iCurMassForT3ArtiBuilder
+                    elseif oBrain[M27EconomyOverseer.refiNetMassBaseIncome] < 0 and oBrain:GetEconomyStoredRatio('MASS') >= 0.3 then
                         table.insert(tBrainsWithMassAndMassAvailable, {[subrefBrain] = oBrain, [subrefMassAvailable] = oBrain:GetEconomyStored('MASS') * 0.02})
                         if bDebugMessages == true then LOG(sFunctionRef..': Have Mass available to give even though have negative mass income') end
                     elseif oBrain[M27EconomyOverseer.refiNetMassBaseIncome] > 0 then
-                        table.insert(tBrainsWithMassAndMassAvailable, {[subrefBrain] = oBrain, [subrefMassAvailable] = iMassStorageMax * (oBrain:GetEconomyStoredRatio('MASS') - 0.25)})
+                        table.insert(tBrainsWithMassAndMassAvailable, {[subrefBrain] = oBrain, [subrefMassAvailable] = math.max(1, iMassStorageMax * (oBrain:GetEconomyStoredRatio('MASS') - 0.25))})
                         if bDebugMessages == true then LOG(sFunctionRef..': Have positive Mass income so have Mass avialable to give') end
                     else
                         --Dont have positive net income, and not got 100% Mass, so want to keep our Mass for ourself

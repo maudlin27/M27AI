@@ -1420,7 +1420,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                                 end
                                 iCategoryToUpgrade = DecideOnFirstHQ()
                                 --Get T3 HQ with similar scenario
-                            elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 and M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) == true and iT3LandFactories + iT3AirFactories == 0 and iT2LandFactories + iT2AirFactories > 0 and (aiBrain[refiGrossMassBaseIncome] >= 11 or iT3Mexes >= 4) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Power + M27UnitInfo.refCategoryT3Power) > 0 and iEngisOfHighestTechLevel >= 2 then
+                            elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 and M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) == true and iT3LandFactories + iT3AirFactories == 0 and iT2LandFactories + iT2AirFactories > 0 and (aiBrain[refiGrossMassBaseIncome] >= 11 or iT3Mexes >= 4) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Power + M27UnitInfo.refCategoryT3Power) > 0 and iEngisOfHighestTechLevel >= 2 and ((iT2LandFactories + iT2AirFactories) >= 4 or aiBrain[M27Overseer.refiEnemyHighestTechLevel] >= 2 or M27Conditions.GetLifetimeBuildCount(aiBrain, categories.TECH2 * categories.MOBILE * categories.LAND) >= 12) then
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Want to get T3 factory upgrade, will decide if want ot get land or air factory')
                                 end
@@ -2804,10 +2804,37 @@ function ManageMassStalls(aiBrain)
             local iTotalUnits = 0
             local iCategoryStartPoint, iIntervalChange, iCategoryEndPoint, iCategoryRef
             local bWasUnitPaused
+            local bConsiderReclaimingEngineer = false
+            local iKillCount = 0
+            local tReclaimLocationsAlreadyConsidered = {}
             if bPauseNotUnpause then
                 iCategoryStartPoint = 1
                 iIntervalChange = 1
                 iCategoryEndPoint = table.getn(tCategoriesByPriority)
+                if GetGameTimeSeconds() - aiBrain[M27EngineerOverseer.refiTimeOfLastEngiSelfDestruct] > 0.99 then
+                    local iEngiCategoryWanted
+                    if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 then iEngiCategoryWanted = M27UnitInfo.refCategoryEngineer * categories.TECH3
+                    elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 then iEngiCategoryWanted = M27UnitInfo.refCategoryEngineer - categories.TECH1
+                    else iEngiCategoryWanted = M27UnitInfo.refCategoryEngineer
+                    end
+                    local iCurEngis = aiBrain:GetCurrentUnits(iEngiCategoryWanted)
+                    if iCurEngis >= 10 then
+                        --If are defending against arti then want a min of 10 + 12 for every t3 shield we have to a max of 70 before start considering ctrl-king any
+                        if not(aiBrain[M27Overseer.refbDefendAgainstArti]) or iCurEngis >= 70 then
+                            bConsiderReclaimingEngineer = true
+                        else
+                            local iPriorityShields = 0
+                            for iUnit, oUnit in aiBrain[M27EngineerOverseer.reftPriorityShieldsToAssist] do
+                                if M27UnitInfo.IsUnitValid(oUnit) then iPriorityShields = iPriorityShields + 1 end
+                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': iPriorityShields='..iPriorityShields..'; iCurEngis='..iCurEngis) end
+                            if iCurEngis >= math.max(1, iPriorityShields) * 12 + 10 then
+                                bConsiderReclaimingEngineer = true
+                            end
+                        end
+                    end
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': Time='..GetGameTimeSeconds()..'; Time of last engi self destruct='..aiBrain[M27EngineerOverseer.refiTimeOfLastEngiSelfDestruct]..'; T3 engis='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * categories.TECH3)..'; bConsiderReclaimingEngineer='..tostring(bConsiderReclaimingEngineer)) end
             else
                 iCategoryStartPoint = table.getn(tCategoriesByPriority)
                 iIntervalChange = -1
@@ -2901,6 +2928,76 @@ function ManageMassStalls(aiBrain)
                                                 end
                                             end
                                         end
+                                        if bApplyActionToUnit and bConsiderReclaimingEngineer and not(oUnit[M27EngineerOverseer.refbPrimaryBuilder]) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 90 then
+                                            --Is there reclaim near the engineer? If so clear its orders and have it reclaim, otherwise kill it
+                                            local oBP = oUnit:GetBlueprint()
+                                            if oBP.Economy.BuildCostMass < 500 and oBP.Economy.MaxBuildDistance then --redundancy so we dont ctrl-K SACUs or a unit with no build radius
+                                                bApplyActionToUnit = false
+                                                M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oUnit, true)
+                                                M27Utilities.IssueTrackedClearCommands({ oUnit })
+
+                                                function KillEngineer(oUnit)
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': About to kill engineer '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                                                    oUnit:Kill() --Assumes we have already cleared engineer action trackers
+                                                    iKillCount = iKillCount + 1
+                                                    if iKillCount >= 2 then
+                                                        bConsiderReclaimingEngineer = false
+                                                    end
+                                                    aiBrain[M27EngineerOverseer.refiTimeOfLastEngiSelfDestruct] = GetGameTimeSeconds()
+                                                end
+
+                                                local bGetReclaimInstead = false
+                                                local iBuildingRadius = oBP.Economy.MaxBuildDistance --approximate so we are highly likely to be able to reclaim without moving
+                                                local rReclaimRect = Rect(oUnit:GetPosition()[1]-iBuildingRadius, oUnit:GetPosition()[3]-iBuildingRadius, oUnit:GetPosition()[1]+iBuildingRadius, oUnit:GetPosition()[3]+iBuildingRadius)
+                                                local iReclaimNearby = M27MapInfo.GetReclaimInRectangle(3, rReclaimRect)
+                                                if iReclaimNearby >= 40 then
+                                                    bGetReclaimInstead = true
+                                                    if M27Utilities.IsTableEmpty(tReclaimLocationsAlreadyConsidered) == false then
+                                                        for iLocation, tLocation in tReclaimLocationsAlreadyConsidered do
+                                                            if M27Utilities.GetDistanceBetweenPositions(tLocation, oUnit:GetPosition()) <= 10 then
+                                                                bGetReclaimInstead = false
+                                                                break
+                                                            end
+                                                        end
+                                                    end
+                                                end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Considering killing engi for mass, iReclaimNearby='..iReclaimNearby..'; bGetReclaimInstead='..tostring(bGetReclaimInstead)) end
+                                                if bGetReclaimInstead then
+                                                    table.insert(tReclaimLocationsAlreadyConsidered, oUnit:GetPosition())
+                                                    local tReclaimables = M27MapInfo.GetReclaimInRectangle(4, rReclaimRect)
+                                                    local bGivenReclaimOrder = false
+                                                    if M27Utilities.IsTableEmpty(tReclaimables) == false then
+                                                        local tReclaimablesNearRange = {}
+                                                        for iWreck, oReclaim in tReclaimables do
+                                                            if (oReclaim.MaxMassReclaim or 0) > 0 and oReclaim.CachePosition then
+                                                                if M27Utilities.GetDistanceBetweenPositions(oReclaim.CachePosition, oUnit:GetPosition()) <= iBuildingRadius then
+                                                                    IssueReclaim({oUnit}, oReclaim)
+                                                                    bGivenReclaimOrder = true
+                                                                else
+                                                                    table.insert(tReclaimablesNearRange, oReclaim)
+                                                                end
+                                                            end
+                                                        end
+                                                        if M27Utilities.IsTableEmpty(tReclaimablesNearRange) == false then
+                                                            for iWreck, oReclaim in tReclaimablesNearRange do
+                                                                IssueReclaim({oUnit}, oReclaim)
+                                                                bGivenReclaimOrder = true
+                                                            end
+                                                        end
+                                                        if not(bGivenReclaimOrder) then
+                                                            if bDebugMessages == true then LOG(sFunctionRef..': Will kill unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' due to no reclaim odrer') end
+                                                            KillEngineer(oUnit)
+                                                        end
+                                                    else
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Will kill unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' due to no reclaim nearby') end
+                                                        KillEngineer(oUnit)
+                                                    end
+                                                else
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Will kill unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' as no reclaim') end
+                                                    KillEngineer(oUnit)
+                                                end
+                                            end
+                                        end
                                         break
                                     end
                                 end
@@ -2949,8 +3046,8 @@ function ManageMassStalls(aiBrain)
                                         bApplyActionToUnit = false
                                     elseif oUnit.GetWorkProgress then
                                         --if oUnit:GetWorkProgress() >= 0.85 then
-                                            bApplyActionToUnit = false
-                                            --dont pause t1 mex construction
+                                        bApplyActionToUnit = false
+                                        --dont pause t1 mex construction
                                         if oUnit.GetFocusUnit and oUnit:GetFocusUnit() and oUnit:GetFocusUnit().UnitId and EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnit:GetFocusUnit().UnitId) then
                                             bApplyActionToUnit = false
                                         elseif aiBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and not(M27Conditions.DoesACUHaveUpgrade(aiBrain, oUnit)) then
@@ -3533,8 +3630,7 @@ function ManageEnergyStalls(aiBrain)
                                     if bPauseNotUnpause and EntityCategoryContains(M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategoryAllFactories, oUnit.UnitId) then
                                         if not(oUnit:IsUnitState('Upgrading') or oUnit:IsUnitState('Repairing') or oUnit:IsUnitState('Building')) then
                                             iCurUnitEnergyUsage = iCurUnitEnergyUsage * 0.01
-                                            LOG(sFunctionRef..': Unit state='..M27Logic.GetUnitState(oUnit)..' so will set the amount of energy saved equal to just 1% of the actual value, so it is now '..iCurUnitEnergyUsage)
-
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Unit state='..M27Logic.GetUnitState(oUnit)..' so will set the amount of energy saved equal to just 1% of the actual value, so it is now '..iCurUnitEnergyUsage) end
                                         end
                                     end
                                 end
