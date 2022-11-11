@@ -10046,6 +10046,7 @@ function GunshipManager(aiBrain)
 
 
     if M27Utilities.IsTableEmpty(aiBrain[reftAvailableGunships]) == false then
+        if aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 2060 then bDebugMessages = true end
         --First get the nearest threat that we want to focus on, then decide how we will approach it
         local iClosestEnemyDist = 100000
         local iCurEnemyDist
@@ -10239,7 +10240,7 @@ function GunshipManager(aiBrain)
         end
         aiBrain[refoFrontGunship] = oFrontGunship
 
-        --Does the enemy have AirAA near our front gunship? If so then retreat unless are in ACU kill/protect mode
+        --Does the enemy have AirAA near our front gunship or lots of T3 AA? If so then retreat unless are in ACU kill/protect mode
         local bRetreatFromAA = false
         if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill) and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU) then
             local iOurAARange = 0
@@ -10263,123 +10264,145 @@ function GunshipManager(aiBrain)
             else
                 iAirAASearchRange = iOurAARange
             end
+            if iAvailableGunships >= 5 then iAirAASearchRange = iAirAASearchRange + iAvailableGunships * 0.5 end
 
 
             local tNearbyAirAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA, oFrontGunship:GetPosition(), iAirAASearchRange, 'Enemy')
+            if bDebugMessages == true then LOG(sFunctionRef..': checking for nearby enemy AirAA, iAirAASearchRange='..iAirAASearchRange..'; Is table empty of enemy AirAA='..tostring(M27Utilities.IsTableEmpty(tNearbyAirAA))) end
             if M27Utilities.IsTableEmpty(tNearbyAirAA) == false then
                 bRetreatFromAA = true
-            end
-        end
+            else
+                local tNearbyT3AA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3 + M27UnitInfo.refCategoryCruiser, oFrontGunship:GetPosition(), math.max(70, iAirAASearchRange), 'Enemy')
+                if M27Utilities.IsTableEmpty(tNearbyT3AA) == false then
+                    bDebugMessages = true
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tNearbyT3AA)..' nearby T3 ground AA') end
+                    if table.getn(tNearbyT3AA) >= 3 then
+                        bRetreatFromAA = true
+                    else
+                        --If we were to move to the closest T3 AA, would there then be 3+ T3 AA around it? If so then also want to retreat (to avoid us moving towards T3 AA in range, then retreating without firing)
 
-
-        --Prioritise closest enemies threatening mexes
-        local iRangeCap = 100000 --cap even for higih priority units if we are far behind on air
-        local bIgnoreRangeCap = true
-
-
-        --Special targeting depending on strategy:
-        local oTargetUnitsAroundThisOne
-        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then iGunshipOperationalRange = 1000
-        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and EntityCategoryContains(categories.COMMAND, aiBrain[M27Overseer.refoACUKillTarget].UnitId) then
-            oTargetUnitsAroundThisOne = aiBrain[M27Overseer.refoACUKillTarget]
-        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU then
-            oTargetUnitsAroundThisOne = M27Utilities.GetACU(aiBrain)
-            if not(EntityCategoryContains(categories.COMMAND, oTargetUnitsAroundThisOne.UnitId)) then
-                oTargetUnitsAroundThisOne = nil
-            end
-        else
-            if aiBrain[refbFarBehindOnAir] then
-                iRangeCap = math.max(aiBrain[refiOurFurthestAAStructureFromBase] + 10, 80)
-                bIgnoreRangeCap = true
-                iGunshipOperationalRange = math.min(iRangeCap, iGunshipOperationalRange)
-            end
-        end
-        if oTargetUnitsAroundThisOne then
-            if not(oTargetUnitsAroundThisOne:IsUnitState('Attached')) and not(M27UnitInfo.IsUnitUnderwater(oTargetUnitsAroundThisOne)) then
-                oClosestEnemy = oTargetUnitsAroundThisOne --Simplification so gunships travel to this unit even if it is our ACU
-            end
-        end
-
-
-
-        if not(oClosestEnemy) then
-            if aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding] then
-                for iThreatGroupCount, sThreatGroupRef in aiBrain[M27Overseer.reftEnemyGroupsThreateningBuildings] do
-                    if bDebugMessages == true then LOG(sFunctionRef..': Considering threat group '..iThreatGroupCount..'-'..sThreatGroupRef..'; Is table of details for this threat group empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyThreatGroup][sThreatGroupRef]))) end
-                    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyThreatGroup][sThreatGroupRef]) == false then
-                        for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyThreatGroup][sThreatGroupRef][M27Overseer.refoEnemyGroupUnits] do
-                            if M27UnitInfo.IsUnitValid(oUnit) then
-                                if bIgnoreRangeCap or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= iRangeCap then
-                                    ConsiderTargetingUnit(oUnit)
-                                end
-                            end
+                        local oNearestT3AA = M27Utilities.GetNearestUnit(tNearbyT3AA, oFrontGunship:GetPosition())
+                        local tT3AANearNearestAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3 + M27UnitInfo.refCategoryCruiser, oFrontGunship:GetPosition(), 70, 'Enemy')
+                        if bDebugMessages == true then LOG(sFunctionRef..': Nearest T3AA='..oNearestT3AA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNearestT3AA)..'; Number of T3 AA near this='..table.getn(tT3AANearNearestAA)) end
+                        if M27Utilities.IsTableEmpty(tT3AANearNearestAA) == false and table.getn(tT3AANearNearestAA) >= 3 then
+                            bRetreatFromAA = true
                         end
                     end
                 end
             end
         end
-        --if iClosestEnemyDist > iGunshipOperationalRange then oClosestEnemy = nil end --Dont want this for enemies threatening a mex
-        if not(oClosestEnemy) then
-            --Get nearest enemy unit within defensive range, unless alreadhave enemies near the front unit
-            --Still consider attacking even if have a range cap to avoid situations where we approach enemy then fall back after taking some damage
-            if bDebugMessages == true then LOG(sFunctionRef..': Dont have a target yet, considering nearest enemy unit within defensive range unlesss already have enemies near front unit. iSmallestBasePlacement='..iSmallestBasePlacement) end
+        if not(bRetreatFromAA) then
 
-            local tEnemiesInGunshipRange
-            --if iSmallestBasePlacement <= 3 then
-            --Check for units near our gunship (i.e. that it is already in range or almost within range of)
-            local iSearchRange
-            if bIgnoreRangeCap then iSearchRange = math.max(20, M27UnitInfo.GetNavalDirectAndSubRange(oFrontGunship) + math.min(30, 5 + iAvailableGunships)) --Gets the direct fire range, used for convenience
-            else iSearchRange = math.max(15, M27UnitInfo.GetNavalDirectAndSubRange(oFrontGunship) + math.min(15, 5 + iAvailableGunships))
-            end
 
-            tEnemiesInGunshipRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryNavalSurface, oFrontGunship:GetPosition(), iSearchRange, 'Enemy')
-            if M27Utilities.IsTableEmpty(tEnemiesInGunshipRange) == false then
-                for iUnit, oUnit in tEnemiesInGunshipRange do
-                    ConsiderTargetingUnit(oUnit)
+            --Prioritise closest enemies threatening mexes
+            local iRangeCap = 100000 --cap even for higih priority units if we are far behind on air
+            local bIgnoreRangeCap = true
+
+
+            --Special targeting depending on strategy:
+            local oTargetUnitsAroundThisOne
+            if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then iGunshipOperationalRange = 1000
+            elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and EntityCategoryContains(categories.COMMAND, aiBrain[M27Overseer.refoACUKillTarget].UnitId) then
+                oTargetUnitsAroundThisOne = aiBrain[M27Overseer.refoACUKillTarget]
+            elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU then
+                oTargetUnitsAroundThisOne = M27Utilities.GetACU(aiBrain)
+                if not(EntityCategoryContains(categories.COMMAND, oTargetUnitsAroundThisOne.UnitId)) then
+                    oTargetUnitsAroundThisOne = nil
+                end
+            else
+                if aiBrain[refbFarBehindOnAir] then
+                    iRangeCap = math.max(aiBrain[refiOurFurthestAAStructureFromBase] + 10, 80)
+                    bIgnoreRangeCap = true
+                    iGunshipOperationalRange = math.min(iRangeCap, iGunshipOperationalRange)
                 end
             end
-            --end
+            if oTargetUnitsAroundThisOne then
+                if not(oTargetUnitsAroundThisOne:IsUnitState('Attached')) and not(M27UnitInfo.IsUnitUnderwater(oTargetUnitsAroundThisOne)) then
+                    oClosestEnemy = oTargetUnitsAroundThisOne --Simplification so gunships travel to this unit even if it is our ACU
+                end
+            end
+
+
+
             if not(oClosestEnemy) then
-                tEnemiesInGunshipRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryNavalSurface, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iGunshipOperationalRange + iMaxDirectLineExtraDist, 'Enemy')
-                if bDebugMessages == true then LOG(sFunctionRef..': Still no enemy, is tEnemiesInGunshipRange empty='..tostring(M27Utilities.IsTableEmpty(tEnemiesInGunshipRange))..'; iGunshipOperationalRange + iMaxDirectLineExtraDist='..iGunshipOperationalRange + iMaxDirectLineExtraDist) end
-                if M27Utilities.IsTableEmpty(tEnemiesInGunshipRange) == false then
-                    for iUnit, oUnit in tEnemiesInGunshipRange do
-                        --Is our mod distance within range?
-                        if bDebugMessages == true then LOG(sFunctionRef..': Considering targeting enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Mod dist to start='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition())..'; iGunshipOperationalRange='..iGunshipOperationalRange) end
-                        if M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition()) <= iGunshipOperationalRange then
-                            ConsiderTargetingUnit(oUnit)
-                        end
-                    end
-                end
-                if iClosestEnemyDist > iGunshipOperationalRange + iMaxDirectLineExtraDist then oClosestEnemy = nil end --(Redundancy)
-            end
-        end
-        if bDebugMessages == true then LOG(sFunctionRef..': Finished considering all potential targets, do we have a valid target='..tostring(M27UnitInfo.IsUnitValid(oClosestEnemy))) end
-        if oClosestEnemy then
-            --Factor in enemy AA around the target and dont engage if it's too much to try and attack attritionally, unless it's in critical defence range
-            if bDebugMessages == true then LOG(sFunctionRef..': Have a potential enemy near our gunship to target, will check for AA around it. iClosestEnemyDist='..iClosestEnemyDist..'; aiBrain[refiBomberDefenceCriticalThreatDistance]='..aiBrain[refiBomberDefenceCriticalThreatDistance]) end
-            if iClosestEnemyDist > aiBrain[refiBomberDefenceCriticalThreatDistance] then
-                local tPotentialGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, oFrontGunship:GetPosition(), M27Utilities.GetDistanceBetweenPositions(oFrontGunship:GetPosition(), oClosestEnemy:GetPosition()) + 75, 'Enemy')
-                if M27Utilities.IsTableEmpty(tPotentialGroundAA) == false then
-                    --Filter to just those AA that would be within 20 of our front gunship
-                    local tAACoverage = GetTargetAACoverage(oClosestEnemy, tPotentialGroundAA, oFrontGunship:GetPosition(), 20)
-                    if M27Utilities.IsTableEmpty(tAACoverage) == false then
-                        --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo, bBlueprintThreat)
-                        local iAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tAACoverage, false, false, true, false, false, nil, nil, nil, nil, false)
-                        if iAAThreat >= 50 then
-                            if bDebugMessages == true then LOG(sFunctionRef..': iAAThreat='..iAAThreat) end
-                            if iAAThreat >= 1600 then --Equivalent to 1 SAM
-                                oClosestEnemy = nil
-                            else
-                                local tNearbyGunships = {}
-                                for iUnit, oUnit in aiBrain[reftAvailableGunships] do
-                                    if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oFrontGunship:GetPosition()) <= 40 then
-                                        table.insert(tNearbyGunships, oUnit)
+                if aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding] then
+                    for iThreatGroupCount, sThreatGroupRef in aiBrain[M27Overseer.reftEnemyGroupsThreateningBuildings] do
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering threat group '..iThreatGroupCount..'-'..sThreatGroupRef..'; Is table of details for this threat group empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyThreatGroup][sThreatGroupRef]))) end
+                        if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyThreatGroup][sThreatGroupRef]) == false then
+                            for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyThreatGroup][sThreatGroupRef][M27Overseer.refoEnemyGroupUnits] do
+                                if M27UnitInfo.IsUnitValid(oUnit) then
+                                    if bIgnoreRangeCap or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= iRangeCap then
+                                        ConsiderTargetingUnit(oUnit)
                                     end
                                 end
-                                local iOurThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyGunships, false, false, false, true, false)
-                                if iOurThreat < iAAThreat * 3 then
+                            end
+                        end
+                    end
+                end
+            end
+            --if iClosestEnemyDist > iGunshipOperationalRange then oClosestEnemy = nil end --Dont want this for enemies threatening a mex
+            if not(oClosestEnemy) then
+                --Get nearest enemy unit within defensive range, unless alreadhave enemies near the front unit
+                --Still consider attacking even if have a range cap to avoid situations where we approach enemy then fall back after taking some damage
+                if bDebugMessages == true then LOG(sFunctionRef..': Dont have a target yet, considering nearest enemy unit within defensive range unlesss already have enemies near front unit. iSmallestBasePlacement='..iSmallestBasePlacement) end
+
+                local tEnemiesInGunshipRange
+                --if iSmallestBasePlacement <= 3 then
+                --Check for units near our gunship (i.e. that it is already in range or almost within range of)
+                local iSearchRange
+                if bIgnoreRangeCap then iSearchRange = math.max(20, M27UnitInfo.GetNavalDirectAndSubRange(oFrontGunship) + math.min(30, 5 + iAvailableGunships)) --Gets the direct fire range, used for convenience
+                else iSearchRange = math.max(15, M27UnitInfo.GetNavalDirectAndSubRange(oFrontGunship) + math.min(15, 5 + iAvailableGunships))
+                end
+
+                tEnemiesInGunshipRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryNavalSurface, oFrontGunship:GetPosition(), iSearchRange, 'Enemy')
+                if M27Utilities.IsTableEmpty(tEnemiesInGunshipRange) == false then
+                    for iUnit, oUnit in tEnemiesInGunshipRange do
+                        ConsiderTargetingUnit(oUnit)
+                    end
+                end
+                --end
+                if not(oClosestEnemy) then
+                    tEnemiesInGunshipRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryNavalSurface, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iGunshipOperationalRange + iMaxDirectLineExtraDist, 'Enemy')
+                    if bDebugMessages == true then LOG(sFunctionRef..': Still no enemy, is tEnemiesInGunshipRange empty='..tostring(M27Utilities.IsTableEmpty(tEnemiesInGunshipRange))..'; iGunshipOperationalRange + iMaxDirectLineExtraDist='..iGunshipOperationalRange + iMaxDirectLineExtraDist) end
+                    if M27Utilities.IsTableEmpty(tEnemiesInGunshipRange) == false then
+                        for iUnit, oUnit in tEnemiesInGunshipRange do
+                            --Is our mod distance within range?
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering targeting enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Mod dist to start='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition())..'; iGunshipOperationalRange='..iGunshipOperationalRange) end
+                            if M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition()) <= iGunshipOperationalRange then
+                                ConsiderTargetingUnit(oUnit)
+                            end
+                        end
+                    end
+                    if iClosestEnemyDist > iGunshipOperationalRange + iMaxDirectLineExtraDist then oClosestEnemy = nil end --(Redundancy)
+                end
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished considering all potential targets, do we have a valid target='..tostring(M27UnitInfo.IsUnitValid(oClosestEnemy))) end
+            if oClosestEnemy then
+                --Factor in enemy AA around the target and dont engage if it's too much to try and attack attritionally, unless it's in critical defence range
+                if bDebugMessages == true then LOG(sFunctionRef..': Have a potential enemy near our gunship to target, will check for AA around it. iClosestEnemyDist='..iClosestEnemyDist..'; aiBrain[refiBomberDefenceCriticalThreatDistance]='..aiBrain[refiBomberDefenceCriticalThreatDistance]) end
+                if iClosestEnemyDist > aiBrain[refiBomberDefenceCriticalThreatDistance] then
+                    local tPotentialGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, oFrontGunship:GetPosition(), M27Utilities.GetDistanceBetweenPositions(oFrontGunship:GetPosition(), oClosestEnemy:GetPosition()) + 75, 'Enemy')
+                    if M27Utilities.IsTableEmpty(tPotentialGroundAA) == false then
+                        --Filter to just those AA that would be within 20 of our front gunship
+                        local tAACoverage = GetTargetAACoverage(oClosestEnemy, tPotentialGroundAA, oFrontGunship:GetPosition(), 20)
+                        if M27Utilities.IsTableEmpty(tAACoverage) == false then
+                            --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo, bBlueprintThreat)
+                            local iAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tAACoverage, false, false, true, false, false, nil, nil, nil, nil, false)
+                            if iAAThreat >= 50 then
+                                if bDebugMessages == true then LOG(sFunctionRef..': iAAThreat='..iAAThreat) end
+                                if iAAThreat >= 1600 then --Equivalent to 1 SAM
                                     oClosestEnemy = nil
+                                else
+                                    local tNearbyGunships = {}
+                                    for iUnit, oUnit in aiBrain[reftAvailableGunships] do
+                                        if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oFrontGunship:GetPosition()) <= 40 then
+                                            table.insert(tNearbyGunships, oUnit)
+                                        end
+                                    end
+                                    local iOurThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyGunships, false, false, false, true, false)
+                                    if iOurThreat < iAAThreat * 3 then
+                                        oClosestEnemy = nil
+                                    end
                                 end
                             end
                         end
@@ -10388,7 +10411,7 @@ function GunshipManager(aiBrain)
             end
         end
 
-        if oClosestEnemy then
+        if oClosestEnemy and not(bRetreatFromAA) then
             SendGunshipMoveOrder(aiBrain[reftAvailableGunships], oClosestEnemy:GetPosition())
         else
             --Return to air rally point
