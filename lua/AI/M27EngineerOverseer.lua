@@ -4805,6 +4805,7 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
     local iCategoryRef
     local iCategoryToBuild
     local iFactionIndex = aiBrain:GetFactionIndex()
+    if aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
     --Have we already started construction on an experimental?
     --reftEngineerAssignmentsByActionRef --Records all engineers. [x][y]{1,2} - x is the action ref; y is the engineer unique ref, 1 is the location ref, 2 is the engineer object (use the subtable ref keys instead of numbers to refer to these)
     if bDebugMessages == true then LOG(sFunctionRef..': iActionToAssign='..iActionToAssign..'; Is the table of engi actions for this empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][iActionToAssign]))..'; aiBrain[refiLastExperimentalReference]='..(aiBrain[refiLastExperimentalReference] or 'nil')..'; aiBrain[refiLastSecondExperimentalRef]='..(aiBrain[refiLastSecondExperimentalRef] or 'nil')) end
@@ -4944,6 +4945,11 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
             end
         end
 
+        local iEnemyLandExperimentals = 0
+        if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then iEnemyLandExperimentals = table.getsize(aiBrain[M27Overseer.reftEnemyLandExperimentals]) end
+
+
+        --MAIN LOGIC FOR DECIDING EXPERIMENTAL
         --If enemy has t3 arti or novax then make building our own t3 arti a top priority
         local iEnemyArtiNovaxAndGameEnder = 0
         local iEnemyEarlyConstructionArti = 0
@@ -5015,9 +5021,6 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
             if not(iCategoryRef) and not(bEnemyIsTurtling) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 850 and (aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] or aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 500) then
                 --If have a chokepoint on the map then dont build land experimental if have as many as the enemy
                 if bTeamHasChokepoint then
-
-                    local iEnemyLandExperimentals = 0
-                    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then iEnemyLandExperimentals = table.getsize(aiBrain[M27Overseer.reftEnemyLandExperimentals]) end
                     if bDebugMessages == true then LOG(sFunctionRef..': bTeamHasChokepoint='..tostring(bTeamHasChokepoint)..'; iEnemyLandExperimentals='..iEnemyLandExperimentals..'; iExistingLandExperimentals='..iExistingLandExperimentals) end
                     if iEnemyLandExperimentals > iExistingLandExperimentals and (not(iActionToAssign == refActionBuildSecondExperimental) or iEnemyLandExperimentals - 1 > iExistingLandExperimentals) then
                         iCategoryRef = refiExperimentalLand
@@ -5097,8 +5100,8 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
                 if iFactionIndex == M27UnitInfo.refFactionUEF then
                     if bDebugMessages == true then LOG(sFunctionRef..': Dealing with UEF, consider if want to build novax') end
                     --Do we want to build a novax? Only consider if enemy base relatively far away or it cant be pathed to amphibiously
-                    --Build fatboy if enemy base not that far away and we dont already have a fatboy
-                    if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 500 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and iExistingLandExperimentals == 0 then
+                    --Build fatboy if enemy base not that far away and we dont already have a fatboy and they dont have lots of t2 arti
+                    if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 500 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and iExistingLandExperimentals == 0 and (iEnemyT2ArtiCount <= 4 or iExistingLandExperimentals > 0) then
                         iCategoryRef = refiExperimentalLand
                     else
                         --Does the enemy have enough targets for a novax? Factor in any novaxes our team has that aren't massively far away
@@ -5146,7 +5149,7 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
                     if not(iCategoryRef) then
                         --Do we want a fatboy?
                         if bDebugMessages == true then LOG(sFunctionRef..': Deciding if we want a fatboy or a T3 arti; aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]..'; iExistingLandExperimentals='..iExistingLandExperimentals..'; Enemy T2 arti='..table.getn(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 725, 'Enemy'))..'; M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3)='..tostring(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3))) end
-                        if iExistingLandExperimentals <= 2 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 600 and iExistingLandExperimentals <= 1 and (iEnemyT2ArtiCount <= (iExistingLandExperimentals + 1) * 2 or table.getn(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 725, 'Enemy')) <= (iExistingLandExperimentals + 1) * 2) and (M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3) or not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, 1))) then
+                        if iExistingLandExperimentals <= math.min(2, iEnemyLandExperimentals) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 600 and iExistingLandExperimentals <= 1 and (iEnemyT2ArtiCount <= (iExistingLandExperimentals + 1) * 2 or table.getn(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 725, 'Enemy')) <= (iExistingLandExperimentals + 1) * 2) and (M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3) or not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, 1))) then
                             iCategoryRef = refiExperimentalLand
                         else
                             --T3 arti if we have the eco to support it
