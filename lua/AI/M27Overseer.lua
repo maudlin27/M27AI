@@ -6559,7 +6559,6 @@ function DetermineInitialBuildOrder(aiBrain)
 
         --Override all of the above if are adopting land spam strategy
         --Land spam strategy
-        bDebugMessages = true
         local iLandSpamThreshold = M27Config.iLandSpamChance
         if aiBrain[refiDistanceToNearestEnemyBase] <= 325 then
             if aiBrain[refiDistanceToNearestEnemyBase] <= 225 then iLandSpamThreshold = 1 - (1 - iLandSpamThreshold) * (1 - iLandSpamThreshold) * (1 - iLandSpamThreshold)
@@ -6580,7 +6579,6 @@ function DetermineInitialBuildOrder(aiBrain)
                 end
             end
         end
-        bDebugMessages = true
         if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to increase land rush chance based on number of AI. iAllyBrains='..iAllyBrains..'; iEnemyBrains='..iEnemyBrains) end
         if iAllyBrains > iEnemyBrains or (iAllyBrains == iEnemyBrains and aiBrain.CheatEnabled and tonumber(ScenarioInfo.Options.CheatMult) > 1) then
             iLandSpamThreshold = 1 - (1 - iLandSpamThreshold) * (1 - iLandSpamThreshold)

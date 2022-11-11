@@ -2060,7 +2060,7 @@ function IssueTrackedClearCommands(tUnits)
             end
         end
     end--]]
-    --if GetGameTimeSeconds() >= 235 and tUnits[1].UnitId and tUnits[1].UnitId..M27UnitInfo.GetUnitLifetimeCount(tUnits[1]) == 'drl02043' then ErrorHandler('Audit trail game time='..GetGameTimeSeconds()) end
+    --if GetGameTimeSeconds() >= 230 and tUnits[1].UnitId and tUnits[1].UnitId..M27UnitInfo.GetUnitLifetimeCount(tUnits[1]) == 'drl02043' then ErrorHandler('Audit trail game time='..GetGameTimeSeconds()) end
 
     IssueClearCommands(tUnits)
 end
