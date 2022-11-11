@@ -2796,7 +2796,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
             local iNavigationDistToEnemybase
             local iTargetUnitDistToEnemyBase
             for iUnit, oUnit in tAllAirOfType do
-                if iUnitType == iTypeGunship and aiBrain:GetArmyIndex() == 7 and GetGameTimeSeconds() >= 1730 and oUnit.UnitId == 'xsa0203' and oUnit:GetHealth() <= 600 then bDebugMessages = true M27Config.M27ShowUnitNames = true else bDebugMessages = false end
+                --if iUnitType == iTypeGunship and aiBrain:GetArmyIndex() == 7 and GetGameTimeSeconds() >= 1730 and oUnit.UnitId == 'xsa0203' and oUnit:GetHealth() <= 600 then bDebugMessages = true M27Config.M27ShowUnitNames = true else bDebugMessages = false end
                 --if M27UnitInfo.GetUnitTechLevel(oUnit) == 4 then bDebugMessages = true else bDebugMessages = false end
                 --if M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 then bDebugMessages = true else bDebugMessages = false end
                 --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uaa03034' and GetGameTimeSeconds() >= 140 then bDebugMessages = true else bDebugMessages = false end
