@@ -2437,7 +2437,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     local sPlatoonName = oPlatoon:GetPlan()
     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
     local bProceed = true
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 490 then bDebugMessages = true end
     --if sPlatoonName == 'M27Defender' and oPlatoon[refiPlatoonCount] == 7 and GetGameTimeSeconds() >= 570 then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
@@ -2447,8 +2447,8 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 937 and aiBrain:GetArmyIndex() == 4 and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
-    if sPlatoonName == 'M27IndirectDefender' and aiBrain:GetArmyIndex() == 10 and GetGameTimeSeconds() >= 940 then bDebugMessages = true end
-    if sPlatoonName == 'M27IndirectSpareAttacker' and aiBrain:GetArmyIndex() == 10 and GetGameTimeSeconds() >= 940 then bDebugMessages = true end
+    --if sPlatoonName == 'M27IndirectDefender' and aiBrain:GetArmyIndex() == 10 and GetGameTimeSeconds() >= 940 then bDebugMessages = true end
+    --if sPlatoonName == 'M27IndirectSpareAttacker' and aiBrain:GetArmyIndex() == 10 and GetGameTimeSeconds() >= 940 then bDebugMessages = true end
     --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
     --if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' and oPlatoon[refiPlatoonCount] == 21 then bDebugMessages = true end
@@ -6368,7 +6368,7 @@ function DecideWhetherToGetACUUpgrade(aiBrain, oPlatoon)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 660 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 490 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local oACU = M27Utilities.GetACU(aiBrain)
     if not(oACU[M27UnitInfo.refbFullyUpgraded]) and (not(M27MapInfo.bNoRushActive) or M27MapInfo.iNoRushTimer - GetGameTimeSeconds() <= 120) then
@@ -7383,7 +7383,7 @@ function DeterminePlatoonAction(oPlatoon)
         --if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then --Removed this check as we do it already as part of the parent function
 
         local sPlatoonName = oPlatoon:GetPlan()
-        --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
+        --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 490 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
         --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 25 then bDebugMessages = true end
         --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
         --if oPlatoon:GetPlan() == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 3 and GetGameTimeSeconds() >= 360 then bDebugMessages = true end
@@ -7398,14 +7398,14 @@ function DeterminePlatoonAction(oPlatoon)
         --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
         --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
         --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
-        if sPlatoonName == 'M27IndirectDefender' and aiBrain:GetArmyIndex() == 10 and GetGameTimeSeconds() >= 940 then bDebugMessages = true end
+        --if sPlatoonName == 'M27IndirectDefender' and aiBrain:GetArmyIndex() == 10 and GetGameTimeSeconds() >= 940 then bDebugMessages = true end
         --if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
         --if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 480 and aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
         --if sPlatoonName == 'M27EscortAI' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 780  then bDebugMessages = true end
         --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
         --if sPlatoonName == 'M27MobileShield' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
         --if sPlatoonName == 'M27MobileStealth' then bDebugMessages = true end
-        if sPlatoonName == 'M27IndirectSpareAttacker' and aiBrain:GetArmyIndex() == 10 and GetGameTimeSeconds() >= 940 then bDebugMessages = true end
+        --if sPlatoonName == 'M27IndirectSpareAttacker' and aiBrain:GetArmyIndex() == 10 and GetGameTimeSeconds() >= 940 then bDebugMessages = true end
         --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
         --if sPlatoonName == 'M27PlateauLandCombat' then bDebugMessages = true end
 
@@ -10028,6 +10028,7 @@ function GetPositionAtOrNearTargetInPathingGroup(tStartPos, tTargetPos, iDistanc
                     if M27Utilities.IsTableEmpty(tExistingTargetPos) == false then
                         if bDebugMessages == true then LOG(sFunctionRef..': tExistingTargetPos='..repru(tExistingTargetPos)..'; Distance to possible target='..M27Utilities.GetDistanceBetweenPositions(tExistingTargetPos, tPossibleTarget)..'; iMinDistanceFromExistingCommandTarget='..(iMinDistanceFromExistingCommandTarget or 'nil')..'; Pathing group of this='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, tExistingTargetPos)..'; Pathing group wanted='..iPathingGroupWanted..'; sPathing='..sPathing..'; Distance of existing position toa ctual target='..M27Utilities.GetDistanceBetweenPositions(tExistingTargetPos, tTargetPos)) end
                         if M27MapInfo.GetSegmentGroupOfLocation(sPathing, tExistingTargetPos) == iPathingGroupWanted then
+
                             --Do we have a minimum distance away from current target required?
                             if iMinDistanceFromExistingCommandTarget and M27Utilities.GetDistanceBetweenPositions(tExistingTargetPos, tPossibleTarget) < iMinDistanceFromExistingCommandTarget then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Distance between existing target position and possible target position is less than the min distance; tExistingTargetPos='..repru(tExistingTargetPos)..'; tPossibleTarget='..repru(tPossibleTarget)) end
@@ -10038,23 +10039,27 @@ function GetPositionAtOrNearTargetInPathingGroup(tStartPos, tTargetPos, iDistanc
                                 local iDistanceFromPossibleTargetToTarget = M27Utilities.GetDistanceBetweenPositions(tPossibleTarget, tTargetPos)
                                 --Are these further away from the start position than the actual target?
                                 if math.abs(iDistanceFromQueuedMoveLocationToTarget - iDistanceFromTargetToStart) < math.abs(iDistanceFromPossibleTargetToTarget - iDistanceFromTargetToStart) then
-                                    --Factor in we might be infront of the target and actually want to be behind
-                                    local iDistanceFromStartToTarget = M27Utilities.GetDistanceBetweenPositions(tStartPos, tTargetPos)
-                                    local iDistanceFromQueuedToStart = M27Utilities.GetDistanceBetweenPositions(tStartPos, tExistingTargetPos)
-                                    local iDistanceFromPossibleTargetToStart = M27Utilities.GetDistanceBetweenPositions(tStartPos, tPossibleTarget)
-                                    if (iDistanceFromQueuedToStart < iDistanceFromStartToTarget and iDistanceFromTargetToStart > 0) or (iDistanceFromQueuedToStart > iDistanceFromStartToTarget and iDistanceFromTargetToStart < 0) then
+                                    --Have we said we want to move closer if the initial point is blocked?
+                                    if not(bMoveCloserBeforeFurtherIfBlocked) or iDistanceFromQueuedMoveLocationToTarget <= iDistanceFromTargetToStart then
+                                        --Factor in we might be infront of the target and actually want to be behind
+                                        local iDistanceFromStartToTarget = M27Utilities.GetDistanceBetweenPositions(tStartPos, tTargetPos)
+                                        local iDistanceFromQueuedToStart = M27Utilities.GetDistanceBetweenPositions(tStartPos, tExistingTargetPos)
+                                        local iDistanceFromPossibleTargetToStart = M27Utilities.GetDistanceBetweenPositions(tStartPos, tPossibleTarget)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': iDistanceFromQueuedMoveLocationToTarget='..iDistanceFromQueuedMoveLocationToTarget..'; iDistanceFromPossibleTargetToTarget='..iDistanceFromPossibleTargetToTarget..'; iDistanceFromQueuedToStart='..iDistanceFromQueuedToStart..'; iDistanceFromStartToTarget='..iDistanceFromStartToTarget..'; iDistanceFromTargetToStart='..iDistanceFromTargetToStart) end
+                                        if iDistanceFromQueuedToStart > 1 and ((iDistanceFromQueuedToStart < iDistanceFromStartToTarget and iDistanceFromTargetToStart > 0) or (iDistanceFromQueuedToStart > iDistanceFromStartToTarget and iDistanceFromTargetToStart < 0)) then
 
-                                        --Adjust these based on if they're in the opposite direction - replaced with above distance checks to see if quicker
-                                        --[[local iAngleDifference = math.abs(M27Utilities.GetAngleFromAToB(tTargetPos, tExistingTargetPos) - iAngleFromTargetToStart)
-                                        if iAngleDifference <= 90 then iDistanceFromQueuedMoveLocationToTarget = -iDistanceFromQueuedMoveLocationToTarget end
-                                        iAngleDifference = math.abs(M27Utilities.GetAngleFromAToB(tTargetPos, tPossibleTarget) - iAngleFromTargetToStart)
-                                        if iAngleDifference <= 90 then iDistanceFromPossibleTargetToTarget = -iDistanceFromPossibleTargetToTarget end
-                                        if bDebugMessages == true then LOG(sFunctionRef..': iDistanceFromQueuedMoveLocationToTarget='..iDistanceFromQueuedMoveLocationToTarget..'; iDistanceFromTargetToStart='..iDistanceFromTargetToStart..'; iDistanceFromPossibleTargetToTarget='..iDistanceFromPossibleTargetToTarget) end
-                                        if math.abs(iDistanceFromQueuedMoveLocationToTarget - iDistanceFromTargetToStart) < math.abs(iDistanceFromPossibleTargetToTarget -iDistanceFromTargetToStart) then
-                                        --]]
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Existing location is closer than the new possible location so go with this') end
-                                        --Existing location is closer than the new location so go with this
-                                        tPossibleTarget = tExistingTargetPos
+                                            --Adjust these based on if they're in the opposite direction - replaced with above distance checks to see if quicker
+                                            --[[local iAngleDifference = math.abs(M27Utilities.GetAngleFromAToB(tTargetPos, tExistingTargetPos) - iAngleFromTargetToStart)
+                                            if iAngleDifference <= 90 then iDistanceFromQueuedMoveLocationToTarget = -iDistanceFromQueuedMoveLocationToTarget end
+                                            iAngleDifference = math.abs(M27Utilities.GetAngleFromAToB(tTargetPos, tPossibleTarget) - iAngleFromTargetToStart)
+                                            if iAngleDifference <= 90 then iDistanceFromPossibleTargetToTarget = -iDistanceFromPossibleTargetToTarget end
+                                            if bDebugMessages == true then LOG(sFunctionRef..': iDistanceFromQueuedMoveLocationToTarget='..iDistanceFromQueuedMoveLocationToTarget..'; iDistanceFromTargetToStart='..iDistanceFromTargetToStart..'; iDistanceFromPossibleTargetToTarget='..iDistanceFromPossibleTargetToTarget) end
+                                            if math.abs(iDistanceFromQueuedMoveLocationToTarget - iDistanceFromTargetToStart) < math.abs(iDistanceFromPossibleTargetToTarget -iDistanceFromTargetToStart) then
+                                            --]]
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Existing location is closer than the new possible location so go with this') end
+                                            --Existing location is closer than the new location so go with this
+                                            tPossibleTarget = tExistingTargetPos
+                                        end
                                     end
                                 end
                             end
@@ -10935,7 +10940,7 @@ function ProcessPlatoonAction(oPlatoon)
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
 
             local sPlatoonName = oPlatoon:GetPlan()
-            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 490 then bDebugMessages = true end
             --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 25 then bDebugMessages = true end
             --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
             --if GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
@@ -12829,6 +12834,13 @@ function ProcessPlatoonAction(oPlatoon)
                                     --local tMoveTarget = GetPositionNearTargetInSamePathingGroup(GetPlatoonFrontPosition(oPlatoon), oNearestPD:GetPosition(), iDistanceFromPDWanted, 0, GetPathingUnit(oPlatoon), 1, true)
                                     local tMoveTarget = GetPositionAtOrNearTargetInPathingGroup(GetPlatoonFrontPosition(oPlatoon), oNearestPD:GetPosition(), iDistanceFromPDWanted, 0, GetPathingUnit(oPlatoon), true, true, 1)
                                     if tMoveTarget then
+                                        --Is this target the same as our current positoin and we aren't in range of the PD?
+                                        bDebugMessages = true
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Our position='..repru(GetPlatoonFrontPosition(oPlatoon))..'; Nearest PD='..repru(oNearestPD:GetPosition())..'; iDistanceFromPDWanted='..iDistanceFromPDWanted..'; Platoon range='..oPlatoon[refiPlatoonMaxRange]..'; Dist from cur move target to PD='..M27Utilities.GetDistanceBetweenPositions(tMoveTarget, oNearestPD:GetPosition())) end
+                                        if M27Utilities.GetDistanceBetweenPositions(tMoveTarget, oNearestPD:GetPosition()) > oPlatoon[refiPlatoonMaxRange] then
+                                            tMoveTarget = oNearestPD:GetPosition()
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Replacing target with the PD as the target wouldnt have got us in range of the PD') end
+                                        end
                                         if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Move target for enemy PD='..repru(tMoveTarget)) end
                                         PlatoonMove(oPlatoon, tMoveTarget)
                                     else
