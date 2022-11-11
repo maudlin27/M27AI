@@ -2308,7 +2308,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 iLCWanted = math.min(iLCWanted, 6)
                                                 iMinLevel = math.min(iMinLevel, 1)
                                             end
-                                            if iLCWanted > M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryGunship * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)) or (iMinLevel > 0 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship) < iMinLevel) then
+                                            local iGunshipTechLevel
+                                            if EntityCategoryContains(categories.SERAPHIM, oFactory.UnitId) then iGunshipTechLevel = 2 else iGunshipTechLevel = iFactoryTechLevel end
+                                            if iLCWanted > M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryGunship * M27UnitInfo.ConvertTechLevelToCategory(iGunshipTechLevel)) or (iMinLevel > 0 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship) < iMinLevel) then
                                                 iCategoryToBuild = M27UnitInfo.refCategoryGunship
                                                 iTotalWanted = 1
                                             end
@@ -2593,7 +2595,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                                             end
                                             if iMinLevel > 0 then
-                                                local iCurGunships = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel))
+                                                local iGunshipTechLevel
+                                                if EntityCategoryContains(categories.SERAPHIM, oFactory.UnitId) then iGunshipTechLevel = 2 else iGunshipTechLevel = iFactoryTechLevel end
+                                                local iCurGunships = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship * M27UnitInfo.ConvertTechLevelToCategory(iGunshipTechLevel))
                                                 if aiBrain[M27Overseer.refbDefendAgainstArti] and M27Conditions.HaveLowMass(aiBrain) then iMinLevel = math.min(iMinLevel * 0.5, 4) end
                                                 if iCurGunships < math.min(12, iMinLevel) then
                                                     iCategoryToBuild = M27UnitInfo.refCategoryGunship
@@ -2701,7 +2705,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                     end
 
                                                     if iMinLevel > 0 then
-                                                        local iCurGunships = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel))
+                                                        local iGunshipTechLevel
+                                                        if EntityCategoryContains(categories.SERAPHIM, oFactory.UnitId) then iGunshipTechLevel = 2 else iGunshipTechLevel = iFactoryTechLevel end
+                                                        local iCurGunships = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship * M27UnitInfo.ConvertTechLevelToCategory(iGunshipTechLevel))
                                                         if iCurGunships < math.min(15, iMinLevel) then
                                                             iCategoryToBuild = M27UnitInfo.refCategoryGunship
                                                             iTotalWanted = 1
