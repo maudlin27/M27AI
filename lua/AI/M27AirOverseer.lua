@@ -2796,6 +2796,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
             local iNavigationDistToEnemybase
             local iTargetUnitDistToEnemyBase
             for iUnit, oUnit in tAllAirOfType do
+                if iUnitType == iTypeGunship and aiBrain:GetArmyIndex() == 7 and GetGameTimeSeconds() >= 1730 and oUnit.UnitId == 'xsa0203' and oUnit:GetHealth() <= 600 then bDebugMessages = true M27Config.M27ShowUnitNames = true else bDebugMessages = false end
                 --if M27UnitInfo.GetUnitTechLevel(oUnit) == 4 then bDebugMessages = true else bDebugMessages = false end
                 --if M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 then bDebugMessages = true else bDebugMessages = false end
                 --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uaa03034' and GetGameTimeSeconds() >= 140 then bDebugMessages = true else bDebugMessages = false end
@@ -2988,6 +2989,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                         elseif iUnitType == iTypeGunship then
                                             --Stop if gunship low health and send it back to our base
                                             if M27UnitInfo.GetUnitHealthPercent() <= iGunshipLowHealthPercent then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Gunship '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' has health percent='..M27UnitInfo.GetUnitHealthPercent()..' so will clear any trackers') end
                                                 ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
                                                 bUnitIsUnassigned = true
                                             end
@@ -3246,16 +3248,25 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                             end
                             oUnit[refbSentRefuelCommand] = false
                         else
-                            --Is the unit sat on the ground for a while near air staging? If so then clear its flag as likely it got overridden
+                            --Is the unit sat on the ground for a while near air staging or has no unit state? If so then clear its flag as likely it got overridden
                             --Air staging size z varies between 2.75 to 3
-                            if oUnit:GetPosition()[2] - GetSurfaceHeight(oUnit:GetPosition()[1], oUnit:GetPosition()[3]) <= 1 then
-                                oUnit[refiCyclesOnGroundWaitingToRefuel] = (oUnit[refiCyclesOnGroundWaitingToRefuel] or 0) + 1
-                                if oUnit[refiCyclesOnGroundWaitingToRefuel] >= 20 then
-                                    --Clear flag but also send unit back for refueling
-                                    ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
-                                    iCurUnitsWithLowFuel = iCurUnitsWithLowFuel + 1
-                                    aiBrain[reftLowFuelAir][iCurUnitsWithLowFuel] = oUnit
+                            if bDebugMessages == true then LOG(sFunctionRef..': Checking if unit refuel command may have been overridden. Unit position='..repru(oUnit:GetPosition())..'; Surface height='..GetSurfaceHeight(oUnit:GetPosition()[1], oUnit:GetPosition()[3])) end
+                            local bReaddToLowFuel = false
+                            if not(M27UnitInfo.IsUnitValid(oUnit[refoAirStagingAssigned])) then
+                                bReaddToLowFuel = true
+                            else
+                                if oUnit:GetPosition()[2] - GetSurfaceHeight(oUnit:GetPosition()[1], oUnit:GetPosition()[3]) <= 7 or oUnit:IsUnitState('MovingDown') then
+                                    oUnit[refiCyclesOnGroundWaitingToRefuel] = (oUnit[refiCyclesOnGroundWaitingToRefuel] or 0) + 1
+                                    if oUnit[refiCyclesOnGroundWaitingToRefuel] >= 20 or (oUnit[refiCyclesOnGroundWaitingToRefuel] >= 5 and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(),oUnit[refoAirStagingAssigned]:GetPosition()) >= 75) then
+                                        bReaddToLowFuel = true
+                                    end
                                 end
+                            end
+                            if bReaddToLowFuel then
+                                --Clear flag but also send unit back for refueling
+                                ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
+                                iCurUnitsWithLowFuel = iCurUnitsWithLowFuel + 1
+                                aiBrain[reftLowFuelAir][iCurUnitsWithLowFuel] = oUnit
                             end
                         end
                     end
