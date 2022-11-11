@@ -25,6 +25,7 @@ refbWantsStealthEscort = 'M27PlatoonWantsStealthEscort' --true if should conside
 refbSkirmisherRetreatLogic = 'M27PlatoonSkirmisherRetreatLogic' --true if will retreat when lacking intel coverage or if any enemy within firing range; will alos use this flag to decide whether to run from t2 arti
 refiAirAttackRange = 'M27PlatoonAirAttackRange' --If this is not nil, then will check if the platoon has any MAA in it, and if so will search for enemy air units within this value + the MAA range; if any are detected, the platoon will move towards these air units (assuming there aren't ground units nearby that they're running from)
 refbSingletonPlatoon = 'M27PlatoonSingleton' --True for platoons which will only have 1 unit (used to disable some of the refresh logic for performance reasons)
+refbDoesntWantMAA = 'M27PlatoonDoesntWantMAA' --true if platoon doesnt want an MAA escort
 
 --AI global idle platoon references (i.e. only have 1 of these per aibrain):
 refoIdleScouts = 'M27IdleScouts'
@@ -236,6 +237,7 @@ PlatoonTemplate = {
         [refbWantsStealthEscort] = false,
         [refiMaxTicksBetweenCycleNoEnemies] = iLowPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iLowPriorityEnemy,
+        [refbDoesntWantMAA] = true,
     },
     ['M27IndirectDefender'] =
     {
@@ -331,6 +333,7 @@ PlatoonTemplate = {
         [refbWantsShieldEscort] = false,
         [refiMaxTicksBetweenCycleNoEnemies] = iLowPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iLowPriorityEnemy,
+        [refbDoesntWantMAA] = true,
     },
     ['M27EscortAI'] =
     {
@@ -353,6 +356,7 @@ PlatoonTemplate = {
         [refbWantsStealthEscort] = true,
         [refiMaxTicksBetweenCycleNoEnemies] = iMedPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iMedPriorityEnemy,
+        [refbDoesntWantMAA] = true,
     },
     ['M27MAAAssister'] =
     {
@@ -377,6 +381,7 @@ PlatoonTemplate = {
         [refiAirAttackRange] = 25,
         [refiMaxTicksBetweenCycleNoEnemies] = iMedPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iMedPriorityEnemy,
+        [refbDoesntWantMAA] = true,
     },
     --MAAPatrol - different platoon to MAA assister as the overseer will treat units in MAApatrol as being available for assignment (i.e. its effectively an active 'idle' platoon)
     ['M27MAAPatrol'] =
@@ -402,6 +407,7 @@ PlatoonTemplate = {
         [refiAirAttackRange] = 40,
         [refiMaxTicksBetweenCycleNoEnemies] = iMedPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iMedPriorityEnemy,
+        [refbDoesntWantMAA] = true,
     },
     ['M27ScoutAssister'] =
     {
@@ -422,6 +428,7 @@ PlatoonTemplate = {
         [refiMaxTicksBetweenCycleNoEnemies] = iHighPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iHighPriorityEnemy,
         [refbSingletonPlatoon] = true,
+        [refbDoesntWantMAA] = true,
     },
     ['M27LocationAssister'] = --used for scouts to stay near mexes
     {
@@ -439,6 +446,7 @@ PlatoonTemplate = {
         [refbWantsShieldEscort] = false,
         [refiMaxTicksBetweenCycleNoEnemies] = iLowPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iLowPriorityEnemy,
+        [refbDoesntWantMAA] = true,
     },
     ['M27IntelPathAI'] =
     {
@@ -459,6 +467,7 @@ PlatoonTemplate = {
         [refiMaxTicksBetweenCycleNoEnemies] = iMedPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iMedPriorityEnemy,
         [refbSingletonPlatoon] = true,
+        [refbDoesntWantMAA] = true,
     },
     ['M27ACUMain'] =
     {
@@ -524,6 +533,7 @@ PlatoonTemplate = {
         [refbUsedByThreatDefender] = false,
         [refiMaxTicksBetweenCycleNoEnemies] = iHighPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iHighPriorityEnemy,
+        [refbDoesntWantMAA] = true,
     },
     ['M27MobileStealth'] =
     {
@@ -546,6 +556,7 @@ PlatoonTemplate = {
         [refiMaxTicksBetweenCycleNoEnemies] = iHighPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iHighPriorityEnemy,
         [refbSingletonPlatoon] = true,
+        [refbDoesntWantMAA] = true,
     },
     ['M27RetreatingShieldUnits'] =
     {
@@ -565,6 +576,7 @@ PlatoonTemplate = {
         [refbUsedByThreatDefender] = false,
         [refiMaxTicksBetweenCycleNoEnemies] = iLowPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iLowPriorityEnemy,
+        [refbDoesntWantMAA] = true,
     },
     ['M27SuicideSquad'] =
     {
@@ -584,6 +596,7 @@ PlatoonTemplate = {
         [refbUsedByThreatDefender] = true,
         [refiMaxTicksBetweenCycleNoEnemies] = iLowPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iLowPriorityEnemy,
+        [refbDoesntWantMAA] = true,
     },
 
 

@@ -1487,7 +1487,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
                 local iOurBaseLandPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                 for iCurPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
-                    if oPlatoon.GetPlan and not (oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) and not (oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow]) and not (oPlatoon[M27PlatoonTemplates.refbRunFromAllEnemies]) and not(oPlatoon[M27PlatoonUtilities.refbACUInPlatoon]) then
+                    if oPlatoon.GetPlan and not (oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) and not(oPlatoon[M27PlatoonTemplates.refbDoesntWantMAA]) not (oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow]) and not (oPlatoon[M27PlatoonTemplates.refbRunFromAllEnemies]) and not(oPlatoon[M27PlatoonUtilities.refbACUInPlatoon]) then
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Considering platoon ' .. (oPlatoon:GetPlan() or 'nil') .. (oPlatoon[M27PlatoonUtilities.refiPlatoonCount] or 'nil') .. '; Land pathing segment=' .. M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) .. '; Our base segment=' .. iOurBaseLandPathingGroup .. '; Mass value=' .. (oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] or 'nil') .. '; iThresholdForAMAA=' .. (iThresholdForAMAA or 'nil'))
                         end
