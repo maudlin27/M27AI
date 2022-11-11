@@ -1411,6 +1411,18 @@ function OnConstructed(oEngineer, oJustBuilt)
                 if EntityCategoryContains(M27UnitInfo.refCategoryFixedShield * categories.TECH3, oJustBuilt.UnitId) then
                     table.insert(aiBrain[M27EngineerOverseer.reftShieldsWantingHives], oJustBuilt)
                 end
+
+                --SAMs covering friendly mexes
+                if EntityCategoryContains(M27UnitInfo.refCategoryStructureAA * categories.TECH3, oJustBuilt.UnitId) then
+                    local tNearbyT3Mexes = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT3Mex, oJustBuilt:GetPosition(), M27EngineerOverseer.iSAMCreepCoverageRange, 'Ally')
+                    if M27Utilities.IsTableEmpty(tNearbyT3Mexes) == false then
+                        for iMex, oMex in tNearbyT3Mexes do
+                            if not(M27UnitInfo.IsUnitValid(oMex[M27EngineerOverseer.refoNearbyFriendlyAA])) then
+                                oMex[M27EngineerOverseer.refoNearbyFriendlyAA] = oJustBuilt
+                            end
+                        end
+                    end
+                end
             end
 
             --All mexes - on construction check if we have allied M27 mass storage nearby (e.g. we have rebuilt on a mex that they used to have) and if so then have that M27 gift over their mass storage
@@ -1426,6 +1438,11 @@ function OnConstructed(oEngineer, oJustBuilt)
                             end
                         end
                     end
+                end
+
+                --T3 mexes - flag as wanting AA coverage
+                if EntityCategoryContains(categories.TECH3, oJustBuilt.UnitId) then
+                    ForkThread(M27EngineerOverseer.CheckIfMexWantsAACoverage, aiBrain, oJustBuilt)
                 end
             end
 

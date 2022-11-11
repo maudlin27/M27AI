@@ -8127,245 +8127,281 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 LOG(sFunctionRef .. ': iMexesInPathingGroupWeHaveClaimed=' .. iMexesInPathingGroupWeHaveClaimed .. '; iOurTeamsShareOfMexesOnMap=' .. iOurTeamsShareOfMexesOnMap .. '; iAllMexesInPathingGroupWeHaventClaimed=' .. iAllMexesInPathingGroupWeHaventClaimed..'; iAllMexesInPathingGroup='..iAllMexesInPathingGroup)
             end
 
-
-            -------->>>>>>>>>>>>Set ACU health to run on<<<<<<<<<<<----------------
-            --NOTE: Platoon utilities nearby enemies logic will adjust this slightly, in particular see the variable bCapHealthToRunOn, which reduces health to run on from 100% to 98% in most cases
-
-
-            aiBrain[refiACUHealthToRunOn] = math.max(5250, oACU:GetMaxHealth() * 0.45)
-            --Play safe with ACU if we have almost half or more of mexes
-            local iUpgradeCount = M27UnitInfo.GetNumberOfUpgradesObtained(oACU)
-            local iKeyUpgradesWanted = 1
-            if bDebugMessages == true then LOG(sFunctionRef..': About to determine adjustments to the ACU health to run on. iUpgradeCount='..iUpgradeCount..'; ACU max health='..oACU:GetMaxHealth()) end
-
-            if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 0.9 then
-                if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 1.1 then
-                    --We have 55% of mexes on map so shoudl be ahead on eco
-
-
-                    if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 1.2 or not(M27Conditions.DoesACUHaveGun(aiBrain, false)) then
-                        aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.95
-                    else
-                        aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.8
-                    end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have 10% more than our share of mexes, so setting health to run at 95% of max health') end
-                    --if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 1.2 then
-                    --Set equal to max health (so run) if we dont have a supporting upgrade as we are ahead on eco so can afford to drop back for an upgrade
-
-                    if EntityCategoryContains(categories.AEON, oACU.UnitId) then
-                        iKeyUpgradesWanted = 2
-                    end
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': iUpgradeCount=' .. iUpgradeCount .. '; iKeyUpgradesWanted=' .. iKeyUpgradesWanted)
-                    end
-                    if iUpgradeCount < iKeyUpgradesWanted and M27Conditions.HaveEnoughGrossIncomeToForceFirstUpgrade(aiBrain) then
-                        aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
-                        if bDebugMessages == true then LOG(sFunctionRef..': Want to force an upgrade so will set health to run at max health') end
-                    end
-                    --end
-
-                else
-                    --We have almost half of the mexes on the map.  Given the delay in claiming mexes it's likely we're at least even with the enemy
-                    if M27Conditions.DoesACUHaveGun(aiBrain, false) then
-                        aiBrain[refiACUHealthToRunOn] = math.max(8000, oACU:GetMaxHealth() * 0.7)
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have almost half of map mexes, and acu has gun, so setting health to retreat to be 70%') end
-                    else
-                        --ACU doesnt have gun so be very careful
-                        aiBrain[refiACUHealthToRunOn] = math.max(9000, oACU:GetMaxHealth() * 0.8)
-                    end
+            --Update flag for if we are behind on eco
+            local iEstimatedNearestEnemyEco = 0
+            local tiMassByTech = {2, 6, 18, 180}
+            local tNearestEnemyMexes = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMex + M27UnitInfo.refCategoryMassStorage, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 10000, 'Enemy')
+            if M27Utilities.IsTableEmpty(tNearestEnemyMexes) == false then
+                for iMex, oMex in tNearestEnemyMexes do
+                    iEstimatedNearestEnemyEco = iEstimatedNearestEnemyEco + tiMassByTech[M27UnitInfo.GetUnitTechLevel(oMex)]
                 end
-            elseif iMexesInPathingGroupWeHaveClaimed <= iOurTeamsShareOfMexesOnMap * 0.7 then
-                aiBrain[refiACUHealthToRunOn] = math.max(4250, oACU:GetMaxHealth() * 0.35)
             end
-            --Do we have a firebase? if so increase health to run on
-            if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]) == false then
-                aiBrain[refiACUHealthToRunOn] = math.min(oACU:GetMaxHealth() * 0.9, aiBrain[refiACUHealthToRunOn] + 2000)
+            --Reduce by enemy team number
+            local iEnemyBrains = 0
+            if M27Utilities.IsTableEmpty(aiBrain[toEnemyBrains]) == false then
+                for iBrain, oBrain in aiBrain[toEnemyBrains] do
+                    iEnemyBrains = iEnemyBrains + 1
+                end
+            end
+            iEnemyBrains = math.max(1, iEnemyBrains * 0.9)
+
+            iEstimatedNearestEnemyEco = iEstimatedNearestEnemyEco / iEnemyBrains
+
+
+            if iMexesInPathingGroupWeHaveClaimed < iOurTeamsShareOfMexesOnMap then
+                if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] <= iEstimatedNearestEnemyEco * 1.5 then
+                    aiBrain[M27EconomyOverseer.refbBehindOnEco] = true
+                else
+                    aiBrain[M27EconomyOverseer.refbBehindOnEco] = false
+                end
+            else
+                --We have more than our team's share of mexes
+                if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] <= iEstimatedNearestEnemyEco * 1.1 then
+                    aiBrain[M27EconomyOverseer.refbBehindOnEco] = true
+                else
+                    aiBrain[M27EconomyOverseer.refbBehindOnEco] = false
+                end
             end
 
-            if oACU[refbInDangerOfBeingFlanked] then
-                aiBrain[refiACUHealthToRunOn] = math.max(oACU:GetMaxHealth() * 0.9, aiBrain[refiACUHealthToRunOn])
-                if bDebugMessages == true then LOG(sFunctionRef..': ACU is in danger of being flanked. Size of flanking units table='..table.getn(oACU[reftPotentialFlankingUnits])) end
-            end
 
-            --Also set health to run as a high value if we have high mass and energy income and enemy is at tech 3
-            if aiBrain[refiEnemyHighestTechLevel] >= 3 and (aiBrain[refiHighestEnemyGroundUnitHealth] >= 5000 or aiBrain[refiTotalEnemyShortRangeThreat] >= 10000) and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 50 then
-                if bDebugMessages == true then LOG(sFunctionRef..': Enemy has access to tech 3, and we have at least 100 mass per second income') end
-                if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 13 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 100 then
-                    if not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
-                        --Increase health to run above max health (so even with mobile shields we will run) if dont have gun upgrade or v.high economy
-                        if not (M27Conditions.DoesACUHaveGun(aiBrain, true, oACU)) or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 26 or aiBrain[refiEnemyHighestTechLevel] >= 4 then
-                            aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() + 15000
-                            if bDebugMessages == true then LOG(sFunctionRef..': Enemy has T4 or we dont have gun or have lots of mass so will force ACU to run') end
+                -------->>>>>>>>>>>>Set ACU health to run on<<<<<<<<<<<----------------
+                --NOTE: Platoon utilities nearby enemies logic will adjust this slightly, in particular see the variable bCapHealthToRunOn, which reduces health to run on from 100% to 98% in most cases
+
+
+                aiBrain[refiACUHealthToRunOn] = math.max(5250, oACU:GetMaxHealth() * 0.45)
+                --Play safe with ACU if we have almost half or more of mexes
+                local iUpgradeCount = M27UnitInfo.GetNumberOfUpgradesObtained(oACU)
+                local iKeyUpgradesWanted = 1
+                if bDebugMessages == true then LOG(sFunctionRef..': About to determine adjustments to the ACU health to run on. iUpgradeCount='..iUpgradeCount..'; ACU max health='..oACU:GetMaxHealth()) end
+
+                if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 0.9 then
+                    if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 1.1 then
+                        --We have 55% of mexes on map so shoudl be ahead on eco
+
+
+                        if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 1.2 or not(M27Conditions.DoesACUHaveGun(aiBrain, false)) then
+                            aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.95
                         else
-                            --Enemy has t3, and we have decent eco; run if we dont have lots of enhancements
-                            if iUpgradeCount < 3 or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 20 then
-                                aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have high mass income and not many upgrades so will force ACU to run') end
-
-                            else    --Have 3+ enhancements and dont have at least 200 gross mass income so will allow a bit of health damage
-                                aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.95
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have at least 3 upgrades so will only retreat if ACU not at full health') end
-                            end
-                            if bDebugMessages == true then LOG(sFunctionRef..': iUpgradeCount='..iUpgradeCount..'; aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; health to run on after adjusting for this='..aiBrain[refiACUHealthToRunOn]) end
+                            aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.8
                         end
-                    else
-                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
-                    end
-                else
-                    if iUpgradeCount < 1 then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have 10% more than our share of mexes, so setting health to run at 95% of max health') end
+                        --if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 1.2 then
+                        --Set equal to max health (so run) if we dont have a supporting upgrade as we are ahead on eco so can afford to drop back for an upgrade
+
+                        if EntityCategoryContains(categories.AEON, oACU.UnitId) then
+                            iKeyUpgradesWanted = 2
+                        end
                         if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Dont have any ugprade on ACU yet so want to retreat it')
+                            LOG(sFunctionRef .. ': iUpgradeCount=' .. iUpgradeCount .. '; iKeyUpgradesWanted=' .. iKeyUpgradesWanted)
                         end
-                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() + 5000)
-                    elseif iUpgradeCount < iKeyUpgradesWanted then
-                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
-                    end
-                end
-            end
-
-            if bDebugMessages == true then LOG(sFunctionRef..': Health to run on before further adjustments='..aiBrain[refiACUHealthToRunOn]) end
-
-            --Increase health to run on if enemy has air nearby and we lack AA
-            if aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then
-                local bHaveNearbyMAA = false
-                if oACU[refoUnitsMAAHelper] and M27Utilities.IsTableEmpty(oACU[refoUnitsMAAHelper][M27PlatoonUtilities.reftCurrentUnits]) == false then
-                    local oNearestMAA = M27Utilities.GetNearestUnit(oACU[refoUnitsMAAHelper][M27PlatoonUtilities.reftCurrentUnits], oACU:GetPosition(), aiBrain)
-                    if M27UnitInfo.IsUnitValid(oNearestMAA) then
-                        if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oNearestMAA:GetPosition()) <= 30 then
-                            bHaveNearbyMAA = true
+                        if iUpgradeCount < iKeyUpgradesWanted and M27Conditions.HaveEnoughGrossIncomeToForceFirstUpgrade(aiBrain) then
+                            aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                            if bDebugMessages == true then LOG(sFunctionRef..': Want to force an upgrade so will set health to run at max health') end
                         end
-                    end
-                end
-                if not (bHaveNearbyMAA) then
-                    if aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0 and aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 2000 and not(oACU:HasEnhancement('CloakingGenerator')) and not(aiBrain[M27AirOverseer.refbHaveAirControl]) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Lack air control and enemy has T3 air so setting ACU health to run at ACU max health') end
-                        aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                        --end
+
                     else
-                        local tEnemyAirThreats = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGunship + M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryTorpBomber, oACU:GetPosition(), 40, 'Enemy')
-                        if M27Utilities.IsTableEmpty(tEnemyAirThreats) == false then
-                            aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.85)
-                            if bDebugMessages == true then LOG(sFunctionRef..': Nearby enemy air threats so setting health to run at 95% of ACU health') end
+                        --We have almost half of the mexes on the map.  Given the delay in claiming mexes it's likely we're at least even with the enemy
+                        if M27Conditions.DoesACUHaveGun(aiBrain, false) then
+                            aiBrain[refiACUHealthToRunOn] = math.max(8000, oACU:GetMaxHealth() * 0.7)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have almost half of map mexes, and acu has gun, so setting health to retreat to be 70%') end
+                        else
+                            --ACU doesnt have gun so be very careful
+                            aiBrain[refiACUHealthToRunOn] = math.max(9000, oACU:GetMaxHealth() * 0.8)
+                        end
+                    end
+                elseif iMexesInPathingGroupWeHaveClaimed <= iOurTeamsShareOfMexesOnMap * 0.7 then
+                    aiBrain[refiACUHealthToRunOn] = math.max(4250, oACU:GetMaxHealth() * 0.35)
+                end
+                --Do we have a firebase? if so increase health to run on
+                if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]) == false then
+                    aiBrain[refiACUHealthToRunOn] = math.min(oACU:GetMaxHealth() * 0.9, aiBrain[refiACUHealthToRunOn] + 2000)
+                end
+
+                if oACU[refbInDangerOfBeingFlanked] then
+                    aiBrain[refiACUHealthToRunOn] = math.max(oACU:GetMaxHealth() * 0.9, aiBrain[refiACUHealthToRunOn])
+                    if bDebugMessages == true then LOG(sFunctionRef..': ACU is in danger of being flanked. Size of flanking units table='..table.getn(oACU[reftPotentialFlankingUnits])) end
+                end
+
+                --Also set health to run as a high value if we have high mass and energy income and enemy is at tech 3
+                if aiBrain[refiEnemyHighestTechLevel] >= 3 and (aiBrain[refiHighestEnemyGroundUnitHealth] >= 5000 or aiBrain[refiTotalEnemyShortRangeThreat] >= 10000) and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 50 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy has access to tech 3, and we have at least 100 mass per second income') end
+                    if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 13 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 100 then
+                        if not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
+                            --Increase health to run above max health (so even with mobile shields we will run) if dont have gun upgrade or v.high economy
+                            if not (M27Conditions.DoesACUHaveGun(aiBrain, true, oACU)) or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 26 or aiBrain[refiEnemyHighestTechLevel] >= 4 then
+                                aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() + 15000
+                                if bDebugMessages == true then LOG(sFunctionRef..': Enemy has T4 or we dont have gun or have lots of mass so will force ACU to run') end
+                            else
+                                --Enemy has t3, and we have decent eco; run if we dont have lots of enhancements
+                                if iUpgradeCount < 3 or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 20 then
+                                    aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have high mass income and not many upgrades so will force ACU to run') end
+
+                                else    --Have 3+ enhancements and dont have at least 200 gross mass income so will allow a bit of health damage
+                                    aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.95
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have at least 3 upgrades so will only retreat if ACU not at full health') end
+                                end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iUpgradeCount='..iUpgradeCount..'; aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; health to run on after adjusting for this='..aiBrain[refiACUHealthToRunOn]) end
+                            end
+                        else
+                            aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
+                        end
+                    else
+                        if iUpgradeCount < 1 then
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': Dont have any ugprade on ACU yet so want to retreat it')
+                            end
+                            aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() + 5000)
+                        elseif iUpgradeCount < iKeyUpgradesWanted then
+                            aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
                         end
                     end
                 end
-            end
 
-            --Increase health to run on if ACU has recently taken torpedo damage
-            if GetGameTimeSeconds() - (oACU[refiACULastTakenUnseenOrTorpedoDamage] or -100) <= 60 and not(oACU:HasEnhancement('NaniteTorpedoTube')) then
-                aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.85)
-                if bDebugMessages == true then LOG(sFunctionRef..': ACU recently taken unseen or torpedo damage so setting health to run to 85% of its health') end
-            end
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Finished setting ACU health to run on. ACU max health=' .. oACU:GetMaxHealth() .. '; ACU health to run on=' .. aiBrain[refiACUHealthToRunOn])
-            end
+                if bDebugMessages == true then LOG(sFunctionRef..': Health to run on before further adjustments='..aiBrain[refiACUHealthToRunOn]) end
 
-            --Increase health to run if we are on enemy side of the map
-            local iDistToOurBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-            local iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-
-
-            --Flag we need AirAA as an emergency and set ACU health to run equal to max health if we fear an air snipe
-            if bDebugMessages == true then LOG(sFunctionRef..': Considering if vulnerable to air snipe. iDistToOurBase='..iDistToOurBase..'; have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl])..'; aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]..'; aiBrain[M27AirOverseer.refiOurMassInAirAA]='..aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; Enemy AirAA threat='..aiBrain[M27AirOverseer.refiEnemyAirAAThreat]) end
-            if iDistToOurBase >= 200 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1800 and not(oACU:HasEnhancement('CloakingGenerator')) then
-                --(1500 threshold as have seen replays where Gun+T2 ACU with mobile shield and T2 MAA escort dies to T1 bombers
-                local tNearbyEnemyAir = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllAir * categories.EXPERIMENTAL + M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryGunship, oACU:GetPosition(), 130, 'Enemy')
-                aiBrain[refbACUVulnerableToAirSnipe] = true
-                if bDebugMessages == true then LOG(sFunctionRef..': Set ACU as being vulnerable to an air snipe. Is table of nearby enemy air to ground empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyAir))) end
-
-                --Also retreat if nearby enemy air threat nearby and ACU not close to base
-                if M27Utilities.IsTableEmpty(tNearbyEnemyAir) == false then
-                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
-                end
-                --Potential air threat; will distinguish between the following scenarios:
-                --High risk of air snipe requiring emergency AA production
-                --Risk of air snipe due to being far away from AirAA support
-
-                if not(aiBrain[M27AirOverseer.refbHaveAirControl]) and aiBrain[M27AirOverseer.refiOurMassInAirAA] <= math.max(2000, aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] * 0.5) then
-                    --High risk of air snipe.  Set health to run equal to 75% normally, or 100% if we have weak MAA nearby
-
-                    --aiBrain[refbACUVulnerableToAirSnipe] = true
-                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.75)
-                    local tNearbyMAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, oACU:GetPosition(), 60, 'Ally')
-                    local iNearbyMAAThreat = 0
-                    if M27Utilities.IsTableEmpty(tNearbyMAA) == false then
-                        iNearbyMAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyMAA, false, false, true, false, false, nil, nil, nil, nil, nil)
-                    end
-                    if iNearbyMAAThreat <= 400 then
-                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
-                        if bDebugMessages == true then LOG(sFunctionRef..': ACU very vulnerable to Air snipe, will retreat even if on full health') end
-                    elseif iNearbyMAAThreat <= 750 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 2500 then
-                        if bDebugMessages == true then LOG(sFunctionRef..': ACU vulnerable to air snipe, but not massively, so will just retreat if not quite full health') end
-                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.9)
-                    end
-                else
-                    --Are we far away from the air rally point, and lack much MAA support? If so then set health to run on between 90-100%
-                    if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27AirOverseer.GetAirRallyPoint(aiBrain)) >= 150 then
-                        local iACUShield, iACUMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU, true)
-                        if oACU:GetHealth() + iACUShield < 19000 then
-
-                            local tNearbyMAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, oACU:GetPosition(), 60, 'Ally')
-                            local iNearbyMAAThreat = 0
-                            if M27Utilities.IsTableEmpty(tNearbyMAA) == false then
-                                iNearbyMAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyMAA, false, false, true, false, false, nil, nil, nil, nil, nil)
+                --Increase health to run on if enemy has air nearby and we lack AA
+                if aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then
+                    local bHaveNearbyMAA = false
+                    if oACU[refoUnitsMAAHelper] and M27Utilities.IsTableEmpty(oACU[refoUnitsMAAHelper][M27PlatoonUtilities.reftCurrentUnits]) == false then
+                        local oNearestMAA = M27Utilities.GetNearestUnit(oACU[refoUnitsMAAHelper][M27PlatoonUtilities.reftCurrentUnits], oACU:GetPosition(), aiBrain)
+                        if M27UnitInfo.IsUnitValid(oNearestMAA) then
+                            if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oNearestMAA:GetPosition()) <= 30 then
+                                bHaveNearbyMAA = true
                             end
-                            if bDebugMessages == true then LOG(sFunctionRef..': More than 150 from nearest air rally point. iNearbyMAAThreat='..iNearbyMAAThreat..'; Enemy air to ground threat='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]) end
-                            if iNearbyMAAThreat <= math.min(400, math.max(200, aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] * 0.1)) then
-                                if aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 3000 then
-                                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Have little MAA nearby and AirAA is a long way away so will run even if on full health') end
-                                else
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Is table of nearby enemy air empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyAir))) end
-                                    if M27Utilities.IsTableEmpty(tNearbyEnemyAir) == false then
+                        end
+                    end
+                    if not (bHaveNearbyMAA) then
+                        if aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0 and aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 2000 and not(oACU:HasEnhancement('CloakingGenerator')) and not(aiBrain[M27AirOverseer.refbHaveAirControl]) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Lack air control and enemy has T3 air so setting ACU health to run at ACU max health') end
+                            aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                        else
+                            local tEnemyAirThreats = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGunship + M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryTorpBomber, oACU:GetPosition(), 40, 'Enemy')
+                            if M27Utilities.IsTableEmpty(tEnemyAirThreats) == false then
+                                aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.85)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Nearby enemy air threats so setting health to run at 95% of ACU health') end
+                            end
+                        end
+                    end
+                end
+
+                --Increase health to run on if ACU has recently taken torpedo damage
+                if GetGameTimeSeconds() - (oACU[refiACULastTakenUnseenOrTorpedoDamage] or -100) <= 60 and not(oACU:HasEnhancement('NaniteTorpedoTube')) then
+                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.85)
+                    if bDebugMessages == true then LOG(sFunctionRef..': ACU recently taken unseen or torpedo damage so setting health to run to 85% of its health') end
+                end
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Finished setting ACU health to run on. ACU max health=' .. oACU:GetMaxHealth() .. '; ACU health to run on=' .. aiBrain[refiACUHealthToRunOn])
+                end
+
+                --Increase health to run if we are on enemy side of the map
+                local iDistToOurBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                local iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+
+
+                --Flag we need AirAA as an emergency and set ACU health to run equal to max health if we fear an air snipe
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering if vulnerable to air snipe. iDistToOurBase='..iDistToOurBase..'; have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl])..'; aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]..'; aiBrain[M27AirOverseer.refiOurMassInAirAA]='..aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; Enemy AirAA threat='..aiBrain[M27AirOverseer.refiEnemyAirAAThreat]) end
+                if iDistToOurBase >= 200 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1800 and not(oACU:HasEnhancement('CloakingGenerator')) then
+                    --(1500 threshold as have seen replays where Gun+T2 ACU with mobile shield and T2 MAA escort dies to T1 bombers
+                    local tNearbyEnemyAir = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllAir * categories.EXPERIMENTAL + M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryGunship, oACU:GetPosition(), 130, 'Enemy')
+                    aiBrain[refbACUVulnerableToAirSnipe] = true
+                    if bDebugMessages == true then LOG(sFunctionRef..': Set ACU as being vulnerable to an air snipe. Is table of nearby enemy air to ground empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyAir))) end
+
+                    --Also retreat if nearby enemy air threat nearby and ACU not close to base
+                    if M27Utilities.IsTableEmpty(tNearbyEnemyAir) == false then
+                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
+                    end
+                    --Potential air threat; will distinguish between the following scenarios:
+                    --High risk of air snipe requiring emergency AA production
+                    --Risk of air snipe due to being far away from AirAA support
+
+                    if not(aiBrain[M27AirOverseer.refbHaveAirControl]) and aiBrain[M27AirOverseer.refiOurMassInAirAA] <= math.max(2000, aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] * 0.5) then
+                        --High risk of air snipe.  Set health to run equal to 75% normally, or 100% if we have weak MAA nearby
+
+                        --aiBrain[refbACUVulnerableToAirSnipe] = true
+                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.75)
+                        local tNearbyMAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, oACU:GetPosition(), 60, 'Ally')
+                        local iNearbyMAAThreat = 0
+                        if M27Utilities.IsTableEmpty(tNearbyMAA) == false then
+                            iNearbyMAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyMAA, false, false, true, false, false, nil, nil, nil, nil, nil)
+                        end
+                        if iNearbyMAAThreat <= 400 then
+                            aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
+                            if bDebugMessages == true then LOG(sFunctionRef..': ACU very vulnerable to Air snipe, will retreat even if on full health') end
+                        elseif iNearbyMAAThreat <= 750 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 2500 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': ACU vulnerable to air snipe, but not massively, so will just retreat if not quite full health') end
+                            aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.9)
+                        end
+                    else
+                        --Are we far away from the air rally point, and lack much MAA support? If so then set health to run on between 90-100%
+                        if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27AirOverseer.GetAirRallyPoint(aiBrain)) >= 150 then
+                            local iACUShield, iACUMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU, true)
+                            if oACU:GetHealth() + iACUShield < 19000 then
+
+                                local tNearbyMAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, oACU:GetPosition(), 60, 'Ally')
+                                local iNearbyMAAThreat = 0
+                                if M27Utilities.IsTableEmpty(tNearbyMAA) == false then
+                                    iNearbyMAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyMAA, false, false, true, false, false, nil, nil, nil, nil, nil)
+                                end
+                                if bDebugMessages == true then LOG(sFunctionRef..': More than 150 from nearest air rally point. iNearbyMAAThreat='..iNearbyMAAThreat..'; Enemy air to ground threat='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]) end
+                                if iNearbyMAAThreat <= math.min(400, math.max(200, aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] * 0.1)) then
+                                    if aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 3000 then
                                         aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Have little MAA nearby, enemy has nearby air threats, and AirAA is a long way away so will run even if on full health') end
-                                    elseif iNearbyMAAThreat <= 400 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 4000 then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': have some MAA but still not much and enemy has high overall air threat so will run if take much damage') end
-                                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.9)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Have little MAA nearby and AirAA is a long way away so will run even if on full health') end
+                                    else
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Is table of nearby enemy air empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyAir))) end
+                                        if M27Utilities.IsTableEmpty(tNearbyEnemyAir) == false then
+                                            aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Have little MAA nearby, enemy has nearby air threats, and AirAA is a long way away so will run even if on full health') end
+                                        elseif iNearbyMAAThreat <= 400 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 4000 then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': have some MAA but still not much and enemy has high overall air threat so will run if take much damage') end
+                                            aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.9)
+                                        end
                                     end
                                 end
                             end
                         end
+
                     end
 
+
+                else
+                    aiBrain[refbACUVulnerableToAirSnipe] = false
                 end
 
 
-            else
-                aiBrain[refbACUVulnerableToAirSnipe] = false
-            end
-
-
-            if bDebugMessages == true then LOG(sFunctionRef..': aiBrain='..aiBrain.Nickname..'; iDistToOurBase='..iDistToOurBase..'; End of deciding if vulnerable to air snipe, is ACU vulnerable='..tostring(aiBrain[refbACUVulnerableToAirSnipe])..'; Current ACU health to run on before further adjustment='..aiBrain[refiACUHealthToRunOn]..'; Has enemy built torpedo bombers='..tostring(aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] or false)..'; iUpgradeCount='..iUpgradeCount..'; Enemy air to ground threat='..(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 'nil')..'; Can path to enemy with land='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; can path to enemy with amphib='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; Is ACU underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oACU))) end
-            --If ACU far from base and is amphibious map and ACU is in big pond, without many upgrades, and enemy has built at least 1 torpedo bomber this game, then have it run if the enemy has torp bombers
-            if iDistToOurBase > 175 and (aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] or aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0) and iUpgradeCount < 3 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 200 and not(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and M27UnitInfo.IsUnitUnderwater(oACU) then
-                --is the ACU in a large pond (10k+ in size)?
-                local iPond = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oACU:GetPosition())
-                if bDebugMessages == true then LOG(sFunctionRef..': ACU pond='..iPond..'; is pond details empty for this pond='..tostring(M27Utilities.IsTableEmpty(M27Navy.tPondDetails[iPond])))
-                    if M27Navy.tPondDetails[iPond] then LOG(sFunctionRef..': Pond size='..(M27Navy.tPondDetails[iPond][M27Navy.subrefPondSize] or 'nil')) end
+                if bDebugMessages == true then LOG(sFunctionRef..': aiBrain='..aiBrain.Nickname..'; iDistToOurBase='..iDistToOurBase..'; End of deciding if vulnerable to air snipe, is ACU vulnerable='..tostring(aiBrain[refbACUVulnerableToAirSnipe])..'; Current ACU health to run on before further adjustment='..aiBrain[refiACUHealthToRunOn]..'; Has enemy built torpedo bombers='..tostring(aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] or false)..'; iUpgradeCount='..iUpgradeCount..'; Enemy air to ground threat='..(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 'nil')..'; Can path to enemy with land='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; can path to enemy with amphib='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; Is ACU underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oACU))) end
+                --If ACU far from base and is amphibious map and ACU is in big pond, without many upgrades, and enemy has built at least 1 torpedo bomber this game, then have it run if the enemy has torp bombers
+                if iDistToOurBase > 175 and (aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] or aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0) and iUpgradeCount < 3 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 200 and not(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and M27UnitInfo.IsUnitUnderwater(oACU) then
+                    --is the ACU in a large pond (10k+ in size)?
+                    local iPond = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oACU:GetPosition())
+                    if bDebugMessages == true then LOG(sFunctionRef..': ACU pond='..iPond..'; is pond details empty for this pond='..tostring(M27Utilities.IsTableEmpty(M27Navy.tPondDetails[iPond])))
+                        if M27Navy.tPondDetails[iPond] then LOG(sFunctionRef..': Pond size='..(M27Navy.tPondDetails[iPond][M27Navy.subrefPondSize] or 'nil')) end
+                    end
+                    if M27Navy.tPondDetails[iPond] and M27Navy.tPondDetails[iPond][M27Navy.subrefPondSize] >= 10000 then
+                        aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy has built torp bombers and our ACU is vulnerable so want to retreat it') end
+                    end
                 end
-                if M27Navy.tPondDetails[iPond] and M27Navy.tPondDetails[iPond][M27Navy.subrefPondSize] >= 10000 then
-                    aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
-                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy has built torp bombers and our ACU is vulnerable so want to retreat it') end
+
+
+                if iDistToOurBase > iDistToEnemyBase then aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], math.min(aiBrain[refiACUHealthToRunOn] + oACU:GetMaxHealth() * 0.05, oACU:GetMaxHealth() * 0.975)) end
+
+                --Increase health to run if we lack basic intel coverage
+                if not(M27Logic.GetIntelCoverageOfPosition(aiBrain, oACU:GetPosition(), 30, false)) then aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], math.min(aiBrain[refiACUHealthToRunOn] + oACU:GetMaxHealth() * 0.05, oACU:GetMaxHealth() * 0.975)) end
+
+                --Decrease health to run if we are in land rush mode
+                if aiBrain[refiAIBrainCurrentStrategy] == refStrategyLandRush and aiBrain[refiACUHealthToRunOn] >= 4000 then aiBrain[refiACUHealthToRunOn] = math.max(4000, aiBrain[refiACUHealthToRunOn] * 0.8) end
+
+                if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating health for ACU to run on. aiBrain[refiACUHealthToRunOn]='..aiBrain[refiACUHealthToRunOn]..'; refbACUVulnerableToAirSnipe='..tostring(aiBrain[refbACUVulnerableToAirSnipe])) end
+
+
+                else
+                --Still want AirAA to update every second
+                ForkThread(M27Team.UpdateTeamDataForEnemyUnits, aiBrain, false) --Currently updates number of wall units but could add other logic to this
                 end
-            end
-
-
-            if iDistToOurBase > iDistToEnemyBase then aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], math.min(aiBrain[refiACUHealthToRunOn] + oACU:GetMaxHealth() * 0.05, oACU:GetMaxHealth() * 0.975)) end
-
-            --Increase health to run if we lack basic intel coverage
-            if not(M27Logic.GetIntelCoverageOfPosition(aiBrain, oACU:GetPosition(), 30, false)) then aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], math.min(aiBrain[refiACUHealthToRunOn] + oACU:GetMaxHealth() * 0.05, oACU:GetMaxHealth() * 0.975)) end
-
-            --Decrease health to run if we are in land rush mode
-            if aiBrain[refiAIBrainCurrentStrategy] == refStrategyLandRush and aiBrain[refiACUHealthToRunOn] >= 4000 then aiBrain[refiACUHealthToRunOn] = math.max(4000, aiBrain[refiACUHealthToRunOn] * 0.8) end
-
-            if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating health for ACU to run on. aiBrain[refiACUHealthToRunOn]='..aiBrain[refiACUHealthToRunOn]..'; refbACUVulnerableToAirSnipe='..tostring(aiBrain[refbACUVulnerableToAirSnipe])) end
-
-
-        else
-            --Still want AirAA to update every second
-            ForkThread(M27Team.UpdateTeamDataForEnemyUnits, aiBrain, false) --Currently updates number of wall units but could add other logic to this
         end
-    end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 

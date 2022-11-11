@@ -2743,10 +2743,36 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     bProceed = false
                     oPlatoon[refiCurrentAction] = refActionRun
                     if bDebugMessages == true then LOG(sFunctionRef..': Are in protect ACU mode so will run') end
-                elseif M27UnitInfo.GetUnitHealthPercent(oACU) <= 0.8 and oPlatoon[refiThreatWhenRetreatToRallyOrBase] >= M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftCurrentUnits]) and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > M27Overseer.iDistanceFromBaseToBeSafe then
-                    bProceed = false
-                    oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
-                    if bDebugMessages == true then LOG(sFunctionRef..': Dont have more threat than when we last had to retreat to rally/base so will do a temporary retreat') end
+                elseif M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > M27Overseer.iDistanceFromBaseToBeSafe then
+                    if M27UnitInfo.GetUnitHealthPercent(oACU) <= 0.8 and oPlatoon[refiThreatWhenRetreatToRallyOrBase] >= M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftCurrentUnits]) then
+                        bProceed = false
+                        oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
+                        if bDebugMessages == true then LOG(sFunctionRef..': Dont have more threat than when we last had to retreat to rally/base so will do a temporary retreat') end
+                    else
+                        --If we are ahead on eco and significant number of enemy threats, and we dont have mobile shield coverage or personal shield, then also consider retreating
+                        if not(aiBrain[M27EconomyOverseer.refbBehindOnEco]) then
+                            local iUpgradeCount = M27UnitInfo.GetNumberOfUpgradesObtained(oACU)
+                            if iUpgradeCount <= 2 and oPlatoon[refiEnemiesInRange] >= (10 + iUpgradeCount) then
+                                local iCurShield, iMaxShield = GetCurrentAndMaximumShield(oPlatoon[refoFrontUnit], false)
+                                if iCurShield <= 2000 then
+                                    --Do we have mobile shield coverage?
+                                    if not(M27Conditions.HaveNearbyMobileShield(oPlatoon)) then
+                                        --Does the enemy have at least 500 combat threat and 5+ combat units? if so then retreat
+                                        if M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemiesInRange]) >= 500 + iUpgradeCount * 300 then
+                                            local tEnemyDFCombatUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat, oPlatoon[reftEnemiesInRange])
+                                            if M27Utilities.IsTableEmpty(tEnemyDFCombatUnits) == false and table.getn(tEnemyDFCombatUnits) >= 5 then
+                                                bDebugMessages = true
+                                                bProceed = false
+                                                oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Worried ACU might be overwhelmed so will temporarily retreat as we are ahead on eco') end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+
                 end
             end
 
