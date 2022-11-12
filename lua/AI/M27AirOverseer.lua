@@ -10046,7 +10046,6 @@ function GunshipManager(aiBrain)
 
 
     if M27Utilities.IsTableEmpty(aiBrain[reftAvailableGunships]) == false then
-        if aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 2060 then bDebugMessages = true end
         --First get the nearest threat that we want to focus on, then decide how we will approach it
         local iClosestEnemyDist = 100000
         local iCurEnemyDist
@@ -10274,7 +10273,6 @@ function GunshipManager(aiBrain)
             else
                 local tNearbyT3AA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3 + M27UnitInfo.refCategoryCruiser, oFrontGunship:GetPosition(), math.max(70, iAirAASearchRange), 'Enemy')
                 if M27Utilities.IsTableEmpty(tNearbyT3AA) == false then
-                    bDebugMessages = true
                     if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tNearbyT3AA)..' nearby T3 ground AA') end
                     if table.getn(tNearbyT3AA) >= 3 then
                         bRetreatFromAA = true

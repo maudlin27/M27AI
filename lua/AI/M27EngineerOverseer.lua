@@ -4805,7 +4805,6 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
     local iCategoryRef
     local iCategoryToBuild
     local iFactionIndex = aiBrain:GetFactionIndex()
-    if aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
     --Have we already started construction on an experimental?
     --reftEngineerAssignmentsByActionRef --Records all engineers. [x][y]{1,2} - x is the action ref; y is the engineer unique ref, 1 is the location ref, 2 is the engineer object (use the subtable ref keys instead of numbers to refer to these)
     if bDebugMessages == true then LOG(sFunctionRef..': iActionToAssign='..iActionToAssign..'; Is the table of engi actions for this empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][iActionToAssign]))..'; aiBrain[refiLastExperimentalReference]='..(aiBrain[refiLastExperimentalReference] or 'nil')..'; aiBrain[refiLastSecondExperimentalRef]='..(aiBrain[refiLastSecondExperimentalRef] or 'nil')) end
@@ -6477,7 +6476,6 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
 
     local sFunctionRef = 'AssignActionToEngineer'
     M27Utilities.FunctionProfiler(sFunctionRef..iActionToAssign, M27Utilities.refProfilerStart)
-    if iActionToAssign == refActionSAMCreep then bDebugMessages = true end
     --if (iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildThirdPower) then bDebugMessages = true end
     --if GetEngineerUniqueCount(oEngineer) == 12 then bDebugMessages = true end
     --if GetEngineerUniqueCount(oEngineer) == 61 and GetGameTimeSeconds() >= 660 then bDebugMessages = true end
@@ -9140,6 +9138,7 @@ function CheckIfMexWantsAACoverage(aiBrain, oUnit, iOptionalBasePathingGroup)
                 break
             end
         else
+            if not(aiBrain[reftoMexesWantingAACoverage]) then aiBrain[reftoMexesWantingAACoverage] = {} end
             table.insert(aiBrain[reftoMexesWantingAACoverage], oUnit)
         end
     end

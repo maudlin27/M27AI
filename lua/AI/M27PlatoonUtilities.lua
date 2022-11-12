@@ -2448,7 +2448,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' and aiBrain:GetArmyIndex() == 10 and GetGameTimeSeconds() >= 940 then bDebugMessages = true end
-    --if sPlatoonName == 'M27IndirectSpareAttacker' and aiBrain:GetArmyIndex() == 10 and GetGameTimeSeconds() >= 940 then bDebugMessages = true end
+    --if sPlatoonName == 'M27IndirectSpareAttacker' and (oPlatoon[refoFrontUnit] == 'dal0310' or oPlatoon[refiPlatoonCount] == 15) then bDebugMessages = true end
     --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
     --if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' and oPlatoon[refiPlatoonCount] == 21 then bDebugMessages = true end
@@ -2761,7 +2761,6 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                         if M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemiesInRange]) >= 500 + iUpgradeCount * 300 then
                                             local tEnemyDFCombatUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat, oPlatoon[reftEnemiesInRange])
                                             if M27Utilities.IsTableEmpty(tEnemyDFCombatUnits) == false and table.getn(tEnemyDFCombatUnits) >= 5 then
-                                                bDebugMessages = true
                                                 bProceed = false
                                                 oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Worried ACU might be overwhelmed so will temporarily retreat as we are ahead on eco') end
@@ -5425,13 +5424,13 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                             end
                             if oPlatoon[refiIndirectUnits] > 0 then
                                 if oPlatoon[refiDFUnits] == 0 then
-                                    oPlatoon[refiPlatoonMaxRange] = math.max(oPlatoon[refiPlatoonMaxRange], M27UnitInfo.GetUnitIndirectRange(oPlatoon[refoFrontUnit]))
+                                    oPlatoon[refiPlatoonMaxRange] = math.max(oPlatoon[refiPlatoonMaxRange], M27Logic.GetUnitMaxGroundRange({oPlatoon[refoFrontUnit]}), M27UnitInfo.GetUnitIndirectRange(oPlatoon[refoFrontUnit]))
                                     if bDebugMessages == true then LOG(sFunctionRef..': Platoon has no DF units but has indirect fire units, range after checking DF units='..oPlatoon[refiPlatoonMaxRange]..'; front unit='..oPlatoon[refoFrontUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit])) end
                                 elseif EntityCategoryContains(categories.INDIRECTFIRE + M27UnitInfo.refCategoryLongRangeDFLand, oPlatoon[refoFrontUnit].UnitId) then
-                                    oPlatoon[refiPlatoonMaxRange] = math.max(oPlatoon[refiPlatoonMaxRange], M27UnitInfo.GetUnitIndirectRange(oPlatoon[refoFrontUnit]))
+                                    oPlatoon[refiPlatoonMaxRange] = math.max(oPlatoon[refiPlatoonMaxRange], M27Logic.GetUnitMaxGroundRange({oPlatoon[refoFrontUnit]}), M27UnitInfo.GetUnitIndirectRange(oPlatoon[refoFrontUnit]))
                                     if bDebugMessages == true then LOG(sFunctionRef..': Platoon has DF units but contains indirect or long range DF land, units but has indirect fire units, range after checking DF units='..oPlatoon[refiPlatoonMaxRange]..'; front unit='..oPlatoon[refoFrontUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit])) end
                                 else
-                                    oPlatoon[refiPlatoonMaxRange] = math.max(oPlatoon[refiPlatoonMaxRange], M27UnitInfo.GetUnitIndirectRange(M27Utilities.GetNearestUnit(oPlatoon[reftIndirectUnits], GetPlatoonFrontPosition(oPlatoon), aiBrain)))
+                                    oPlatoon[refiPlatoonMaxRange] = math.max(oPlatoon[refiPlatoonMaxRange], M27Logic.GetUnitMaxGroundRange({oPlatoon[refoFrontUnit]}), M27UnitInfo.GetUnitIndirectRange(M27Utilities.GetNearestUnit(oPlatoon[reftIndirectUnits], GetPlatoonFrontPosition(oPlatoon), aiBrain)))
                                     if bDebugMessages == true then LOG(sFunctionRef..': Platoon has DF units but no long range DF land, will get range of the indirect fire unit nearest to the platoon front.  Range='..oPlatoon[refiPlatoonMaxRange]) end
                                 end
                             end
@@ -12835,7 +12834,6 @@ function ProcessPlatoonAction(oPlatoon)
                                     local tMoveTarget = GetPositionAtOrNearTargetInPathingGroup(GetPlatoonFrontPosition(oPlatoon), oNearestPD:GetPosition(), iDistanceFromPDWanted, 0, GetPathingUnit(oPlatoon), true, true, 1)
                                     if tMoveTarget then
                                         --Is this target the same as our current positoin and we aren't in range of the PD?
-                                        bDebugMessages = true
                                         if bDebugMessages == true then LOG(sFunctionRef..': Our position='..repru(GetPlatoonFrontPosition(oPlatoon))..'; Nearest PD='..repru(oNearestPD:GetPosition())..'; iDistanceFromPDWanted='..iDistanceFromPDWanted..'; Platoon range='..oPlatoon[refiPlatoonMaxRange]..'; Dist from cur move target to PD='..M27Utilities.GetDistanceBetweenPositions(tMoveTarget, oNearestPD:GetPosition())) end
                                         if M27Utilities.GetDistanceBetweenPositions(tMoveTarget, oNearestPD:GetPosition()) > oPlatoon[refiPlatoonMaxRange] then
                                             tMoveTarget = oNearestPD:GetPosition()
