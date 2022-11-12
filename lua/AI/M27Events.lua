@@ -153,6 +153,10 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
 
 
                 if oKilledBrain.M27AI then
+                    --Flag for the platoon to update
+                    if oUnitKilled.PlatoonHandle then oUnitKilled.PlatoonHandle[M27PlatoonUtilities.refbPlatoonUnitDetailsChangedRecently] = true end
+
+
                     --were we killed by something?
                     local oKillerUnit
 
@@ -275,7 +279,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                     if oKillerBrain.M27AI then
                         --Chat message for experimentals
                         if bDebugMessages == true then LOG(sFunctionRef..': Instigator='..instigator.UnitId..'; Time since last OC='..GetGameTimeSeconds() - (instigator[M27UnitInfo.refiTimeOfLastOverchargeShot] or -100)..'; oUnitKilled='..oUnitKilled.UnitId..'; killed nearby experimental value='..(M27Chat.tiM27VoiceTauntByType['Killed nearby experimental'] or 'nil')..'; Did we kill a land experimental='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, oUnitKilled.UnitId))..'; Did we kill it with an ACU='..tostring(EntityCategoryContains(categories.COMMAND, instigator.UnitId))..'; repru of M27Chat.tiM27VoiceTauntByType='..repru(M27Chat.tiM27VoiceTauntByType)) end
-                        if EntityCategoryContains(categories.EXPERIMENTAL, oUnitKilled.UnitId) and not(M27Chat.tiM27VoiceTauntByType['Killed nearby experimental']) and (oUnitKilled.Sync.totalMassKilled or 0) <= math.min(10000, oUnitKilled:GetBlueprint().Economy.BuildCostMass * 0.35) and M27Utilities.GetDistanceBetweenPositions(oUnitKilled:GetPosition(), M27MapInfo.PlayerStartPoints[oKillerBrain.M27StartPositionNumber]) <= 150 and M27Logic.GetCombatThreatRating(oKillerBrain, oKillerBrain:GetUnitsAroundPoint(categories.EXPERIMENTAL, oUnitKilled:GetPosition(), 80, 'Enemy')) <= 5000 then
+                        if EntityCategoryContains(categories.EXPERIMENTAL, oUnitKilled.UnitId) and not(M27Chat.tiM27VoiceTauntByType['Killed nearby experimental']) and (oUnitKilled.Sync.totalMassKilled or 0) <= math.min(10000, oUnitKilled:GetBlueprint().Economy.BuildCostMass * 0.35) and M27Utilities.GetDistanceBetweenPositions(oUnitKilled:GetPosition(), M27MapInfo.PlayerStartPoints[oKillerBrain.M27StartPositionNumber]) <= 150 and M27Logic.GetCombatThreatRating(oKillerBrain, oKillerBrain:GetUnitsAroundPoint(categories.EXPERIMENTAL, oUnitKilled:GetPosition(), 150, 'Enemy')) <= 5000 then
                             M27Chat.SendMessage(oKillerBrain, 'Killed nearby experimental', 'Thanks for the mass', 5, 10000)
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, oUnitKilled.UnitId) and EntityCategoryContains(categories.COMMAND, instigator.UnitId) and GetGameTimeSeconds() - (instigator[M27UnitInfo.refiTimeOfLastOverchargeShot] or -100) <= 5 then
                             if bDebugMessages == true then LOG(sFunctionRef..': About to send ACU OC message') end
@@ -290,15 +294,15 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                             local iMassKilled = (oUnitKilled.Sync.totalMassKilled or 0)
                             if bDebugMessages == true then LOG(sFunctionRef..': Just killed '..oUnitKilled.UnitId..'; Mass that unit had killed='..iMassKilled..'; Is this chat message empty='..(M27Chat.tiM27VoiceTauntByType['Killed deadly unit'] or 'nil')..'; BP mass cost='..(oUnitKilled:GetBlueprint().Economy.BuildCostMass or 'nil')..'; Vet level='..(oUnitKilled.Sync.VeteranLevel or 'nil')) end
                             --Dont send message unless the killer is still alive (to avoid e.g. ACU killing something via its death explosion)
-                            if iMassKilled >= 1000 and M27UnitInfo.IsUnitValid(instigator) and not(M27Chat.tiM27VoiceTauntByType['Killed deadly unit']) and not(EntityCategoryContains(categories.COMMAND, oUnitKilled.UnitId)) and oUnitKilled.Sync.VeteranLevel >= 5 and oUnitKilled.GetAIBrain and not(M27Logic.IsCivilianBrain(oUnitKilled:GetAIBrain())) then
+                            if iMassKilled >= 4000 and M27UnitInfo.IsUnitValid(instigator) and not(M27Chat.tiM27VoiceTauntByType['Killed deadly unit']) and not(EntityCategoryContains(categories.COMMAND, oUnitKilled.UnitId)) and oUnitKilled.Sync.VeteranLevel >= 5 and oUnitKilled.GetAIBrain and not(M27Logic.IsCivilianBrain(oUnitKilled:GetAIBrain())) then
                                 --local oBP = oUnitKilled:GetBlueprint()
                                 --if iMassKilled >= oBP.Economy.BuildCostMass * 7 then
                                 if not(EntityCategoryContains(categories.COMMAND, instigator.UnitId)) or M27UnitInfo.GetUnitHealthPercent(instigator) >= 0.9 then
 
-                                    local sMessage = 'FINALLY killed that annoying '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)
+                                    local sMessage = 'Wow, that  '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)..' managed '..math.floor(iMassKilled)..' in mass kills :('
                                     local iRandom = math.random(1,3)
                                     if iRandom == 1 then
-                                        sMessage = 'About time I killed that '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)
+                                        sMessage = 'Ah well, at least I managed to kill that '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)..' that did so much damage'
                                     elseif iRandom == 2 then
                                         sMessage = 'That '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)..' did way too much damage'
                                     end
@@ -355,9 +359,9 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                     if M27Utilities.IsTableEmpty(M27Overseer.tAllActiveM27Brains) == false then
                         for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
                             if IsEnemy(oBrain:GetArmyIndex(), oKilledBrain:GetArmyIndex()) then
-                                local iThreatReductionMod = 0.5
-                                if EntityCategoryContains(categories.EXPERIMENTAL, oUnitKilled.UnitId) then iThreatReductionMod = 0.6 end
-                                oBrain[M27AirOverseer.refiEnemyAirAAThreat] = math.max(oBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] * (1 - iThreatReductionMod), oBrain[M27AirOverseer.refiEnemyAirAAThreat] - oUnitKilled:GetBlueprint().Economy.BuildCostMass * iThreatReductionMod)
+                                local iThreatReductionMod = 0.6
+                                if EntityCategoryContains(categories.EXPERIMENTAL, oUnitKilled.UnitId) then iThreatReductionMod = 0.7 end
+                                oBrain[M27AirOverseer.refiEnemyAirAAThreat] = math.max(math.min(oBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] * (1 - iThreatReductionMod), oBrain[M27AirOverseer.refiEnemyAirAAThreat]), oBrain[M27AirOverseer.refiEnemyAirAAThreat] - oUnitKilled:GetBlueprint().Economy.BuildCostMass * iThreatReductionMod)
                             end
                         end
                     end
@@ -869,6 +873,8 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                 --If just damaged T2+ mex or high value building with surface naval unit then have it attack that unit specifically until it is dead
                 if EntityCategoryContains(M27UnitInfo.refCategoryNavalSurface, instigator.UnitId) and EntityCategoryContains(M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex + categories.VOLATILE * categories.STRUCTURE - M27UnitInfo.refCategoryT1Power + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + categories.EXPERIMENTAL * categories.STRUCTURE, self.UnitId) then
                     ForkThread(M27UnitMicro.FocusDownTarget, instigator, self)
+                elseif EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, instigator.UnitId) then
+                    if M27UnitInfo.IsUnitValid(self) then self[M27Logic.refiT3ArtiShotCount] = 0 end --reset count of missed arti shots
                 end
             end
         end
@@ -1120,9 +1126,10 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
             --Game enders - check if we have already started a gameender nearby, and if so clear current building and reclaim it
             local bCancelAndReclaim = false
             local oUnitToSwitchTo
-            if EntityCategoryContains(M27UnitInfo.refCategoryExperimentalStructure, oConstruction.UnitId) then
+            if bDebugMessages == true then LOG(sFunctionRef..': Construction started for unit '..oConstruction.UnitId..M27UnitInfo.GetUnitLifetimeCount(oConstruction)..'; Is it an experimental structure='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryExperimentalLevel, oConstruction.UnitId))) end
+            if EntityCategoryContains(M27UnitInfo.refCategoryExperimentalLevel, oConstruction.UnitId) then
                 local tNearbyGameEnders = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryExperimentalStructure, oConstruction:GetPosition(), 150, 'Ally')
-
+                if bDebugMessages == true then LOG(sFunctionRef..': Is table of nearby gameenders empty='..tostring(M27Utilities.IsTableEmpty(tNearbyGameEnders))) end
                 if M27Utilities.IsTableEmpty(tNearbyGameEnders) == false then
                     local iPathingGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oConstruction:GetPosition())
                     for iUnit, oUnit in tNearbyGameEnders do
@@ -1133,12 +1140,48 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                         end
                     end
                 end
+                if not(bCancelAndReclaim) then
+                    --Have we just started an experimental level unit and we have the same unit under construction nearby and we aren't close to overflowing, and we dont have loads of mass?
+                    if bDebugMessages == true then LOG(sFunctionRef..': Gross mass income='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; Mass stored ratio='..aiBrain:GetEconomyStoredRatio('MASS')..'; Have low mass='..tostring(M27Conditions.HaveLowMass(aiBrain))) end
+                    if (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] <= 50 or aiBrain:GetEconomyStoredRatio('MASS') <= 0.25) and (M27Conditions.HaveLowMass(aiBrain) or aiBrain:GetEconomyStoredRatio('MASS') <= 0.4) then
+                        local tNearbyExperimentalLevel = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryExperimentalLevel, oConstruction:GetPosition(), 150, 'Ally')
+                        for iUnit, oUnit in tNearbyExperimentalLevel do
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering nearby unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Fraction complete='..oUnit:GetFractionComplete()) end
+                            if oUnit.UnitId == oConstruction.UnitId and not(oUnit == oConstruction) and (oUnit:GetFractionComplete() < 0.9 or (oUnit:GetFractionComplete() < 1 and aiBrain:GetEconomyStoredRatio('MASS') < 0.1)) then
+                                bCancelAndReclaim = true
+                                oUnitToSwitchTo = oUnit
+                                if bDebugMessages == true then LOG(sFunctionRef..': Are buildling the same unit nearby so will switch to this, oUnitToSwitchTo='..oUnitToSwitchTo.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToSwitchTo)..' with fraction complete='..oUnitToSwitchTo:GetFractionComplete()) end
+                                break
+                            end
+                        end
+                    end
+                end
+
             end
             if bCancelAndReclaim then
+                local iActionRef = oEngineer[M27EngineerOverseer.refiEngineerCurrentAction]
+                local iUniqueRef = M27EngineerOverseer.GetEngineerUniqueCount(oEngineer)
+                local sLocationRef = aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][iUniqueRef][1][M27EngineerOverseer.refEngineerAssignmentLocationRef]
+
+
                 M27Utilities.IssueTrackedClearCommands({oEngineer})
                 IssueReclaim({oEngineer}, oConstruction)
                 if oUnitToSwitchTo then
                     IssueRepair({oEngineer}, oUnitToSwitchTo)
+                end
+
+                if bDebugMessages == true then LOG(sFunctionRef..': iActionRef='..(iActionRef or 'nil')..'; iUniqueRef='..iUniqueRef..'; sLocationRef='..sLocationRef..'; Is table of assignemnts for this empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef]))) end
+
+
+                if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) == false and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef]) == false then
+                    for iOtherEngi, oOtherEngi in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef] do
+                        M27Utilities.IssueTrackedClearCommands({oOtherEngi})
+
+                        if oUnitToSwitchTo then
+                            IssueRepair({oOtherEngi}, oUnitToSwitchTo)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Telling oOtherEngi='..oOtherEngi.UnitId..M27UnitInfo.GetUnitLifetimeCount(oOtherEngi)..' to also switch to repairing '..oUnitToSwitchTo.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToSwitchTo)) end
+                        end
+                    end
                 end
             else
                 --T3 mex tracking
@@ -1368,6 +1411,18 @@ function OnConstructed(oEngineer, oJustBuilt)
                 if EntityCategoryContains(M27UnitInfo.refCategoryFixedShield * categories.TECH3, oJustBuilt.UnitId) then
                     table.insert(aiBrain[M27EngineerOverseer.reftShieldsWantingHives], oJustBuilt)
                 end
+
+                --SAMs covering friendly mexes
+                if EntityCategoryContains(M27UnitInfo.refCategoryStructureAA * categories.TECH3, oJustBuilt.UnitId) then
+                    local tNearbyT3Mexes = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT3Mex, oJustBuilt:GetPosition(), M27EngineerOverseer.iSAMCreepCoverageRange, 'Ally')
+                    if M27Utilities.IsTableEmpty(tNearbyT3Mexes) == false then
+                        for iMex, oMex in tNearbyT3Mexes do
+                            if not(M27UnitInfo.IsUnitValid(oMex[M27EngineerOverseer.refoNearbyFriendlyAA])) then
+                                oMex[M27EngineerOverseer.refoNearbyFriendlyAA] = oJustBuilt
+                            end
+                        end
+                    end
+                end
             end
 
             --All mexes - on construction check if we have allied M27 mass storage nearby (e.g. we have rebuilt on a mex that they used to have) and if so then have that M27 gift over their mass storage
@@ -1383,6 +1438,11 @@ function OnConstructed(oEngineer, oJustBuilt)
                             end
                         end
                     end
+                end
+
+                --T3 mexes - flag as wanting AA coverage
+                if EntityCategoryContains(categories.TECH3, oJustBuilt.UnitId) then
+                    ForkThread(M27EngineerOverseer.CheckIfMexWantsAACoverage, aiBrain, oJustBuilt)
                 end
             end
 
@@ -1698,6 +1758,44 @@ function OnCreateWreck(tPosition, iMass, iEnergy)
             ForkThread(M27MapInfo.DelayedReclaimRecordAtLocation, tPosition, 0, 5)
         else
             ForkThread(M27MapInfo.RecordThatWeWantToUpdateReclaimAtLocation, tPosition, 0)
+            if iMass >= 15 then
+
+                local tNearbyUnits = GetUnitsInRect(Rect(tPosition[1] - 2.5, tPosition[3] - 2.5, tPosition[1] + 2.5, tPosition[3] + 2.5))
+                if M27Utilities.IsTableEmpty(tNearbyUnits) == false then
+                    local tEngineers = EntityCategoryFilterDown(M27UnitInfo.refCategoryEngineer, tNearbyUnits)
+                    if M27Utilities.IsTableEmpty(tEngineers) == false then
+                        for iUnit, oUnit in tEngineers do
+                            if M27UnitInfo.IsUnitValid(oUnit) then
+                                if oUnit:GetAIBrain().M27AI then
+                                    if not(oUnit[M27EngineerOverseer.refbPrimaryBuilder]) and not(oUnit:IsUnitState('Reclaiming')) then
+                                        if not(oUnit[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionBuildEmergencyPD) and M27Utilities.GetDistanceBetweenPositions(tPosition, oUnit:GetPosition()) <= oUnit:GetBlueprint().Economy.MaxBuildDistance then
+                                            local aiBrain = oUnit:GetAIBrain()
+                                            if aiBrain:GetEconomyStoredRatio('MASS') <= 0.3 then
+                                                local tNearbyReclaim = M27MapInfo.GetReclaimInRectangle(4, Rect(oUnit:GetPosition()[1] - 2.5, oUnit:GetPosition()[3] - 2.5, oUnit:GetPosition()[1] + 2.5, oUnit:GetPosition()[3] + 2.5))
+                                                if M27Utilities.IsTableEmpty(tNearbyReclaim) == false then
+                                                    M27Utilities.IssueTrackedClearCommands({oUnit})
+                                                    M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oUnit, true)
+                                                    M27EngineerOverseer.UpdateEngineerActionTrackers(aiBrain, oUnit, M27EngineerOverseer.refActionReclaimUnit, tPosition, false, 50, nil, true, nil, nil)
+                                                    local iBuildRange = oUnit:GetBlueprint().Economy.MaxBuildDistance
+                                                    for iWreck, oWreck in tNearbyReclaim do
+                                                        if oWreck.MaxMassReclaim > 0 and oWreck.CachePosition and M27Utilities.GetDistanceBetweenPositions(oWreck.CachePosition, oUnit:GetPosition()) <= iBuildRange then
+                                                            IssueReclaim({oUnit}, oWreck)
+                                                            --LOG('Issuing reclaim callback for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                            break
+                                        end
+                                    end
+                                    break
+                                end
+                            end
+                        end
+
+                    end
+                end
+            end
             --[[if GetGameTimeSeconds() >= 590 then bDebugMessages = true end
             if bDebugMessages == true then
                 local iReclaimSegmentX, iReclaimSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tPosition)

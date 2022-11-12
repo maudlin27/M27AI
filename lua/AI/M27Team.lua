@@ -16,7 +16,14 @@ local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27Navy = import('/mods/M27AI/lua/AI/M27Navy.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 
+--Subteam varaibles
+iTotalSubteamCount = 0 --Number of subteams in the game
+tSubteamData = {} --[x] is the aiBrain.M27Subteam number, similar to tTeamData in how it works
+subrefiTimeOfLastFriendlyDataUpdate = 'M27SubteamTimeOfLastFriendlyUpdate' --Gametime in seconds that we last updated the subteamdata for friendly units/threat vlaues
+subreftoFriendlyBrains = 'M27SubteamFriendlyBrains' --Friendly brains in our subteam
+subrefiFriendlyAirAAThreat = 'M27SubteamFriendlyAirAA' --threat of our entire subteam's airaa
 
+--Team data
 tTeamData = {} --[x] is the aiBrain.M27Team number - stores certain team-wide information
 reftFriendlyActiveM27Brains = 'M27TeamFriendlyM27Brains' --Stored against tTeamData[brain.M27Team], returns table of all M27 brains on the same team (including this one), with a key of the army index
 iTotalTeamCount = 0 --Number o teams in the game
@@ -83,6 +90,31 @@ Various informatino about chokepoints, starting with the refbConsideredChokepoin
 includes chokepoint locations, the average team and enemy team start positions for the chokepoint line, angle and distances relating to chokepoints
 
 --]]
+
+function UpdateSubteamDataForFriendlyUnits(aiBrain)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'UpdateSubteamDataForFriendlyUnits'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if GetGameTimeSeconds() - (tSubteamData[aiBrain.M27Subteam][subrefiTimeOfLastFriendlyDataUpdate] or 0) >= 0.9 then
+        tSubteamData[aiBrain.M27Subteam][subrefiTimeOfLastFriendlyDataUpdate] = GetGameTimeSeconds()
+
+        --Reset values
+        tSubteamData[aiBrain.M27Subteam][subrefiFriendlyAirAAThreat] = 0
+
+
+        --Record new values
+        for iBrain, oBrain in tSubteamData[aiBrain.M27Subteam][subreftoFriendlyBrains] do
+            if not(oBrain.M27IsDefeated) then
+                --AirAA threat
+                tSubteamData[aiBrain.M27Subteam][subrefiFriendlyAirAAThreat] = tSubteamData[aiBrain.M27Subteam][subrefiFriendlyAirAAThreat] + (oBrain[M27AirOverseer.refiOurMassInAirAA] or 0)
+            end
+        end
+    end
+
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code for subteam '..aiBrain.M27Subteam..'; tSubteamData[aiBrain.M27Subteam][subrefiFriendlyAirAAThreat]='..tSubteamData[aiBrain.M27Subteam][subrefiFriendlyAirAAThreat]) end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
 
 
 function UpdateTeamDataForEnemyUnits(aiBrain, bUpdateSlowData)
@@ -472,6 +504,33 @@ function AllocateTeamMassResources(iTeam, iFirstM27Brain)
 
     local iPriority
 
+    local oM27BrainWithT3ArtiMostComplete
+    local iTotalMassWantedForT3ArtiBuilder = 0
+    local iCumulativeMassToBeAvailable = 0
+    local iCurMassForT3ArtiBuilder = 0
+    local aiBrain = tTeamData[iTeam][reftFriendlyActiveM27Brains][iFirstM27Brain]
+    local tFriendlyT3Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti + M27UnitInfo.refCategorySML * categories.EXPERIMENTAL, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Ally')
+    if M27Utilities.IsTableEmpty(tFriendlyT3Arti) == false then
+        local iHighestCompletion = 0
+        local iCurCompletion
+        for iUnit, oUnit in tFriendlyT3Arti do
+            iCurCompletion = oUnit:GetFractionComplete()
+            if iCurCompletion < 1 and iCurCompletion > iHighestCompletion and oUnit:GetAIBrain().M27AI then
+                iHighestCompletion = iCurCompletion
+                oM27BrainWithT3ArtiMostComplete = oUnit:GetAIBrain()
+                if bDebugMessages == true then LOG(sFunctionRef..': oM27BrainWithT3ArtiMostComplete '..oM27BrainWithT3ArtiMostComplete.Nickname..' has unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' with fraction complete '..oUnit:GetFractionComplete()..'; brain mass stored ratio='..oM27BrainWithT3ArtiMostComplete:GetEconomyStoredRatio('MASS')) end
+            end
+        end
+    end
+    if oM27BrainWithT3ArtiMostComplete then --Dont prioritise t3 arti builder if they arent low on mass
+        if oM27BrainWithT3ArtiMostComplete:GetEconomyStoredRatio('MASS') > 0.05 then
+            oM27BrainWithT3ArtiMostComplete = nil
+        else
+            iTotalMassWantedForT3ArtiBuilder = M27EconomyOverseer.GetMassStorageMaximum(oM27BrainWithT3ArtiMostComplete) * (0.05 - oM27BrainWithT3ArtiMostComplete:GetEconomyStoredRatio('MASS'))
+        end
+    end
+
+
     for iBrain, oBrain in tTeamData[iTeam][reftFriendlyActiveM27Brains] do
         if oBrain.M27IsDefeated and (not(oBrain.GetCurrentUnits) or oBrain:GetCurrentUnits(categories.ALLUNITS - categories.BENIGN) <= 1) then tTeamData[iTeam][reftFriendlyActiveM27Brains][iBrain] = nil break
         else
@@ -482,22 +541,30 @@ function AllocateTeamMassResources(iTeam, iFirstM27Brain)
 
             --Do we have low mass?
             if oBrain:GetEconomyStoredRatio('MASS') < 0.05 then
-                if oBrain:GetEconomyStoredRatio('MASS') < 0.01 and oBrain:GetEconomyStoredRatio('ENERGY') == 1 then
+                if oM27BrainWithT3ArtiMostComplete and oM27BrainWithT3ArtiMostComplete == oBrain then
                     iPriority = 1
+                    if bDebugMessages == true then LOG(sFunctionRef..': Our T3 arti builder doesnt have much mass so setting as priority 1') end
+                elseif oBrain:GetEconomyStoredRatio('MASS') < 0.01 and oBrain:GetEconomyStoredRatio('ENERGY') == 1 then
+                    if oM27BrainWithT3ArtiMostComplete then iPriority = 2 else iPriority = 1 end
                 else
-                    iPriority = 2
+                    if oM27BrainWithT3ArtiMostComplete then iPriority = 3 else iPriority = 2 end
                 end
                 table.insert(tBrainsNeedingMassByPriority, {[subrefBrain] = oBrain, [subrefMassPriority] = iPriority, [subrefRemainingMassNeeded] = iMassStorageMax * (0.05 - oBrain:GetEconomyStoredRatio('MASS'))})
                 tiCountOfBrainsNeedingMassByPriority[iPriority] = (tiCountOfBrainsNeedingMassByPriority[iPriority] or 0) + 1
                 if bDebugMessages == true then LOG(sFunctionRef..': Not in combat, want Mass as priority '..iPriority) end
             else
                 --Do we have enough to offer some?
-                if oBrain:GetEconomyStoredRatio('MASS') > 0.25 and not(oBrain[M27EconomyOverseer.refbStallingMass]) and not(M27Conditions.HaveLowMass(oBrain)) then
-                    if oBrain[M27EconomyOverseer.refiNetMassBaseIncome] < 0 and oBrain:GetEconomyStoredRatio('MASS') >= 0.3 then
+                if (oM27BrainWithT3ArtiMostComplete and not(oM27BrainWithT3ArtiMostComplete == oBrain) and iTotalMassWantedForT3ArtiBuilder < iCumulativeMassToBeAvailable and aiBrain:GetEconomyStoredRatio('MASS') > 0.01 and not(oBrain[M27EconomyOverseer.refbStallingMass])) or (oBrain:GetEconomyStoredRatio('MASS') > 0.25 and not(oBrain[M27EconomyOverseer.refbStallingMass]) and not(M27Conditions.HaveLowMass(oBrain))) then
+                    if oM27BrainWithT3ArtiMostComplete and not(oM27BrainWithT3ArtiMostComplete == oBrain) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': We have mass to g ive to our t3 arti builder, our brain='..oBrain.Nickname..'; our mass stored ratio='..aiBrain:GetEconomyStoredRatio('MASS')..'; our mass stored='..aiBrain:GetEconomyStored('MASS')) end
+                        iCurMassForT3ArtiBuilder = math.min(oBrain:GetEconomyStored('MASS'), iMassStorageMax * 0.02)
+                        table.insert(tBrainsWithMassAndMassAvailable, {[subrefBrain] = oBrain, [subrefMassAvailable] = iCurMassForT3ArtiBuilder})
+                        iCumulativeMassToBeAvailable = iCumulativeMassToBeAvailable + iCurMassForT3ArtiBuilder
+                    elseif oBrain[M27EconomyOverseer.refiNetMassBaseIncome] < 0 and oBrain:GetEconomyStoredRatio('MASS') >= 0.3 then
                         table.insert(tBrainsWithMassAndMassAvailable, {[subrefBrain] = oBrain, [subrefMassAvailable] = oBrain:GetEconomyStored('MASS') * 0.02})
                         if bDebugMessages == true then LOG(sFunctionRef..': Have Mass available to give even though have negative mass income') end
                     elseif oBrain[M27EconomyOverseer.refiNetMassBaseIncome] > 0 then
-                        table.insert(tBrainsWithMassAndMassAvailable, {[subrefBrain] = oBrain, [subrefMassAvailable] = iMassStorageMax * (oBrain:GetEconomyStoredRatio('MASS') - 0.25)})
+                        table.insert(tBrainsWithMassAndMassAvailable, {[subrefBrain] = oBrain, [subrefMassAvailable] = math.max(1, iMassStorageMax * (oBrain:GetEconomyStoredRatio('MASS') - 0.25))})
                         if bDebugMessages == true then LOG(sFunctionRef..': Have positive Mass income so have Mass avialable to give') end
                     else
                         --Dont have positive net income, and not got 100% Mass, so want to keep our Mass for ourself
@@ -815,6 +882,12 @@ function RecordSegmentsThatTeamHasVisualOf(aiBrain)
             end
         end
     end
+end
+
+function SubteamInitialisation(iSubteamRef)
+    tSubteamData[iSubteamRef] = {}
+    tSubteamData[iSubteamRef][subreftoFriendlyBrains] = {}
+    tSubteamData[iSubteamRef][subrefiFriendlyAirAAThreat] = 0
 end
 
 function TeamInitialisation(iTeamRef)

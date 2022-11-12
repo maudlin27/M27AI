@@ -1,6 +1,7 @@
-local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
+--[[local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 
+--v63 - removed below due to bug highlighted by Relent0r
 local M27EngineerTryReclaimCaptureArea = EngineerTryReclaimCaptureArea
 function EngineerTryReclaimCaptureArea(aiBrain, eng, pos, iAreaSize)
     --Reclaims only if within iAreaSize (defaults to size of 1) - although called iAreaSize, it will be based on rectangle, i.e. see if both x and Z co=-ordinates are within iAreaSize of the pos
@@ -61,7 +62,7 @@ function EngineerTryReclaimCaptureArea(aiBrain, eng, pos, iAreaSize)
         end
         return Reclaiming
     end
-end
+end--]]
 
 -- Assist factories based on what factories have less units helping
 --[[local M27AIEngineersAssistFactories = AIEngineersAssistFactories

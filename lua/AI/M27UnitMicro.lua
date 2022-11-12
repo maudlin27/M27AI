@@ -480,6 +480,7 @@ function DodgeShot(oTarget, oWeapon, oAttacker, iTimeToDodge)
     local sFunctionRef = 'DodgeShot'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+
     local oNavigator = oTarget:GetNavigator()
     local tCurDestination
     if oNavigator and oNavigator.GetCurrentTargetPos then

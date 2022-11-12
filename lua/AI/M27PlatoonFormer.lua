@@ -824,10 +824,13 @@ function AddIdleUnitsToPlatoon(aiBrain, tUnits, oPlatoonToAddTo)
         if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonName='..sPlatoonName..'; tUnits size='..table.getn(tUnits)) end
         aiBrain:AssignUnitsToPlatoon(oPlatoonToAddTo, tUnits, 'Support', 'GrowthFormation')
         if M27Config.M27ShowUnitNames == true and oPlatoonToAddTo[M27PlatoonTemplates.refbDontDisplayName] then
-            local sName = sPlatoonName..':'
+            local sBaseName = sPlatoonName..':'
+            local sName
             local iLifetimeCount
             for iUnit, oUnit in tUnits do
-                if oUnit.GetUnitId then sName = sName..oUnit.UnitId end
+                if oUnit.GetUnitId then sName = sBaseName..oUnit.UnitId
+                else sName = sBaseName
+                end
                 iLifetimeCount = M27UnitInfo.GetUnitLifetimeCount(oUnit)
                 if not(iLifetimeCount) then iLifetimeCount = 0 end
                 sName = sName..iLifetimeCount

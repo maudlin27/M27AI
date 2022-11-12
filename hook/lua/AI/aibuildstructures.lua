@@ -1,4 +1,4 @@
-local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
+--[[local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 --local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 --local M27ConUtility = import('/mods/M27AI/lua/AI/M27ConstructionUtilities.lua')
 --local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
@@ -12,7 +12,7 @@ local M27AddToBuildQueue = AddToBuildQueue
 function AddToBuildQueue(aiBrain, builder, whatToBuild, buildLocation, relative)
     --Hook of code - so that can add debuging if wanted; below will also have a reclaim size of 8 before building
 
-    if aiBrain.M27AI == false then
+    if not(aiBrain.M27AI) then
         M27AddToBuildQueue(aiBrain, builder, whatToBuild, buildLocation, relative)
     else
         local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -36,7 +36,7 @@ function AddToBuildQueue(aiBrain, builder, whatToBuild, buildLocation, relative)
         if bDebugMessages==true then LOG('7 Adding to BuildQueue: whatToBuild='..tostring(whatToBuild)..'; buildLocation='..buildLocation[1]..'-'..buildLocation[2]..'-'..buildLocation[3]) end
         table.insert(builder.EngineerBuildQueue, newEntry)
     end
-end
+end--]]
 
 function M27BuildStructureAtLocation(oBuilder, sBuildingType, tBuildLocation)
     --Custom function - will no doubt want to expand at some point to add some of the checks in the core AI logic
