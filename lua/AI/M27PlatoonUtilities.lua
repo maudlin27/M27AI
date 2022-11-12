@@ -1648,7 +1648,7 @@ function GetNearbyEnemyData(oPlatoon, iEnemySearchRadius, bPlatoonIsAUnit)
         if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then
             --Add land experimentals to skirmishers and ACU if not already in nearbyenemies - e.g. if recently seen monkeylord nearby and its briefly dropped out of intel
             for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyLandExperimentals] do
-                if not(M27Utilities.CanSeeUnit(aiBrain, oUnit, true)) then
+                if M27UnitInfo.IsUnitValid(oUnit) and not(M27Utilities.CanSeeUnit(aiBrain, oUnit, true)) then
                     if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= iEnemySearchRadius then
                         table.insert(tNearbyEnemies, oUnit)
                         if bDebugMessages == true then LOG(sFunctionRef..': Adding experimental '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to nearby enemies for platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]) end
@@ -8159,7 +8159,7 @@ function DeterminePlatoonAction(oPlatoon)
                 LOG('Prev action is different to current action, so will refresh unless is a movement path special case or assisting building when already assisting; bRefreshAction=' .. tostring(bRefreshAction) .. '; iRefreshActionThreshold=' .. iRefreshActionThreshold)
             end
         end
-        if bRefreshAction == true then
+        if bRefreshAction == true and not(oPlatoon[refiCurrentAction] == refActionDisband) then
             if oPlatoon[refbHoverInPlatoon] and (oPlatoon[reftPrevAction][1] == oPlatoon[refiCurrentAction] or ((oPlatoon[refiCurrentAction] == refActionContinueMovementPath or oPlatoon[refiCurrentAction] == refActionReissueMovementPath) and (oPlatoon[reftPrevAction][1] == refActionContinueMovementPath or oPlatoon[reftPrevAction][1] == refActionReissueMovementPath))) then
                 if sPlatoonName == 'M27MobileShield' or sPlatoonName == 'M27MobileStealth' then
                     --Dont increase refresh threshold if shield isnt moving (in case it has reached its destination)
@@ -11914,7 +11914,7 @@ function ProcessPlatoonAction(oPlatoon)
                                         M27Utilities.DrawLocation(tTempMoveTarget, false, 6)
                                     end
                     --IsDestinationAwayFromNearbyEnemies(aiBrain, tCurPos,          tCurDestination,                iEnemySearchRadius,                                                                                 bAlsoRunFromEnemyStartLocation, iMinDistanceOverride, tOptionalNearbyEnemies)
-                                    if (oPlatoon[refiEnemiesInRange] == 0 or IsDestinationAwayFromNearbyEnemies(aiBrain, tCurPlatoonPos, tTempMoveTarget, math.max(oPlatoon[refiEnemySearchRadius], aiBrain[M27Overseer.refiSearchRangeForEnemyStructures]), false, nil, oPlatoon[reftEnemiesInRange]) == true) and (oPlatoon[refiEnemyStructuresInRange] == 0 or IsDestinationAwayFromNearbyEnemies(aiBrain, tCurPlatoonPos, tTempMoveTarget, math.max(oPlatoon[refiEnemySearchRadius], aiBrain[M27Overseer.refiSearchRangeForEnemyStructures]), false, nil, oPlatoon[reftEnemyStructures]) == true) and M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget] - 1], tCurPlatoonPos) >= iMinDistanceToRunBack then
+                                    if (oPlatoon[refiEnemiesInRange] == 0 or IsDestinationAwayFromNearbyEnemies(aiBrain, tCurPlatoonPos, tTempMoveTarget, math.max(oPlatoon[refiEnemySearchRadius], aiBrain[M27Overseer.refiSearchRangeForEnemyStructures]), false, nil, oPlatoon[reftEnemiesInRange]) == true) and (oPlatoon[refiEnemyStructuresInRange] == 0 or IsDestinationAwayFromNearbyEnemies(aiBrain, tCurPlatoonPos, tTempMoveTarget, math.max(oPlatoon[refiEnemySearchRadius], aiBrain[M27Overseer.refiSearchRangeForEnemyStructures]), false, nil, oPlatoon[reftEnemyStructuresInRange]) == true) and M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget] - 1], tCurPlatoonPos) >= iMinDistanceToRunBack then
                                         bTargetAwayFromNearestEnemy = true
                                         oPlatoon[refiCurrentPathTarget] = oPlatoon[refiCurrentPathTarget] - 1
                                         if bTemporaryRetreat == true then

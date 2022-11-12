@@ -41,12 +41,15 @@ function UpdateTransportForLoadedUnit(oUnitJustLoaded, oTransport)
     oUnitJustLoaded[refoTransportToLoadOnto] = nil
     oUnitJustLoaded[M27UnitInfo.refbSpecialMicroActive] = false
     if M27UnitInfo.IsUnitValid(oTransport) then
+        if oTransport[reftUnitsToldToLoadOntoTransport] then oTransport[reftUnitsToldToLoadOntoTransport] = {} end
+
         oTransport[reftUnitsToldToLoadOntoTransport][oUnitJustLoaded.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitJustLoaded)] = nil
         oTransport[refiUnitsLoaded] = (oTransport[refiUnitsLoaded] or 0) + 1
         if M27Utilities.IsTableEmpty(oTransport[reftUnitsToldToLoadOntoTransport]) then
             oTransport[M27UnitInfo.refbSpecialMicroActive] = false
         end
         if not(oTransport[reftUnitsLoadedOntoTransport]) then oTransport[reftUnitsLoadedOntoTransport] = {} end
+
 
 
 
