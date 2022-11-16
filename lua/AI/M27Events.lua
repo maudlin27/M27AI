@@ -427,7 +427,7 @@ end
 function OnPropDestroyed(oProp)
     --Confirmed manually this triggers e.g. if a bomber destroys a rock, and if a tree is reclaimed
     if M27Utilities.bM27AIInGame then
-        local sFunctionRef = 'OnUnitDeath'
+        local sFunctionRef = 'OnPropDestroyed'
         local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if oProp.CachePosition then
