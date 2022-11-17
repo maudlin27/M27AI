@@ -7221,7 +7221,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 for iBrain, oBrain in M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subreftoFriendlyBrains] do
                     if not(oBrain.M27IsDefeated) then
                         iSubteamLC = iSubteamLC + M27Conditions.GetLifetimeBuildCount(oBrain, M27UnitInfo.refCategoryExperimentalLevel)
-                        if iSubteamLC > iLCThresholdHigh or iActiveSubteamLandExperimental >= iLCThresholdLow then break end
+                        if iSubteamLC > iLCThresholdHigh or iActiveSubteamExperimentalLevel >= iLCThresholdLow then break end
                         iActiveSubteamExperimentalLevel = iActiveSubteamExperimentalLevel + oBrain:GetCurrentUnits(M27UnitInfo.refCategoryExperimentalLevel)
                     end
                 end

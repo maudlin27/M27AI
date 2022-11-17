@@ -1267,12 +1267,14 @@ function GetBestBomberTarget(oBomber, tPotentialUnitTargets, iMinFractionComplet
 
 
 
-
+    local bDontCheckIfCivilian = true
+    --Avoid targeting hostile civilians with initail bombers, but consider for later T1-T2 bombers
+    if EntityCategoryContains(categories.TECH1 + categories.TECH2, oBomber.UnitId) and aiBrain[M27Overseer.refiActiveEnemyBrains] > 0 and M27UnitInfo.GetUnitLifetimeCount(oBomber) <= 10 then bDontCheckIfCivilian = false end
 
     for iUnit, oUnit in tPotentialUnitTargets do
         --Check its not about to die and is complete enough
         if bDebugMessages == true then LOG(sFunctionRef..': Considering if we want to target oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oBomber[refbEngiHunterMode]='..tostring(oBomber[refbEngiHunterMode] or false)..'; Bomber LC='..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; Dist from unit to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))..'; aiBrain[refiHighestEnemyAirThreat]='..(aiBrain[refiHighestEnemyAirThreat] or 0)..'; aiBrain[refiEnemyMassInGroundAA]='..(aiBrain[refiEnemyMassInGroundAA] or 0)..'; is oUnit the same as oRecentlyTargeted='..tostring(oUnit == oRecentlyTargeted)..'; oUnit fraction complete='..oUnit:GetFractionComplete()..'; GetMaxStrikeDamageWanted(oUnit)='..GetMaxStrikeDamageWanted(oUnit)..'; oUnit[refiStrikeDamageAssigned]='..(oUnit[refiStrikeDamageAssigned] or 'nil')..'; Is unit bombers current target='..tostring(oUnit == oBomberCurTarget)..'; Dist to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))..'; aiBrain[refiHighestEnemyAirThreat]='..aiBrain[refiHighestEnemyAirThreat]..'; iMinFractionComplete wanted='..iMinFractionComplete) end
-        if not(oUnit == oRecentlyTargeted) and oUnit:GetFractionComplete() >= (iMinFractionComplete or 0.5) then
+        if not(oUnit == oRecentlyTargeted) and oUnit:GetFractionComplete() >= (iMinFractionComplete or 0.5) and (bDontCheckIfCivilian or not(M27Logic.IsCivilianBrain(oUnit:GetAIBrain()))) then
             --Check it odesnt already have enough strike damage assigned
             if GetMaxStrikeDamageWanted(oUnit) > (oUnit[refiStrikeDamageAssigned] or 0) or oUnit == oBomberCurTarget then
                 --If in engi hunter mode then ignore engineers close to enemy base unless enemy has no air units
