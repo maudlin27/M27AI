@@ -2437,7 +2437,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     local sPlatoonName = oPlatoon:GetPlan()
     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
     local bProceed = true
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 490 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27Defender' and oPlatoon[refiPlatoonCount] == 7 and GetGameTimeSeconds() >= 570 then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
@@ -7382,7 +7382,7 @@ function DeterminePlatoonAction(oPlatoon)
         --if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then --Removed this check as we do it already as part of the parent function
 
         local sPlatoonName = oPlatoon:GetPlan()
-        --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 490 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
+        --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
         --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 25 then bDebugMessages = true end
         --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
         --if oPlatoon:GetPlan() == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 3 and GetGameTimeSeconds() >= 360 then bDebugMessages = true end
@@ -10939,7 +10939,7 @@ function ProcessPlatoonAction(oPlatoon)
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
 
             local sPlatoonName = oPlatoon:GetPlan()
-            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 490 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 25 then bDebugMessages = true end
             --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
             --if GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
@@ -13745,4 +13745,8 @@ function PlatoonCycler(oPlatoon)
         if bDebugMessages == true then LOG(sFunctionRef..': '..sOrigPlatoonName..(oPlatoon[refiPlatoonCount] or 'nil')..' has ceased to exist so stopping platoon loop') end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function ACUInitialBuildOrder(self)
+    --Do nothing - main logic is handled in M27Overseer ACUInitialisation, this is just to make sure we dont get platoon logic interfering
 end

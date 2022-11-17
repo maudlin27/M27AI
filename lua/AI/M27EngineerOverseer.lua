@@ -6493,7 +6493,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                 else LOG('oActionTargetObject is nil') end
             end
 
-            IssueClearCommands{oEngineer}
+            M27Utilities.IssueTrackedClearCommands{oEngineer}
             oEngineer[M27Logic.refiIdleCount] = 0
 
             --Pond tracking

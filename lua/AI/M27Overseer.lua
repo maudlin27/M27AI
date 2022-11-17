@@ -8929,6 +8929,16 @@ function ACUInitialisation(aiBrain)
     end
     local oACU = M27Utilities.GetACU(aiBrain)
     oACU[refbACUOnInitialBuildOrder] = true
+
+
+    local oNewPlatoon = aiBrain:MakePlatoon('', '')
+    aiBrain:AssignUnitsToPlatoon(oNewPlatoon, { oACU }, 'Support', 'None')
+    --Set movement path to current position so wont force a new movement path as the first action, but will update once have done initial construction
+    oNewPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
+    oNewPlatoon[M27PlatoonUtilities.reftMovementPath][1] = oACU:GetPosition()
+    oNewPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
+    oNewPlatoon:SetAIPlan('M27ACUBuildOrder')
+
     local iCategoryToBuild = M27UnitInfo.refCategoryLandFactory
     local iMaxAreaToSearch = 14
     local iCategoryToBuildBy = M27UnitInfo.refCategoryT1Mex
@@ -9005,6 +9015,7 @@ function ACUInitialisation(aiBrain)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(1)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+        if bDebugMessages == true then LOG(sFunctionRef..': Still waiting for ACU to get a factory. ACU unit state='..M27Logic.GetUnitState(oACU)) end
     end
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Have a factory unit now, so will set ACU platoon to use ACUMain')

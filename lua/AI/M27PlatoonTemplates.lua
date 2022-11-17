@@ -469,6 +469,29 @@ PlatoonTemplate = {
         [refbSingletonPlatoon] = true,
         [refbDoesntWantMAA] = true,
     },
+    ['M27ACUBuildOrder']= { --have just copied M27ACUMain as a redundancy, however this isnt expected to do anything as this is meant to just be a hollow platoon
+        [refbIdlePlatoon] = false,
+        [refbRequiresUnitToFollow] = false,
+        [refbIgnoreStuckAction] = false,
+        [refiMinimumPlatoonSize] = 1,
+        [refsDefaultFormation] = 'GrowthFormation',
+        [refbDisbandIfReachDestination] = false,
+        [refbDisbandAfterRunningAway] = false,
+        [refbSwitchToAttackIfReachDestination] = false,
+        [refbRunFromAllEnemies] = false,
+        [refbAlwaysAttack] = false,
+        [refbAttackMove] = false,
+        [reftPlatoonsToAmalgamate] = nil,
+        [refiPlatoonAmalgamationRange] = nil,
+        [refbAmalgamateIntoEscort] = true, --E.g. overseer will in some cases set amalgamation to happen in which case want it to be into escort
+        [refbUsedByThreatDefender] = false, --Some of functionality in platoon utilities such as building factory is turned off if this is true
+        [refbWantsShieldEscort] = true,
+        [refbWantsStealthEscort] = true,
+        [refiMaxTicksBetweenCycleNoEnemies] = iVHighPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iVHighPriorityEnemy,
+        [refbSingletonPlatoon] = true,
+    },
+
     ['M27ACUMain'] =
     {
         [refbIdlePlatoon] = false,

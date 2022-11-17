@@ -730,6 +730,11 @@ Platoon = Class(M27PlatoonClass) {
     M27IntelPathAI = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
+    M27ACUBuildOrder = function(self)
+        --Intended to house main ACU logic after initial build order is done
+        M27PlatoonUtilities.ACUInitialBuildOrder(self)
+    end,
+
 
     M27ACUMain = function(self)
         --Intended to house main ACU logic after initial build order is done
