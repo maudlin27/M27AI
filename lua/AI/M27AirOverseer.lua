@@ -3259,8 +3259,11 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                             else
                                 if oUnit:GetPosition()[2] - GetSurfaceHeight(oUnit:GetPosition()[1], oUnit:GetPosition()[3]) <= 7 or oUnit:IsUnitState('MovingDown') then
                                     oUnit[refiCyclesOnGroundWaitingToRefuel] = (oUnit[refiCyclesOnGroundWaitingToRefuel] or 0) + 1
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit state='..M27Logic.GetUnitState(oUnit)..'; Distance above surface height='..oUnit:GetPosition()[2] - GetSurfaceHeight(oUnit:GetPosition()[1], oUnit:GetPosition()[3])..'; Cycles in this position='..oUnit[refiCyclesOnGroundWaitingToRefuel]) end
                                     if oUnit[refiCyclesOnGroundWaitingToRefuel] >= 20 or (oUnit[refiCyclesOnGroundWaitingToRefuel] >= 5 and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(),oUnit[refoAirStagingAssigned]:GetPosition()) >= 75) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Will readd unit to those wanting a new refuel command') end
                                         bReaddToLowFuel = true
+                                        oUnit[refiCyclesOnGroundWaitingToRefuel] = 0
                                     end
                                 end
                             end
