@@ -134,7 +134,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
         if not(oUnitKilled[refbAlreadyRun]) then
             oUnitKilled[refbAlreadyRun] = true
 
-            if bDebugMessages == true then LOG(sFunctionRef..': oUnitKilled='..oUnitKilled.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitKilled)..'; Is unit killed an ACU='..tostring(M27Utilities.IsACU(oUnitKilled))) end
+            if bDebugMessages == true then LOG(sFunctionRef..': oUnitKilled='..oUnitKilled.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitKilled)..'; Is unit killed an ACU='..tostring(M27Utilities.IsACU(oUnitKilled))..'; GameTime='..GetGameTimeSeconds()) end
 
             if oUnitKilled.GetAIBrain then
                 if EntityCategoryContains(categories.COMMAND, oUnitKilled.UnitId) then
@@ -365,6 +365,9 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                             end
                         end
                     end
+                    --Ythotha death logic
+                elseif oUnitKilled.UnitId == 'xsl0401' then
+                    OnYthothaDeath(oUnitKilled)
                 end
 
             elseif bDebugMessages == true then LOG(sFunctionRef..': Unit killed doesnt have a brain')
@@ -444,6 +447,43 @@ function OnPropDestroyed(oProp)
     end
 end
 
+function OnYthothaDeath(oUnit)
+    --Called when a ythotha (oUnit) is flagged as dying or being killed
+    --Swarm-AI workaround to deal with how it is controlled as a normal unit - slow it down so it stays in a simialr area to normal
+    local refbYthothaDeath = 'M27EventYthothaDeath'
+
+    local sFunctionRef = 'OnYthothaDeath'
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if not(oUnit[refbYthothaDeath]) then
+        oUnit[refbYthothaDeath] = true
+        if oUnit:GetAIBrain().M27SwarmAI then
+            ForkThread(M27Logic.YthothaDeathBallSearchAndSlow, oUnit:GetAIBrain(), oUnit:GetPosition())
+        end
+        local tNearbyUnits
+        if bDebugMessages == true then LOG(sFunctionRef..': Ythotha has just died, will look for nearby units and tell them to run away') end
+        local iTimeToRun
+        local iSearchRange = 70
+        for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
+            tNearbyUnits = oBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand, oUnit:GetPosition(), 50, 'Ally')
+            if M27Utilities.IsTableEmpty(tNearbyUnits) == false then
+                for iFriendlyUnit, oFriendlyUnit in tNearbyUnits do
+                    if bDebugMessages == true then LOG(sFunctionRef..': oFriendlyUnit='..oFriendlyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFriendlyUnit)..'; if we own it then will make it run away') end
+                    if oFriendlyUnit:GetAIBrain() == oBrain then --Only do this for M27 units
+                        if M27UnitInfo.IsUnitValid(oFriendlyUnit, true) then
+                            iTimeToRun = math.min(32, math.max(10, 18 + (50 - M27Utilities.GetDistanceBetweenPositions(oFriendlyUnit:GetPosition(), oUnit:GetPosition()) / (oFriendlyUnit:GetBlueprint().Physics.MaxSpeed or 1))))
+                            if bDebugMessages == true then LOG(sFunctionRef..': Telling friendly unit '..oFriendlyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFriendlyUnit)..' to move away for 18s via moveawayfromtarget order') end
+                            ForkThread(M27UnitMicro.MoveAwayFromTargetTemporarily, oFriendlyUnit, iTimeToRun, oUnit:GetPosition())
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+end
+
 
 function OnUnitDeath(oUnit)
     --WARNING: Doesnt trigger when an ACU is killed
@@ -454,7 +494,8 @@ function OnUnitDeath(oUnit)
         local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-        if bDebugMessages == true then LOG(sFunctionRef..'Hook successful. oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; IsACU='..tostring(M27Utilities.IsACU(oUnit))) end
+
+        if bDebugMessages == true then LOG(sFunctionRef..'Hook successful. oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; IsACU='..tostring(M27Utilities.IsACU(oUnit))..'; GameTime='..GetGameTimeSeconds()) end
         --Is it an ACU?
         if M27Utilities.IsACU(oUnit) then --NOTE: THis doesnt always trigger for ACU (not sure if it triggers some of the time, or none of the time)
             OnACUKilled(oUnit)
@@ -477,29 +518,7 @@ function OnUnitDeath(oUnit)
                     --Note -seraphimunits.lua contains SEnergyBallUnit which looks like it is for when the death ball is spawned; ID is XSL0402; SpawnElectroStorm is in the ythotha script
                     --Sandbox test - have c.36s from ythotha dying to energy ball dying, so want to run away for half of this (18s) plus extra time based on how far away we already were
                     if EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental * categories.SERAPHIM, oUnit.UnitId) then
-                        --Swarm-AI workaround to deal with how it is controlled as a normal unit - slow it down so it stays in a simialr area to normal
-                        if oUnit:GetAIBrain().M27SwarmAI then
-                            ForkThread(M27Logic.YthothaDeathBallSearchAndSlow, oUnit:GetAIBrain(), oUnit:GetPosition())
-                        end
-                        local tNearbyUnits
-                        if bDebugMessages == true then LOG(sFunctionRef..': Ythotha has just died, will look for nearby units and tell them to run away') end
-                        local iTimeToRun
-                        local iSearchRange = 70
-                        for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
-                            tNearbyUnits = oBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand, oUnit:GetPosition(), 50, 'Ally')
-                            if M27Utilities.IsTableEmpty(tNearbyUnits) == false then
-                                for iFriendlyUnit, oFriendlyUnit in tNearbyUnits do
-                                    if bDebugMessages == true then LOG(sFunctionRef..': oFriendlyUnit='..oFriendlyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFriendlyUnit)..'; if we own it then will make it run away') end
-                                    if oFriendlyUnit:GetAIBrain() == oBrain then --Only do this for M27 units
-                                        if M27UnitInfo.IsUnitValid(oFriendlyUnit, true) then
-                                            iTimeToRun = math.min(32, math.max(10, 18 + (50 - M27Utilities.GetDistanceBetweenPositions(oFriendlyUnit:GetPosition(), oUnit:GetPosition()) / (oFriendlyUnit:GetBlueprint().Physics.MaxSpeed or 1))))
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Telling friendly unit '..oFriendlyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFriendlyUnit)..' to move away for 18s via moveawayfromtarget order') end
-                                            ForkThread(M27UnitMicro.MoveAwayFromTargetTemporarily, oFriendlyUnit, iTimeToRun, oUnit:GetPosition())
-                                        end
-                                    end
-                                end
-                            end
-                        end
+                        OnYthothaDeath(oUnit)
                     end
 
                     --Enemy experimental dies - update all M27 threat values

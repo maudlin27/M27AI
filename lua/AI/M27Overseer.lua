@@ -3198,6 +3198,7 @@ function ThreatAssessAndRespond(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ThreatAssessAndRespond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if GetGameTimeSeconds() >= 625 then bDebugMessages = true end
 
     --if GetGameTimeSeconds() >= 245 then bDebugMessages = true end
 
