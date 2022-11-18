@@ -3613,14 +3613,12 @@ function ReleaseRefueledUnitsFromAirStaging(aiBrain, oAirStaging)
         end
         if M27Utilities.IsTableEmpty(tRefuelingUnits) == false then
             for iRefuelingUnit, oRefuelingUnit in tRefuelingUnits do
-                if not (oRefuelingUnit.Dead) then
+                if not (oRefuelingUnit.Dead) and not(EntityCategoryContains(categories.UNSELECTABLE, oRefuelingUnit.UnitId)) then
                     oRefuelingUnit[refbSentRefuelCommand] = false
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Have a unit refueling, checking tracker')
-                    end
                     bReadyToLeave = true
                     if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Have a unit refueling, checking its health and fuel')
+                        LOG(sFunctionRef .. ': Have a unit refueling, checking its health and fuel. Unit='..oRefuelingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oRefuelingUnit))
+                        LOG(sFunctionRef..': Unit fuel ratio='..oRefuelingUnit:GetFuelRatio())
                     end
                     if oRefuelingUnit:GetFuelRatio() < 0.99 or M27UnitInfo.GetUnitHealthPercent(oRefuelingUnit) < 0.99 then
                         bReadyToLeave = false
