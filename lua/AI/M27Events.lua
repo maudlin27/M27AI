@@ -1388,6 +1388,8 @@ function OnConstructed(oEngineer, oJustBuilt)
                         if bDebugMessages == true then LOG(sFunctionRef..': Just given order for oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to build T1 radar at location '..repru(M27Utilities.MoveInDirection(oJustBuilt:GetPosition(), M27Utilities.GetAngleFromAToB(oJustBuilt:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)), 5, true))) end
                     end
                 end
+
+                --Weapon priority updates:
             elseif EntityCategoryContains(M27UnitInfo.refCategoryPD, oJustBuilt.UnitId) then
                 ForkThread(M27UnitInfo.SetUnitTargetPriorities, oJustBuilt, M27UnitInfo.refWeaponPriorityPD)
             elseif EntityCategoryContains(M27UnitInfo.refCategoryMissileShip, oJustBuilt.UnitId) then
@@ -1398,6 +1400,12 @@ function OnConstructed(oEngineer, oJustBuilt)
                 ForkThread(M27UnitInfo.SetUnitTargetPriorities, oJustBuilt, M27UnitInfo.refWeaponPrioritySniperBot)
             elseif EntityCategoryContains(M27UnitInfo.refCategoryDestroyer, oJustBuilt.UnitId) then
                 ForkThread(M27UnitInfo.SetUnitTargetPriorities, oJustBuilt, M27UnitInfo.refWeaponPriorityDestroyer)
+
+
+                --Other units:
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryMassStorage, oJustBuilt.UnitId) then
+                ForkThread(M27EngineerOverseer.UpdateMassFabPotentialLocations, oJustBuilt)
+
             end
 
             --Firebase tracking

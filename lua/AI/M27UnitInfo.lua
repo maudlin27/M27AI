@@ -106,6 +106,7 @@ refCategoryMassStorage = categories.STRUCTURE * categories.MASSSTORAGE * categor
 
 refCategoryEnergyStorage = categories.STRUCTURE * categories.ENERGYSTORAGE
 refCategoryParagon = categories.MASSPRODUCTION * categories.MASSFABRICATION * categories.EXPERIMENTAL
+refCategoryMassFab = categories.MASSFABRICATION * categories.STRUCTURE - categories.MASSEXTRACTION - categories.EXPERIMENTAL
 
 --Building - intel and misc
 refCategoryAirStaging = categories.STRUCTURE * categories.AIRSTAGINGPLATFORM
