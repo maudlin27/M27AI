@@ -4909,6 +4909,11 @@ function DetermineBomberDefenceRange(aiBrain)
                 aiBrain[refiBomberDefenceModDistance] = math.max(aiBrain[refiBomberDefenceCriticalThreatDistance], math.min(aiBrain[refiBomberDefenceModDistance], iValueCap))
             end
         end
+
+        --Limit the defence range based on nearest enemy dangerous AA
+        if aiBrain[refiBomberDefenceModDistance] > 125 then
+            aiBrain[refiBomberDefenceModDistance] = math.max(125, math.min(aiBrain[refiBomberDefenceModDistance], aiBrain[refiClosestEnemyDangerousAADistToOurBase] - 80))
+        end
     end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -5096,7 +5101,7 @@ function AirBomberManager(aiBrain)
 
     DetermineBomberDefenceRange(aiBrain) --Updates aiBrain[refiBomberDefenceModDistance]
     if bDebugMessages == true then
-        LOG(sFunctionRef .. ': Start of code for aiBrain=' .. aiBrain.Nickname .. ' Index=' .. aiBrain:GetArmyIndex() .. '; have determined bomber defence range=' .. aiBrain[refiBomberDefenceModDistance] .. '; is table of available bombers empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftAvailableBombers])) .. '; Distance cap=' .. aiBrain[refiBomberDefenceDistanceCap] .. '; Critical dist=' .. aiBrain[refiBomberDefenceCriticalThreatDistance])
+        LOG(sFunctionRef .. ': Start of code for aiBrain=' .. aiBrain.Nickname .. ' Index=' .. aiBrain:GetArmyIndex() .. '; have determined bomber defence range=' .. aiBrain[refiBomberDefenceModDistance] .. '; is table of available bombers empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftAvailableBombers])) .. '; Distance cap=' .. aiBrain[refiBomberDefenceDistanceCap] .. '; Critical dist=' .. aiBrain[refiBomberDefenceCriticalThreatDistance]..'; GameTime='..GetGameTimeSeconds())
     end
 
     if M27Utilities.IsTableEmpty(aiBrain[reftAvailableBombers]) == false then
@@ -6757,7 +6762,7 @@ function AirBomberManager(aiBrain)
                                         --tBestBombTarget, iMinValueWanted = M27Logic.GetBestAOETarget(aiBrain, oClosestDistance:GetPosition(), iAOE, iCurStrikeDamage, false,                nil,                     nil,                                   nil,                nil,                                nil,                     iMaxDistanceChecks,             iWithin75PercentFactor)
 
                                         --if bDebugMessages == true then LOG(sFunctionRef..': About to get damage from bomb for position '..repru(oClosestDistance:GetPosition())..'; iAOE='..(iAOE or 'nil')..'; iCurStrikeDamage='..(iCurStrikeDamage or 'nil')..'; iWithin75PercentFactor='..(iWithin75PercentFactor or 'nil')) end
-                                                                    --GetDamageFromBomb(aiBrain, tBaseLocation,             iAOE, iDamage,          iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck, iOptionalSizeAdjust, iOptionalModIfNeedMultipleShots, iMobileValueOverrideFactorWithin75Percent)
+                                        --GetDamageFromBomb(aiBrain, tBaseLocation,             iAOE, iDamage,          iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck, iOptionalSizeAdjust, iOptionalModIfNeedMultipleShots, iMobileValueOverrideFactorWithin75Percent)
                                         iCurBombValue = M27Logic.GetDamageFromBomb(aiBrain, oClosestDistance:GetPosition(), iAOE, iCurStrikeDamage, nil,                                nil,                    nil,                            nil,                nil,                                iWithin75PercentFactor)
                                         iMinValueWanted = iCurBombValue * 1.3
                                         if EntityCategoryContains(categories.ANTIAIR, oClosestDistance.UnitId) then iMinValueWanted = iMinValueWanted * 1.5 end --If we are targeting an AA unit then only want to switch to a further away target if potential for damage is greatly increased
