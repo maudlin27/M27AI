@@ -1130,7 +1130,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     end
                                 elseif iCurrentConditionToTry == 12 then --Emergency defence where enemy near our base, even if we think we can beat them
                                     local iImmediateRange = math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * aiBrain[M27Overseer.refiMaxDefenceCoveragePercentWanted], math.max(math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35, 180), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25))
-                                    if (aiBrain[M27Overseer.refbDefendAgainstArti]  or aiBrain[M27Overseer.refbPrioritiseExperimental]) and M27Conditions.HaveLowMass(aiBrain) and iImmediateRange >= 150 then iImmediateRange = 150 end
+                                    if (aiBrain[M27EngineerOverseer.refbNeedResourcesForMissile] or aiBrain[M27Overseer.refbDefendAgainstArti] or aiBrain[M27Overseer.refbPrioritiseExperimental]) and M27Conditions.HaveLowMass(aiBrain) and iImmediateRange >= 125 then
+                                        iImmediateRange = 125
+                                        if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= iImmediateRange and M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.refoNearestThreat]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 175 then
+                                            iImmediateRange = 50
+                                        end
+                                    end
                                     if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= iImmediateRange and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
                                         if aiBrain[M27Overseer.refbNeedIndirect] == true then
                                             iCategoryToBuild = refCategoryIndirect
