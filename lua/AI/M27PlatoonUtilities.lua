@@ -6880,7 +6880,19 @@ function GetACUUpgradeWanted(aiBrain, oACU)
                 if aiBrain[M27AirOverseer.refbEnemyHasOmniVision] then
                     tUpgradesWanted = {'ResourceAllocation'}
                 else
-                    tUpgradesWanted = { 'StealthGenerator', 'CloakingGenerator', 'MicrowaveLaserGenerator' }
+                    --Are any of the enemy Aeon? If so then want to also get RAS due to risk they build a GC
+                    local bEnemyIsAeon = false
+                    for iBrain, oBrain in aiBrain[M27Overseer.toEnemyBrains] do
+                        if oBrain:GetFactionIndex() == M27UnitInfo.refFactionAeon then
+                            bEnemyIsAeon = true
+                            break
+                        end
+                    end
+                    if bEnemyIsAeon then
+                        tUpgradesWanted = {'ResourceAllocation'}
+                    else
+                        tUpgradesWanted = { 'StealthGenerator', 'CloakingGenerator', 'MicrowaveLaserGenerator' }
+                    end
                 end
             elseif iFactionRef == M27UnitInfo.refFactionAeon then
                 tUpgradesWanted = { 'Shield' }
