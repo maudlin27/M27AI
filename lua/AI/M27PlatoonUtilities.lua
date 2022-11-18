@@ -2437,7 +2437,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     local sPlatoonName = oPlatoon:GetPlan()
     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
     local bProceed = true
-    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and oPlatoon[refoFrontUnit] and EntityCategoryContains(categories.COMMAND, oPlatoon[refoFrontUnit]) and oPlatoon[refoFrontUnit]:HasEnhancement('CloakingGenerator') and oPlatoon[refiEnemiesInRange] > 0 then bDebugMessages = true end
     --if sPlatoonName == 'M27Defender' and oPlatoon[refiPlatoonCount] == 7 and GetGameTimeSeconds() >= 570 then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
@@ -3159,10 +3159,15 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                 if bDebugMessages == true then LOG(sFunctionRef..': Finished considering if too many PD or enemy threat nearby, bACUNeedsToRun='..tostring(bACUNeedsToRun)) end
                 if bACUNeedsToRun == true then
                     --If have stealth or cloak, and no big enemy threats, do a temporary retreat
-                    if (oACU:HasEnhancement('CloakingGenerator') or oACU:HasEnhancement('StealthGenerator')) and M27Utilities.GetDistanceBetweenPositions(M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon)), GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit]) > 50 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have cloak or stealth so want to do temporary retreat') end
-                        oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
-                        oPlatoon[refbHavePreviouslyRun] = true
+                    if (oACU:HasEnhancement('CloakingGenerator') or oACU:HasEnhancement('StealthGenerator')) and M27Utilities.GetDistanceBetweenPositions(M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon)), GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit]) > 50 then
+                        if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have cloak or stealth so want to do temporary retreat') end
+                            oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
+                            oPlatoon[refbHavePreviouslyRun] = true
+                        else
+                            oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
+                            oPlatoon[refbHavePreviouslyRun] = true
+                        end
                     else
                         --Are we close to the nearest rally point, with >=75% health, and close to our base? then dont set an action to run (as it may be e.g. we are just running to be prudent due to high eco)
                         if M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.75 and (M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.25)) or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])) <= 30) then
@@ -4049,6 +4054,8 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                         end
                     end
                 end
+            else
+                if not(oPlatoon[refiCurrentAction]) then oPlatoon[refiCurrentAction] = refActionTemporaryRetreat end --redundancy for if we wont proceed with normal logic about if we can attack but havent given any other order
             end
 
 
@@ -7402,7 +7409,7 @@ function DeterminePlatoonAction(oPlatoon)
         --if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then --Removed this check as we do it already as part of the parent function
 
         local sPlatoonName = oPlatoon:GetPlan()
-        --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+        --if oPlatoon[refbACUInPlatoon] == true and oPlatoon[refoFrontUnit] and EntityCategoryContains(categories.COMMAND, oPlatoon[refoFrontUnit]) and oPlatoon[refoFrontUnit]:HasEnhancement('CloakingGenerator') and oPlatoon[refiEnemiesInRange] > 0 then bDebugMessages = true end
         --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 25 then bDebugMessages = true end
         --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
         --if oPlatoon:GetPlan() == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 3 and GetGameTimeSeconds() >= 360 then bDebugMessages = true end
@@ -10959,7 +10966,7 @@ function ProcessPlatoonAction(oPlatoon)
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
 
             local sPlatoonName = oPlatoon:GetPlan()
-            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and oPlatoon[refoFrontUnit] and EntityCategoryContains(categories.COMMAND, oPlatoon[refoFrontUnit]) and oPlatoon[refoFrontUnit]:HasEnhancement('CloakingGenerator') and oPlatoon[refiEnemiesInRange] > 0 then bDebugMessages = true end
             --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 25 then bDebugMessages = true end
             --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
             --if GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
