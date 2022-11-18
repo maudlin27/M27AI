@@ -6269,8 +6269,8 @@ function RecordPossibleTMLTargets(aiBrain, bForceRefresh)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function UpdateMassFabPotentialLocations(oMassStorage)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+function UpdateMassFabPotentialLocations(oMassStorage, bDontAddToTable)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateMassFabPotentialLocations'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local aiBrain = oMassStorage:GetAIBrain()
@@ -6298,9 +6298,21 @@ function UpdateMassFabPotentialLocations(oMassStorage)
                 end
                 --sLocationRef = M27Utilities.ConvertLocationToReference(tAdjustedPosition)
             end
-            if M27Utilities.IsTableEmpty(oMassStorage[reftPotentialMassFabLocations]) == false then
+            if not(bDontAddToTable) and M27Utilities.IsTableEmpty(oMassStorage[reftPotentialMassFabLocations]) == false then
                 if bDebugMessages == true then LOG(sFunctionRef..': Adding to table of storage wanting mass fab') end
-                table.insert(aiBrain[reftMassStorageWantingMassFab], oMassStorage)
+                --Double check not already in table as backup/redundancy to prevent infinite loop
+                local bInTableAlready = false
+                if M27Utilities.IsTableEmpty(aiBrain[reftMassStorageWantingMassFab]) == false then
+                    for iExistingStorage, oExistingStorage in aiBrain[reftMassStorageWantingMassFab] do
+                        if oExistingStorage == oMassStorage then
+                            bInTableAlready = true
+                            break
+                        end
+                    end
+                end
+                if not(bInTableAlready) then
+                    table.insert(aiBrain[reftMassStorageWantingMassFab], oMassStorage)
+                end
             end
         end
     end
@@ -6308,7 +6320,7 @@ function UpdateMassFabPotentialLocations(oMassStorage)
 end
 
 function RefreshStorageWantingMassFabs(aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RefreshStorageWantingMassFabs'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Is table of storage wanting mass fab empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftMassStorageWantingMassFab]))) end
@@ -6321,20 +6333,28 @@ function RefreshStorageWantingMassFabs(aiBrain)
             iCurCount = iCurCount + 1
             if iCurCount >= 100 then M27Utilities.ErrorHandler('Infinite loop') break end
             for iStorage, oMassStorage in aiBrain[reftMassStorageWantingMassFab] do
-                bRemove = true
+                bRemove = false
                 if M27UnitInfo.IsUnitValid(oMassStorage) then
-                    UpdateMassFabPotentialLocations(oMassStorage)
-                    if M27Utilities.IsTableEmpty(oMassStorage[reftPotentialMassFabLocations]) == false then
-                        bRemove = false
+                    if bDebugMessages == true then LOG(sFunctionRef..': Will update mass fab locations for storage '..oMassStorage.UnitId..M27UnitInfo.GetUnitLifetimeCount(oMassStorage)) end
+                    UpdateMassFabPotentialLocations(oMassStorage, true)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Finished udpating the storage fab locations, is table of locations empty='..tostring(M27Utilities.IsTableEmpty(oMassStorage[reftPotentialMassFabLocations]))) end
+                    if M27Utilities.IsTableEmpty(oMassStorage[reftPotentialMassFabLocations]) then
+                        bRemove = true
+                        if bDebugMessages == true then LOG(sFunctionRef..': No mass fab locations so will remove') end
                     end
+                else
+                    bRemove = true
+                    if bDebugMessages == true then LOG(sFunctionRef..': Not a valid unit so will remove') end
                 end
                 if bRemove then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Will remove the mass storage from list of units wanting mass fab') end
                     table.remove(aiBrain[reftMassStorageWantingMassFab], iStorage)
                     bUpdate = true
                     break
                 end
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': Finished one cycle of update, iCurCount='..iCurCount) end
+            if M27Utilities.IsTableEmpty(aiBrain[reftMassStorageWantingMassFab]) then bUpdate = false end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished one cycle of update, iCurCount='..iCurCount..'; bUpdate='..tostring(bUpdate)) end
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -7180,7 +7200,6 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                         local iCurCount = 1
                                         local iLoopCount = 0
                                         while iCurCount < iMaxCount do
-                                            bDebugMessages = true
                                             iLoopCount = iLoopCount + 1
                                             if iLoopCount > 100 then
                                                 M27Utilities.ErrorHandler('Infinite loop')
@@ -7191,15 +7210,13 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                             local iNearestStorage = 1000
                                             local iCurDistance
                                             local oNearestStorage
-                                            local tStorage
                                             if bDebugMessages == true then
                                                 LOG(sFunctionRef .. ': About to loop through all storage locations to see if we want to queue up more mass fabs; repr of storage locations=' .. repru(aiBrain[M27EconomyOverseer.reftMassStorageLocations]))
                                             end
-                                            if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftMassStorageWantingMassFab]) == false then
-                                                if iCurCount == 2 or table.getn(aiBrain[M27EconomyOverseer.reftMassStorageWantingMassFab]) <= 2 then RefreshStorageWantingMassFabs(aiBrain) end
-                                                if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftMassStorageWantingMassFab]) == false then
-                                                    for iStorage, oStorage in aiBrain[M27EconomyOverseer.reftMassStorageWantingMassFab] do
-                                                        tStorage = tSubtable[M27EconomyOverseer.reftStorageSubtableLocation]
+                                            if M27Utilities.IsTableEmpty(aiBrain[reftMassStorageWantingMassFab]) == false then
+                                                if iCurCount == 2 or table.getn(aiBrain[reftMassStorageWantingMassFab]) <= 2 then RefreshStorageWantingMassFabs(aiBrain) end
+                                                if M27Utilities.IsTableEmpty(aiBrain[reftMassStorageWantingMassFab]) == false then
+                                                    for iStorage, oStorage in aiBrain[reftMassStorageWantingMassFab] do
                                                         iCurDistance = M27Utilities.GetDistanceBetweenPositions(tTargetLocation, oStorage:GetPosition())
                                                         if bDebugMessages == true then
                                                             LOG(sFunctionRef .. ': iStorage=' .. iStorage .. '; iCurDistance=' .. iCurDistance .. '; oStorage='..oStorage.UnitId..M27UnitInfo.GetUnitLifetimeCount(oStorage))
@@ -7218,7 +7235,8 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                                             end
                                                             UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, false, iConditionNumber, nil, true, nil, iCategoryToBuild)
                                                             iCurCount = iCurCount + 1
-                                                            UpdateMassFabPotentialLocations(oNearestStorage)
+                                                            if bDebugMessages == true then LOG(sFunctionRef..': Will update mass fab locations for oNearestStorage '..oNearestStorage.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNearestStorage)) end
+                                                            UpdateMassFabPotentialLocations(oNearestStorage, true)
                                                         else
                                                             --Couldnt build here for some reason so abort
                                                             break

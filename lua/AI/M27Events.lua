@@ -1404,6 +1404,7 @@ function OnConstructed(oEngineer, oJustBuilt)
 
                 --Other units:
             elseif EntityCategoryContains(M27UnitInfo.refCategoryMassStorage, oJustBuilt.UnitId) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Just built mass storage '..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)..';, will refresh mass fab locations') end
                 ForkThread(M27EngineerOverseer.UpdateMassFabPotentialLocations, oJustBuilt)
 
             end
