@@ -196,6 +196,8 @@ refiStatusAllyPartBuilt = 6
 refiStatusQueued = 3
 refiStatusAvailable = 4
 refiStatusT3MexQueued = 5
+refiStatusWeHaveBuilt = 7
+refiStatusWeHavePartBuilt = 8
 
 refbMissileRecentlyBuilt = 'M27EngineerMissileRecentlyBuilt' --True when the missilebuilt event is run, given a delay in the unit registering that it has missiles
 refbEmergencyArtiNeeded = 'M27EngineerEmergencyArtiNeeded' --against aibrain, true if enemy has a significant threat that we need T2 Arti for ASAP
