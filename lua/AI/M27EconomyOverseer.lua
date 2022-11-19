@@ -549,6 +549,8 @@ function GetMassStorageTargets(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+
+
 function RefreshT2MexesNearBase(aiBrain)
     --Updates list of T2 mexes that are near to base and pathable by amphibious units, and arent upgrading, along with the varaible with the nearest one to our base
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -1996,6 +1998,19 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                     end
                 end
                 if not(bAlreadyUpgradingAir) then bWantHQEvenWithLowMass = true end
+            end
+            if not(bWantHQEvenWithLowMass) and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and aiBrain[M27Overseer.refoLastNearestACU]:HasEnhancement('AdvancedEngineering') and iLandFactoryCount > 0 and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 1 and M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()) <= 325 then
+                if M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) == true then
+                    bWantHQEvenWithLowMass = true
+                else
+                    local bAlreadyUpgradingLand = false
+                    for iUnit, oUnit in aiBrain[reftUpgrading] do
+                        if EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oUnit.UnitId) then
+                            bAlreadyUpgradingLand = true
+                        end
+                    end
+                    if not(bAlreadyUpgradingLand) then bWantHQEvenWithLowMass = true end
+                end
             end
         end
         --Alternative to mass threshold - try and get an HQ even if we have low mass in certain cases

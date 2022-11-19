@@ -57,6 +57,7 @@ reftLastLocationOfPathingGroup = 'M27UnitLastLocationOfPathingGroup' --Unit's po
 refbTreatAsVisible = 'M27UnitTreatAsVisible' --used for unseen T2PD that damages us - means we will calculate threat on it
 reftLastKnownPosition = 'M27UnitLastKnownPosition' --Used for naval units to try and avoid AI cheating while giving it a basic memory
 refbIsDangerousAA = 'M27UnitIsDangerousAA' --true if have added to table due to being dangeorus
+reftbInArmyIndexBigThreatTable = 'M27UnitInBigThreatTable' --[x] is army index; true if have added unit to table of big threats for that army index
 
 --Order related - used for navy (platoon uses platoon tracking)
 reftLastOrderTarget = 'M27UnitLastOrderTarget' --location of last target (e.g. for issuemove)
@@ -106,6 +107,7 @@ refCategoryMassStorage = categories.STRUCTURE * categories.MASSSTORAGE * categor
 
 refCategoryEnergyStorage = categories.STRUCTURE * categories.ENERGYSTORAGE
 refCategoryParagon = categories.MASSPRODUCTION * categories.MASSFABRICATION * categories.EXPERIMENTAL
+refCategoryMassFab = categories.MASSFABRICATION * categories.STRUCTURE - categories.MASSEXTRACTION - categories.EXPERIMENTAL
 
 --Building - intel and misc
 refCategoryAirStaging = categories.STRUCTURE * categories.AIRSTAGINGPLATFORM
@@ -153,10 +155,10 @@ refCategoryUpgraded = refCategoryT2Radar + refCategoryT3Radar + refCategoryT2Son
 --Land units
 refCategoryScathis = categories.CYBRAN * categories.ARTILLERY * categories.EXPERIMENTAL
 refCategoryExperimentalStructure = refCategoryScathis + categories.STRUCTURE * categories.EXPERIMENTAL
-refCategoryLandExperimental = categories.EXPERIMENTAL * categories.MOBILE * categories.LAND - categories.CYBRAN * categories.ARTILLERY - categories.UNSELECTABLE
+refCategoryLandExperimental = categories.EXPERIMENTAL * categories.MOBILE * categories.LAND - categories.CYBRAN * categories.ARTILLERY - categories.UNSELECTABLE - categories.UNTARGETABLE
 refCategoryMonkeylord = refCategoryLandExperimental * categories.BOT * categories.DIRECTFIRE - categories.SNIPER
 refCategoryMegalith = refCategoryLandExperimental * categories.BOT * categories.DIRECTFIRE * categories.SNIPER
-refCategoryMobileLand = categories.LAND * categories.MOBILE  - categories.UNSELECTABLE
+refCategoryMobileLand = categories.LAND * categories.MOBILE  - categories.UNSELECTABLE - categories.UNTARGETABLE
 refCategoryEngineer = categories.LAND * categories.MOBILE * categories.ENGINEER - categories.COMMAND - categories.FIELDENGINEER -categories.SUBCOMMANDER --Dont include sparkys as they cant build a lot of things, so just treat them as a combat unit that can reclaim
 refCategoryRASSACU = categories.SUBCOMMANDER * categories.RASPRESET + categories.SUBCOMMANDER * categories.SERAPHIM
 refCategoryRover = categories.POD * categories.ENGINEER * categories.MOBILE - categories.CONSTRUCTION -refCategoryEngineer
@@ -166,16 +168,16 @@ refCategoryEngineerStation = refCategoryRover + refCategoryHive + refCategoryKen
 
 refCategoryMAA = categories.LAND * categories.MOBILE * categories.ANTIAIR - categories.EXPERIMENTAL
 refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.BOT + categories.LAND * categories.MOBILE * categories.TANK * categories.TECH1 * categories.SERAPHIM - refCategoryMAA -categories.REPAIR --(repair exclusion added as basic way to differentiate between mantis (which has repair category) and LAB; alternative way is to specify the fastest when choosing the blueprint to build
-refCategoryDFTank = categories.LAND * categories.MOBILE * categories.DIRECTFIRE - categories.SCOUT - refCategoryMAA --NOTE: Need to specify slowest (so dont pick LAB)
+refCategoryDFTank = categories.LAND * categories.MOBILE * categories.DIRECTFIRE - categories.SCOUT - refCategoryMAA - categories.UNSELECTABLE - categories.UNTARGETABLE --NOTE: Need to specify slowest (so dont pick LAB)
 refCategoryLandScout = categories.LAND * categories.MOBILE * categories.SCOUT
 refCategoryCombatScout = categories.SERAPHIM * categories.SCOUT * categories.DIRECTFIRE
-refCategoryIndirect = categories.LAND * categories.MOBILE * categories.INDIRECTFIRE - categories.DIRECTFIRE - refCategoryLandExperimental - refCategoryScathis
-refCategoryT3MobileArtillery = categories.ARTILLERY * categories.LAND * categories.MOBILE * categories.TECH3
-refCategoryT3MML = categories.SILO * categories.MOBILE * categories.TECH3 * categories.LAND
-refCategoryFatboy = categories.EXPERIMENTAL * categories.UEF * categories.MOBILE * categories.LAND * categories.ARTILLERY
-refCategoryLandCombat = categories.MOBILE * categories.LAND * categories.DIRECTFIRE + categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 + categories.FIELDENGINEER + refCategoryFatboy - refCategoryEngineer -refCategoryLandScout -refCategoryMAA
+refCategoryIndirect = categories.LAND * categories.MOBILE * categories.INDIRECTFIRE - categories.DIRECTFIRE - refCategoryLandExperimental - refCategoryScathis - categories.UNSELECTABLE - categories.UNTARGETABLE
+refCategoryT3MobileArtillery = categories.ARTILLERY * categories.LAND * categories.MOBILE * categories.TECH3 - categories.UNSELECTABLE - categories.UNTARGETABLE
+refCategoryT3MML = categories.SILO * categories.MOBILE * categories.TECH3 * categories.LAND - categories.UNSELECTABLE - categories.UNTARGETABLE
+refCategoryFatboy = categories.EXPERIMENTAL * categories.UEF * categories.MOBILE * categories.LAND * categories.ARTILLERY - categories.UNSELECTABLE - categories.UNTARGETABLE
+refCategoryLandCombat = categories.MOBILE * categories.LAND * categories.DIRECTFIRE + categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 + categories.FIELDENGINEER + refCategoryFatboy - refCategoryEngineer -refCategoryLandScout -refCategoryMAA - categories.UNSELECTABLE - categories.UNTARGETABLE
 refCategoryAmphibiousCombat = refCategoryLandCombat * categories.HOVER + refCategoryLandCombat * categories.AMPHIBIOUS - categories.ANTISHIELD * categories.AEON --Dont include aeon T3 anti-shield here as it sucks unless against shields
-refCategorySurfaceAmphibiousCombat = refCategoryLandCombat * categories.HOVER + categories.ANTINAVY * categories.LAND * categories.MOBILE
+refCategorySurfaceAmphibiousCombat = refCategoryLandCombat * categories.HOVER + categories.ANTINAVY * categories.LAND * categories.MOBILE - categories.UNSELECTABLE - categories.UNTARGETABLE
 refCategoryGroundAA = refCategoryMAA + categories.NAVAL * categories.ANTIAIR + categories.STRUCTURE * categories.ANTIAIR + categories.NAVALCARRIER * categories.EXPERIMENTAL
 refCategoryStructureAA = categories.STRUCTURE * categories.ANTIAIR
 refCategoryIndirectT2Plus = categories.MOBILE * categories.LAND * categories.INDIRECTFIRE - categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 - categories.DIRECTFIRE
@@ -183,7 +185,7 @@ refCategoryIndirectT2Below = categories.MOBILE * categories.INDIRECTFIRE * categ
 refCategoryIndirectT3 = categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH3 - categories.DIRECTFIRE
 --Obsidian special case with shields due to inconsistent categories:
 refCategoryObsidian = categories.AEON * categories.TECH2 * categories.SHIELD * categories.DIRECTFIRE * categories.MOBILE * categories.LAND * categories.TANK --
-refCategoryMobileLandShield = categories.LAND * categories.MOBILE * categories.SHIELD - refCategoryObsidian --Miscategorised obsidian tank
+refCategoryMobileLandShield = categories.LAND * categories.MOBILE * categories.SHIELD - refCategoryObsidian  --Miscategorised obsidian tank
 refCategoryPersonalShield = categories.PERSONALSHIELD + refCategoryObsidian
 refCategoryMobileLandStealth = categories.LAND * categories.MOBILE * categories.STEALTHFIELD
 refCategorySniperBot = categories.MOBILE * categories.SNIPER * categories.LAND
@@ -208,9 +210,9 @@ refCategoryCzar = categories.AIR * categories.EXPERIMENTAL * categories.ANTIAIR 
 
 --Naval units
 refCategoryFrigate = categories.NAVAL * categories.FRIGATE
-refCategoryNavalSurface = categories.NAVAL - categories.SUBMERSIBLE --NOTE: This includes structures (e.g. torp launcher and factory)
+refCategoryNavalSurface = categories.NAVAL - categories.SUBMERSIBLE - categories.UNSELECTABLE - categories.UNTARGETABLE --NOTE: This includes structures (e.g. torp launcher and factory)
 refCategoryMobileNavalSurface = refCategoryNavalSurface * categories.MOBILE
-refCategoryAllNavy = categories.NAVAL
+refCategoryAllNavy = categories.NAVAL - categories.UNSELECTABLE - categories.UNTARGETABLE
 refCategoryNavalAA = refCategoryAllNavy * categories.ANTIAIR
 refCategoryCruiser = categories.NAVAL * categories.CRUISER
 refCategorySalem = categories.NAVAL * categories.AMPHIBIOUS * categories.DIRECTFIRE
@@ -1012,8 +1014,9 @@ function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
 
     if bDebugMessages == true then
         local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
-        LOG(sFunctionRef..': Start of code, oUnit='..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..'; bPauseNotUnpause='..tostring(bPauseNotUnpause)..'; Unit state='..M27Logic.GetUnitState(oUnit))
-        if oUnit.GetWorkProgress then LOG(sFunctionRef..': Unit work progress='..oUnit:GetWorkProgress()) end
+        LOG(sFunctionRef..': Start of code, oUnit='..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..' owned by brain '..oUnit:GetAIBrain().Nickname..'; bPauseNotUnpause='..tostring(bPauseNotUnpause)..'; Unit state='..M27Logic.GetUnitState(oUnit))
+        if oUnit.GetFocusUnit and oUnit:GetFocusUnit() then LOG(sFunctionRef..': Focus unit='..oUnit:GetFocusUnit().UnitId..GetUnitLifetimeCount(oUnit:GetFocusUnit())) end
+        if oUnit.GetWorkProgress then LOG(sFunctionRef..': Unit work progress='..oUnit:GetWorkProgress()..'; Unit fraction complete='..oUnit:GetFractionComplete()) end
     end
     if IsUnitValid(oUnit, true) and oUnit.SetPaused then
 
@@ -1043,10 +1046,11 @@ function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
             end
         end
         --Normal logic - just pause unit - exception if are dealing with a factory whose workcomplete is 100%
-        if not(EntityCategoryContains(refCategoryAllFactories, oUnit.UnitId)) or not(bPauseNotUnpause) or (oUnit.GetWorkProgress and oUnit:GetWorkProgress() > 0 and oUnit:GetWorkProgress() < 1) then
+        if oUnit.SetPaused and (not(EntityCategoryContains(refCategoryAllFactories, oUnit.UnitId)) or not(bPauseNotUnpause) or (oUnit.GetWorkProgress and oUnit:GetWorkProgress() > 0 and oUnit:GetWorkProgress() < 1)) then
             if oUnit.UnitId == 'xsb2401' then M27Utilities.ErrorHandler('Pausing Yolona') end
+            if bDebugMessages == true then LOG(sFunctionRef..': About to set paused to '..tostring(bPauseNotUnpause)..' for unit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit)) end
             oUnit:SetPaused(bPauseNotUnpause)
-            if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)) end
+
         elseif bDebugMessages == true then
             LOG(sFunctionRef..': Factory with either no workprogress or workprogress that isnt <1')
             if oUnit.GetWorkProgress then LOG(sFunctionRef..': Workprogress='..oUnit:GetWorkProgress()) end

@@ -125,6 +125,23 @@ end
 function DoWeWantPriorityT2LandFactoryHQ(aiBrain, iOptionalLandFactoryCount)
     if not(iOptionalLandFactoryCount) then iOptionalLandFactoryCount = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory) end
     local bGetT2FactoryEvenWithLowMass = false
+    function AlreadyGettingT2Land()
+        if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]) == false then
+            --Are we upgrading a T2 air fac to T3 (rather than T1 to T2), or a land fac?
+            for iUpgrading, oUpgrading in aiBrain[M27EconomyOverseer.reftActiveHQUpgrades] do
+                if EntityCategoryContains(M27UnitInfo.refCategoryLandFactory + categories.TECH1, oUpgrading.UnitId) then
+                    return true
+                end
+            end
+        end
+        return false
+    end
+    --If enemy has ACU with T2 upgrade and can path to us with land and it isnt that far away then want T2 land
+    if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and iOptionalLandFactoryCount > 0 and aiBrain[M27Overseer.refoLastNearestACU]:HasEnhancement('AdvancedEngineering') and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 1 and M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()) <= 325 then
+        if not(AlreadyGettingT2Land) then
+            return true
+        end
+    end
     if iOptionalLandFactoryCount >= 4 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandMain and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 1 and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] > 1 then
         local bAlreadyGettingT2LandFacOrT2Air = false
         if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]) == false then
@@ -136,7 +153,7 @@ function DoWeWantPriorityT2LandFactoryHQ(aiBrain, iOptionalLandFactoryCount)
                 end
             end
         end
-        if not(bAlreadyGettingT2LandFacOrT2Air) then
+        if not(AlreadyGettingT2Land()) then
             local iCurrentCombatUnits = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandCombat)
             if iCurrentCombatUnits >= 40 or (iCurrentCombatUnits >= 30 and (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 5 or aiBrain:GetEconomyStored('MASS') >= 1000)) then
                 bGetT2FactoryEvenWithLowMass = true
@@ -971,10 +988,11 @@ function DoesACUHaveGun(aiBrain, bROFAndRange, oAltACU)
     return bACUHasUpgrade
 end
 
-function HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable, bNotYetBuiltOn)
+function HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable, bNotYetBuiltOn, bIncludeEvenIfBuiltOrQueuedByAlly)
     --If further away hydro, considers if its closer to enemy base than start point; returns empty table if no hydro
     --if bAlsoReturnHydroTable == true then returns table of the hydro locations
     --bNotYetBuiltOn - if true, only includes hydro if it's not already built on
+    --bIncludeEvenIfBuiltOrQueuedByAlly - if true, includes hydro even if it has been built on or queued to be built on by an ally
     local sFunctionRef = 'HydroNearACUAndBase'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -1001,18 +1019,20 @@ function HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable,
                     iDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tHydro, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                     if iDistanceToStart <= iMaxDistanceForHydro then
                         if bDebugMessages == true then LOG(sFunctionRef..': Is table of uncliamed hydros containing just this hydro empty='..tostring(M27Utilities.IsTableEmpty(M27EngineerOverseer.FilterLocationsBasedOnIfUnclaimed(aiBrain, { tHydro }, false)))) end
-                        if not(bNotYetBuiltOn) or M27Utilities.IsTableEmpty(M27EngineerOverseer.FilterLocationsBasedOnIfUnclaimed(aiBrain, { tHydro }, false)) == false then
-                            if not(M27MapInfo.bNoRushActive) or iDistanceToStart + 0.5 < M27MapInfo.iNoRushRange then
-                                --Norush active - check if hydro is in range of norush
+                        --Norush active - check if hydro is in range of norush
+                        if not(M27MapInfo.bNoRushActive) or iDistanceToStart + 0.5 < M27MapInfo.iNoRushRange then
+                            if not(bNotYetBuiltOn) or M27Utilities.IsTableEmpty(M27EngineerOverseer.FilterLocationsBasedOnIfUnclaimed(aiBrain, { tHydro }, false)) == false then
+                                --IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatEnemyBuildingAsUnclaimed, bTreatOurOrAllyBuildingAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed, bTreatAllyBuildingAsClaimed)
+                                if bIncludeEvenIfBuiltOrQueuedByAlly or IsMexOrHydroUnclaimed(aiBrain, tHydro, false, false, true, true, true) then
 
-
-                                bHydroNear = true
-                                if bAlsoReturnHydroTable == false then
-                                    break
-                                else
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Have a valid hydro location') end
-                                    iValidHydroCount = iValidHydroCount + 1
-                                    tValidHydro[iValidHydroCount] = tHydro
+                                    bHydroNear = true
+                                    if bAlsoReturnHydroTable == false then
+                                        break
+                                    else
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Have a valid hydro location') end
+                                        iValidHydroCount = iValidHydroCount + 1
+                                        tValidHydro[iValidHydroCount] = tHydro
+                                    end
                                 end
                             end
                         end
@@ -1169,8 +1189,9 @@ function IsReclaimNearby(tLocation, iAdjacentSegmentSize, iMinTotal, iMinIndivid
     return false
 end
 
-function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatEnemyBuildingAsUnclaimed, bTreatOurOrAllyBuildingAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
+function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatEnemyBuildingAsUnclaimed, bTreatOurOrAllyBuildingAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed, bTreatAllyBuildingAsClaimed)
     --bTreatQueuedBuildingsAsUnclaimed: If set to false, then consideres all planned mex buidlings for engineers and treats them as being claimed
+    --bTreatAllyBuildingAsClaimed - if set to true then even if bTreatOurOrAllyBuildingAsUnclaimed is true, we will treat as claimed if an ally has built on it
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsMexOrHydroUnclaimed'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -1210,9 +1231,15 @@ function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatE
                 for iBuilding, oBuilding in tNearbyUnits do
                     if not(oBuilding.Dead) and oBuilding.GetFractionComplete then
                         if oBuilding:GetFractionComplete() >= 1 then
-                            iAvailabilityType = M27EngineerOverseer.refiStatusAllyBuilt
+                            if oBuilding:GetAIBrain() == aiBrain then iAvailabilityType = M27EngineerOverseer.refiStatusWeHaveBuilt
+                            else
+                                iAvailabilityType = M27EngineerOverseer.refiStatusAllyBuilt
+                            end
                         else
-                            iAvailabilityType = M27EngineerOverseer.refiStatusAllyPartBuilt
+                            if oBuilding:GetAIBrain() == aiBrain then iAvailabilityType = M27EngineerOverseer.refiStatusWeHavePartBuilt
+                            else
+                                iAvailabilityType = M27EngineerOverseer.refiStatusAllyPartBuilt
+                            end
                         end
                         bDontHaveResourceStatus = false
                         break
@@ -1270,8 +1297,18 @@ function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatE
     if iAvailabilityType == M27EngineerOverseer.refiStatusEnemyBuilt then
         return bTreatEnemyBuildingAsUnclaimed
     elseif iAvailabilityType == M27EngineerOverseer.refiStatusAllyBuilt then
-        return bTreatOurOrAllyBuildingAsUnclaimed
+        if bTreatAllyBuildingAsClaimed then return false
+        else return bTreatOurOrAllyBuildingAsUnclaimed
+        end
     elseif iAvailabilityType == M27EngineerOverseer.refiStatusAllyPartBuilt then
+        if bTreatAllyBuildingAsClaimed then return false
+        else
+            --Want to treat as claimed if we have fully built on it, or if we are part-built and have an engineer queued up to build; if part built and no engi queued then treat as unclaimed
+            return M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef])
+        end
+    elseif iAvailabilityType == M27EngineerOverseer.refiStatusWeHaveBuilt then
+        return bTreatOurOrAllyBuildingAsUnclaimed
+    elseif iAvailabilityType == M27EngineerOverseer.refiStatusWeHavePartBuilt then
         if bTreatOurOrAllyBuildingAsUnclaimed then return true
         else
             --Want to treat as claimed if we have fully built on it, or if we are part-built and have an engineer queued up to build; if part built and no engi queued then treat as unclaimed

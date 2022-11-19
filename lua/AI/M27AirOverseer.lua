@@ -1267,12 +1267,14 @@ function GetBestBomberTarget(oBomber, tPotentialUnitTargets, iMinFractionComplet
 
 
 
-
+    local bDontCheckIfCivilian = true
+    --Avoid targeting hostile civilians with initail bombers, but consider for later T1-T2 bombers
+    if EntityCategoryContains(categories.TECH1 + categories.TECH2, oBomber.UnitId) and aiBrain[M27Overseer.refiActiveEnemyBrains] > 0 and M27UnitInfo.GetUnitLifetimeCount(oBomber) <= 10 then bDontCheckIfCivilian = false end
 
     for iUnit, oUnit in tPotentialUnitTargets do
         --Check its not about to die and is complete enough
         if bDebugMessages == true then LOG(sFunctionRef..': Considering if we want to target oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oBomber[refbEngiHunterMode]='..tostring(oBomber[refbEngiHunterMode] or false)..'; Bomber LC='..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; Dist from unit to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))..'; aiBrain[refiHighestEnemyAirThreat]='..(aiBrain[refiHighestEnemyAirThreat] or 0)..'; aiBrain[refiEnemyMassInGroundAA]='..(aiBrain[refiEnemyMassInGroundAA] or 0)..'; is oUnit the same as oRecentlyTargeted='..tostring(oUnit == oRecentlyTargeted)..'; oUnit fraction complete='..oUnit:GetFractionComplete()..'; GetMaxStrikeDamageWanted(oUnit)='..GetMaxStrikeDamageWanted(oUnit)..'; oUnit[refiStrikeDamageAssigned]='..(oUnit[refiStrikeDamageAssigned] or 'nil')..'; Is unit bombers current target='..tostring(oUnit == oBomberCurTarget)..'; Dist to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))..'; aiBrain[refiHighestEnemyAirThreat]='..aiBrain[refiHighestEnemyAirThreat]..'; iMinFractionComplete wanted='..iMinFractionComplete) end
-        if not(oUnit == oRecentlyTargeted) and oUnit:GetFractionComplete() >= (iMinFractionComplete or 0.5) then
+        if not(oUnit == oRecentlyTargeted) and oUnit:GetFractionComplete() >= (iMinFractionComplete or 0.5) and (bDontCheckIfCivilian or not(M27Logic.IsCivilianBrain(oUnit:GetAIBrain()))) then
             --Check it odesnt already have enough strike damage assigned
             if GetMaxStrikeDamageWanted(oUnit) > (oUnit[refiStrikeDamageAssigned] or 0) or oUnit == oBomberCurTarget then
                 --If in engi hunter mode then ignore engineers close to enemy base unless enemy has no air units
@@ -3257,8 +3259,11 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                             else
                                 if oUnit:GetPosition()[2] - GetSurfaceHeight(oUnit:GetPosition()[1], oUnit:GetPosition()[3]) <= 7 or oUnit:IsUnitState('MovingDown') then
                                     oUnit[refiCyclesOnGroundWaitingToRefuel] = (oUnit[refiCyclesOnGroundWaitingToRefuel] or 0) + 1
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit state='..M27Logic.GetUnitState(oUnit)..'; Distance above surface height='..oUnit:GetPosition()[2] - GetSurfaceHeight(oUnit:GetPosition()[1], oUnit:GetPosition()[3])..'; Cycles in this position='..oUnit[refiCyclesOnGroundWaitingToRefuel]) end
                                     if oUnit[refiCyclesOnGroundWaitingToRefuel] >= 20 or (oUnit[refiCyclesOnGroundWaitingToRefuel] >= 5 and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(),oUnit[refoAirStagingAssigned]:GetPosition()) >= 75) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Will readd unit to those wanting a new refuel command') end
                                         bReaddToLowFuel = true
+                                        oUnit[refiCyclesOnGroundWaitingToRefuel] = 0
                                     end
                                 end
                             end
@@ -3608,14 +3613,12 @@ function ReleaseRefueledUnitsFromAirStaging(aiBrain, oAirStaging)
         end
         if M27Utilities.IsTableEmpty(tRefuelingUnits) == false then
             for iRefuelingUnit, oRefuelingUnit in tRefuelingUnits do
-                if not (oRefuelingUnit.Dead) then
+                if not (oRefuelingUnit.Dead) and not(EntityCategoryContains(categories.UNSELECTABLE, oRefuelingUnit.UnitId)) then
                     oRefuelingUnit[refbSentRefuelCommand] = false
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Have a unit refueling, checking tracker')
-                    end
                     bReadyToLeave = true
                     if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Have a unit refueling, checking its health and fuel')
+                        LOG(sFunctionRef .. ': Have a unit refueling, checking its health and fuel. Unit='..oRefuelingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oRefuelingUnit))
+                        LOG(sFunctionRef..': Unit fuel ratio='..oRefuelingUnit:GetFuelRatio())
                     end
                     if oRefuelingUnit:GetFuelRatio() < 0.99 or M27UnitInfo.GetUnitHealthPercent(oRefuelingUnit) < 0.99 then
                         bReadyToLeave = false
@@ -4906,6 +4909,11 @@ function DetermineBomberDefenceRange(aiBrain)
                 aiBrain[refiBomberDefenceModDistance] = math.max(aiBrain[refiBomberDefenceCriticalThreatDistance], math.min(aiBrain[refiBomberDefenceModDistance], iValueCap))
             end
         end
+
+        --Limit the defence range based on nearest enemy dangerous AA
+        if aiBrain[refiBomberDefenceModDistance] > 125 then
+            aiBrain[refiBomberDefenceModDistance] = math.max(125, math.min(aiBrain[refiBomberDefenceModDistance], aiBrain[refiClosestEnemyDangerousAADistToOurBase] - 80))
+        end
     end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -5093,7 +5101,7 @@ function AirBomberManager(aiBrain)
 
     DetermineBomberDefenceRange(aiBrain) --Updates aiBrain[refiBomberDefenceModDistance]
     if bDebugMessages == true then
-        LOG(sFunctionRef .. ': Start of code for aiBrain=' .. aiBrain.Nickname .. ' Index=' .. aiBrain:GetArmyIndex() .. '; have determined bomber defence range=' .. aiBrain[refiBomberDefenceModDistance] .. '; is table of available bombers empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftAvailableBombers])) .. '; Distance cap=' .. aiBrain[refiBomberDefenceDistanceCap] .. '; Critical dist=' .. aiBrain[refiBomberDefenceCriticalThreatDistance])
+        LOG(sFunctionRef .. ': Start of code for aiBrain=' .. aiBrain.Nickname .. ' Index=' .. aiBrain:GetArmyIndex() .. '; have determined bomber defence range=' .. aiBrain[refiBomberDefenceModDistance] .. '; is table of available bombers empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftAvailableBombers])) .. '; Distance cap=' .. aiBrain[refiBomberDefenceDistanceCap] .. '; Critical dist=' .. aiBrain[refiBomberDefenceCriticalThreatDistance]..'; GameTime='..GetGameTimeSeconds())
     end
 
     if M27Utilities.IsTableEmpty(aiBrain[reftAvailableBombers]) == false then
@@ -5286,13 +5294,11 @@ function AirBomberManager(aiBrain)
                         end
 
                         local sMessage
-                        local iRandom = math.random(1, 4)
+                        local iRandom = math.random(1, 3)
                         if iRandom <= 2 then
                             sMessage = 'That\'s a lot of anti-air '..sEnemyName..'.  Think it\'ll be enough to calm the fear?', 0, 10000
                         elseif iRandom == 3 then
-                            sMessage = 'Scared of strats much '..sEnemyName..'?'
-                        elseif iRandom == 4 then
-                            sMessage = 'You must really want to keep my air out of your base '..sEnemyName
+                            sMessage = 'Scared of air much '..sEnemyName..'?'
                         end
 
                         M27Chat.SendMessage(aiBrain, 'LotsOfAA', sMessage, 0, 10000)
@@ -6754,7 +6760,7 @@ function AirBomberManager(aiBrain)
                                         --tBestBombTarget, iMinValueWanted = M27Logic.GetBestAOETarget(aiBrain, oClosestDistance:GetPosition(), iAOE, iCurStrikeDamage, false,                nil,                     nil,                                   nil,                nil,                                nil,                     iMaxDistanceChecks,             iWithin75PercentFactor)
 
                                         --if bDebugMessages == true then LOG(sFunctionRef..': About to get damage from bomb for position '..repru(oClosestDistance:GetPosition())..'; iAOE='..(iAOE or 'nil')..'; iCurStrikeDamage='..(iCurStrikeDamage or 'nil')..'; iWithin75PercentFactor='..(iWithin75PercentFactor or 'nil')) end
-                                                                    --GetDamageFromBomb(aiBrain, tBaseLocation,             iAOE, iDamage,          iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck, iOptionalSizeAdjust, iOptionalModIfNeedMultipleShots, iMobileValueOverrideFactorWithin75Percent)
+                                        --GetDamageFromBomb(aiBrain, tBaseLocation,             iAOE, iDamage,          iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor, bCumulativeShieldHealthCheck, iOptionalSizeAdjust, iOptionalModIfNeedMultipleShots, iMobileValueOverrideFactorWithin75Percent)
                                         iCurBombValue = M27Logic.GetDamageFromBomb(aiBrain, oClosestDistance:GetPosition(), iAOE, iCurStrikeDamage, nil,                                nil,                    nil,                            nil,                nil,                                iWithin75PercentFactor)
                                         iMinValueWanted = iCurBombValue * 1.3
                                         if EntityCategoryContains(categories.ANTIAIR, oClosestDistance.UnitId) then iMinValueWanted = iMinValueWanted * 1.5 end --If we are targeting an AA unit then only want to switch to a further away target if potential for damage is greatly increased
@@ -7772,6 +7778,9 @@ function AirAAManager(aiBrain)
                                         end
                                     end--]]
                                 end
+                            end
+                            if not(bShouldAttackThreat) and EntityCategoryContains(M27UnitInfo.refCategoryTransport, oUnit.UnitId) and oUnit.GetCargo and M27Utilities.IsTableEmpty(oUnit:GetCargo()) == false and M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition()) <= 175 then
+                                bShouldAttackThreat = true
                             end
 
                             if not (bShouldAttackThreat) then
@@ -10057,7 +10066,7 @@ function GunshipManager(aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': About to start main gunship logic, Gunships available='..iAvailableGunships..'; Gunship range='..iGunshipOperationalRange..'; iMaxDirectLineExtraDist='..iMaxDirectLineExtraDist) end
 
         function ConsiderTargetingUnit(oUnit)
-            if not(oUnit:IsUnitState('Attached')) and not(M27UnitInfo.IsUnitUnderwater(oUnit)) then
+            if not(oUnit:IsUnitState('Attached')) and not(M27UnitInfo.IsUnitUnderwater(oUnit)) and not(EntityCategoryContains(categories.UNTARGETABLE, oUnit.UnitId)) then
                 iCurEnemyDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                 if bDebugMessages == true then LOG(sFunctionRef..': Unit threatening mex='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurEnemyDist='..iCurEnemyDist) end
                 if iCurEnemyDist < iClosestEnemyDist then

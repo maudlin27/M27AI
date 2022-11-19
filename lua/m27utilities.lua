@@ -2054,10 +2054,10 @@ function IssueTrackedClearCommands(tUnits)
     --Below is example if want to give an alert in the log when a unit has its orders cleared
     --[[if GetGameTimeSeconds() >= 360 and tUnits[1]:GetAIBrain():GetArmyIndex() == 5 and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, tUnits[1]) then
         for iUnit, oUnit in tUnits do
-            if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uel01052' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uel01054' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uel01055' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uel010516' then
+            --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uel01052' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uel01054' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uel01055' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uel010516' then
                 LOG('About to issue clear commands for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
                 ErrorHandler('Audit trail game time='..GetGameTimeSeconds(), true)
-            end
+            --end
         end
     end--]]
     --if GetGameTimeSeconds() >= 230 and tUnits[1].UnitId and tUnits[1].UnitId..M27UnitInfo.GetUnitLifetimeCount(tUnits[1]) == 'drl02043' then ErrorHandler('Audit trail game time='..GetGameTimeSeconds()) end
