@@ -5294,13 +5294,11 @@ function AirBomberManager(aiBrain)
                         end
 
                         local sMessage
-                        local iRandom = math.random(1, 4)
+                        local iRandom = math.random(1, 3)
                         if iRandom <= 2 then
                             sMessage = 'That\'s a lot of anti-air '..sEnemyName..'.  Think it\'ll be enough to calm the fear?', 0, 10000
                         elseif iRandom == 3 then
-                            sMessage = 'Scared of strats much '..sEnemyName..'?'
-                        elseif iRandom == 4 then
-                            sMessage = 'You must really want to keep my air out of your base '..sEnemyName
+                            sMessage = 'Scared of air much '..sEnemyName..'?'
                         end
 
                         M27Chat.SendMessage(aiBrain, 'LotsOfAA', sMessage, 0, 10000)

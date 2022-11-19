@@ -282,10 +282,13 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                         if EntityCategoryContains(categories.EXPERIMENTAL, oUnitKilled.UnitId) and not(M27Chat.tiM27VoiceTauntByType['Killed nearby experimental']) and (oUnitKilled.Sync.totalMassKilled or 0) <= math.min(10000, oUnitKilled:GetBlueprint().Economy.BuildCostMass * 0.35) and M27Utilities.GetDistanceBetweenPositions(oUnitKilled:GetPosition(), M27MapInfo.PlayerStartPoints[oKillerBrain.M27StartPositionNumber]) <= 150 and M27Logic.GetCombatThreatRating(oKillerBrain, oKillerBrain:GetUnitsAroundPoint(categories.EXPERIMENTAL, oUnitKilled:GetPosition(), 150, 'Enemy')) <= 5000 then
                             M27Chat.SendMessage(oKillerBrain, 'Killed nearby experimental', 'Thanks for the mass', 5, 10000)
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, oUnitKilled.UnitId) and EntityCategoryContains(categories.COMMAND, instigator.UnitId) and GetGameTimeSeconds() - (instigator[M27UnitInfo.refiTimeOfLastOverchargeShot] or -100) <= 5 then
-                            if bDebugMessages == true then LOG(sFunctionRef..': About to send ACU OC message') end
-                            local sMessage = 'Wow, talk about a clutch overcharge'
-                            if math.random(1,2) == 1 and M27Conditions.DoesACUHaveGun(oKillerBrain, false, instigator) then sMessage = 'Lol, turns out guncom counters '..LOCF(oUnitKilled:GetBlueprint().General.UnitName) end
-                            M27Chat.SendMessage(oKillerBrain, 'ACU OC experimental', sMessage, 5, 10000)
+                            --Dont send message if enemy still have nearby dangerous units
+                            if M27Utilities.IsTableEmpty(oKillerBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandExperimental + M27UnitInfo.refCategoryLandCombat * categories.TECH3, instigator:GetPosition(), 60, 'Enemy')) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': About to send ACU OC message') end
+                                local sMessage = 'Wow, talk about a clutch overcharge'
+                                if math.random(1,2) == 1 and M27Conditions.DoesACUHaveGun(oKillerBrain, false, instigator) then sMessage = 'Lol, turns out guncom counters '..LOCF(oUnitKilled:GetBlueprint().General.UnitName) end
+                                M27Chat.SendMessage(oKillerBrain, 'ACU OC experimental', sMessage, 5, 10000)
+                            end
                         elseif EntityCategoryContains(categories.STRUCTURE * M27UnitInfo.refCategoryExperimentalLevel, oUnitKilled.UnitId) and oUnitKilled:GetFractionComplete() >= 0.5 then
                             M27Chat.SendGloatingMessage(oKillerBrain, 1, 900)
                         else
@@ -986,6 +989,8 @@ function OnWeaponFired(oWeapon)
             end
 
 
+
+
             if oUnit:GetAIBrain().M27AI then
                 --T3 and experimental arti
                 if bDebugMessages == true then LOG(sFunctionRef..': Shot just fired by '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Weapon range category='..oWeapon.Blueprint.RangeCategory or 'nil') end
@@ -1026,6 +1031,16 @@ function OnWeaponFired(oWeapon)
                             local sMessage = 'Nice try'
                             if math.random(1,2) == 1 then sMessage = 'Loaded :)' end
                             M27Chat.SendMessage(aiBrain, 'Stopped nuke', sMessage, 2, 10000)
+                        end
+                    end
+                end
+            else
+                --Experimental fired - add to table of big threats
+                if EntityCategoryContains(M27UnitInfo.refCategoryExperimentalLevel + M27UnitInfo.refCategoryTML, oUnit.UnitId) then
+                    local aiBrain = oUnit:GetAIBrain()
+                    for iBrain, oBrain in ArmyBrains do
+                        if oBrain.M27AI and IsEnemy(oBrain:GetArmyIndex(), aiBrain:GetArmyIndex()) then
+                            M27Overseer.AddUnitToBigThreatTable(oBrain, oUnit)
                         end
                     end
                 end

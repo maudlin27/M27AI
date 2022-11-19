@@ -6833,60 +6833,68 @@ function AddUnitToBigThreatTable(aiBrain, oUnit)
     --local bDebugMessages = M27Config.M27StrategicLog
     local sFunctionRef = 'AddUnitToBigThreatTable'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if not(oUnit[M27UnitInfo.reftbInArmyIndexBigThreatTable] and oUnit[M27UnitInfo.reftbInArmyIndexBigThreatTable][aiBrain:GetArmyIndex()]) then
 
 
 
 
-    local bAlreadyInTable = false
-    local bConsiderChatWarning = true
-    local bWantACUToReturnToBase = false
+        local bAlreadyInTable = false
+        local bConsiderChatWarning = true
+        local bWantACUToReturnToBase = false
 
 
-    for sReferenceTable, iCategory in tEnemyBigThreatCategories do
-        if EntityCategoryContains(iCategory, oUnit.UnitId) then
-            for iExistingUnit, oExistingUnit in aiBrain[sReferenceTable] do
-                if oExistingUnit == oUnit then
-                    bAlreadyInTable = true
-                    break
-                end
-            end
-            if not(bAlreadyInTable) then
-                if bDebugMessages == true then LOG(sFunctionRef..': About to add unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to reference table. Is table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[sReferenceTable]))..'; bConsiderChatWarning='..tostring(bConsiderChatWarning)..'; Unit fraction complete='..oUnit:GetFractionComplete()..'; T3 resource generation units held by owner='..oUnit:GetAIBrain():GetCurrentUnits(M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryRASSACU + M27UnitInfo.refCategoryParagon)) end
-                if sReferenceTable == reftEnemySMD or sReferenceTable == reftEnemyTML then
-                    bConsiderChatWarning = false
-                elseif sReferenceTable == reftEnemyLandExperimentals then
-                    bWantACUToReturnToBase = true
-                end
+        for sReferenceTable, iCategory in tEnemyBigThreatCategories do
+            if EntityCategoryContains(iCategory, oUnit.UnitId) then
+                for iExistingUnit, oExistingUnit in aiBrain[sReferenceTable] do
+                    if oExistingUnit == oUnit then
 
-                if bConsiderChatWarning and M27Utilities.IsTableEmpty(aiBrain[sReferenceTable]) then
-                    if sReferenceTable == reftEnemyArtiAndExpStructure then
-                        if EntityCategoryContains(M27UnitInfo.refCategoryNovaxCentre, oUnit.UnitId) then
-                            M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy Novax detected', 0, 1000, true)
-                        elseif EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oUnit.UnitId) then
-                            M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy T3 arti detected', 0, 1000, true)
-                        elseif EntityCategoryContains(M27UnitInfo.refCategoryExperimentalStructure, oUnit.UnitId) then
-                            if oUnit:GetFractionComplete() <= 0.2 and oUnit:GetAIBrain():GetCurrentUnits(M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryRASSACU + M27UnitInfo.refCategoryParagon) <= 20 then
-                                M27Chat.SendMessage(aiBrain, sReferenceTable, 'LOL theyre building a '..LOCF(oUnit:GetBlueprint().General.UnitName), 0, 1000, true)
-                            else
-                                M27Chat.SendMessage(aiBrain, sReferenceTable, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 0, 1000, true)
-                            end
-                        end
-                    elseif sReferenceTable == reftEnemyLandExperimentals then
-                        M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 0, 1000, true)
-                    else
-                        M27Chat.SendMessage(aiBrain, sReferenceTable, 'Enemy '..sReferenceTable..' detected', 0, 1000, true)
+                        bAlreadyInTable = true --redundancy
+                        if not(oUnit[M27UnitInfo.reftbInArmyIndexBigThreatTable]) then oUnit[M27UnitInfo.reftbInArmyIndexBigThreatTable] = {} end
+                        oUnit[M27UnitInfo.reftbInArmyIndexBigThreatTable][aiBrain:GetArmyIndex()] = true
+                        break
                     end
                 end
+                if not(bAlreadyInTable) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': About to add unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to reference table. Is table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[sReferenceTable]))..'; bConsiderChatWarning='..tostring(bConsiderChatWarning)..'; Unit fraction complete='..oUnit:GetFractionComplete()..'; T3 resource generation units held by owner='..oUnit:GetAIBrain():GetCurrentUnits(M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryRASSACU + M27UnitInfo.refCategoryParagon)) end
+                    if sReferenceTable == reftEnemySMD or sReferenceTable == reftEnemyTML then
+                        bConsiderChatWarning = false
+                    elseif sReferenceTable == reftEnemyLandExperimentals then
+                        bWantACUToReturnToBase = true
+                    end
 
-                table.insert(aiBrain[sReferenceTable], oUnit)
-                if bWantACUToReturnToBase and M27Utilities.IsTableEmpty(aiBrain[sReferenceTable]) == false then
-                    aiBrain[refbAreBigThreats] = true
+                    if bConsiderChatWarning and M27Utilities.IsTableEmpty(aiBrain[sReferenceTable]) then
+                        if sReferenceTable == reftEnemyArtiAndExpStructure then
+                            if EntityCategoryContains(M27UnitInfo.refCategoryNovaxCentre, oUnit.UnitId) then
+                                M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy Novax detected', 0, 1000, true)
+                            elseif EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oUnit.UnitId) then
+                                M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy T3 arti detected', 0, 1000, true)
+                            elseif EntityCategoryContains(M27UnitInfo.refCategoryExperimentalStructure, oUnit.UnitId) then
+                                if oUnit:GetFractionComplete() <= 0.2 and oUnit:GetAIBrain():GetCurrentUnits(M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryRASSACU + M27UnitInfo.refCategoryParagon) <= 20 then
+                                    M27Chat.SendMessage(aiBrain, sReferenceTable, 'LOL theyre building a '..LOCF(oUnit:GetBlueprint().General.UnitName), 0, 1000, true)
+                                else
+                                    M27Chat.SendMessage(aiBrain, sReferenceTable, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 0, 1000, true)
+                                end
+                            end
+                        elseif sReferenceTable == reftEnemyLandExperimentals then
+                            M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 0, 1000, true)
+                        else
+                            M27Chat.SendMessage(aiBrain, sReferenceTable, 'Enemy '..sReferenceTable..' detected', 0, 1000, true)
+                        end
+                    end
+
+                    table.insert(aiBrain[sReferenceTable], oUnit)
+                    if not(oUnit[M27UnitInfo.reftbInArmyIndexBigThreatTable]) then oUnit[M27UnitInfo.reftbInArmyIndexBigThreatTable] = {} end
+                    oUnit[M27UnitInfo.reftbInArmyIndexBigThreatTable][aiBrain:GetArmyIndex()] = true
+
+                    if bWantACUToReturnToBase and M27Utilities.IsTableEmpty(aiBrain[sReferenceTable]) == false then
+                        aiBrain[refbAreBigThreats] = true
+                    end
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Have some units for experimental threat category sReferenceTable=' .. sReferenceTable .. '; is tReferenceTableEmpty after considering if civilian or pathable to us='..tostring(M27Utilities.IsTableEmpty(aiBrain[sReferenceTable]))..'; aiBrain[refbAreBigThreats]='..tostring(aiBrain[refbAreBigThreats]))
+                    end
                 end
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Have some units for experimental threat category sReferenceTable=' .. sReferenceTable .. '; is tReferenceTableEmpty after considering if civilian or pathable to us='..tostring(M27Utilities.IsTableEmpty(aiBrain[sReferenceTable]))..'; aiBrain[refbAreBigThreats]='..tostring(aiBrain[refbAreBigThreats]))
-                end
+                break
             end
-            break
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
