@@ -2739,6 +2739,7 @@ function ResetEnemyThreatGroups(aiBrain, iSearchRange, tCategoriesToSearch)
         end
         sOldRef = oEnemyUnit[iArmyIndex][refsEnemyThreatGroup]
         if sOldRef == nil then
+            oEnemyUnit[iArmyIndex] = {} --redundancy - once (v64) got error with setting the below line on a boolean
             oEnemyUnit[iArmyIndex][refsEnemyThreatGroup] = {}
         end
         if oEnemyUnit[iArmyIndex][refstPrevEnemyThreatGroup] == nil then

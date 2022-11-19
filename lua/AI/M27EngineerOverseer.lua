@@ -4351,9 +4351,9 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
         local bBuildNearToEnemy = false
         if iDistanceFromStart <= 80 then bBuildNearToEnemy = true end
 
-        --Check we're not trying to buidl a mex or hydro or mass storage
+        --Check we're not trying to buidl a mex or hydro or mass storage or mass fab
         local bMexHydroOrStorage = false
-        if EntityCategoryContains(refCategoryMex, sBlueprintToBuild) or EntityCategoryContains(refCategoryHydro, sBlueprintToBuild) or EntityCategoryContains(M27UnitInfo.refCategoryMassStorage, sBlueprintToBuild) then bMexHydroOrStorage = true end
+        if EntityCategoryContains(refCategoryMex, sBlueprintToBuild) or EntityCategoryContains(refCategoryHydro, sBlueprintToBuild) or EntityCategoryContains(M27UnitInfo.refCategoryMassStorage + M27UnitInfo.refCategoryMassFab, sBlueprintToBuild)  then bMexHydroOrStorage = true end
 
         --Check if is an existing building of the type wanted first:
         local oPartCompleteBuilding
@@ -4985,7 +4985,7 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
 
         --UEF - high priority fatboy if enemy has sniper bots or land experimentals (even if enemy has T3 arti as well)
         if bDebugMessages == true then LOG(sFunctionRef..': Fatboy priority checker: Are we UEF='..tostring(iFactionIndex == M27UnitInfo.refFactionUEF)..'; Lifetime build count='..iLifetimeLandExperimentalCount..'; Existing experimentals='..iExistingLandExperimentals..'; Is table of enemy land experi empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]))..'; has enemy built sniperbots='..tostring(aiBrain[M27Overseer.refbEnemyHasBuiltSniperbots])) end
-        if iFactionIndex == M27UnitInfo.refFactionUEF and iLifetimeLandExperimentalCount <= 1 and iExistingLandExperimentals == 0 then
+        if iFactionIndex == M27UnitInfo.refFactionUEF and ((iLifetimeLandExperimentalCount <= 1 and iExistingLandExperimentals == 0) or (M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFatboy, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 600, 'Ally')) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFatboy) == 0)) then
             if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false or aiBrain[M27Overseer.refbEnemyHasBuiltSniperbots] then
                 iCategoryRef = refiExperimentalLand
                 if bDebugMessages == true then LOG(sFunctionRef..': Will build land experimental as want priority fatboy') end
@@ -6958,7 +6958,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                 iMaxAreaToSearch = 5
                             elseif iActionToAssign == refActionBuildMassFab then
                                 bQueueUpMultiple = true
-                                iMaxAreaToSearch = 5
+                                iMaxAreaToSearch = 1
                             elseif iActionToAssign == refActionBuildT1Sonar or iActionToAssign == refActionBuildT2Sonar then
                             elseif iActionToAssign == refActionBuildShield or iActionToAssign == refActionBuildSecondShield then
                                 oUnitToBuildBy = oActionTargetObject
@@ -7080,7 +7080,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                 end
 
                                 if bQueueUpMultiple == true and M27Utilities.IsTableEmpty(tTargetLocation) == false then
-                                    iMaxAreaToSearch = iMaxAreaToSearch - 5
+                                    iMaxAreaToSearch = math.max(0, iMaxAreaToSearch - 5)
                                     if iActionToAssign == refActionBuildMex or iActionToAssign == refActionBuildPlateauMex then
                                         --Get nearest mex in pathing group and see if its close enough
                                         local tMexesToIgnore = {}

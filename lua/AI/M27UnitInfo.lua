@@ -210,9 +210,9 @@ refCategoryCzar = categories.AIR * categories.EXPERIMENTAL * categories.ANTIAIR 
 
 --Naval units
 refCategoryFrigate = categories.NAVAL * categories.FRIGATE
-refCategoryNavalSurface = categories.NAVAL - categories.SUBMERSIBLE --NOTE: This includes structures (e.g. torp launcher and factory)
+refCategoryNavalSurface = categories.NAVAL - categories.SUBMERSIBLE - categories.UNSELECTABLE - categories.UNTARGETABLE --NOTE: This includes structures (e.g. torp launcher and factory)
 refCategoryMobileNavalSurface = refCategoryNavalSurface * categories.MOBILE
-refCategoryAllNavy = categories.NAVAL
+refCategoryAllNavy = categories.NAVAL - categories.UNSELECTABLE - categories.UNTARGETABLE
 refCategoryNavalAA = refCategoryAllNavy * categories.ANTIAIR
 refCategoryCruiser = categories.NAVAL * categories.CRUISER
 refCategorySalem = categories.NAVAL * categories.AMPHIBIOUS * categories.DIRECTFIRE
@@ -1014,8 +1014,9 @@ function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
 
     if bDebugMessages == true then
         local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
-        LOG(sFunctionRef..': Start of code, oUnit='..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..'; bPauseNotUnpause='..tostring(bPauseNotUnpause)..'; Unit state='..M27Logic.GetUnitState(oUnit))
-        if oUnit.GetWorkProgress then LOG(sFunctionRef..': Unit work progress='..oUnit:GetWorkProgress()) end
+        LOG(sFunctionRef..': Start of code, oUnit='..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..' owned by brain '..oUnit:GetAIBrain().Nickname..'; bPauseNotUnpause='..tostring(bPauseNotUnpause)..'; Unit state='..M27Logic.GetUnitState(oUnit))
+        if oUnit.GetFocusUnit and oUnit:GetFocusUnit() then LOG(sFunctionRef..': Focus unit='..oUnit:GetFocusUnit().UnitId..GetUnitLifetimeCount(oUnit:GetFocusUnit())) end
+        if oUnit.GetWorkProgress then LOG(sFunctionRef..': Unit work progress='..oUnit:GetWorkProgress()..'; Unit fraction complete='..oUnit:GetFractionComplete()) end
     end
     if IsUnitValid(oUnit, true) and oUnit.SetPaused then
 
@@ -1045,10 +1046,11 @@ function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
             end
         end
         --Normal logic - just pause unit - exception if are dealing with a factory whose workcomplete is 100%
-        if not(EntityCategoryContains(refCategoryAllFactories, oUnit.UnitId)) or not(bPauseNotUnpause) or (oUnit.GetWorkProgress and oUnit:GetWorkProgress() > 0 and oUnit:GetWorkProgress() < 1) then
+        if oUnit.SetPaused and (not(EntityCategoryContains(refCategoryAllFactories, oUnit.UnitId)) or not(bPauseNotUnpause) or (oUnit.GetWorkProgress and oUnit:GetWorkProgress() > 0 and oUnit:GetWorkProgress() < 1)) then
             if oUnit.UnitId == 'xsb2401' then M27Utilities.ErrorHandler('Pausing Yolona') end
+            if bDebugMessages == true then LOG(sFunctionRef..': About to set paused to '..tostring(bPauseNotUnpause)..' for unit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit)) end
             oUnit:SetPaused(bPauseNotUnpause)
-            if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)) end
+
         elseif bDebugMessages == true then
             LOG(sFunctionRef..': Factory with either no workprogress or workprogress that isnt <1')
             if oUnit.GetWorkProgress then LOG(sFunctionRef..': Workprogress='..oUnit:GetWorkProgress()) end

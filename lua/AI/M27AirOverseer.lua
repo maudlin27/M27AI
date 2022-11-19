@@ -7779,6 +7779,9 @@ function AirAAManager(aiBrain)
                                     end--]]
                                 end
                             end
+                            if not(bShouldAttackThreat) and EntityCategoryContains(M27UnitInfo.refCategoryTransport, oUnit.UnitId) and oUnit.GetCargo and M27Utilities.IsTableEmpty(oUnit:GetCargo()) == false and M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition()) <= 175 then
+                                bShouldAttackThreat = true
+                            end
 
                             if not (bShouldAttackThreat) then
                                 --Lower priority air targets, which will only consider if we think we have air control
@@ -10063,7 +10066,7 @@ function GunshipManager(aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': About to start main gunship logic, Gunships available='..iAvailableGunships..'; Gunship range='..iGunshipOperationalRange..'; iMaxDirectLineExtraDist='..iMaxDirectLineExtraDist) end
 
         function ConsiderTargetingUnit(oUnit)
-            if not(oUnit:IsUnitState('Attached')) and not(M27UnitInfo.IsUnitUnderwater(oUnit)) then
+            if not(oUnit:IsUnitState('Attached')) and not(M27UnitInfo.IsUnitUnderwater(oUnit)) and not(EntityCategoryContains(categories.UNTARGETABLE, oUnit.UnitId)) then
                 iCurEnemyDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                 if bDebugMessages == true then LOG(sFunctionRef..': Unit threatening mex='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurEnemyDist='..iCurEnemyDist) end
                 if iCurEnemyDist < iClosestEnemyDist then
