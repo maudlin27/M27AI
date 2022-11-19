@@ -1453,7 +1453,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ManageTeamNavy'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if GetGameTimeSeconds() >= 600 and M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.TECH3 * M27UnitInfo.refCategoryBattleship, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])) == false then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 1095 and M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.SHIELD, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])) == false then bDebugMessages = true end
     --if GetGameTimeSeconds() >= 480 then bDebugMessages = true end
     --if GetGameTimeSeconds() >= 840 and (aiBrain:GetArmyIndex() == 2 or aiBrain:GetArmyIndex() == 4) then bDebugMessages = true end
 
@@ -3440,7 +3440,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
         for iUnit, oUnit in EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileNavalSurface - iSupportNavyCategory, tFriendlyNavalExcludingIntercept) do
             bDontCheckIfTargetUnderwater = EntityCategoryContains(categories.ANTINAVY, oUnit.UnitId)
             if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Considering unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; is underwater=' .. tostring(oUnit[refbTempIsUnderwater]) .. '; oUnit[M27UnitInfo.refiDFRange]=' .. oUnit[M27UnitInfo.refiDFRange] .. '; oUnit[M27UnitInfo.refiIndirectRange]=' .. oUnit[M27UnitInfo.refiIndirectRange])
+                LOG(sFunctionRef .. ': Considering unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; is underwater=' .. tostring(oUnit[refbTempIsUnderwater]) .. '; oUnit[M27UnitInfo.refiDFRange]=' .. (oUnit[M27UnitInfo.refiDFRange] or 'nil') .. '; oUnit[M27UnitInfo.refiIndirectRange]=' .. (oUnit[M27UnitInfo.refiIndirectRange] or 'nil'))
             end
             if not (oUnit[refbTempIsUnderwater]) then
                 if oUnit[M27UnitInfo.refiIndirectRange] == nil then
@@ -3662,13 +3662,14 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                     iCurShieldHealth, iMaxShieldHealth = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
                     iShieldPercent = iCurShieldHealth / iMaxShieldHealth
                     if oUnit[refbRechargeShield] then
-                        if iShieldPercent >= 0.75 then oUnit[refbRechargeShield] = true end
+                        if iShieldPercent >= 0.75 then oUnit[refbRechargeShield] = false end
                     else
                         if iShieldPercent <= 0.2 then
                             oUnit[refbRechargeShield] = true
                             RemoveShieldAssignment(oUnit)
                         end
                     end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iMaxShieldHealth='..iMaxShieldHealth..'; iCurShieldHealth='..iCurShieldHealth..'; iShieldPercent='..iShieldPercent..'; RechargeShield='..tostring(oUnit[refbRechargeShield])) end
 
                     --Determine action based on if we want to recharge shield
                     if iMaxShieldHealth == 0 then --Redundancy
