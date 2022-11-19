@@ -2447,10 +2447,10 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 937 and aiBrain:GetArmyIndex() == 4 and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
-    --if sPlatoonName == 'M27IndirectDefender' and GetGameTimeSeconds() >= 625 then bDebugMessages = true end
+    if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectSpareAttacker' and (oPlatoon[refoFrontUnit] == 'dal0310' or oPlatoon[refiPlatoonCount] == 15) then bDebugMessages = true end
     --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
-    if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and aiBrain:GetArmyIndex() == 2 and GetGameTimeSeconds() >= 420 then bDebugMessages = true end
+    --if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and aiBrain:GetArmyIndex() == 2 and GetGameTimeSeconds() >= 420 then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' and oPlatoon[refiPlatoonCount] == 21 then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 4 and aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
@@ -4335,9 +4335,10 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                 if iMaxPDRange < oPlatoon[refiPlatoonMaxRange] then
                                                     local oNearestPD = M27Utilities.GetNearestUnit(tNearbyEnemyPD, GetPlatoonFrontPosition(oPlatoon))
                                                     if bDebugMessages == true then LOG(sFunctionRef..': Nearest PD distance to front position='..M27Utilities.GetDistanceBetweenPositions(oNearestPD:GetPosition(), GetPlatoonFrontPosition(oPlatoon))..'; nearest PD='..oNearestPD.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNearestPD)) end
-                                                    if iMaxPDRange + 5 > M27Utilities.GetDistanceBetweenPositions(oNearestPD:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) then
+                                                    --Note: If below dist increase is too high then risk MMLs never grouping up to attack (i.e. front MML gets too close trying to hit shield/TMD, so causes whole platoon to retreat, meaning rear MMLs never end up getting closer)
+                                                    if iMaxPDRange + 3.3 > M27Utilities.GetDistanceBetweenPositions(oNearestPD:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) then
                                                         oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
-                                                        if bDebugMessages == true then LOG(sFunctionRef..': within 5 of being in range of enemy PD that we outrange so want to retreat temporarily') end
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': within 3.5 of being in range of enemy PD that we outrange so want to retreat temporarily') end
                                                     end
                                                 end
                                             end
@@ -7443,7 +7444,7 @@ function DeterminePlatoonAction(oPlatoon)
         --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
         --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
         --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
-        --if sPlatoonName == 'M27IndirectDefender' and aiBrain:GetArmyIndex() == 10 and GetGameTimeSeconds() >= 940 then bDebugMessages = true end
+        if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
         --if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and aiBrain:GetArmyIndex() == 2 and GetGameTimeSeconds() >= 420 then bDebugMessages = true end
         --if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 480 and aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
         --if sPlatoonName == 'M27EscortAI' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 780  then bDebugMessages = true end
@@ -9524,7 +9525,7 @@ end
 
 function IssueIndirectAttack(oPlatoon, bDontClearActions)
     --Targets structures first, if no structures then spread attack on units
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IssueIndirectAttack'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..':'..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Start of code: iIndirectUnites='..oPlatoon[refiIndirectUnits]) end
@@ -11001,10 +11002,10 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == M27Overseer.sIntelPlatoonRef then bDebugMessages = true end
             --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
             --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
-            --if sPlatoonName == 'M27IndirectDefender' and GetGameTimeSeconds() >= 625 then bDebugMessages = true end
+            if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 480 and aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
-            if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and aiBrain:GetArmyIndex() == 2 and GetGameTimeSeconds() >= 420 then bDebugMessages = true end
+            --if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and aiBrain:GetArmyIndex() == 2 and GetGameTimeSeconds() >= 420 then bDebugMessages = true end
             --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
             --if sPlatoonName == 'M27MobileShield' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27MobileStealth' then bDebugMessages = true end

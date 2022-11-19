@@ -3198,7 +3198,6 @@ function ThreatAssessAndRespond(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ThreatAssessAndRespond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetGameTimeSeconds() >= 625 then bDebugMessages = true end
 
     --if GetGameTimeSeconds() >= 245 then bDebugMessages = true end
 
@@ -7713,7 +7712,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                                 bCancelLandRush = true
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Either we have at least 6 mass income or enemy or us have t3. aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; aiBrain[refiEnemyHighestTechLevel]='..aiBrain[refiEnemyHighestTechLevel]..'; aiBrain[refiOurHighestFactoryTechLevel]='..aiBrain[refiOurHighestFactoryTechLevel]) end
                                             elseif aiBrain[refiEnemyHighestTechLevel] == 2 then
-                                                --Does enemy have at least 1 T2 PD, or >=5 T2 land combat units?
+                                                --Does enemy have at least 1 T2 PD, or >=5 T2 land combat units, or a nearby ACU with T2 upgrade?
                                                 local tEnemyPD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy')
                                                 if M27Utilities.IsTableEmpty(tEnemyPD) == false then
                                                     bCancelLandRush = true
@@ -7723,6 +7722,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                                     if M27Utilities.IsTableEmpty(tEnemyT2Combat) == false and table.getn(tEnemyT2Combat) >= 5 then
                                                         bCancelLandRush = true
                                                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy has '..table.getn(tEnemyT2Combat)..' T2 combat units so will cancel land rush mode') end
+                                                    elseif M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) and aiBrain[refoLastNearestACU]:HasEnhancement('AdvancedEngineering') and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 1 and M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()) <= 325 then
+                                                        bCancelLandRush = true
                                                     end
                                                 end
                                             end

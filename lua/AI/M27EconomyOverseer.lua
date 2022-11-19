@@ -1999,6 +1999,19 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                 end
                 if not(bAlreadyUpgradingAir) then bWantHQEvenWithLowMass = true end
             end
+            if not(bWantHQEvenWithLowMass) and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and aiBrain[M27Overseer.refoLastNearestACU]:HasEnhancement('AdvancedEngineering') and iLandFactoryCount > 0 and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 1 and M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()) <= 325 then
+                if M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) == true then
+                    bWantHQEvenWithLowMass = true
+                else
+                    local bAlreadyUpgradingLand = false
+                    for iUnit, oUnit in aiBrain[reftUpgrading] do
+                        if EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oUnit.UnitId) then
+                            bAlreadyUpgradingLand = true
+                        end
+                    end
+                    if not(bAlreadyUpgradingLand) then bWantHQEvenWithLowMass = true end
+                end
+            end
         end
         --Alternative to mass threshold - try and get an HQ even if we have low mass in certain cases
         if M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) == true then

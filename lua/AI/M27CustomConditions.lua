@@ -125,6 +125,23 @@ end
 function DoWeWantPriorityT2LandFactoryHQ(aiBrain, iOptionalLandFactoryCount)
     if not(iOptionalLandFactoryCount) then iOptionalLandFactoryCount = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory) end
     local bGetT2FactoryEvenWithLowMass = false
+    function AlreadyGettingT2Land()
+        if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]) == false then
+            --Are we upgrading a T2 air fac to T3 (rather than T1 to T2), or a land fac?
+            for iUpgrading, oUpgrading in aiBrain[M27EconomyOverseer.reftActiveHQUpgrades] do
+                if EntityCategoryContains(M27UnitInfo.refCategoryLandFactory + categories.TECH1, oUpgrading.UnitId) then
+                    return true
+                end
+            end
+        end
+        return false
+    end
+    --If enemy has ACU with T2 upgrade and can path to us with land and it isnt that far away then want T2 land
+    if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and iOptionalLandFactoryCount > 0 and aiBrain[M27Overseer.refoLastNearestACU]:HasEnhancement('AdvancedEngineering') and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 1 and M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()) <= 325 then
+        if not(AlreadyGettingT2Land) then
+            return true
+        end
+    end
     if iOptionalLandFactoryCount >= 4 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandMain and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 1 and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] > 1 then
         local bAlreadyGettingT2LandFacOrT2Air = false
         if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]) == false then
@@ -136,7 +153,7 @@ function DoWeWantPriorityT2LandFactoryHQ(aiBrain, iOptionalLandFactoryCount)
                 end
             end
         end
-        if not(bAlreadyGettingT2LandFacOrT2Air) then
+        if not(AlreadyGettingT2Land()) then
             local iCurrentCombatUnits = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandCombat)
             if iCurrentCombatUnits >= 40 or (iCurrentCombatUnits >= 30 and (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 5 or aiBrain:GetEconomyStored('MASS') >= 1000)) then
                 bGetT2FactoryEvenWithLowMass = true
