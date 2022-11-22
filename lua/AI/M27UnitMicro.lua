@@ -1131,7 +1131,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                 --Target enemy ACU if its low health as a top priority unless it's about to move out of our range
                 if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoACUKillTarget], true) then
                     oEnemyACU = aiBrain[M27Overseer.refoACUKillTarget]
-                    if aiBrain[M27Overseer.refoLastNearestACU]:GetHealth() < 1400 then
+                    if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and aiBrain[M27Overseer.refoLastNearestACU]:GetHealth() < 1400 then
                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy ACU is almost dead so want to target it, and not target anything else if we cant hit it') end
                         iDistanceToEnemyACU = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], tUnitPosition)
                         if iDistanceToEnemyACU < (iACURange - 2) and WillShotHit(oUnitWithOvercharge, oEnemyACU) then
