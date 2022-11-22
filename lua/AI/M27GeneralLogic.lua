@@ -4789,6 +4789,47 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitD
                             iMassFactor = iMassFactor * 0.1
                         end
                         iTotalDamage = iTotalDamage + oCurBP.Economy.BuildCostMass * oUnit:GetFractionComplete() * iMassFactor
+                        --Increase further for SML and SMD that might have a missile
+                        if EntityCategoryContains(M27UnitInfo.refCategorySML, oUnit.UnitId) then
+                            if oUnit:GetFractionComplete() == 1 then
+                                iTotalDamage = iTotalDamage + 12000 * math.min(iMassFactor, 1)
+                            end
+                        elseif EntityCategoryContains(M27UnitInfo.refCategorySMD, oUnit.UnitId) then
+                            if oUnit:GetFractionComplete() == 1 then
+                                iTotalDamage = iTotalDamage + 3600 * math.min(iMassFactor, 1)
+                                --Also increase if we have a nuke launcher more than 35% complete
+
+                                function HaveSML(oBrain)
+                                    local tFriendlyNukes = aiBrain:GetListOfUnits(M27UnitInfo.refCategorySML, false, true)
+                                    if M27Utilities.IsTableEmpty(tFriendlyNukes) == false then
+                                        for iUnit, oUnit in tFriendlyNukes do
+                                            if oUnit:GetFractionComplete() == 1 then
+                                                if oUnit:GetWorkProgress() >= 0.35 then
+                                                    return true
+                                                elseif oUnit.GetNukeSiloAmmoCount and oUnit:GetNukeSiloAmmoCount() >= 1 then
+                                                    return true
+                                                end
+                                            end
+                                        end
+                                    end
+                                    return false
+                                end
+                                local bHaveFriendlySMLNearlyLoaded = false
+                                if not(bHaveFriendlySMLNearlyLoaded) then
+                                    for iBrain, oBrain in aiBrain[M27Overseer.toAllyBrains] do
+                                        if not(oBrain == aiBrain) then
+                                            if HaveSML(oBrain) then
+                                                bHaveFriendlySMLNearlyLoaded = true
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+                                if bHaveFriendlySMLNearlyLoaded then
+                                    iTotalDamage = iTotalDamage + 10000
+                                end
+                            end
+                        end
                         if bDebugMessages == true then LOG(sFunctionRef..': Finished considering the unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iTotalDamage='..iTotalDamage..'; oCurBP.Economy.BuildCostMass='..oCurBP.Economy.BuildCostMass..'; oUnit:GetFractionComplete()='..oUnit:GetFractionComplete()..'; iMassFactor after considering if unit is mobile='..iMassFactor..'; distance between unit and target='..M27Utilities.GetDistanceBetweenPositions(tBaseLocation, oUnit:GetPosition())) end
                     end
                 end

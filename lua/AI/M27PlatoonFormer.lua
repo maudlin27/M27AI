@@ -500,7 +500,8 @@ function CombatPlatoonFormer(aiBrain)
                 sPlatoonToForm = 'M27EscortAI'
                 oPlatoonOrUnitToEscort = M27Utilities.GetACU(aiBrain).PlatoonHandle
             else
-                M27Utilities.ErrorHandler('Dont have a recognised strategy')
+                M27Utilities.ErrorHandler('Dont have a recognised strategy, iStrategy='..(iStrategy or 'nil'))
+                LOG('Brain='..(aiBrain.Nickname or 'nil')..'; M27IsDefeated='..tostring(aiBrain.M27IsDefeated or  false))
             end
             iCurrentConditionToTry = iCurrentConditionToTry + 1
         end

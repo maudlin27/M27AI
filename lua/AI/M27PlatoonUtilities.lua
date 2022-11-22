@@ -2780,7 +2780,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                         if not(aiBrain[M27EconomyOverseer.refbBehindOnEco]) then
                             local iUpgradeCount = M27UnitInfo.GetNumberOfUpgradesObtained(oACU)
                             if iUpgradeCount <= 2 and oPlatoon[refiEnemiesInRange] >= (10 + iUpgradeCount) then
-                                local iCurShield, iMaxShield = GetCurrentAndMaximumShield(oPlatoon[refoFrontUnit], false)
+                                local iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oPlatoon[refoFrontUnit], false)
                                 if iCurShield <= 2000 then
                                     --Do we have mobile shield coverage?
                                     if not(M27Conditions.HaveNearbyMobileShield(oPlatoon)) then
@@ -3462,7 +3462,8 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
         if bProceed then
             --T2 arti avoidance logic for specified platoons - for now will just try with skirmishers, combat patrol and ACU
             --NOTE: If expanding platoons that this applies to, then also update logic for recording enemies, as it has code to increase the search range if T2 arti are identified
-            if (oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic] or sPlatoonName == 'M27CombatPatrolAI' or oPlatoon[refbACUInPlatoon]) and M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid]) == false then
+            --Dont do this if t2 arti is close to our base
+            if ((oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic] or sPlatoonName == 'M27CombatPatrolAI' or oPlatoon[refbACUInPlatoon]) and M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid]) == false) then
                 --if oPlatoon[refbACUInPlatoon] then bDebugMessages = true end
                 local iArtiSearchRange = 135
                 if oPlatoon[refbRecentlyRunFromT2Arti] and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 75 then
@@ -3474,12 +3475,14 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                 for iArti, oArti in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid] do
                     if bDebugMessages == true and M27UnitInfo.IsUnitValid(oArti) then LOG(sFunctionRef..': Considering oArti='..oArti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oArti)..' owned by '..oArti:GetAIBrain().Nickname..'; Distance to platoon='..M27Utilities.GetDistanceBetweenPositions(oArti:GetPosition(), GetPlatoonFrontPosition(oPlatoon))) end
                     if M27UnitInfo.IsUnitValid(oArti) and M27Utilities.GetDistanceBetweenPositions(oArti:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= iArtiSearchRange then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Platoon '..sPlatoonName..oPlatoon[refiPlatoonCount]..'Has nearby t2 arti '..oArti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oArti)..' owned by '..oArti:GetAIBrain().Nickname..' so want to retreat') end
-                        oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
-                        bProceed = false
-                        oNearbyArti = oArti
+                        if M27Utilities.GetDistanceBetweenPositions(oArti:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 175 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Platoon '..sPlatoonName..oPlatoon[refiPlatoonCount]..'Has nearby t2 arti '..oArti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oArti)..' owned by '..oArti:GetAIBrain().Nickname..' so want to retreat') end
+                            oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
+                            bProceed = false
+                            oNearbyArti = oArti
 
-                        break
+                            break
+                        end
                     end
                 end
 

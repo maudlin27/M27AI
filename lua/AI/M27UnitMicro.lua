@@ -479,6 +479,9 @@ function DodgeShot(oTarget, oWeapon, oAttacker, iTimeToDodge)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DodgeShot'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if EntityCategoryContains(categories.EXPERIMENTAL, oTarget.UnitId) then
+        bDebugMessages = true
+    end
 
 
     local oNavigator = oTarget:GetNavigator()
@@ -509,7 +512,13 @@ function DodgeShot(oTarget, oWeapon, oAttacker, iTimeToDodge)
     local oBP = oTarget:GetBlueprint()
     local iSpeed = oBP.Physics.MaxSpeed
     local iDistanceToRun = iTimeToDodge * iSpeed
+    local iUnitSize = oBP.SizeX + oBP.SizeZ
     local iAngleAdjust = math.max(15, oBP.Physics.TurnRate * 0.3)
+    if iUnitSize >= 2 then
+        if iUnitSize >= 4 then iAngleAdjust = iAngleAdjust * 2.5
+        else iAngleAdjust = iAngleAdjust * 1.75
+        end
+    end
     if M27Utilities.GetAngleDifference(iCurFacingAngle + iAngleAdjust, iAngleToDestination) > M27Utilities.GetAngleDifference(iCurFacingAngle - iAngleAdjust, iAngleToDestination) then
         iAngleAdjust = iAngleAdjust * -1
     end
@@ -520,7 +529,7 @@ function DodgeShot(oTarget, oWeapon, oAttacker, iTimeToDodge)
     if iLastOrder and (iLastOrder == M27PlatoonUtilities.refiOrderIssueAttack or iLastOrder == M27PlatoonUtilities.refiOrderIssueAggressiveMove or iLastOrder == M27PlatoonUtilities.refiOrderIssueAggressiveFormMove) then
         bAttackMove = true
     end
-    if bDebugMessages == true then LOG(sFunctionRef..': oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; clearing current orders which have a possible destination of '..repru(tCurDestination)..'; and giving an order to move to '..repru(tTempDestination)..'; Dist from our position to temp position='..M27Utilities.GetDistanceBetweenPositions(oTarget:GetPosition(), tTempDestination)) end
+    if bDebugMessages == true then LOG(sFunctionRef..': oTarget (ie unit that is dodging)='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; clearing current orders which have a possible destination of '..repru(tCurDestination)..'; and giving an order to move to '..repru(tTempDestination)..'; Dist from our position to temp position='..M27Utilities.GetDistanceBetweenPositions(oTarget:GetPosition(), tTempDestination)..'; iAngleAdjust='..iAngleAdjust..'; Unit size='..iUnitSize) end
     M27Utilities.IssueTrackedClearCommands({oTarget})
     TrackTemporaryUnitMicro(oTarget, iTimeToDodge)
     IssueMove({oTarget}, tTempDestination)
@@ -537,6 +546,7 @@ function ConsiderDodgingShot(oUnit, oWeapon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ConsiderDodgingShot'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if EntityCategoryContains(categories.TECH2, oUnit.UnitId) then bDebugMessages = true end
     if bDebugMessages == true then
         LOG(sFunctionRef..': Just fired, oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
         if oWeapon.GetCurrentTarget then
@@ -552,33 +562,37 @@ function ConsiderDodgingShot(oUnit, oWeapon)
         end
     end
     --Direct fire, t1 mobile arti, and t2 mobile missile launchers
-    if oWeapon.GetCurrentTarget and (oWeapon.Blueprint.WeaponCategory == 'Direct Fire' or oWeapon.Blueprint.WeaponCategory == 'Direct Fire Naval' or (oWeapon.Blueprint.WeaponCategory == 'Artillery' and EntityCategoryContains(categories.TECH1, oUnit.UnitId)) or (oWeapon.Blueprint.WeaponCategory == 'Missile' and oWeapon.Blueprint.MaxRadius <= 80)) then
+    if oWeapon.GetCurrentTarget and (oWeapon.Blueprint.WeaponCategory == 'Direct Fire' or oWeapon.Blueprint.WeaponCategory == 'Direct Fire Naval' or oWeapon.Blueprint.WeaponCategory == 'Direct Fire Experimental' or (oWeapon.Blueprint.WeaponCategory == 'Artillery' and EntityCategoryContains(categories.TECH1, oUnit.UnitId)) or (oWeapon.Blueprint.WeaponCategory == 'Missile' and oWeapon.Blueprint.MaxRadius <= 80)) then
         if bDebugMessages == true then LOG(sFunctionRef..': Have a valid weapon category, will see if have targets to consider dodging') end
         local oWeaponTarget = oWeapon:GetCurrentTarget()
         local bConsiderUnitsInArea = false
         if not(M27UnitInfo.IsUnitValid(oWeaponTarget)) or EntityCategoryContains(categories.NAVAL * categories.MOBILE, oWeaponTarget.UnitId) then bConsiderUnitsInArea = true end
 
         local tUnitsToConsiderDodgeFor = {}
-        function ConsiderAddingUnitToTable(oCurUnit)
-            if oCurUnit:GetAIBrain().M27AI and not(oCurUnit:IsUnitState('Upgrading')) and not(oCurUnit[M27UnitInfo.refbSpecialMicroActive]) then
+        function ConsiderAddingUnitToTable(oCurUnit, bIncludeBusyUnits)
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering if we should add oCurUnit='..oCurUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCurUnit)..'; Brain='..oCurUnit:GetAIBrain().Nickname..'; Unit state='..M27Logic.GetUnitState(oCurUnit)..'; Special micro active='..tostring(oCurUnit[M27UnitInfo.refbSpecialMicroActive] or false)) end
+            if oCurUnit:GetAIBrain().M27AI and (bIncludeBusyUnits or (not(oCurUnit:IsUnitState('Upgrading')) and not(oCurUnit[M27UnitInfo.refbSpecialMicroActive]))) then
                 if EntityCategoryContains(categories.AIR + categories.STRUCTURE, oCurUnit.UnitId) then
                     --Do nothing
                 elseif EntityCategoryContains(categories.MOBILE, oCurUnit.UnitId) then
                     if oCurUnit:GetFractionComplete() == 1 then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Added unit to table of units to consider dodging for') end
                         table.insert(tUnitsToConsiderDodgeFor, oCurUnit)
                     end
                 end
             end
         end
+        local bIncludeBusyUnits = false
+        if oWeapon.Blueprint.Damage >= 5000 then bIncludeBusyUnits = true end
         if not(bConsiderUnitsInArea) then
             --Is it a unit with a shield?
             if EntityCategoryContains(categories.SHIELD, oWeaponTarget.UnitId) then
                 local iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oWeaponTarget, true)
                 if (iCurShield or 0) <= (iMaxShield or 0) * 0.2 then
-                    ConsiderAddingUnitToTable(oWeaponTarget)
+                    ConsiderAddingUnitToTable(oWeaponTarget, bIncludeBusyUnits)
                 end
             else
-                ConsiderAddingUnitToTable(oWeaponTarget)
+                ConsiderAddingUnitToTable(oWeaponTarget, bIncludeBusyUnits)
             end
 
         else
@@ -607,7 +621,7 @@ function ConsiderDodgingShot(oUnit, oWeapon)
                         end
                         if not(bUnderMobileShield) then
                             for iNearbyUnit, oNearbyUnit in tAllUnitsInArea do
-                                ConsiderAddingUnitToTable(oNearbyUnit)
+                                ConsiderAddingUnitToTable(oNearbyUnit, bIncludeBusyUnits)
                             end
                         end
                     end
@@ -640,7 +654,7 @@ function ConsiderDodgingShot(oUnit, oWeapon)
                         local oBP = oTarget:GetBlueprint()
                         local iAverageSize = (oBP.SizeX + oBP.SizeZ) * 0.5
                         if bDebugMessages == true then LOG(sFunctionRef..': iAverageSize='..iAverageSize..'; Is unit underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oUnit))..'; Unit speed='..oBP.Physics.MaxSpeed) end
-                        if iTimeUntilImpact > 0.4 + iAverageSize * 1.5 / oBP.Physics.MaxSpeed then
+                        if iTimeUntilImpact > math.min(2.5, 0.4 + iAverageSize * 1.5 / oBP.Physics.MaxSpeed) then
                             --Are we not underwater?
                             if not(M27UnitInfo.IsUnitUnderwater(oUnit)) then
                                 --If dealing with an ACU then drastically reduce the dodge time so we can overcharge if we havent recently and have enemies in range and enough power
