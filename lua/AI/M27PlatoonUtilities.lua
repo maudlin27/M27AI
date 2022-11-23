@@ -4022,6 +4022,11 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                 end
                                             else
                                                 --We either dont outrange enemy or dont know if we do - revert to normal logic
+                                                --If we are a skirmisher platoon then retreat to nearest rally if the enemy outranges us
+                                                if oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic] and iEnemyMaxRange > oPlatoon[refiPlatoonMaxRange] then
+                                                    oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy platoon outranges us and we are using skirmisher retreat logic so will go to nearest rally point') end
+                                                end
                                                 --bDontConsiderFurtherOrders = true
                                                 --oPlatoon[refiCurrentAction] = refActionMoveDFToNearestEnemy
                                             end
