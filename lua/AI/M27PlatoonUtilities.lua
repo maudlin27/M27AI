@@ -5716,7 +5716,7 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                 if bOldMicroFlag and not(bActiveMicro) then ForceActionRefresh(oPlatoon, 2) end
             end
 
-            if oPlatoon[refoFrontUnit] then
+            if M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) then
                 oPlatoon[reftFrontPosition] = oPlatoon[refoFrontUnit]:GetPosition()
 
                 --Update unit's pathing details

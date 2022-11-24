@@ -547,9 +547,14 @@ end
 function GetACUShieldRegenRate(oUnit)
     --Cycles through every possible enhancement, sees if the unit has it, and if so what its shield regen rate is, and returns the max value
     local iRegenRate = 0
-    for sEnhancement, tEnhancement in oUnit:GetBlueprint().Enhancements do
-        if oUnit:HasEnhancement(sEnhancement) and tEnhancement.ShieldRegenRate then
-            iRegenRate = math.max(iRegenRate, tEnhancement.ShieldRegenRate)
+    if oUnit.HasEnhancement then
+        local oBP = oUnit:GetBlueprint()
+        if M27Utilities.IsTableEmpty(oBP.Enhancements) == false then
+            for sEnhancement, tEnhancement in oBP.Enhancements do
+                if oUnit:HasEnhancement(sEnhancement) and tEnhancement.ShieldRegenRate then
+                    iRegenRate = math.max(iRegenRate, tEnhancement.ShieldRegenRate)
+                end
+            end
         end
     end
     return iRegenRate
