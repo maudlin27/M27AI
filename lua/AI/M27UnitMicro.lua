@@ -476,7 +476,7 @@ end
 function DodgeShot(oTarget, oWeapon, oAttacker, iTimeToDodge)
     --Should have already checked oTarget is a valid unit that has a chance of dodging the shot in time before claling this
     --Gets unit to move at a slightly different angle to its current facing direction for iTimeToDodge
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DodgeShot'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if EntityCategoryContains(categories.EXPERIMENTAL, oTarget.UnitId) then
@@ -484,29 +484,40 @@ function DodgeShot(oTarget, oWeapon, oAttacker, iTimeToDodge)
     end
 
 
-    local oNavigator = oTarget:GetNavigator()
+
     local tCurDestination
-    if oNavigator and oNavigator.GetCurrentTargetPos then
-        tCurDestination = oNavigator:GetCurrentTargetPos()
+    if oTarget.PlatoonHandle and M27Utilities.IsTableEmpty(oTarget.PlatoonHandle[M27PlatoonUtilities.reftLastOrderPosition]) == false then
+        tCurDestination = oTarget.PlatoonHandle[M27PlatoonUtilities.reftLastOrderPosition]
+        if bDebugMessages == true then LOG(sFunctionRef..': Part of platoon '..oTarget.PlatoonHandle:GetPlan()..oTarget.PlatoonHandle[M27PlatoonUtilities.refiPlatoonCount]..'; last order position='..repru(oTarget.PlatoonHandle[M27PlatoonUtilities.reftLastOrderPosition])) end
     else
-        if oAttacker.GetPosition then
-            if bDebugMessages == true then LOG(sFunctionRef..': Attacker has position so will get this') end
-            tCurDestination = oAttacker:GetPosition()
-        else
-            if oWeapon.GetPosition then
-                if bDebugMessages == true then LOG(sFunctionRef..': Weapon has position so will get this') end
-                tCurDestination = oWeapon:GetPosition()
-            elseif oWeapon.unit and oWeapon.unit.GetPosition then
-                if bDebugMessages == true then LOG(sFunctionRef..': Weapon has unit htat has position so will get this') end
-                tCurDestination = oWeapon.unit:GetPosition()
-            else
-                local aiBrain = oTarget:GetAIBrain()
-                tCurDestination = {M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][2], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][3]}
-                if bDebugMessages == true then LOG(sFunctionRef..': Will assume we were moving towards our start position as a redundancy') end
+        local oNavigator = oTarget:GetNavigator()
+        if oNavigator and oNavigator.GetCurrentTargetPos then
+            tCurDestination = oNavigator:GetCurrentTargetPos()
+            if bDebugMessages == true then
+                LOG(sFunctionRef..': Will get navigator current target position='..repru(oNavigator:GetCurrentTargetPos())..'; Cur pos='..repru(oTarget:GetPosition())..'; Platoon last order='..(oTarget.PlatoonHandle[M27PlatoonUtilities.refiLastOrderType] or 'nil')..'; Angle to nav target='..M27Utilities.GetAngleFromAToB(oTarget:GetPosition(), oNavigator:GetCurrentTargetPos()))
             end
+
+        else
+            if oAttacker.GetPosition then
+                if bDebugMessages == true then LOG(sFunctionRef..': Attacker has position so will get this') end
+                tCurDestination = oAttacker:GetPosition()
+            else
+                if oWeapon.GetPosition then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Weapon has position so will get this') end
+                    tCurDestination = oWeapon:GetPosition()
+                elseif oWeapon.unit and oWeapon.unit.GetPosition then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Weapon has unit htat has position so will get this') end
+                    tCurDestination = oWeapon.unit:GetPosition()
+                else
+                    local aiBrain = oTarget:GetAIBrain()
+                    tCurDestination = {M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][2], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][3]}
+                    if bDebugMessages == true then LOG(sFunctionRef..': Will assume we were moving towards our start position as a redundancy') end
+                end
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': tCurDestination after backup options='..repru(tCurDestination)) end
         end
-        if bDebugMessages == true then LOG(sFunctionRef..': tCurDestination after backup options='..repru(tCurDestination)) end
     end
+
     local iCurFacingAngle = M27UnitInfo.GetUnitFacingAngle(oTarget)
     local iAngleToDestination = M27Utilities.GetAngleFromAToB(oTarget:GetPosition(), tCurDestination)
     local oBP = oTarget:GetBlueprint()
@@ -517,6 +528,9 @@ function DodgeShot(oTarget, oWeapon, oAttacker, iTimeToDodge)
     if iUnitSize >= 2 then
         if iUnitSize >= 4 then iAngleAdjust = iAngleAdjust * 2.5
         else iAngleAdjust = iAngleAdjust * 1.75
+        end
+        if EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, oTarget.UnitId) then
+            iAngleAdjust = math.min(iAngleAdjust, 30)
         end
     end
     if M27Utilities.GetAngleDifference(iCurFacingAngle + iAngleAdjust, iAngleToDestination) > M27Utilities.GetAngleDifference(iCurFacingAngle - iAngleAdjust, iAngleToDestination) then
@@ -561,8 +575,8 @@ function ConsiderDodgingShot(oUnit, oWeapon)
             LOG(sFunctionRef..': Dont have a current target for this weapon')
         end
     end
-    --Direct fire, t1 mobile arti, and t2 mobile missile launchers
-    if oWeapon.GetCurrentTarget and (oWeapon.Blueprint.WeaponCategory == 'Direct Fire' or oWeapon.Blueprint.WeaponCategory == 'Direct Fire Naval' or oWeapon.Blueprint.WeaponCategory == 'Direct Fire Experimental' or (oWeapon.Blueprint.WeaponCategory == 'Artillery' and EntityCategoryContains(categories.TECH1, oUnit.UnitId)) or (oWeapon.Blueprint.WeaponCategory == 'Missile' and oWeapon.Blueprint.MaxRadius <= 80)) then
+    --Direct fire, t1 mobile arti, t2 mobile missile launchers, and experimental land
+    if oWeapon.GetCurrentTarget and (oWeapon.Blueprint.WeaponCategory == 'Direct Fire' or oWeapon.Blueprint.WeaponCategory == 'Direct Fire Naval' or oWeapon.Blueprint.WeaponCategory == 'Direct Fire Experimental' or (oWeapon.Blueprint.WeaponCategory == 'Artillery' and EntityCategoryContains(categories.TECH1, oUnit.UnitId)) or (oWeapon.Blueprint.WeaponCategory == 'Missile' and oWeapon.Blueprint.MaxRadius <= 80)) or (oWeapon.Blueprint.WeaponCategory == 'Indirect Fire' and oWeapon.Blueprint.MuzzleVelocity <= 25) then
         if bDebugMessages == true then LOG(sFunctionRef..': Have a valid weapon category, will see if have targets to consider dodging') end
         local oWeaponTarget = oWeapon:GetCurrentTarget()
         local bConsiderUnitsInArea = false
@@ -584,6 +598,7 @@ function ConsiderDodgingShot(oUnit, oWeapon)
         end
         local bIncludeBusyUnits = false
         if oWeapon.Blueprint.Damage >= 5000 then bIncludeBusyUnits = true end
+        if oWeapon.Blueprint.Damage >= 250 then bDebugMessages = true end
         if not(bConsiderUnitsInArea) then
             --Is it a unit with a shield?
             if EntityCategoryContains(categories.SHIELD, oWeaponTarget.UnitId) then
@@ -628,6 +643,7 @@ function ConsiderDodgingShot(oUnit, oWeapon)
                 end
             end
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': Is table of units to consider dodging empty='..tostring(M27Utilities.IsTableEmpty(tUnitsToConsiderDodgeFor))..'; Weapon damage='..oWeapon.Blueprint.Damage) end
         if M27Utilities.IsTableEmpty(tUnitsToConsiderDodgeFor) == false then
             --Calculate time to impact
             local iDistToTarget = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oWeapon:GetCurrentTargetPos())
@@ -654,7 +670,7 @@ function ConsiderDodgingShot(oUnit, oWeapon)
                         local oBP = oTarget:GetBlueprint()
                         local iAverageSize = (oBP.SizeX + oBP.SizeZ) * 0.5
                         if bDebugMessages == true then LOG(sFunctionRef..': iAverageSize='..iAverageSize..'; Is unit underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oUnit))..'; Unit speed='..oBP.Physics.MaxSpeed) end
-                        if iTimeUntilImpact > math.min(2.5, 0.4 + iAverageSize * 1.5 / oBP.Physics.MaxSpeed) then
+                        if iTimeUntilImpact > math.min(2.5, 0.4 + iAverageSize * 1.5 / oBP.Physics.MaxSpeed) and (iTimeUntilImpact >= 2 or not(EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId))) then
                             --Are we not underwater?
                             if not(M27UnitInfo.IsUnitUnderwater(oUnit)) then
                                 --If dealing with an ACU then drastically reduce the dodge time so we can overcharge if we havent recently and have enemies in range and enough power
@@ -665,6 +681,11 @@ function ConsiderDodgingShot(oUnit, oWeapon)
                                     else
                                         iMaxTimeToRun = math.min(0.7, iMaxTimeToRun)
                                     end
+                                elseif EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId) then
+                                    --If we are a GC, Monkey or Ythotha that has an enemy experimental nearby but not in range, then cancel dodging as want to get in range to be able to  fire
+                                    --local iOurRange = M27Logic.GetUnitMinGroundRange({ oUnit })
+                                    --local tNearbyEnemyExperimentals = oUnit:GetAIBrain():GetUnitsAroundPoint(M27UnitInfo.refCategoryLandExperimental, oUnit:GetPosition(), 70, 'Enemy')
+                                    iMaxTimeToRun = math.min(2.5, iMaxTimeToRun)
                                 end
 
                                 if not(bCancelDodge) then

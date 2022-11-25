@@ -417,7 +417,7 @@ Platoon = Class(M27PlatoonClass) {
                             end
 
                             M27PlatoonUtilities.RecordPlatoonUnitsByType(self)
-                            M27PlatoonUtilities.GetNearbyEnemyData(self, iEnemySearchRadius)
+                            M27PlatoonUtilities.RecordNearbyEnemyData(self, iEnemySearchRadius)
                             if bDebugMessages == true then LOG(sFunctionRef..': iNearbyEnemies='..self[M27PlatoonUtilities.refiEnemiesInRange]) end
                             M27PlatoonUtilities.UpdatePlatoonActionForNearbyEnemies(self)
                             if self[M27PlatoonUtilities.refiCurrentAction] == nil then

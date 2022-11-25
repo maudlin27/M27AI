@@ -965,7 +965,7 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
         if bWantEscort == true then
             oEngineer[M27PlatoonUtilities.refbShouldHaveEscort] = true
             M27PlatoonUtilities.RecordPlatoonUnitsByType(oEngineer, true)
-            M27PlatoonUtilities.GetNearbyEnemyData(oEngineer, iEngineerMobileEnemySearchRange, true)
+            M27PlatoonUtilities.RecordNearbyEnemyData(oEngineer, iEngineerMobileEnemySearchRange, true)
             M27PlatoonUtilities.UpdateEscortDetails(oEngineer)
         else
             oEngineer[M27PlatoonUtilities.refbShouldHaveEscort] = false --Redundancy (clearactiontracker should already cover)
