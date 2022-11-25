@@ -7991,6 +7991,15 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 aiBrain[sThreatVariableRef] = math.max(aiBrain[sThreatVariableRef], iCurMassTotal)
             end
 
+            if not(aiBrain[refiAIBrainCurrentStrategy]) then
+                M27Utilities.ErrorHandler('We didnt have a strategy set for brain '..aiBrain.Nickname..'; so will set it to the default strategy '..(aiBrain[refiDefaultStrategy] or 'nil'))
+                if not(aiBrain[refiDefaultStrategy]) then
+                    M27Utilities.ErrorHandler('We dont have a default strategy set so will set it to land main')
+                    aiBrain[refiDefaultStrategy] = refStrategyLandMain
+                end
+                aiBrain[refiAIBrainCurrentStrategy] = aiBrain[refiDefaultStrategy]
+            end
+
 
             --TestCustom(aiBrain)
 

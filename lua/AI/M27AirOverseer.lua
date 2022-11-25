@@ -5497,6 +5497,25 @@ function AirBomberManager(aiBrain)
                         if bDebugMessages == true then LOG(sFunctionRef..': Checking if any enemies threatening our mexes that have a threat group for. aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding]='..tostring(aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding])) end
                         ConsiderAddingUnitsNearMexesToShortlist(aiBrain, aiBrain[refiBomberDefenceModDistance] + 300)
 
+                        --Consider nearest enemy experimental and if it is near a friendly experimental level structure
+                        if M27Conditions.HaveApproachingLandExperimentalThreat(aiBrain) then
+                            if M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.refoNearestRangeAdjustedLandExperimental]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 500 and not(M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoNearestRangeAdjustedLandExperimental])) then
+                                local tNearbyExperimentalLevelBuildings = aiBrain:GetUnitsAroundPoint(categories.COMMAND + M27UnitInfo.refCategoryExperimentalLevel * categories.STRUCTURE, aiBrain[M27Overseer.refoNearestRangeAdjustedLandExperimental]:GetPosition(), M27UnitInfo.GetNavalDirectAndSubRange(aiBrain[M27Overseer.refoNearestRangeAdjustedLandExperimental]) + 40, 'Ally')
+                                if M27Utilities.IsTableEmpty(tNearbyExperimentalLevelBuildings) == false then
+                                    for iPriorityAllyUnit, oPriorityAllyUnit in tNearbyExperimentalLevelBuildings do
+                                        if oPriorityAllyUnit:GetAIBrain().M27Subteam == aiBrain.M27Subteam then
+
+                                            iCurPriority = 1
+                                            iCurModDistance = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.refoNearestRangeAdjustedLandExperimental]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                            --if not(aiBrain == oPriorityAllyUnit:GetAIBrain()) then bDebugMessages = true end
+                                            AddUnitToShortlist(aiBrain[M27Overseer.refoNearestRangeAdjustedLandExperimental], iTechLevel, iCurModDistance)
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Want to defend subteammate building that is under threat from experimental '..aiBrain[M27Overseer.refoNearestRangeAdjustedLandExperimental].UnitId..M27UnitInfo.GetUnitLifetimeCount(aiBrain[M27Overseer.refoNearestRangeAdjustedLandExperimental])) end
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                        end
 
                         --Prioritise AA and vulnerable indirect fire units (will only consider structure based AA threats if part-complete)
                         --T2 bombers will use the exact same logic

@@ -46,7 +46,7 @@ function OnPlayerDefeated(aiBrain)
             for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                 if not(oBrain == aiBrain) then
                     oBrain[aiBrain[M27MapInfo.refiAssignedChokepointCount]] = nil
-                    oBrain[M27Overseer.refiDefaultStrategy] = oBrain[M27Overseer.refStrategyLandMain]
+                    oBrain[M27Overseer.refiDefaultStrategy] = M27Overseer.refStrategyLandMain
                     oBrain[M27Overseer.refiAIBrainCurrentStrategy] = oBrain[M27Overseer.refiDefaultStrategy]
                 end
             end

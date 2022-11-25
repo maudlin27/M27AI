@@ -735,14 +735,14 @@ function GetUnitAARange(oUnit)
     return iMaxRange
 end
 
-function GetUnitIndirectRange(oUnit)
+function GetUnitIndirectRange(oUnit, bIncludeManualFire)
 
     local iMaxRange = 0
     if oUnit.GetBlueprint then
         local oBP = oUnit:GetBlueprint()
         if oBP.Weapon then
             for iCurWeapon, oCurWeapon in oBP.Weapon do
-                if (oCurWeapon.WeaponCategory == 'Missile' and not(oCurWeapon.DamageType == 'Nuke')) or oCurWeapon.WeaponCategory == 'Artillery' or oCurWeapon.WeaponCategory == 'Indirect Fire' then
+                if (bIncludeManualFire or not(oCurWeapon.ManualFire)) and (oCurWeapon.WeaponCategory == 'Missile' and not(oCurWeapon.DamageType == 'Nuke')) or oCurWeapon.WeaponCategory == 'Artillery' or oCurWeapon.WeaponCategory == 'Indirect Fire' then
                     if oCurWeapon.MaxRadius > iMaxRange then iMaxRange = oCurWeapon.MaxRadius end
                 end
             end
@@ -756,7 +756,7 @@ function GetBlueprintMaxGroundRange(oBP)
     if oBP.Weapon then
         for iCurWeapon, oCurWeapon in oBP.Weapon do
             if oCurWeapon.MaxRadius > iMaxRange and not(oCurWeapon.EnabledByEnhancement) and oCurWeapon.Damage > 0 then
-                if oCurWeapon.FireTargetLayerCapsTable and oCurWeapon.FireTargetLayerCapsTable['Land'] == 'Land|Water|Seabed' then
+                if oCurWeapon.FireTargetLayerCapsTable and oCurWeapon.FireTargetLayerCapsTable['Land'] == 'Land|Water|Seabed' and not(oCurWeapon.ManualFire) then
                     iMaxRange = math.max(iMaxRange, oCurWeapon.MaxRadius)
                 end
             end
@@ -783,7 +783,7 @@ function GetUnitMaxGroundRange(oUnit)
 
                 for iCurWeapon, oCurWeapon in oBP.Weapon do
                     if oCurWeapon.MaxRadius > iMaxRange and not(oCurWeapon.EnabledByEnhancement) and oCurWeapon.Damage > 0 then
-                        if oCurWeapon.FireTargetLayerCapsTable and oCurWeapon.FireTargetLayerCapsTable['Land'] == 'Land|Water|Seabed' then
+                        if oCurWeapon.FireTargetLayerCapsTable and oCurWeapon.FireTargetLayerCapsTable['Land'] == 'Land|Water|Seabed' and not(oCurWeapon.ManualFire) then
                             iMaxRange = math.max(oCurWeapon.MaxRadius, iMaxRange)
                         end
                     end
