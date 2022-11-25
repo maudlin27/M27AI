@@ -6147,8 +6147,26 @@ function AirBomberManager(aiBrain)
                                         end
                                         if not (M27UnitInfo.IsUnitUnderwater(oUnit)) then
                                             if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tStartPoint) < math.max(M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.6) then
-                                                --Include if its unshielded with no AA on the way to it from our base (assume part-compelte shields will be built by the time we get there)
-                                                if not (M27Logic.IsTargetUnderShield(aiBrain, oUnit, 0, false, false, true)) then
+                                                --Fatboy specific - include if shield is low and we have fewer than 5 T2 arti in range of it, and we have friendly units in range of it
+                                                if EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oUnit.UnitId) and not(aiBrain[refbFarBehindOnAir]) then
+                                                    local iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit, true)
+                                                    if iCurShield <= iMaxShield * 0.15 then
+                                                        bDebugMessages = true
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy fatboy has low shield, iCurShield='..iCurShield..'; iMaxShield='..iMaxShield..'; Is it covered by AA='..tostring(IsTargetCoveredByAA(oUnit, tEnemyAAAndCruisers, 3, tStartPoint))) end
+                                                        if not (IsTargetCoveredByAA(oUnit, tEnemyAAAndCruisers, 3, tStartPoint)) then
+                                                            AddUnitToShortlist(oUnit, iTechLevel)
+                                                        else
+                                                            --Still attack if nearby T2+ units or ACU
+                                                            local tNearbyT2PlusFriendlies = aiBrain:GetUnitsAroundPoint(categories.LAND + categories.STRUCTURE - categories.TECH1 - categories.UNSELECTABLE - categories.UNTARGETABLE, oUnit:GetPosition(), 110, 'Ally')
+                                                            if bDebugMessages == true then LOG(sFunctionRef..': Do we have T2+ ground units near the fatboy? Is table empty='..tostring(M27Utilities.IsTableEmpty(tNearbyT2PlusFriendlies))) end
+                                                            if M27Utilities.IsTableEmpty(tNearbyT2PlusFriendlies) == false then
+                                                                AddUnitToShortlist(oUnit, iTechLevel)
+                                                            end
+                                                        end
+                                                        bDebugMessages = false
+                                                    end
+                                                    --Include if its unshielded with no AA on the way to it from our base (assume part-compelte shields will be built by the time we get there)
+                                                elseif not (M27Logic.IsTargetUnderShield(aiBrain, oUnit, 0, false, false, true)) then
                                                     if not (IsTargetCoveredByAA(oUnit, tEnemyAAAndCruisers, 3, tStartPoint)) then
                                                         AddUnitToShortlist(oUnit, iTechLevel)
                                                     end
