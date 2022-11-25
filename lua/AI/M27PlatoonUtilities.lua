@@ -429,13 +429,13 @@ function PlatoonMove(oPlatoon, tLocation)
     if bGiveSameOrdersToEveryone then
         --Can just give command to all current units - do we want to attackmove?
         local bAttackMove
-        if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to attackmove.  Will base decisino on both the refbAttackMove status, and if we have indirect fire units, and if the platoon has previously run. oPlatoon[refiIndirectUnits]='..oPlatoon[refiIndirectUnits]..'; oPlatoon[refiCurrentUnits]='..oPlatoon[refiCurrentUnits]..'; oPlatoon[M27PlatoonTemplates.refbAttackMove]='..tostring(oPlatoon[M27PlatoonTemplates.refbAttackMove] or false)..'; oPlatoon[refbHavePreviouslyRun]='..tostring(oPlatoon[refbHavePreviouslyRun] or false)) end
-        if ((oPlatoon[refiIndirectUnits] > 0 and oPlatoon[refiCurrentUnits] == oPlatoon[refiIndirectUnits]) or (oPlatoon[M27PlatoonTemplates.refbAttackMove]) and not(oPlatoon[refbHavePreviouslyRun])) then
-            if oPlatoon[refiCurrentAction] == refActionTemporaryRetreat or oPlatoon[refiCurrentAction] == refActionKitingRetreat or oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionReturnToBase then
-                if bDebugMessages == true then LOG(sFunctionRef..': Platoon is retreating so in most cases will want to move instead of attack-move') end
+        if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to attackmove.  Will base decisino on both the refbAttackMove status. oPlatoon[refiIndirectUnits]='..oPlatoon[refiIndirectUnits]..'; oPlatoon[refiCurrentUnits]='..oPlatoon[refiCurrentUnits]..'; oPlatoon[M27PlatoonTemplates.refbAttackMove]='..tostring(oPlatoon[M27PlatoonTemplates.refbAttackMove] or false)..'; oPlatoon[refbHavePreviouslyRun]='..tostring(oPlatoon[refbHavePreviouslyRun] or false)) end
+        if oPlatoon[M27PlatoonTemplates.refbAttackMove] then
+            --if oPlatoon[refiCurrentAction] == refActionTemporaryRetreat or oPlatoon[refiCurrentAction] == refActionKitingRetreat or oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionReturnToBase then
+                --if bDebugMessages == true then LOG(sFunctionRef..': Platoon is retreating so in most cases will want to move instead of attack-move') end
                 --If we have T3 mobile arti then just attack-move due to deployment time unless are close to a firebase, otherwise normal move if we have a run type action
                 --v58 - removed this as already ahve this logic when getting nearby enemies for the platoon, and will get inconsistent results
-                bAttackMove = false
+                --bAttackMove = false
                 --[[if oPlatoon[refiIndirectUnits] > 0 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryT3MobileArtillery, oPlatoon[reftIndirectUnits])) == false then
                     if bDebugMessages == true then LOG(sFunctionRef..': We have T3 mobile arti in platoon so will force an attackmove unless close to a firebase') end
                     bAttackMove = true
@@ -453,7 +453,8 @@ function PlatoonMove(oPlatoon, tLocation)
                 else
                     bAttackMove = false
                 end--]]
-            else
+            --else
+            --[[
                 --Is it an experimental indirect unit? If so then refer to the main platoon attackmove command since its less reliable to attack-move e.g. with fatboy due to low arc
                 if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.EXPERIMENTAL, oPlatoon[reftIndirectUnits])) then
                     if bDebugMessages == true then LOG(sFunctionRef..': Dont have any experimentals in the platoon so will attackmove') end
@@ -462,7 +463,8 @@ function PlatoonMove(oPlatoon, tLocation)
                     if bDebugMessages == true then LOG(sFunctionRef..': Have an indirect fire experimental platoon so will defer to the refbAttackMove position='..tostring(oPlatoon[M27PlatoonTemplates.refbAttackMove] or false)) end
                     bAttackMove = oPlatoon[M27PlatoonTemplates.refbAttackMove]
                 end
-            end
+            end--]]
+            bAttackMove = true
         else
             bAttackMove = false
         end
