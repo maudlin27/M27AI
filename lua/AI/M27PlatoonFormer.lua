@@ -1706,6 +1706,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
     local oNewUnit
     local bValidUnit = false
     local iCount = 0
+    local bHadDeadUnits = false
     while bValidUnit == false do
         iCount = iCount + 1 if iCount > 200 then M27Utilities.ErrorHandler('Infinite loop') break end
         for iUnit, oUnit in tNewUnits do
@@ -1713,13 +1714,18 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                 oNewUnit = oUnit
                 bValidUnit = true
                 break
+            else
+                bHadDeadUnits = true
             end
         end
         break
     end
     if bValidUnit == false then
-        if not(iDelayInTicks) then
-            LOG('Warning - no valid units in tNewUnits')
+        if not(iDelayInTicks) and not(bHadDeadUnits) then
+            M27Utilities.ErrorHandler('No valid units in tNewUnits; iDelayInTicks='..(iDelayInTicks or 'nil')..'; Is tNewUnits empty='..tostring(M27Utilities.IsTableEmpty(tNewUnits))..'; bNotJustBuiltByFactory='..repru(bNotJustBuiltByFactory)..'; bHadDeadUnits='..tostring(bHadDeadUnits)..'; will list out units')
+            for iUnit, oUnit in tNewUnits do
+                LOG(sFunctionRef..': No valid units: iUnit'..iUnit..'; Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' was part of the units to form a platoon')
+            end
         end
     else
         if EntityCategoryContains(categories.STRUCTURE + M27UnitInfo.refCategoryExperimentalArti, oNewUnit.UnitId) then

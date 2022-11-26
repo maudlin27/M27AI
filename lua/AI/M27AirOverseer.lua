@@ -6151,7 +6151,6 @@ function AirBomberManager(aiBrain)
                                                 if EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oUnit.UnitId) and not(aiBrain[refbFarBehindOnAir]) then
                                                     local iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit, true)
                                                     if iCurShield <= iMaxShield * 0.15 then
-                                                        bDebugMessages = true
                                                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy fatboy has low shield, iCurShield='..iCurShield..'; iMaxShield='..iMaxShield..'; Is it covered by AA='..tostring(IsTargetCoveredByAA(oUnit, tEnemyAAAndCruisers, 3, tStartPoint))) end
                                                         if not (IsTargetCoveredByAA(oUnit, tEnemyAAAndCruisers, 3, tStartPoint)) then
                                                             AddUnitToShortlist(oUnit, iTechLevel)
@@ -6163,7 +6162,6 @@ function AirBomberManager(aiBrain)
                                                                 AddUnitToShortlist(oUnit, iTechLevel)
                                                             end
                                                         end
-                                                        bDebugMessages = false
                                                     end
                                                     --Include if its unshielded with no AA on the way to it from our base (assume part-compelte shields will be built by the time we get there)
                                                 elseif not (M27Logic.IsTargetUnderShield(aiBrain, oUnit, 0, false, false, true)) then

@@ -476,13 +476,9 @@ end
 function DodgeShot(oTarget, oWeapon, oAttacker, iTimeToDodge)
     --Should have already checked oTarget is a valid unit that has a chance of dodging the shot in time before claling this
     --Gets unit to move at a slightly different angle to its current facing direction for iTimeToDodge
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DodgeShot'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if EntityCategoryContains(categories.EXPERIMENTAL, oTarget.UnitId) then
-        bDebugMessages = true
-    end
-
 
 
     local tCurDestination
@@ -598,7 +594,6 @@ function ConsiderDodgingShot(oUnit, oWeapon)
         end
         local bIncludeBusyUnits = false
         if oWeapon.Blueprint.Damage >= 5000 then bIncludeBusyUnits = true end
-        if oWeapon.Blueprint.Damage >= 250 then bDebugMessages = true end
         if not(bConsiderUnitsInArea) then
             --Is it a unit with a shield?
             if EntityCategoryContains(categories.SHIELD, oWeaponTarget.UnitId) then

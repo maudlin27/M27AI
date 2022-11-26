@@ -6,6 +6,7 @@ local BuildingTemplates = import('/lua/BuildingTemplates.lua').BuildingTemplates
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
+local AdjacencyBuffs = import("/lua/sim/adjacencybuffs.lua")
 
 refPathingTypeAmphibious = 'Amphibious'
 refPathingTypeNavy = 'Water'
@@ -39,6 +40,7 @@ refbActiveMissileChecker = 'M27UnitMissileTracker' --True if are actively checki
 refbActiveSMDChecker = 'M27UnitSMDChecker' -- true if unit is checking for enemy SMD (use on nuke)
 refbActiveTargetChecker = 'M27UnitActiveTargetChecker' --e.g. used for T3 fixed arti, Quantum optics, hive
 refoLastTargetUnit = 'M27UnitLastTargetUnit' --e.g. indirect fire units will update this when given an IssueAttack order; hives will update when given a reclaim order; T3 arti will update when they are told to attack a specific unit
+refsAdjacencyRef = 'M27UnitAdjacencyRef' --Used to store the adjacency reference for adjacency.lua so can easil lookup without needing to recalcaulte each time
 reftAdjacencyPGensWanted = 'M27UnitAdjacentPGensWanted' --Table, [x] = subref: 1 = category wanted; 2 = buildlocation
 refiSubrefCategory = 1 --for reftAdjacencyPGensWanted
 refiSubrefBuildLocation = 2 --for reftAdjacencyPGensWanted
@@ -693,9 +695,31 @@ function EnableUnitStealth(oUnit)
 end
 
 
+
 function GetUnitFacingAngle(oUnit)
     --0/360 = north, 90 = west, 180 = south, 270 = east
-    return 180 - oUnit:GetHeading() / math.pi * 180
+
+    --T3 arti - get the angle of the turret
+    if EntityCategoryContains(categories.STRUCTURE, oUnit.UnitId) then
+        if oUnit.GetWeapon then
+            local oWeapon = oUnit:GetWeapon(1)
+            if oWeapon and oWeapon.GetAimManipulator then
+                return M27Utilities.ConvertRadiansToAngle(oWeapon:GetAimManipulator():GetHeadingPitch())
+            else return 0
+            end
+        else return 0
+        end
+        if oUnit:IsValidBone('Turret') then
+            --0% = south, 25% = east, 50% = north; want to convert from % into angle where 0 is north
+            return M27Utilities.ConvertCounterclockwisePercentageToAngle(oUnit:GetBoneDirection('Turret'))
+        else
+            return 180 - oUnit:GetHeading() / math.pi * 180 --redundancy - for a building this is likeliy to be the same value every time
+        end
+    else
+        --Other units (would expect to be mobile) - get the unit direction
+        return 180 - oUnit:GetHeading() / math.pi * 180
+    end
+
 end
 
 function IsUnitValid(oUnit, bMustBeComplete)
@@ -741,19 +765,23 @@ function GetUnitAARange(oUnit)
 end
 
 function GetUnitIndirectRange(oUnit, bIncludeManualFire)
-
-    local iMaxRange = 0
-    if oUnit.GetBlueprint then
-        local oBP = oUnit:GetBlueprint()
-        if oBP.Weapon then
-            for iCurWeapon, oCurWeapon in oBP.Weapon do
-                if (bIncludeManualFire or not(oCurWeapon.ManualFire)) and (oCurWeapon.WeaponCategory == 'Missile' and not(oCurWeapon.DamageType == 'Nuke')) or oCurWeapon.WeaponCategory == 'Artillery' or oCurWeapon.WeaponCategory == 'Indirect Fire' then
-                    if oCurWeapon.MaxRadius > iMaxRange then iMaxRange = oCurWeapon.MaxRadius end
+    if not(oUnit[refiIndirectRange]) then
+        local iMaxRange = 0
+        if oUnit.GetBlueprint then
+            local oBP = oUnit:GetBlueprint()
+            if oBP.Weapon then
+                for iCurWeapon, oCurWeapon in oBP.Weapon do
+                    if (bIncludeManualFire or not(oCurWeapon.ManualFire)) and (oCurWeapon.WeaponCategory == 'Missile' and not(oCurWeapon.DamageType == 'Nuke')) or oCurWeapon.WeaponCategory == 'Artillery' or oCurWeapon.WeaponCategory == 'Indirect Fire' then
+                        if oCurWeapon.MaxRadius > iMaxRange then iMaxRange = oCurWeapon.MaxRadius end
+                    end
                 end
             end
         end
+        oUnit[refiIndirectRange] = iMaxRange
+        return iMaxRange
+    else
+        return oUnit[refiIndirectRange]
     end
-    return iMaxRange
 end
 
 function GetBlueprintMaxGroundRange(oBP)
@@ -824,7 +852,7 @@ function GetNavalDirectAndSubRange(oUnit)
         end
         oUnit[refiDFRange] = iMaxDFRange
         oUnit[refiAntiNavyRange] = iMaxAntiNavyRange
-        oUnit[refiIndirectRange] = GetUnitIndirectRange(oUnit)
+        oUnit[refiIndirectRange] = GetUnitIndirectRange(oUnit, false) --This must come after setting the DF range or will get infinite loop
     end
     return math.max(oUnit[refiDFRange], oUnit[refiAntiNavyRange])
 end
@@ -1350,6 +1378,42 @@ function RefreshUnitDFStrikeDamage(oTarget)
             end
         end
     end
+end
+
+function IsEnemyUnitLikelyMoving(oUnit)
+    --Intended for combat units - currently used by T3 arti to decide if should try and lead with shots
+    --local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua') --This is only for the below log
+    --LOG('Considering if unit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..' is likely moving. Fractioncomplete='..oUnit:GetFractionComplete()..'; Unit state='..M27Logic.GetUnitState(oUnit)..'; Navigator target='..repru(oUnit:GetNavigator():GetCurrentTargetPos())..'; Range='..math.max(GetNavalDirectAndSubRange(oUnit), GetUnitIndirectRange(oUnit))..'; Postiion='..repru(oUnit:GetPosition())..'; Dist to target='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oUnit:GetNavigator():GetCurrentTargetPos()))
+    if EntityCategoryContains(categories.MOBILE, oUnit.UnitId) and oUnit:GetFractionComplete() == 1 then
+        function IsUnitAttackingOutOfRangeTarget(oAttacker)
+            if oAttacker.GetNavigator then
+                local oNavigator = oAttacker:GetNavigator()
+                if oNavigator and M27Utilities.IsTableEmpty(oNavigator:GetCurrentTargetPos()) == false then
+                    local iRange = math.max(GetNavalDirectAndSubRange(oAttacker), GetUnitIndirectRange(oAttacker))
+                    if iRange < M27Utilities.GetDistanceBetweenPositions(oNavigator:GetCurrentTargetPos(), oAttacker:GetPosition()) then
+                        return true
+                    end
+                end
+            end
+            return false
+        end
+
+
+        if oUnit:IsUnitState('Moving') then
+            return true
+        elseif oUnit:IsUnitState('Attacking') then
+            --Get navigation target and if it's close to being in range
+            return IsUnitAttackingOutOfRangeTarget(oUnit)
+        elseif oUnit:IsUnitState('Guarding') then
+            if oUnit.GetGuardedUnit then
+                local oGuardedUnit = oUnit:GetGuardedUnit()
+                if IsUnitValid(oGuardedUnit) then
+                    return IsEnemyUnitLikelyMoving(oGuardedUnit)
+                end
+            end
+        end
+    end
+    return false
 end
 
 function ToggleUnitDiveOrSurfaceStatus(oUnit)

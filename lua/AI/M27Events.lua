@@ -1408,7 +1408,7 @@ function OnConstructed(oEngineer, oJustBuilt)
 
                 --Do we want to build radar here?
                 if bDebugMessages == true then LOG(sFunctionRef..': Engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' just completed a T2 Arti, checking if want to build a T1 radar. Intel coverage='..M27Logic.GetIntelCoverageOfPosition(aiBrain, oJustBuilt:GetPosition(), nil, true)) end
-                if oEngineer:GetAIBrain().M27AI and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer.UnitId) and not(M27Logic.GetIntelCoverageOfPosition(aiBrain, oJustBuilt:GetPosition(), 104, true)) then
+                if oEngineer and oEngineer:GetAIBrain().M27AI and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer.UnitId) and not(M27Logic.GetIntelCoverageOfPosition(aiBrain, oJustBuilt:GetPosition(), 104, true)) then
                     --Check we dont have 2+ radar close by as backup in case we keep trying to build t1 radar in the same place and there's no space
                     local tNearbyT1Radar = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT1Radar, oJustBuilt:GetPosition(), 25, 'Ally')
                     if M27Utilities.IsTableEmpty(tNearbyT1Radar) or table.getn(tNearbyT1Radar) <= 1 then
@@ -1448,7 +1448,7 @@ function OnConstructed(oEngineer, oJustBuilt)
                 aiBrain[M27EngineerOverseer.refbPotentialFirebaseBuildingChangedSinceLastFirebaseCheck] = true
                 ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oJustBuilt)
                 --If just built by ACU than refresh firebase so ACU doesnt risk building loads more T2 PD to try and get a firebase to register
-                if EntityCategoryContains(categories.COMMAND, oEngineer.UnitId) then ForkThread(M27EngineerOverseer.RefreshListOfFirebases, aiBrain) end
+                if oEngineer and EntityCategoryContains(categories.COMMAND, oEngineer.UnitId) then ForkThread(M27EngineerOverseer.RefreshListOfFirebases, aiBrain) end
 
                 --Shields wanting hives
                 if EntityCategoryContains(M27UnitInfo.refCategoryFixedShield * categories.TECH3, oJustBuilt.UnitId) then
@@ -1492,7 +1492,7 @@ function OnConstructed(oEngineer, oJustBuilt)
             --Initial categories below are for if not protecting from TML
             --Mexes built by spare engineers - want to clear already assigned engineers
             if EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oJustBuilt.UnitId) then
-                if oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionSpare then
+                if oEngineer and oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionSpare then
                     --reftEngineerAssignmentsByLocation --[x][y][z];  x is the unique location ref (need to use ConvertLocationToReference in utilities to use), [y] is the actionref, z is the engineer unique ref assigned to this location; returns the engineer object
                     local sLocationRef = M27Utilities.ConvertLocationToStringRef(oJustBuilt:GetPosition())
                     if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionBuildMex]) == false then
@@ -1553,7 +1553,7 @@ function OnConstructed(oEngineer, oJustBuilt)
             elseif EntityCategoryContains(M27UnitInfo.refCategoryMAA, oJustBuilt.UnitId) then
                 aiBrain[M27Overseer.refbMAABuiltOrDied] = true
                 --naval factory just built something?
-            elseif EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, oEngineer.UnitId) then
+            elseif oEngineer and EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, oEngineer.UnitId) then
                 --Clear assisting engineers
                 if M27Utilities.IsTableEmpty(oEngineer[M27EngineerOverseer.reftAssistingEngineers]) == false then
                     for iAssistingEngi, oAssistingEngi in oEngineer[M27EngineerOverseer.reftAssistingEngineers] do
@@ -1637,7 +1637,7 @@ function OnConstructed(oEngineer, oJustBuilt)
                     aiBrain[M27Overseer.refbAreBigThreats] = true
                     --T3 arti - first time its constructed want to start thread checking for power, and also tell it what to fire
                     oJustBuilt[M27UnitInfo.refbActiveTargetChecker] = true
-                    ForkThread(M27Logic.GetT3ArtiTarget, oJustBuilt)
+                    ForkThread(M27Logic.GetT3ArtiTarget, oJustBuilt, true)
                     if bDebugMessages == true then LOG(sFunctionRef..': Just built t3 arti or equivalent so have called the logic to get t3 arti target') end
                 end
                 --Quantum optics redundancy
@@ -1648,7 +1648,7 @@ function OnConstructed(oEngineer, oJustBuilt)
 
 
             --Update pond
-            if not(oJustBuilt[M27Navy.refiAssignedPond]) and (EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, oEngineer.UnitId) or EntityCategoryContains(categories.NAVAL + M27UnitInfo.refCategorySonar + M27UnitInfo.refCategoryNavalFactory + M27UnitInfo.refCategoryTorpedoLauncher, oJustBuilt.UnitId)) then
+            if not(oJustBuilt[M27Navy.refiAssignedPond]) and ((oEngineer and EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, oEngineer.UnitId)) or EntityCategoryContains(categories.NAVAL + M27UnitInfo.refCategorySonar + M27UnitInfo.refCategoryNavalFactory + M27UnitInfo.refCategoryTorpedoLauncher, oJustBuilt.UnitId)) then
                 --Exception for 1st engineer of current tech level (as want this used by normal logic)
                 if not(EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oJustBuilt.UnitId) and M27UnitInfo.GetUnitLifetimeCount(oJustBuilt) <= 1) then
                     M27Navy.UpdateUnitPond(oJustBuilt, oJustBuilt:GetAIBrain().M27Team, false)
@@ -1656,7 +1656,7 @@ function OnConstructed(oEngineer, oJustBuilt)
             end
 
             --If have just upgraded a shield then clear tracking (redundancy as should also trigger from 'death' of old shield)
-            if EntityCategoryContains(M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryEngineer, oEngineer.UnitId) and M27Utilities.IsTableEmpty(oJustBuilt[M27EngineerOverseer.reftAssistingEngineers]) == false then
+            if oEngineer and EntityCategoryContains(M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryEngineer, oEngineer.UnitId) and M27Utilities.IsTableEmpty(oJustBuilt[M27EngineerOverseer.reftAssistingEngineers]) == false then
                 for iEngi, oEngi in oJustBuilt[M27EngineerOverseer.reftAssistingEngineers] do
                     if M27UnitInfo.IsUnitValid(oEngi) then
                         M27Utilities.IssueTrackedClearCommands({ oEngi })
@@ -1675,7 +1675,7 @@ function OnConstructed(oEngineer, oJustBuilt)
 
 
         --Engineer callbacks
-        if not(bGivenSubsequentEngineerOrder) and oEngineer:GetAIBrain().M27AI and not (oEngineer.Dead) then
+        if not(bGivenSubsequentEngineerOrder) and oEngineer and oEngineer:GetAIBrain().M27AI and not (oEngineer.Dead) then
             if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer:GetUnitId()) then
                 --Dont do this if just built t1 pd as want it to have walls
                 if not(EntityCategoryContains(M27UnitInfo.refCategoryWall + M27UnitInfo.refCategoryPD * categories.TECH1, oJustBuilt.UnitId)) then

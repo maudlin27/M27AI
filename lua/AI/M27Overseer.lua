@@ -5287,7 +5287,11 @@ function ACUManager(aiBrain)
 
                 end
                 if not(oEnemyACUToConsiderAttacking) then oEnemyACUToConsiderAttacking = aiBrain[refoLastNearestACU] end
-                iLastDistanceToACU = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oEnemyACUToConsiderAttacking:GetPosition())
+                if M27UnitInfo.IsUnitValid(oEnemyACUToConsiderAttacking) then
+                    iLastDistanceToACU = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oEnemyACUToConsiderAttacking:GetPosition())
+                else
+                    iLastDistanceToACU = aiBrain[refiDistanceToNearestEnemyBase]
+                end
 
                 --If the ACU is near to us consider attacking with our ACU and/or doing all-out attack
                 if iLastDistanceToACU <= iEnemyACUSearchRange and M27UnitInfo.IsUnitValid(oEnemyACUToConsiderAttacking) then
@@ -9809,9 +9813,26 @@ end
 function TestCustom(aiBrain)
     local sFunctionRef = 'TestCustom'
 
+    --Call T3 arti logic when first spawn via cheat
+    local tAlliedT3Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Ally')
+    LOG('GameTime='..GetGameTimeSeconds())
+    if M27Utilities.IsTableEmpty(tAlliedT3Arti) == false then
+        for iUnit, oUnit in tAlliedT3Arti do
+            LOG('T3 arti turret facing direction raw output='..oUnit:GetBoneDirection('Turret'))
+            local oWeapon = oUnit:GetWeapon(1)
+            local oManipulator = oWeapon:GetAimManipulator()
+            LOG('Aim manipulator pitch='..oManipulator:GetHeadingPitch())
+            LOG('Unit info angle facing result='..M27UnitInfo.GetUnitFacingAngle(oUnit))
+        end
+    end
+    local tEnemyT3Engineers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryEngineer * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Enemy')
+    if M27Utilities.IsTableEmpty(tEnemyT3Engineers) == false then
+        LOG('Enemy T3 engi count='..table.getn(tEnemyT3Engineers))
+    end
+
 
     --Calc range of SACUs - test
-    local tEnemySACU = aiBrain:GetUnitsAroundPoint(categories.SUBCOMMANDER, {0,0,0}, 1000, 'Enemy')
+    --[[local tEnemySACU = aiBrain:GetUnitsAroundPoint(categories.SUBCOMMANDER, {0,0,0}, 1000, 'Enemy')
     if M27Utilities.IsTableEmpty(tEnemySACU) == false then
         for iUnit, oUnit in tEnemySACU do
             LOG('Getting SACU range, oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; GetBlueprintMaxGroundRange(oBP)='..M27UnitInfo.GetBlueprintMaxGroundRange(oUnit:GetBlueprint())..'; GetUnitMaxGroundRange(oUnit)='..M27UnitInfo.GetUnitMaxGroundRange(oUnit)..'; GetNavalDirectAndSubRange(oUnit)='..M27UnitInfo.GetNavalDirectAndSubRange(oUnit)..'; GetUnitMaxGroundRange(tUnits)='..M27Logic.GetUnitMaxGroundRange({oUnit}))
@@ -9822,7 +9843,7 @@ function TestCustom(aiBrain)
                 end
             end
         end
-    end
+    end--]]
 
     --[[local tFriendlyACU = aiBrain:GetListOfUnits(ParseEntityCategory('COMMAND'))
     LOG('Is table empty='..tostring(M27Utilities.IsTableEmpty(tFriendlyACU)))
