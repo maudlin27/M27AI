@@ -4802,7 +4802,7 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitD
                         end
                         iTotalDamage = iTotalDamage + oCurBP.Economy.BuildCostMass * oUnit:GetFractionComplete() * iMassFactor
                         --Increase further for SML and SMD that might have a missile
-                        if EntityCategoryContains(M27UnitInfo.refCategorySML, oUnit.UnitId) then
+                        if EntityCategoryContains(M27UnitInfo.refCategorySML - M27UnitInfo.refCategoryBattleship, oUnit.UnitId) then
                             if oUnit:GetFractionComplete() == 1 then
                                 iTotalDamage = iTotalDamage + 12000 * math.min(iMassFactor, 1)
                             end
