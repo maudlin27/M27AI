@@ -655,8 +655,36 @@ function GetDistanceToBuildingEdgeTowardsEngineer(tEngineerPosition, tBuildingPo
     return iBuildingSquareRadius / math.cos(ConvertAngleToRadians(iTheta))
 end
 
+function ConvertCounterclockwisePercentageToAngle(iPercent)
+    --Assumes it is sent a percent where 0 = south, 50% = north, 25% = east, and we want 0 = north, 25% = east, 50% = south
+    local iBaseAngle = (1-iPercent) * 360 - 180
+    if iBaseAngle < 0 then
+        iBaseAngle = iBaseAngle + 360
+        if iBaseAngle < 0 then
+            local iCount = 1
+            while iBaseAngle < 0 do
+                iBaseAngle = iBaseAngle + 360
+                iCount = iCount + 1
+                if iCount >= 10 then ErrorHandler('Infinite loop') break end
+            end
+        end
+    end
+    return iBaseAngle
+end
+
 function ConvertAngleToRadians(iAngle)
     return iAngle * math.pi / 180
+end
+
+function ConvertRadiansToAngle(iRadians)
+    --Assumes radians when converted would result in north being 180 degrees, east 90 degrees, south 0 degrees, west 270 degrees
+
+    --iRadians = iAngle * math.pi / 180
+    --180 * iRadians = iAngle * math.pi
+    --iAngle = 180 * iRadians / math.pi
+    local iAngle = 360 - (180 * iRadians / math.pi) - 180
+    if iAngle < 0 then iAngle = iAngle + 360 end
+    return iAngle
 end
 
 function GetAngleDifference(iAngle1, iAngle2)

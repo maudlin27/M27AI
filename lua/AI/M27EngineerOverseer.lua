@@ -965,7 +965,7 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
         if bWantEscort == true then
             oEngineer[M27PlatoonUtilities.refbShouldHaveEscort] = true
             M27PlatoonUtilities.RecordPlatoonUnitsByType(oEngineer, true)
-            M27PlatoonUtilities.GetNearbyEnemyData(oEngineer, iEngineerMobileEnemySearchRange, true)
+            M27PlatoonUtilities.RecordNearbyEnemyData(oEngineer, iEngineerMobileEnemySearchRange, true)
             M27PlatoonUtilities.UpdateEscortDetails(oEngineer)
         else
             oEngineer[M27PlatoonUtilities.refbShouldHaveEscort] = false --Redundancy (clearactiontracker should already cover)
@@ -3521,6 +3521,7 @@ function GetEmergencyArtiStartLocation(aiBrain)
             end
             if bDebugMessages == true then LOG(sFunctionRef..': bBuildAtFirebase='..tostring(bBuildAtFirebase)) end
             if bBuildAtFirebase then
+                --if aiBrain:GetArmyIndex() == 7 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT2Arti) >= 10 then bDebugMessages = true end
                 iActionToAssign = refActionBuildEmergencyArti
                 iMinEngiTechLevelWanted = 2
                 tStartingPoint = {aiBrain[reftFirebasePosition][aiBrain[refiFirebaseBeingFortified]][1], aiBrain[reftFirebasePosition][aiBrain[refiFirebaseBeingFortified]][2], aiBrain[reftFirebasePosition][aiBrain[refiFirebaseBeingFortified]][3]}
@@ -5014,7 +5015,7 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
             if bDebugMessages == true then LOG(sFunctionRef..': Deciding if want land experimental due to nearby enemy threat; iT3ArtiWeOwn='..iT3ArtiWeOwn..'; iLifetimeLandExperimentalCount='..iLifetimeLandExperimentalCount..'; aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; Enemy PD threat='..iEnemyPDThreat..'; iExistingLandExperimentals='..iExistingLandExperimentals..'; iEnemyT2ArtiCount='..iEnemyT2ArtiCount) end
 
             --Top priority for UEF - build novax if enemy has navy and we dont have novax and have lifetime build count of at least 1 on land experimental
-            if iFactionIndex == M27UnitInfo.refFactionUEF and iLifetimeLandExperimentalCount > 0 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryNovaxCentre) == 0 and (iActionToAssign == refActionBuildExperimental or not(aiBrain[refiLastExperimentalReference] == refiExperimentalNovax)) then
+            if iFactionIndex == M27UnitInfo.refFactionUEF and (iLifetimeLandExperimentalCount > 0 or not(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryNovaxCentre) < 3 then
                 local tEnemyNavy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalFactory + M27UnitInfo.refCategoryNavalSurface, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], math.max(500, aiBrain[M27AirOverseer.refiMaxScoutRadius]), 'Enemy')
                 if M27Utilities.IsTableEmpty(tEnemyNavy) == false and (table.getn(tEnemyNavy) >= 4 or M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.TECH2 + categories.TECH3 + categories.EXPERIMENTAL, tEnemyNavy)) == false) then
                     iCategoryRef = refiExperimentalNovax
@@ -8662,6 +8663,7 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                             end
 
                             CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], M27UnitInfo.refCategoryFixedT2Arti, 50, iArtiWanted)
+                            --if aiBrain:GetArmyIndex() == 7 and bWantFortification and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT2Arti) >= 10 then bDebugMessages = true end
                             if bDebugMessages == true then LOG(sFunctionRef..': Do we want fortification after checking for initial Arti='..tostring(bWantFortification)) end
                         end
                         --SAM
@@ -8800,8 +8802,9 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                                     if bDebugMessages == true then LOG(sFunctionRef..': iArtiWithNoKills='..iArtiWithNoKills..'; iTotalMassKilled='..iTotalMassKilled..'; iTotalMassCost='..iTotalMassCost..'; iPercentFactor='..iPercentFactor) end
                                     if (iTotalMassKilled >= iTotalMassCost * 0.65 * iPercentFactor and iArtiWithNoKills == 0) or (iTotalMassKilled >= iTotalMassCost * 0.85 * iPercentFactor and iArtiWithNoKills <= 1) or (iTotalMassKilled >= iTotalMassCost * iPercentFactor and iArtiWithNoKills <= 2) or (iTotalMassCost <= 22000 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, aiBrain[M27Overseer.reftEnemyLandExperimentals])) == false) or (iTotalMassKilled >= iTotalMassCost * 2.5 * iPercentFactor and iArtiWithNoKills <= 5) then
                                         bWantFortification = true
+                                        --if aiBrain:GetArmyIndex() == 7 and bWantFortification and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT2Arti) >= 10 then bDebugMessages = true end
                                         aiBrain[refiFirebaseCategoryWanted][iFirebaseRef] = M27UnitInfo.refCategoryFixedT2Arti
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Want to build more T2 arti at firebase') end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Want to build more T2 arti at firebase as they are getting decent amount of mass kills, iTotalMassKilled='..iTotalMassKilled..'; iArtiWithNoKills='..iArtiWithNoKills) end
                                     end
                                 end
                             end
@@ -8849,6 +8852,7 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                                 end
                                 if bDebugMessages == true then LOG(sFunctionRef..': iNearbyEnemyShieldsAndArti='..iNearbyEnemyShields..'; iMinT2ArtiWanted='..iMinT2ArtiWanted) end
                                 CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], M27UnitInfo.refCategoryFixedT2Arti, 50, iMinT2ArtiWanted)
+                                --if aiBrain:GetArmyIndex() == 7 and bWantFortification and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT2Arti) >= 10 then bDebugMessages = true end
                             end
                         end
 
@@ -9008,6 +9012,7 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                                 end
                                 if iLowestRatio < iRatioWanted and sRefWanted then
                                     CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebaseFrontPDPosition][iFirebaseRef], tiCategoriesWanted[sRefWanted] - M27UnitInfo.refCategoryFixedShield, 50, tiUnitCap[sRefWanted])
+                                    --if aiBrain:GetArmyIndex() == 7 and bWantFortification and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT2Arti) >= 10 and tiCategoriesWanted[sRefWanted] == M27UnitInfo.refCategoryFixedT2Arti then bDebugMessages = true end
                                     if bDebugMessages == true then LOG(sFunctionRef..': Will try and build something to satisfy sRefWanted='..sRefWanted..'; bWantFortification after checking='..tostring(bWantFortification)) end
                                 end
                             end
@@ -11777,43 +11782,48 @@ end--]]
                                     LOG(sFunctionRef .. ': Deciding if need emergency T2 Arti. Torp bombers wanted=' .. aiBrain[M27AirOverseer.refiTorpBombersWanted] .. '; Is nearby enemy navy empty=' .. tostring(M27Utilities.IsTableEmpty(tNearbyEnemyNavy)) .. '; bEnemyHasFatboy=' .. tostring(bEnemyHasFatboy))
                                 end
                                 if bEnemyHasFatboy or bEnemyHasNearbyT2StructureOrLongRange or (M27Utilities.IsTableEmpty(tNearbyEnemyNavy) == false and (table.getn(tNearbyEnemyNavy) >= 3 or M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiserCarrier, tNearbyEnemyNavy)) == false)) then
-                                    local tNearbyT2Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 50, 'Ally')
-                                    local iNearbyT2Arti = 0
-                                    if M27Utilities.IsTableEmpty(tNearbyT2Arti) == false then
-                                        for iArti, oArti in tNearbyT2Arti do
-                                            if oArti:GetFractionComplete() == 1 then
-                                                iNearbyT2Arti = iNearbyT2Arti + 1
+                                    if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT2Arti) <= 12 then
+                                        local tNearbyT2Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 50, 'Ally')
+                                        local iNearbyT2Arti = 0
+                                        if M27Utilities.IsTableEmpty(tNearbyT2Arti) == false then
+                                            for iArti, oArti in tNearbyT2Arti do
+                                                if oArti:GetFractionComplete() == 1 then
+                                                    iNearbyT2Arti = iNearbyT2Arti + 1
+                                                end
                                             end
                                         end
-                                    end
 
-                                    if tiAvailableEngineersByTech[3] > 0 then
-                                        iMaxEngisWanted = math.max(4, aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 4)
-                                    else
-                                        iMaxEngisWanted = math.max(4, aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 2)
-                                    end
-                                    if bHaveLowMass and iNearbyT2Arti >= 2 then
-                                        iMaxEngisWanted = 3
-                                    end
-
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Nearby fatboy or naval threat, will check how much navy; iNearbyT2Arti=' .. iNearbyT2Arti .. '; bEnemyHasFatboy=' .. tostring(bEnemyHasFatboy) .. '; iMaxEngisWanted=' .. iMaxEngisWanted)
-                                    end
-                                    if iNearbyT2Arti == 0 or (not (bEnemyHasFatboy or bEnemyHasNearbyT2StructureOrLongRange) and table.getn(tNearbyEnemyNavy) / 3 > iNearbyT2Arti) or (iNearbyT2Arti <= 7 and (bEnemyHasFatboy or bEnemyHasNearbyT2StructureOrLongRange) and (iNearbyT2Arti < 3 or M27Utilities.IsTableEmpty(aiBrain[reftFirebaseUnitsByFirebaseRef]))) then
-                                        aiBrain[refbEmergencyArtiNeeded] = true
-                                        iActionToAssign = refActionBuildEmergencyArti
-                                        iMinEngiTechLevelWanted = 2
+                                        if tiAvailableEngineersByTech[3] > 0 then
+                                            iMaxEngisWanted = math.max(4, aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 4)
+                                        else
+                                            iMaxEngisWanted = math.max(4, aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 2)
+                                        end
+                                        if bHaveLowMass and iNearbyT2Arti >= 2 then
+                                            iMaxEngisWanted = 3
+                                        end
 
                                         if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': Will build arti by base')
+                                            LOG(sFunctionRef .. ': Nearby fatboy or naval threat, will check how much navy; iNearbyT2Arti=' .. iNearbyT2Arti .. '; bEnemyHasFatboy=' .. tostring(bEnemyHasFatboy) .. '; iMaxEngisWanted=' .. iMaxEngisWanted)
                                         end
-                                    elseif iNearbyT2Arti <= 7 and (bEnemyHasFatboy or (bEnemyHasNearbyT2StructureOrLongRange and iNearbyT2Arti <= 3)) then
-                                        --Enemy has a fatboy and we have a firebase - fortify the firebase if it lacks at least 8 T2 arti
+                                        if iNearbyT2Arti == 0 or (not (bEnemyHasFatboy or bEnemyHasNearbyT2StructureOrLongRange) and table.getn(tNearbyEnemyNavy) / 3 > iNearbyT2Arti) or (iNearbyT2Arti <= 7 and (bEnemyHasFatboy or bEnemyHasNearbyT2StructureOrLongRange) and (iNearbyT2Arti < 3 or M27Utilities.IsTableEmpty(aiBrain[reftFirebaseUnitsByFirebaseRef]))) then
+                                            --if aiBrain:GetArmyIndex() == 7 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT2Arti) >= 10 then bDebugMessages = true end
+                                            aiBrain[refbEmergencyArtiNeeded] = true
+                                            iActionToAssign = refActionBuildEmergencyArti
+                                            iMinEngiTechLevelWanted = 2
 
-                                        iActionToAssign = refActionBuildEmergencyArti
-                                        iMinEngiTechLevelWanted = 2
-                                        --if bDebugMessages == true then LOG(sFunctionRef..': Dont have a firebase but will still build emergeny arti') end
-                                        --end
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef .. ': Will build arti by base')
+                                            end
+                                        elseif iNearbyT2Arti <= 7 and (bEnemyHasFatboy or (bEnemyHasNearbyT2StructureOrLongRange and iNearbyT2Arti <= 3)) then
+                                            --Enemy has a fatboy or nearby structures, so want to build more t2 arti
+
+                                            --if aiBrain:GetArmyIndex() == 7 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT2Arti) >= 10 then bDebugMessages = true end
+                                            iActionToAssign = refActionBuildEmergencyArti
+                                            iMinEngiTechLevelWanted = 2
+                                            if bDebugMessages == true then LOG(sFunctionRef..': enemy has fatboy or nearby t2 structure and we have fewer than 7 nearby so will build t2 arti') end
+                                            --if bDebugMessages == true then LOG(sFunctionRef..': Dont have a firebase but will still build emergeny arti') end
+                                            --end
+                                        end
                                     end
                                 end
                             else
@@ -11827,6 +11837,7 @@ end--]]
                                         --Danger enemy tries getting a firebase so get a T2 arti preemptively
                                         local iCurT2Arti = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT2Arti)
                                         if iCurT2Arti == 0 then
+                                            --if aiBrain:GetArmyIndex() == 7 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT2Arti) >= 10 then bDebugMessages = true end
                                             iActionToAssign = refActionBuildEmergencyArti
                                             iMinEngiTechLevelWanted = 2
                                             iMaxEngisWanted = 2
