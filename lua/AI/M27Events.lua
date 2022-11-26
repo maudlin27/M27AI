@@ -89,8 +89,21 @@ function OnACUKilled(oUnit)
                         M27Chat.SendMessage(oACUBrain, 'Epic game', 'That was an epic game!', 3, 10000)
                     else
                         local iRandom = math.random(1,3)
-                        if iRandom == 1 and M27Conditions.GetLifetimeBuildCount(oACUBrain, M27UnitInfo.refCategoryExperimentalLevel) >= 2 then
-                            M27Chat.SendMessage(oACUBrain, 'Our ACU Died', 'gg, closer than I thought it would be', 3, 60)
+                        if iRandom == 1 and  M27Conditions.GetLifetimeBuildCount(oACUBrain, M27UnitInfo.refCategoryExperimentalLevel) >= 2 then
+                            --Do we have a teammate?
+                            local iAliveM27Allies = 0
+                            if M27Utilities.IsTableEmpty(oACUBrain[M27Overseer.toAllyBrains]) == false then
+                                for iBrain, oBrain in oACUBrain[M27Overseer.toAllyBrains] do
+                                    if oBrain.M27AI and not(oBrain.M27IsDefeated) and not(oBrain == oACUBrain) then
+                                        iAliveM27Allies = iAliveM27Allies + 1
+                                    end
+                                end
+                            end
+                            if iAliveM27Allies > 0 then
+                                M27Chat.SendMessage(oACUBrain, 'Our ACU Died', 'wp', 3, 60)
+                            else
+                                M27Chat.SendMessage(oACUBrain, 'Our ACU Died', 'gg, closer than I thought it would be', 3, 60)
+                            end
                         elseif iRandom == 2 then
                             M27Chat.SendMessage(oACUBrain, 'Our ACU Died', 'gg wp', 3, 60)
                         else
