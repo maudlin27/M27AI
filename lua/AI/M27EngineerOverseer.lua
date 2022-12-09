@@ -4759,7 +4759,7 @@ function GetPartCompleteBuilding(aiBrain, oBuilder, iCategoryToBuild, iBuildingS
         for iBuilding, oBuilding in tAllBuildings do
             if oBuilding.GetFractionComplete and oBuilding.GetPosition and oBuilding:GetFractionComplete() < 1 then
                 local tNearbyEnemies
-                local tBuildingPosition = oBuilding:GetPosition()
+                tBuildingPosition = oBuilding:GetPosition()
                 if iEnemySearchRange then tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.ALLUNITS, tBuildingPosition, iEnemySearchRange, 'Enemy') end
                 if M27Utilities.IsTableEmpty(tNearbyEnemies) == true then
                     iCurDistanceToBuilder = M27Utilities.GetDistanceBetweenPositions(tBuildingPosition, tBuilderPosition)
