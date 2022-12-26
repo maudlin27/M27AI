@@ -2796,7 +2796,7 @@ function ManageMassStalls(aiBrain)
         if bChangeRequired then
             --Decide on order to pause/unpause
 
-            local tCategoriesByPriority, tEngineerActionsByPriority = GetCategoriesAndActionsToPause(aiBrain)
+            local tCategoriesByPriority, tEngineerActionsByPriority = GetCategoriesAndActionsToPause(aiBrain, true)
 
             local iMassPerTickSavingNeeded
             if aiBrain[refbStallingMass] then
