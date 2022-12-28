@@ -3784,7 +3784,7 @@ end
 function GetMassStorageMaximum(aiBrain)
     if aiBrain:GetEconomyStoredRatio('MASS') > 0 then return aiBrain:GetEconomyStored('MASS') / aiBrain:GetEconomyStoredRatio('MASS')
     else
-        return aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEnergyStorage) * 500 + aiBrain:GetCurrentUnits(categories.COMMAND) * 650 + 150
+        return aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryMassStorage) * 500 + aiBrain:GetCurrentUnits(categories.COMMAND) * 650 + 150
     end
 end
 
