@@ -9319,11 +9319,11 @@ function GameSettingWarningsAndChecks(aiBrain)
     --Check for non-AI sim-mods.  Thanks to Softles for pointing me towards the __active_mods variable
     local tSimMods = __active_mods or {}
     local tAIModNameWhitelist = {
-        'M27AI', 'AI-Swarm', 'AI-Uveso', 'AI: DilliDalli', 'Dalli AI', 'Dilli AI', 'M20AI', 'Marlo\'s Sorian AI edit', 'RNGAI', 'SACUAI',
+        'M27AI', 'AI-Swarm', 'AI-Uveso', 'AI: DilliDalli', 'Dalli AI', 'Dilli AI', 'M20AI', 'Marlo\'s Sorian AI edit', 'RNGAI', 'SACUAI', 'M28AI'
     }
 
     local tAIModNameWhereExpectAI = {
-        'AI-Swarm', 'AI-Uveso', 'AI: DilliDalli', 'Dalli AI', 'Dilli AI', 'M20AI', 'Marlo\'s Sorian AI edit', 'RNGAI',
+        'AI-Swarm', 'AI-Uveso', 'AI: DilliDalli', 'Dalli AI', 'Dilli AI', 'M20AI', 'Marlo\'s Sorian AI edit', 'RNGAI', 'M28AI'
     }
     local tModIsOk = {}
     local bHaveOtherAI = false
