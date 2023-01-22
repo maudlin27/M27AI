@@ -10173,10 +10173,19 @@ end--]]
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Will build pogen')
                             end
-                            iActionToAssign = refActionBuildPower
+                            if bNearbyHydro == nil then
+                                bNearbyHydro, tNearbyHydro = M27Conditions.HydroNearACUAndBase(aiBrain, true, true)
+                            end --Ignores ACU and just checks if near start position
+
+                            if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] < 10 and bNearbyHydro then
+                                iActionToAssign = refActionBuildHydro
+                            else
+                                iActionToAssign = refActionBuildPower
+                            end
+
                             iMaxEngisWanted = 10
                         elseif iCurrentConditionToTry == 3 then
-                            if iHighestFactoryOrEngineerTechAvailable <= 1 then
+                            if iHighestFactoryOrEngineerTechAvailable <= 1 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] > 10 then
                                 iActionToAssign = refActionBuildSecondPower
                                 iMaxEngisWanted = 5
                             end
@@ -10918,6 +10927,9 @@ end--]]
                             if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.4 then
                                 iActionToAssign = refActionBuildPower
                                 iMaxEngisWanted = 4
+                                --If have nearby hydro and havent built it yet then get it in priority so we dont pwoer stall
+                                if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] < 10 and bNearbyHydro then iActionToAssign = refActionBuildHydro end
+
                             end
                         elseif iCurrentConditionToTry == 16 then
                             if bWantMorePower and aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.7 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.25 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 2.6 then
@@ -12126,49 +12138,54 @@ end--]]
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': About to check if we have any power of current tech level')
                         end
-                        if iHighestFactoryOrEngineerTechAvailable > 1 then
-                            if iT3Power == nil then
-                                iT3Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH3)
-                            end
-                            if iHighestFactoryOrEngineerTechAvailable > 2 then
-                                if iT3Power == 0 or (iT3Power < 2 and (GetGameTimeSeconds() - aiBrain[M27EconomyOverseer.refiLastEnergyStall] <= 60 or aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] <= 100)) then
-                                    iSearchRangeForNearestEngi = 100
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Will build pogen')
-                                    end
-                                    iActionToAssign = refActionBuildPower
-                                    if iT3Power == 0 then
-                                        iMaxEngisWanted = 5
-                                    else
-                                        iMaxEngisWanted = 1
-                                    end
+                        if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] < 10 and bNearbyHydro then
+                            iActionToAssign = refActionBuildHydro
+                            iMaxEngisWanted = 5
+                        else
+                            if iHighestFactoryOrEngineerTechAvailable > 1 then
+                                if iT3Power == nil then
+                                    iT3Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH3)
                                 end
-                            else
-                                if iT2Power == nil then
-                                    iT2Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH2)
-                                end
-                                if iT2Power + iT3Power == 0 or (bWantMorePower and iT3Power == 0 and iT2Power < 4 and (bHaveLowMass == false or iT2Power < 2) and (aiBrain[M27EconomyOverseer.refiLastEnergyStall] <= 60 or aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] <= 50)) then
-                                    iSearchRangeForNearestEngi = 100
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Will build pogen')
+                                if iHighestFactoryOrEngineerTechAvailable > 2 then
+                                    if iT3Power == 0 or (iT3Power < 2 and (GetGameTimeSeconds() - aiBrain[M27EconomyOverseer.refiLastEnergyStall] <= 60 or aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] <= 100)) then
+                                        iSearchRangeForNearestEngi = 100
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Will build pogen')
+                                        end
+                                        iActionToAssign = refActionBuildPower
+                                        if iT3Power == 0 then
+                                            iMaxEngisWanted = 5
+                                        else
+                                            iMaxEngisWanted = 1
+                                        end
                                     end
-                                    iActionToAssign = refActionBuildPower
-                                    if iT2Power <= 3 then
-                                        iMaxEngisWanted = 5
-                                    else
-                                        iMaxEngisWanted = 1
-                                    end
-                                end
-                            end
-                            if bDebugMessages == true then
-                                if iT2Power == nil then
-                                    iT2Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH2)
-                                end
-                                LOG('Condition:' .. iCurrentConditionToTry .. ': iT3Power=' .. iT3Power .. '; iT2Power=' .. iT2Power .. '; iHighestFactoryOrEngineerTechAvailable=' .. iHighestFactoryOrEngineerTechAvailable .. '; bWantMorePower=' .. tostring(bWantMorePower))
-                                if iActionToAssign == nil then
-                                    LOG('Not assigned an action')
                                 else
-                                    LOG('iActionToAssign=' .. iActionToAssign)
+                                    if iT2Power == nil then
+                                        iT2Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH2)
+                                    end
+                                    if iT2Power + iT3Power == 0 or (bWantMorePower and iT3Power == 0 and iT2Power < 4 and (bHaveLowMass == false or iT2Power < 2) and (aiBrain[M27EconomyOverseer.refiLastEnergyStall] <= 60 or aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] <= 50)) then
+                                        iSearchRangeForNearestEngi = 100
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Will build pogen')
+                                        end
+                                        iActionToAssign = refActionBuildPower
+                                        if iT2Power <= 3 then
+                                            iMaxEngisWanted = 5
+                                        else
+                                            iMaxEngisWanted = 1
+                                        end
+                                    end
+                                end
+                                if bDebugMessages == true then
+                                    if iT2Power == nil then
+                                        iT2Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH2)
+                                    end
+                                    LOG('Condition:' .. iCurrentConditionToTry .. ': iT3Power=' .. iT3Power .. '; iT2Power=' .. iT2Power .. '; iHighestFactoryOrEngineerTechAvailable=' .. iHighestFactoryOrEngineerTechAvailable .. '; bWantMorePower=' .. tostring(bWantMorePower))
+                                    if iActionToAssign == nil then
+                                        LOG('Not assigned an action')
+                                    else
+                                        LOG('iActionToAssign=' .. iActionToAssign)
+                                    end
                                 end
                             end
                         end
@@ -14604,17 +14621,22 @@ end--]]
                                 iT2Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH2)
                             end
                             if bWantMorePower == true then
-                                if iHighestFactoryOrEngineerTechAvailable == 1 or (iHighestFactoryOrEngineerTechAvailable == 2 and iT2Power >= 2) then
-                                    iActionToAssign = refActionBuildSecondPower
-                                    iSearchRangeForNearestEngi = 100
+                                if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] < 10 and bNearbyHydro then
+                                    iActionToAssign = refActionBuildHydro
                                     iMaxEngisWanted = 4
                                 else
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Will build pogen')
+                                    if iHighestFactoryOrEngineerTechAvailable == 1 or (iHighestFactoryOrEngineerTechAvailable == 2 and iT2Power >= 2) then
+                                        iActionToAssign = refActionBuildSecondPower
+                                        iSearchRangeForNearestEngi = 100
+                                        iMaxEngisWanted = 4
+                                    else
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Will build pogen')
+                                        end
+                                        iActionToAssign = refActionBuildPower
+                                        iSearchRangeForNearestEngi = 100
+                                        iMaxEngisWanted = 8
                                     end
-                                    iActionToAssign = refActionBuildPower
-                                    iSearchRangeForNearestEngi = 100
-                                    iMaxEngisWanted = 8
                                 end
                             end
                         end
@@ -14979,8 +15001,13 @@ end--]]
                                         if bDebugMessages == true then
                                             LOG(sFunctionRef .. ': Will build pogen')
                                         end
-                                        iActionToAssign = refActionBuildPower
-                                        iMaxEngisWanted = 15
+                                        if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] < 10 and bNearbyHydro then
+                                            iActionToAssign = refActionBuildHydro
+                                            iMaxEngisWanted = 5
+                                        else
+                                            iActionToAssign = refActionBuildPower
+                                            iMaxEngisWanted = 15
+                                        end
                                     end
                                     iSearchRangeForNearestEngi = 100
                                 end
@@ -15154,7 +15181,7 @@ end--]]
                             iMaxEngisWanted = 1000
                         end
                     end
-                end
+                    end
                 M27Utilities.FunctionProfiler(sFunctionRef .. ': Condition' .. (iCurrentConditionToTry or 'nil') .. 'Strat' .. (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] or 'nil'), M27Utilities.refProfilerEnd)
                 M27Utilities.FunctionProfiler(sFunctionRef .. ': EngiConditions', M27Utilities.refProfilerEnd)
 
