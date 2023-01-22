@@ -960,12 +960,12 @@ end
 
 function OnWeaponFired(oWeapon)
     if M27Utilities.bM27AIInGame then
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local sFunctionRef = 'OnWeaponFired'
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-        --NOTE: Have used hook on calcballisticacceleration instead of below now
-        --if oWeapon.GetBlueprint then LOG('OnWeaponFired hook for blueprint='..repru(oWeapon:GetBlueprint())) end
+
+        if bDebugMessages == true then LOG(sFunctionRef..': Time='..GetGameTimeSeconds()..'; oWeapon='..reprs(oWeapon)) end
         local oUnit = oWeapon.unit
         if oUnit and oUnit.GetUnitId then
             if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' Just fired weapon, reprs of weapon='..reprs(oWeapon)) end

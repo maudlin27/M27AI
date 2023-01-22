@@ -9911,6 +9911,8 @@ end--]]
             iNetCurEnergyIncome = aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome]
             iEnergyStored = aiBrain:GetEconomyStored('ENERGY')
 
+            if tiAvailableEngineersByTech[1] > 0 then bDebugMessages = true else bDebugMessages = false end
+
             if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush then
                 bWantMorePower = false
                 local iEnergyRatio = aiBrain:GetEconomyStoredRatio('ENERGY')
@@ -10078,9 +10080,7 @@ end--]]
                 bHaveVeryLowPower = false
             end
 
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Power calcs: bHaveLowPower=' .. tostring(bHaveLowPower) .. '; bWantMorePower=' .. tostring(bWantMorePower) .. '; iPowerWantedPerTick=' .. iPowerWantedPerTick .. '; iNetCurEnergyIncome=' .. iNetCurEnergyIncome .. '; % energy stored=' .. aiBrain:GetEconomyStoredRatio('ENERGY') .. '; iEnergyBufferMassFactorWanted=' .. iEnergyBufferMassFactorWanted .. '; aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] .. '; aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] .. '; iAbsolutePowerBufferWanted=' .. iAbsolutePowerBufferWanted .. '; Time since last power stall=' .. (GetGameTimeSeconds() - (aiBrain[M27EconomyOverseer.refiLastEnergyStall] or -100)))
-            end
+            if bDebugMessages == true then LOG(sFunctionRef .. ': Power calcs: bHaveLowPower=' .. tostring(bHaveLowPower) .. '; bWantMorePower=' .. tostring(bWantMorePower) .. '; iPowerWantedPerTick=' .. iPowerWantedPerTick .. '; iNetCurEnergyIncome=' .. iNetCurEnergyIncome .. '; % energy stored=' .. aiBrain:GetEconomyStoredRatio('ENERGY') .. '; aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] .. '; aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] .. '; Time since last power stall=' .. (GetGameTimeSeconds() - (aiBrain[M27EconomyOverseer.refiLastEnergyStall] or -100))) end
 
 
 
@@ -10114,6 +10114,7 @@ end--]]
             end
 
             while iEngineersToConsider >= 0 do
+                if iEngineersToConsider > 0 then bDebugMessages = true else bDebugMessages = false end
                 --want >= rather than > so get correct calculation of engineers needed
 
                 --if iEngineersToConsider > 0 then bDebugMessages = true else bDebugMessages = false end
@@ -10692,6 +10693,10 @@ end--]]
                             end
                         elseif iCurrentConditionToTry == 10 then
                             --Low power builder
+                            if bNearbyHydro == nil then
+                                bNearbyHydro, tNearbyHydro = M27Conditions.HydroNearACUAndBase(aiBrain, true, true)
+                            end --Ignores ACU and just checks if near start position
+
                             if bHaveVeryLowPower or bHaveLowPower then
                                 iActionToAssign = refActionBuildPower
                                 if bHaveVeryLowPower then
@@ -10727,6 +10732,11 @@ end--]]
                                     end
                                 end
 
+                                --If have nearby hydro and havent built it yet then get it in priority so we dont pwoer stall
+                                if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] < 10 and bNearbyHydro then
+                                    iActionToAssign = refActionBuildHydro
+                                    iMaxEngisWanted = iMaxEngisWanted + 1
+                                end
                             end
                         elseif iCurrentConditionToTry == 11 then
                             --High priority energy storage
@@ -10797,7 +10807,7 @@ end--]]
                                 end
                             end
                             if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Considering buildilng land facs, iMassStored=' .. iMassStored .. '; iEnergyStored=' .. iEnergyStored .. '; iLandFactories=' .. iLandFactories .. '; iAirFactories=' .. iAirFactories)
+                                LOG(sFunctionRef .. ': Considering buildilng land facs, iMassStored=' .. iMassStored .. '; iEnergyStored=' .. iEnergyStored .. '; iLandFactories=' .. (iLandFactories or 'nil') .. '; iAirFactories=' .. (iAirFactories or 'nil'))
                             end
 
 
