@@ -9911,7 +9911,6 @@ end--]]
             iNetCurEnergyIncome = aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome]
             iEnergyStored = aiBrain:GetEconomyStored('ENERGY')
 
-            if tiAvailableEngineersByTech[1] > 0 then bDebugMessages = true else bDebugMessages = false end
 
             if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush then
                 bWantMorePower = false
@@ -10114,7 +10113,6 @@ end--]]
             end
 
             while iEngineersToConsider >= 0 do
-                if iEngineersToConsider > 0 then bDebugMessages = true else bDebugMessages = false end
                 --want >= rather than > so get correct calculation of engineers needed
 
                 --if iEngineersToConsider > 0 then bDebugMessages = true else bDebugMessages = false end
@@ -11012,7 +11010,7 @@ end--]]
                             if not (bHaveVeryLowPower) and aiBrain:GetEconomyStored('MASS') > 0 then
                                 --Do we have a mex near base that is being upgraded?
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Mexes upgrading=' .. aiBrain[M27EconomyOverseer.refiMexesUpgrading] .. '; Is table empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftUpgrading])))
+                                    LOG(sFunctionRef .. ': Mexes upgrading=' .. (aiBrain[M27EconomyOverseer.refiMexesUpgrading] or 'nil') .. '; Is table empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftUpgrading])))
                                 end
                                 if aiBrain[M27EconomyOverseer.refiMexesUpgrading] > 0 and M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftUpgrading]) == false then
                                     local tUpgradingMexes = EntityCategoryFilterDown(M27UnitInfo.refCategoryMex, aiBrain[M27EconomyOverseer.reftUpgrading])
