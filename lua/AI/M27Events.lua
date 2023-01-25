@@ -960,7 +960,7 @@ end
 
 function OnWeaponFired(oWeapon)
     if M27Utilities.bM27AIInGame then
-        local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local sFunctionRef = 'OnWeaponFired'
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)

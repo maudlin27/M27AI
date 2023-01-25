@@ -5756,7 +5756,6 @@ function GetT3ArtiTarget(oT3Arti, bDontDelayShot)
         oT3Arti[M27UnitInfo.refoLastTargetUnit] = oTarget
         if bRecheckWhenReadyToFire and not(bDontDelayShot) and iMaxTimeToWait - iTicksWaited > 0.1 then
             WaitTicks(iMaxTimeToWait - iTicksWaited)
-            bDebugMessages = true
             if bDebugMessages == true then LOG(sFunctionRef..': Have waited '..iMaxTimeToWait..'; will now get a new target and fire') end
             GetT3ArtiTarget(oT3Arti, true)
         else
