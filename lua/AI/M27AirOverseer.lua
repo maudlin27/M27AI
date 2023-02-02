@@ -8837,7 +8837,12 @@ function GetNovaxTarget(aiBrain, oNovax)
 
                                 iTimeToKillTarget = (oUnit:GetHealth() + iCurShield + math.min(iMaxShield - iCurShield, iTimeToTarget * iCurDPSMod)) / math.max(0.001, iDPS - iCurDPSMod)
                                 if iMaxShield == 0 and not (EntityCategoryContains(categories.COMMAND, oUnit.UnitId)) then
-                                    iCurValue = iCurValue * math.max(M27UnitInfo.GetUnitHealthPercent(oUnit), 0.25)
+                                    --If target is already in firing range then prioritise low health units; if its outside firing range then instead prioritise higher health units (that are worth a detour to kill)
+                                    if iTimeToTarget > 0 then
+                                        iCurValue = iCurValue * math.max(M27UnitInfo.GetUnitHealthPercent(oUnit), 0.25)
+                                    elseif oUnit:GetMaxHealth() >= 600 then
+                                        iCurValue = iCurValue * (1 + 0.2 * (1-M27UnitInfo.GetUnitHealthPercent(oUnit)))
+                                    end
                                 end
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ' Unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' iCurValue=' .. iCurValue .. '; iTimeToTarget=' .. iTimeToTarget .. '; iTimeToKillTarget=' .. iTimeToKillTarget .. '; iCurShield=' .. iCurShield .. '; iMaxShield=' .. iMaxShield .. '; iCurDPSMod=' .. iCurDPSMod)
@@ -9010,7 +9015,7 @@ function NovaxCoreTargetLoop(aiBrain, oNovax, bCalledFromUnitDeath)
 
     if oTarget then
         if bDebugMessages == true then
-            LOG(sFunctionRef .. ': Have a target ' .. oTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oTarget) .. '; will decide whether to attack or move to it; Distance to target=' .. M27Utilities.GetDistanceBetweenPositions(oTarget:GetPosition(), oNovax:GetPosition()))
+            LOG(sFunctionRef .. ': GameTime='..GetGameTimeSeconds()..'; Have a target ' .. oTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oTarget) .. '; will decide whether to attack or move to it; Distance to target=' .. M27Utilities.GetDistanceBetweenPositions(oTarget:GetPosition(), oNovax:GetPosition()))
         end
         if M27Utilities.GetDistanceBetweenPositions(oTarget:GetPosition(), oNovax:GetPosition()) > iEffectiveRange then
             iOrderType = refOrderMove
