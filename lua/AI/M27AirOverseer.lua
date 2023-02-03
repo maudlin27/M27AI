@@ -8592,7 +8592,7 @@ function UpdateMexScoutingPriorities(aiBrain)
 end
 
 function GetNovaxTarget(aiBrain, oNovax)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetNovaxTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -8602,7 +8602,7 @@ function GetNovaxTarget(aiBrain, oNovax)
 
     --Check for priority override (but still consider shields and ACU even if have a priority target)
     if bDebugMessages == true then
-        LOG(sFunctionRef .. ': Is there a valid target override set=' .. tostring(oNovax[refoPriorityTargetOverride]) .. '; Time since last override=' .. GetGameTimeSeconds() - (oNovax[refiTimeOfLastOverride] or -100))
+        LOG(sFunctionRef .. ': Time='..GetGameTimeSeconds()..'; Is there a valid target override set=' .. tostring(oNovax[refoPriorityTargetOverride]) .. '; Time since last override=' .. GetGameTimeSeconds() - (oNovax[refiTimeOfLastOverride] or -100))
     end
     if M27UnitInfo.IsUnitValid(oNovax[refoPriorityTargetOverride]) and (GetGameTimeSeconds() - oNovax[refiTimeOfLastOverride]) <= 11 then
         --Ignore override if are in ACU kill mode and its assassination
@@ -8611,7 +8611,7 @@ function GetNovaxTarget(aiBrain, oNovax)
         end
         if not (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and ScenarioInfo.Options.Victory == "demoralization") then
             --Are there any near-exposed shields nearby? Then target them instead
-            local tNearbyEnemyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, oNovax[refoPriorityTargetOverride]:GetPosition(), 23, 'Enemy')
+            local tNearbyEnemyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryShieldBoat + M27UnitInfo.refCategoryMobileLandShield * categories.TECH3, oNovax[refoPriorityTargetOverride]:GetPosition(), 23, 'Enemy')
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': is table of nearby shields empty=' .. tostring(M27Utilities.IsTableEmpty(tNearbyEnemyShields)) .. '; target subject to this=' .. oNovax[refoPriorityTargetOverride].UnitId .. M27UnitInfo.GetUnitLifetimeCount(oNovax[refoPriorityTargetOverride]))
             end
@@ -8620,7 +8620,8 @@ function GetNovaxTarget(aiBrain, oNovax)
                 local iLowestShield = 5000
                 for iUnit, oUnit in tNearbyEnemyShields do
                     iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
-                    if iCurShield <= iLowestShield then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to target enemy near-exposed shield, oUnit='..oUnit.UnitId..M28UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurShield='..iCurShield..'; iMaxShield='..iMaxShield) end
+                    if iCurShield <= iLowestShield and iCurShield <= iMaxShield * 0.3 then
                         if not (M27Logic.IsTargetUnderShield(aiBrain, oUnit, iLowestShield + 1, false, false, false)) then
                             oTarget = oUnit
                             iLowestShield = iCurShield
@@ -8745,7 +8746,7 @@ function GetNovaxTarget(aiBrain, oNovax)
                 --HOW BELOW WORKS: all units are treated as euqal priority, the only differencees are thes earch range for these 'high priority' units, and the mass mod value to apply
                 if iCurTargetType == 1 then
                     --Nearby low shields
-                    iCategoriesToSearch = M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryMobileLandShield
+                    iCategoriesToSearch = M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryShieldBoat
                     iSearchRange = 90
                     iMassFactor = 4
                 elseif iCurTargetType == 2 then
