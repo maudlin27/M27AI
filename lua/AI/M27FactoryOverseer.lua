@@ -61,7 +61,7 @@ local refCategoryAttackBot = M27UnitInfo.refCategoryAttackBot
 local refCategoryDFTank = M27UnitInfo.refCategoryDFTank --NOTE: Need to specify slowest (so dont pick LAB)
 local refCategoryLandScout = M27UnitInfo.refCategoryLandScout
 local refCategoryMAA = M27UnitInfo.refCategoryMAA
-local refCategoryIndirect` = M27UnitInfo.refCategoryIndirect
+local refCategoryIndirect = M27UnitInfo.refCategoryIndirect
 --Air
 local refCategoryAirScout = M27UnitInfo.refCategoryAirScout
 local refCategoryAirAA = M27UnitInfo.refCategoryAirAA
