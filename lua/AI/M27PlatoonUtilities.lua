@@ -8912,7 +8912,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                             if bDebugMessages == true then LOG(sFunctionRef..': Will defend the chokepoint '..repru(tChokepointToDefend)) end
                             --end
                         else
-                            --Do we lack air support and enemy has large air threat?  If so then stay back
+                            --Do we lack air support and enemy has large air threat?  If so then stay back; also stay back if enemy has more experimentals than us
                             local bDefend = false
                             if bDebugMessages == true then LOG(sFunctionRef..': Checking if we want to stay on defence due to enemy air therat. Have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl])..'; Enemy air to ground threat='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]..'; AirAAWanted='..aiBrain[M27AirOverseer.refiAirAAWanted]) end
                             if not(aiBrain[M27AirOverseer.refbHaveAirControl]) and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 3000 and aiBrain[M27AirOverseer.refiAirAAWanted] >= 10 then
@@ -8941,6 +8941,20 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                     end
                                 end
 
+                            end
+                            if not(bDefend) then
+                                --Does the enemy have alot orme threat and we arent using a fatboy
+                                if oPlatoon[refiPlatoonMaxRange] < 80 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then
+                                    local iEnemyExperimentalThreat = M27Logic.GetCombatThreatRating(aiBrain, aiBrain[M27Overseer.reftEnemyLandExperimentals], false, nil, nil, nil, nil, nil, nil, false, false, false)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iEnemyExperimentalThreat='..iEnemyExperimentalThreat..'; Will see if want to switch to defence mode') end
+                                    if iEnemyExperimentalThreat > oPlatoon[refiPlatoonThreatValue] then
+                                        local iNearbyAlliedExperimentalThreat = M27Logic.GetCombatThreatRating(aiBrain, aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandExperimental, GetPlatoonFrontPosition(oPlatoon), 200, 'Ally'), false, nil, nil, nil, nil, nil, nil, false, false, false)
+                                        if iEnemyExperimentalThreat > iNearbyAlliedExperimentalThreat then
+                                            bDefend = true
+                                        end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': iNearbyAlliedExperimentalThreat='..iNearbyAlliedExperimentalThreat..'; bDefend='..tostring(bDefend)) end
+                                    end
+                                end
                             end
                             if bDebugMessages == true then LOG(sFunctionRef..': bDefend='..tostring(bDefend)) end
                             if bDefend then
