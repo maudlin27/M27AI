@@ -3613,7 +3613,7 @@ function ReleaseRefueledUnitsFromAirStaging(aiBrain, oAirStaging)
         end
         if M27Utilities.IsTableEmpty(tRefuelingUnits) == false then
             for iRefuelingUnit, oRefuelingUnit in tRefuelingUnits do
-                if not (oRefuelingUnit.Dead) and not(EntityCategoryContains(categories.UNSELECTABLE, oRefuelingUnit.UnitId)) then
+                if not (oRefuelingUnit.Dead) and not(EntityCategoryContains(categories.UNSELECTABLE + categories.STRUCTURE, oRefuelingUnit.UnitId)) then --Need structure in here to avoid error with blackops which has structure units included as part of the cargo
                     oRefuelingUnit[refbSentRefuelCommand] = false
                     bReadyToLeave = true
                     if bDebugMessages == true then
