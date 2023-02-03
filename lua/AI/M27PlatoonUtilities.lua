@@ -2476,7 +2476,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and GetGameTimeSeconds() >= 300 and EntityCategoryContains(M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) and oPlatoon[refiPlatoonCount] == 9 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true end
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
-    --if (oPlatoon:GetPlan() == 'M27GroundExperimental' or oPlatoon[refoFrontUnit].UnitId == 'xsl0401') then bDebugMessages = true end
+    if (oPlatoon:GetPlan() == 'M27GroundExperimental' or oPlatoon[refoFrontUnit].UnitId == 'xsl0401') then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 937 and aiBrain:GetArmyIndex() == 4 and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
@@ -3369,6 +3369,20 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                 if bDebugMessages == true then LOG(sFunctionRef..': About to get within range of enemy PD so will retreat, iNearestPD distance='..iNearestPD..'; iBestPDRange='..iBestPDRange) end
                             end
 
+                        end
+                    end
+                    if not(oPlatoon[refiCurrentAction]) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': No action yet for fatboy, will set kiting flag based on how much enemy DF threat is nearby') end
+                        SetIfPlatoonCanKite(oPlatoon)
+                        if oPlatoon[refiEnemiesInRange] >= 2 and not(oPlatoon[refbKiteEnemies]) then
+                            local tNearbyEnemyDangerousLand = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat * categories.TECH3, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refiPlatoonMaxRange] - 8, 'Enemy')
+                            if M27Utilities.IsTableEmpty(tNearbyEnemyDangerousLand) == false then
+                                local iNearbyT3Plus = table.getn(tNearbyEnemyDangerousLand)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Deciding whether to turn on kiting for fatboy, iNearbyT3Plus='..iNearbyT3Plus..'; Combat threat rating='..M27Logic.GetCombatThreatRating(aiBrain, tNearbyEnemyDangerousLand)) end
+                                if iNearbyT3Plus >= 5 or M27Logic.GetCombatThreatRating(aiBrain, tNearbyEnemyDangerousLand) >= 3000 then
+                                    oPlatoon[refbKiteEnemies] = true
+                                end
+                            end
                         end
                     end
 
