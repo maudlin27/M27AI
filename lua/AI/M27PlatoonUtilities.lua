@@ -2150,12 +2150,12 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
     local sFunctionRef = 'GetUnderwaterActionForLandUnit'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 and oPlatoon:GetBrain():GetArmyIndex() == 4 then bDebugMessages = true end
-    --if oPlatoon:GetPlan() == 'M27GroundExperimental' then bDebugMessages = true end
+    --if oPlatoon:GetPlan() == 'M27GroundExperimental' or oPlatoon[refoFrontUnit].UnitId == 'xsl0401' then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     local iHeightAtWhichConsideredUnderwater = M27MapInfo.IsUnderwater(GetPlatoonFrontPosition(oPlatoon), true)
     local iMaxDistanceForLandSearch = math.max(20, oPlatoon[refiPlatoonMaxRange] * 0.5)
 
-    if bDebugMessages == true then LOG(sFunctionRef..': Checking if underwater; iHeightAtWhichConsideredUnderwater='..iHeightAtWhichConsideredUnderwater..'; Cur Position height='..GetPlatoonFrontPosition(oPlatoon)[2]..'; Surface height='..GetSurfaceHeight(GetPlatoonFrontPosition(oPlatoon)[1], GetPlatoonFrontPosition(oPlatoon)[3])..'; terrain height='..GetTerrainHeight(GetPlatoonFrontPosition(oPlatoon)[1], GetPlatoonFrontPosition(oPlatoon)[3])) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Time='..GetGameTimeSeconds()..'; Checking if underwater; iHeightAtWhichConsideredUnderwater='..iHeightAtWhichConsideredUnderwater..'; Cur Position height='..GetPlatoonFrontPosition(oPlatoon)[2]..'; Surface height='..GetSurfaceHeight(GetPlatoonFrontPosition(oPlatoon)[1], GetPlatoonFrontPosition(oPlatoon)[3])..'; terrain height='..GetTerrainHeight(GetPlatoonFrontPosition(oPlatoon)[1], GetPlatoonFrontPosition(oPlatoon)[3])..'; Front unit position (if dif)='..repru(oPlatoon[refoFrontUnit]:GetPosition())..'; Front unit='..oPlatoon[refoFrontUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit])) end
 
 
     if GetPlatoonFrontPosition(oPlatoon)[2] < iHeightAtWhichConsideredUnderwater then
@@ -2476,7 +2476,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and GetGameTimeSeconds() >= 300 and EntityCategoryContains(M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) and oPlatoon[refiPlatoonCount] == 9 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true end
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
-    --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refiPlatoonMaxRange] >= 10 then bDebugMessages = true end
+    --if (oPlatoon:GetPlan() == 'M27GroundExperimental' or oPlatoon[refoFrontUnit].UnitId == 'xsl0401') then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 937 and aiBrain:GetArmyIndex() == 4 and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
@@ -2492,7 +2492,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27MobileShield' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
 
 
-    if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonName..oPlatoon[refiPlatoonCount]..': Start of code; platoon action='..(oPlatoon[refiCurrentAction] or 'nil')..' Enemies in range='..oPlatoon[refiEnemiesInRange]..'; Structures in range='..oPlatoon[refiEnemyStructuresInRange]) end
+    if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonName..oPlatoon[refiPlatoonCount]..': Start of code at time '..GetGameTimeSeconds()..'; platoon action='..(oPlatoon[refiCurrentAction] or 'nil')..' Enemies in range='..oPlatoon[refiEnemiesInRange]..'; Structures in range='..oPlatoon[refiEnemyStructuresInRange]..'; platoon front position='..(oPlatoon[refoFrontUnit].UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit]) or 'nil')) end
 
 
     if sPlatoonName == 'M27MobileShield' then
@@ -3480,6 +3480,10 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
         if oPlatoon[refiCurrentAction] then
             if bDebugMessages == true then LOG(sFunctionRef..': Have determined platoon action from the above so wont proceed, action='..oPlatoon[refiCurrentAction]) end
             bProceed = false
+            if oPlatoon[refbPlatoonHasUnderwaterLand] == true and not(oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionReturnToBase or oPlatoon[refiCurrentAction] == refActionGoToNearestRallyPoint) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Have an underwater unit, about to run code to check for underwater action') end
+                GetUnderwaterActionForLandUnit(oPlatoon)
+            end
         end
 
         if bProceed then

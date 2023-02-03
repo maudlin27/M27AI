@@ -2545,10 +2545,23 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                 --If dont have enough for all out attack, consider attacking nearest enemy unit if we can attack it without leaving our naval yard vulnerable
                 if not(bAllOutSubAttack) and not(bAllOutAttack) and oClosestEnemyCombatUnit then
                     local iDistToClosestEnemyCombat =  M27Utilities.GetDistanceBetweenPositions(oClosestEnemyCombatUnit:GetPosition(), oClosestFriendlyUnitToEnemyBase:GetPosition())
-                    local iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tEnemyBase, oClosestFriendlyUnitToEnemyBase:GetPosition())
-                    if iDistToClosestEnemyCombat <= iDistToEnemyBase * 0.4 then
+                    local iClosestFriendlyDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tEnemyBase, oClosestFriendlyUnitToEnemyBase:GetPosition())
+                    local iDistThreshold = math.max(iClosestFriendlyDistToEnemyBase * 0.4, math.min(iClosestFriendlyDistToEnemyBase * 0.6, 300))
+                    if iOurSurfaceThreat >= 30000 then
+                        if iOurSurfaceThreat >= 60000 then
+
+                            iDistThreshold = math.max(iDistThreshold, M27Utilities.GetDistanceBetweenPositions(tEnemyBase, tOurBase) * 0.7, 350)
+                        elseif iOurSurfaceThreat >= 45000 then
+                            iDistThreshold = math.max(iDistThreshold, M27Utilities.GetDistanceBetweenPositions(tEnemyBase, tOurBase) * 0.6, 325)
+                        else
+                            iDistThreshold = math.max(iDistThreshold, M27Utilities.GetDistanceBetweenPositions(tEnemyBase, tOurBase) * 0.5, 300)
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Deciding if we can either attack without leaving navla yard vulnerable, or have so much threat that we want to attack. iDistThreshold='..iDistThreshold..'; iDistToClosestEnemyCombat='..iDistToClosestEnemyCombat) end
+                    if iDistToClosestEnemyCombat <= iDistThreshold then
                         local iDistToOurNavalBase = M27Utilities.GetDistanceBetweenPositions(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase)
-                        if iDistToClosestEnemyCombat + iDistToOurNavalBase < iDistToEnemyBase and iDistToClosestEnemyCombat + M27Utilities.GetDistanceBetweenPositions(oClosestEnemyCombatUnit:GetPosition(), tOurBase) <= iDistToEnemyBase * 1.45 then
+                        if bDebugMessages == true then LOG(sFunctionRef..': iDistToOurNavalBase='..iDistToOurNavalBase..'; iClosestFriendlyDistToEnemyBase='..iClosestFriendlyDistToEnemyBase..'; Dist between closest enemy combat unit and our base='..M27Utilities.GetDistanceBetweenPositions(oClosestEnemyCombatUnit:GetPosition(), tOurBase)) end
+                        if iDistToClosestEnemyCombat + iDistToOurNavalBase < iClosestFriendlyDistToEnemyBase and iDistToClosestEnemyCombat + M27Utilities.GetDistanceBetweenPositions(oClosestEnemyCombatUnit:GetPosition(), tOurBase) <= math.max(iDistThreshold, iClosestFriendlyDistToEnemyBase * 1.45) then
 
                             local iSurfaceThreatOfNearbyEnemies = M27Logic.GetCombatThreatRating(aiBrain, tEnemiesNearClosestEnemyUnit, false, nil, nil, false, false, false, false, true, false, false)
                             local iAntiNavyThreatOfNearbyEnemies = M27Logic.GetCombatThreatRating(aiBrain, tEnemiesNearClosestEnemyUnit, false, nil, nil, false, false, false, true, false, false, false)
@@ -2559,11 +2572,15 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                             elseif iOurSubmersibleThreat > iAntiNavyThreatOfNearbyEnemies then
                                 bAllOutSubAttack = true
                                 bAttackNearbyEnemies = true
+                            elseif iOurSurfaceThreat >= 30000 then --3-4 battleships in size
+                                bAllOutAttack = true
+                                bAttackNearbyEnemies = true
                             end
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering if we can take on nearest enemy unit with an all out attack. iSurfaceThreatOfNearbyEnemies='..iSurfaceThreatOfNearbyEnemies..'; iAntiNavyThreatOfNearbyEnemies='..iAntiNavyThreatOfNearbyEnemies..'; iOurSurfaceThreat='..iOurSurfaceThreat..'; iOurSubmersibleThreat='..iOurSubmersibleThreat..'; bAllOutAttack after considering='..tostring(bAllOutAttack)..'; bAllOutSubAttack='..tostring(bAllOutSubAttack)..'; bAttackNearbyEnemies='..tostring(bAttackNearbyEnemies)) end
                         end
                     end
                 end
+                bDebugMessages = false
 
                 local tGlobalNavalDestination
                 local tDestinationForShortRangeUnits --If doing an all out attack/all out sub attack, units whose range is below the min range for engagement should instead go to this destination

@@ -9321,7 +9321,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             LOG(sFunctionRef .. ': ENemy ACU is within 80 of us but we have run recently and its not in combat range')
         end
     else
-        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
+        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) then
             bUpdateLocationAttemptCount = false
             tLocationToMoveTo = aiBrain[M27Overseer.refoACUKillTarget]:GetPosition()
             if bDebugMessages == true then
