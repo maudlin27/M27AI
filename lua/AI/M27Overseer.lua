@@ -1508,7 +1508,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
                                     iMAAAlreadyHave = 0
                                     --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo)
                                 else
-                                    iMAAAlreadyHave = GetAirThreatLevel(aiBrain, tPlatoonCurrentMAAs, false, false, true, false, false, nil, nil, nil, nil, nil)
+                                    iMAAAlreadyHave = M27Logic.GetAirThreatLevel(aiBrain, tPlatoonCurrentMAAs, false, false, true, false, false, nil, nil, nil, nil, nil)
                                 end
                                 if oPlatoon[refoUnitsMAAHelper] then
                                     --tPlatoonCurrentMAAs = oPlatoon[refoUnitsMAAHelper]:GetPlatoonUnits()
