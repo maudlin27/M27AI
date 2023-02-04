@@ -4839,7 +4839,7 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
                         if oUnit:GetFractionComplete() >= 0.01 and oUnit:GetFractionComplete() < 1 then
                             --Can we path here?
                             if iBasePathingGroup == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) then
-                                --Is it iether within 150, or has a mass build cost of at least 70k, or we have <=250 gross mass income?
+                                --Is it iether within 150, or has a mass build cost of at least 70k, or we have <=300 gross mass income?
                                 if oUnit:GetAIBrain():GetArmyIndex() == aiBrain:GetArmyIndex() or (oUnit:GetFractionComplete() < 0.85 and (oUnit:GetBlueprint().Economy.BuildCostMass >= 60000 or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] <= 30 or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 130)) then
                                     iCategoryRef = aiBrain[refiLastExperimentalReference]
                                     break
@@ -5298,35 +5298,43 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
 
         --Game-enders (override for T3 arti, and for if ahve no category ref)
         if bDebugMessages == true then LOG(sFunctionRef..': If are about to build t3 arti or have no category will consider if we want a gameender. iCategoryRef='..(iCategoryRef or 'nil')..'; Gross mass='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; bTargetsForT3Arti='..tostring(bTargetsForT3Arti)..'; Dist to enemy='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
-        if (iCategoryRef == refiExperimentalT3Arti or not(iCategoryRef)) and (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 95 or ((aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 55 or (bTargetsForT3Arti == false and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 40)) and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 800)) then
-            if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 750 and iT3ArtiWeOwn < 4 then
-                iCategoryRef = refiExperimentalT3Arti
-            elseif aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 825 and iT3ArtiWeOwn < 1 then
-                iCategoryRef = refiExperimentalT3Arti
-            else
-                --Do we already ahve a game-ender and its not a paragon?
-                local iExistingGameEnders = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryExperimentalStructure - M27UnitInfo.refCategoryParagon)
-                local bBuildGameEnder = false
-                if iExistingGameEnders == 0 then
-                    bBuildGameEnder = true
+        if (iCategoryRef == refiExperimentalT3Arti or not(iCategoryRef)) then
+            --Do we have the eco to support a game ender instead of a T3 arti?
+            local iTeamMass = 0
+            for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
+                iTeamMass = iTeamMass + oBrain[M27EconomyOverseer.refiGrossMassBaseIncome]
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Seeing if we want to switch our T3 arti to be a game ender; iTeamMass='..(iTeamMass or 'nil')) end
+            if (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 95 or (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 25 and iTeamMass >= 140 and (iFactionIndex == M27UnitInfo.refFactionUEF or iFactionIndex == M27UnitInfo.refFactionSeraphim)) or ((aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 55 or (bTargetsForT3Arti == false and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 40)) and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 800)) then
+                if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 750 and iT3ArtiWeOwn < 4 and iTeamMass < 140 then
+                    iCategoryRef = refiExperimentalT3Arti
+                elseif aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 825 and iT3ArtiWeOwn < 1 and iTeamMass <= 170 then
+                    iCategoryRef = refiExperimentalT3Arti
                 else
-                    if math.min(iExistingGameEnders, 2) < (iExistingLandExperimentals + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL)) / 3 then
+                    --Do we already ahve a game-ender and its not a paragon?
+                    local iExistingGameEnders = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryExperimentalStructure - M27UnitInfo.refCategoryParagon)
+                    local bBuildGameEnder = false
+                    if iExistingGameEnders == 0 then
                         bBuildGameEnder = true
                     else
-                        --Want more experimentals first unless wanted t3 arti and are aeon or cybran (since may ened multiple 'game-enders' for them)
-                        if iExistingGameEnders <= 1 and iCategoryRef == refiExperimentalT3Arti and (iFactionIndex == M27UnitInfo.refFactionAeon or iFactionIndex == M27UnitInfo.refFactionCybran) then
+                        if math.min(iExistingGameEnders, 2) < (iExistingLandExperimentals + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL)) / 3 then
                             bBuildGameEnder = true
+                        else
+                            --Want more experimentals first unless wanted t3 arti and are aeon or cybran (since may ened multiple 'game-enders' for them)
+                            if iExistingGameEnders <= 1 and iCategoryRef == refiExperimentalT3Arti and (iFactionIndex == M27UnitInfo.refFactionAeon or iFactionIndex == M27UnitInfo.refFactionCybran) then
+                                bBuildGameEnder = true
+                            end
                         end
                     end
-                end
-                if bBuildGameEnder then
-                    --Build a game-ender - experimental arti or experimental nuke
-                    if iFactionIndex == M27UnitInfo.refFactionSeraphim then
-                        iCategoryRef = refiExperimentalYolona
-                    else iCategoryRef = refiExperimentalArti
+                    if bBuildGameEnder then
+                        --Build a game-ender - experimental arti or experimental nuke
+                        if iFactionIndex == M27UnitInfo.refFactionSeraphim then
+                            iCategoryRef = refiExperimentalYolona
+                        else iCategoryRef = refiExperimentalArti
+                        end
                     end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iExistingGameEnders='..iExistingGameEnders..'; bBuildGameEnder='..tostring(bBuildGameEnder)) end
                 end
-                if bDebugMessages == true then LOG(sFunctionRef..': iExistingGameEnders='..iExistingGameEnders..'; bBuildGameEnder='..tostring(bBuildGameEnder)) end
             end
         end
 
@@ -8034,11 +8042,18 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                         local iCategoryToBuild = GetCategoryToBuildFromAction(iActionRefToAssign, iMinTechLevelWanted, aiBrain)
                         --Use massive range for experimentals
                         local iSearchRangeForPartBuilt = math.max(iSearchRangeForNearestEngi, 30)
-                        if iActionRefToAssign == refActionBuildExperimental then
+                        if iActionRefToAssign == refActionBuildExperimental or iActionRefToAssign == refActionBuildSecondExperimental then --will increase search range on second experimental so more likely to help allied buildings, especially as some of the issues with mass overflow have reduced from when this was put in
+                            iSearchRangeForPartBuilt = math.max(iSearchRangeForPartBuilt, 250)
+                            --Increase if we are low mass
                             if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] <= 30 then
-                                iSearchRangeForPartBuilt = math.max(iSearchRangeForPartBuilt, 330)
-                            else
-                                iSearchRangeForPartBuilt = math.max(iSearchRangeForPartBuilt, 250)
+                                iSearchRangeForPartBuilt = iSearchRangeForPartBuilt + 80
+                            end
+                            --Increase even more if dealing with T3 arti or experimental
+                            if M27Utilities.DoesCategoryContainCategory(iCategoryToBuild, M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryScathis, false) then
+                                iSearchRangeForPartBuilt = iSearchRangeForPartBuilt + 80
+                                if M27Utilities.DoesCategoryContainCategory(iCategoryToBuild, M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryScathis, false) then
+                                    iSearchRangeForPartBuilt = iSearchRangeForPartBuilt + 150
+                                end
                             end
                         end
                         local oNearestPartBuilt = GetNearestPartBuiltUnit(aiBrain, iCategoryToBuild, tStartPosition, iSearchRangeForPartBuilt)

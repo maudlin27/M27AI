@@ -3393,10 +3393,13 @@ function ManageEnergyStalls(aiBrain)
             local iTotalUnits = 0
             local iCategoryStartPoint, iIntervalChange, iCategoryEndPoint, iCategoryRef
             local bWasUnitPaused
+            local bDontPauseShields = false
             if bPauseNotUnpause then
                 iCategoryStartPoint = 1
                 iIntervalChange = 1
                 iCategoryEndPoint = table.getn(tCategoriesByPriority)
+                --Pausing shields - if have lots of gross energy then dont want to do this
+                if aiBrain[refiGrossEnergyBaseIncome] >= 750 then bDontPauseShields = true end
             else
                 iCategoryStartPoint = table.getn(tCategoriesByPriority)
                 iIntervalChange = -1
@@ -3411,6 +3414,10 @@ function ManageEnergyStalls(aiBrain)
             end
             for iCategoryCount = iCategoryStartPoint, iCategoryEndPoint, iIntervalChange do
                 iCategoryRef = tCategoriesByPriority[iCategoryCount]
+                if bDontPauseShields and (iCategoryRef == M27UnitInfo.refCategoryPersonalShield or iCategoryRef == M27UnitInfo.refCategoryFixedShield or iCategoryRef == M27UnitInfo.refCategoryMobileLandShield) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Dont want to pause shields so will abort') end
+                    break
+                end
 
                 --Are we considering upgrading factory HQs?
                 if iCategoryRef == iSpecialHQCategory then
@@ -3832,7 +3839,14 @@ function UpgradeManager(aiBrain)
         if aiBrain.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then
             break
         end
+        --Decide when to refresh next - refresh sooner for energy stalls and mass overflows
         iCurCycleTime = iCycleWaitTime --default (is shortened if have lots to upgrade)
+        --Shorten the shortest wait time at high energy levels if are stalling energy
+        if iCycleWaitTime > 1 and aiBrain[refiGrossEnergyBaseIncome] >= 750 then
+            if aiBrain[refbStallingEnergy] or aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.5 then
+                iShortestWaitTime = math.floor(iShortestWaitTime * 0.5)
+            end
+        end
         ForkThread(UpgradeMainLoop, aiBrain)
         if aiBrain[refbWantToUpgradeMoreBuildings] then
             iCurCycleTime = iReducedWaitTime
@@ -3840,7 +3854,7 @@ function UpgradeManager(aiBrain)
                 iCurCycleTime = iShortestWaitTime
             end
         end
-        if iCurCycleTime >= 11 and aiBrain[refbStallingEnergy] and aiBrain:GetEconomyStoredRatio('ENERGY') < 0.99 then iCurCycleTime = iShortestWaitTime end
+        if iCurCycleTime > iShortestWaitTime and aiBrain[refbStallingEnergy] and aiBrain:GetEconomyStoredRatio('ENERGY') < 0.99 then iCurCycleTime = iShortestWaitTime end
 
         ForkThread(GetMassStorageTargets, aiBrain)
         ForkThread(GetUnitReclaimTargets, aiBrain)
@@ -3849,6 +3863,7 @@ function UpgradeManager(aiBrain)
         end
 
         ForkThread(ManageEnergyStalls, aiBrain)
+        if aiBrain[refiGrossEnergyBaseIncome] >= 750 and GetGameTimeSeconds() - (aiBrain[refiLastEnergyStall] or -100) <= 10 then iCurCycleTime = iShortestWaitTime end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         iCurCycleTime = _G.MyM27Scheduler:WaitTicks(iCurCycleTime,iCurCycleTime + 0.5, 0.4)
         --WaitTicks(iCurCycleTime)
