@@ -413,6 +413,17 @@ function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
                 ['xsb0201'] = 'zsb9601',
                 ['xsb0202'] = 'zsb9602',
                 ['xsb0203'] = 'zsb9603',
+
+                --Nomads
+                ['xnb0101'] = 'znb9501',
+                ['znb9501'] = 'znb9601',
+                ['xnb0201'] = 'znb9601',
+                ['xnb0102'] = 'znb9502',
+                ['znb9502'] = 'znb9602',
+                ['xnb0202'] = 'znb9602',
+                ['xnb0103'] = 'znb9503',
+                ['xnb0203'] = 'znb9603',
+                ['znb9503'] = 'znb9603',
             }
 
             local sFactoryBP = oUnitToUpgrade.UnitId

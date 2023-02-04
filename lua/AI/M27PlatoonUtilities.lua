@@ -6998,6 +6998,22 @@ function GetACUUpgradeWanted(aiBrain, oACU)
             end
             --end
         end
+        if not(sAltUpgrade) then
+            bDebugMessages = true
+            --Find the cheapest upgrade that boosts either rate of fire or range
+            local iLowestMassCost = 1000000
+            for sUpgrade, tUpgrade in oACU:GetBlueprint().Enhancements do
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering sUpgrade='..sUpgrade..'; tUpgrade='..reprs(tUpgrade)) end
+                if tUpgrade.NewMaxRadius or tUpgrade.NewRateOfFire then
+                    if tUpgrade.BuildCostMass < iLowestMassCost and not(tUpgrade.Prerequisite) then
+                        sAltUpgrade = sUpgrade
+                        iLowestMassCost = tUpgrade.BuildCostMass
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have a new preferred upgrade '..sUpgrade..'; iLowestMassCost='..iLowestMassCost) end
+                    end
+                end
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished considering the cheapest gun improving upgrade, sAltUpgrade='..(sAltUpgrade or 'nil')) end
+        end
         if sAltUpgrade then
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': sAltUpgrade=' .. sAltUpgrade)
