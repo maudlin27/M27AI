@@ -3715,14 +3715,14 @@ function ThreatAssessAndRespond(aiBrain)
                         --Check for ACU flanking
                         if bCheckForACUFlanking and not(bIndirectThreatOnly) and tEnemyThreatGroup[refiTotalThreat] > iThreatThresholdHigh then
                             --How close is threat group to ACU?
-                            if tEnemyThreatGroup[refiModDistanceFromOurStart] < iACUActualDistFromBase and math.abs(tEnemyThreatGroup[refiDistanceFromOurBase] - iACUActualDistFromBase) < 110 then
+                            if tEnemyThreatGroup[refiModDistanceFromOurStart] < iACUActualDistFromBase and math.abs(tEnemyThreatGroup[refiDistanceFromOurBase] - iACUActualDistFromBase) < 125 then
                                 iDistFromThreatGroupToACU = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), tEnemyThreatGroup[reftFrontPosition])
-                                if iDistFromThreatGroupToACU >= 25 and iDistFromThreatGroupToACU <= 110 then
+                                if iDistFromThreatGroupToACU >= 25 and iDistFromThreatGroupToACU <= 125 then
                                     local iACUEnemySearchRange = oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemySearchRadius]
                                     local tUnitsToAdd = {}
                                     for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
                                         iDistFromThreatGroupToACU = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oACU:GetPosition())
-                                        if iDistFromThreatGroupToACU <= 110 and iDistFromThreatGroupToACU > iACUEnemySearchRange then
+                                        if iDistFromThreatGroupToACU <= 125 and iDistFromThreatGroupToACU > iACUEnemySearchRange then
                                             table.insert(tUnitsToAdd, oUnit)
                                         end
                                     end

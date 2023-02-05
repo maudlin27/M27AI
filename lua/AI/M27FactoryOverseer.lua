@@ -862,7 +862,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
 
                         if bDebugMessages == true then LOG(sFunctionRef..': bHaveLowMass='..tostring(bHaveLowMass)..'; bHaveLowPower='..tostring(bHaveLowPower)..'; iStrategy='..iStrategy) end
-                        if (oFactory[refiFactoryBuildCount] or 0) <= 4 or M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][oFactory[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauEngineers]) or iCurDFTanks == 0 or (not(bHaveLowPower) and not(aiBrain[M27Overseer.refbCloseToUnitCap]) and (not(bHaveLowMass)) or iStrategy == aiBrain[M27Overseer.refiDefaultStrategy] or (aiBrain:GetEconomyStored('MASS') > 10 and (oFactory[refiFactoryBuildCount] or 0) <= 7 and not(aiBrain[M27EconomyOverseer.refbStallingEnergy]))) then
+                        if (iEngis == 0 and (not(bHaveLowMass) or aiBrain:GetEconomyStored('MASS') >= 50)) or (oFactory[refiFactoryBuildCount] or 0) <= 4 or M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][oFactory[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauEngineers]) or iCurDFTanks == 0 or (not(bHaveLowPower) and not(aiBrain[M27Overseer.refbCloseToUnitCap]) and (not(bHaveLowMass)) or iStrategy == aiBrain[M27Overseer.refiDefaultStrategy] or (aiBrain:GetEconomyStored('MASS') > 10 and (oFactory[refiFactoryBuildCount] or 0) <= 7 and not(aiBrain[M27EconomyOverseer.refbStallingEnergy]))) then
                             if iCurrentConditionToTry == 1 then
                                 if iCurMAA > 0 and iCurDFTanks >= 3 and iCurScouts > 0 and iCurIndirect > 0 and iEngis == 0 then
                                     iCategoryToBuild = refCategoryEngineer
