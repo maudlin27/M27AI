@@ -11,4 +11,8 @@ ACUUnit = Class(M27OldACUUnit) {
         M27Events.OnKilled(self, instigator, type, overkillRatio)
         M27OldACUUnit.OnKilled(self, instigator, type, overkillRatio)
     end,
+    CreateEnhancement = function(self, enh)
+        ForkThread(M27Events.OnEnhancementComplete, self, enh)
+        return M27OldACUUnit.CreateEnhancement(self, enh)
+    end
 }

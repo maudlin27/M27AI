@@ -700,6 +700,17 @@ function OnWorkEnd(self, work)
     end
 end
 
+function OnEnhancementComplete(oUnit, sEnhancement)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'OnEnhancementComplete'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Enhancement completed for self='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; sEnhancement='..reprs(sEnhancement)) end
+
+    if sEnhancement == 'Teleporter' then M27AirOverseer.bTeleportersInGame = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
 function OnShieldBubbleDamaged(self, instigator)
     if M27Utilities.bM27AIInGame then
         local sFunctionRef = 'OnShieldBubbleDamaged'
@@ -1453,7 +1464,8 @@ function OnConstructed(oEngineer, oJustBuilt)
             elseif EntityCategoryContains(M27UnitInfo.refCategoryMassStorage, oJustBuilt.UnitId) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Just built mass storage '..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)..';, will refresh mass fab locations') end
                 ForkThread(M27EngineerOverseer.UpdateMassFabPotentialLocations, oJustBuilt)
-
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryMobileLandStealth, oJustBuilt.UnitId) then
+                ForkThread(M27Team.ConsiderGiftingShieldOrStealthToSubteam, oJustBuilt)
             end
 
             --Firebase tracking

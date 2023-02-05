@@ -1165,7 +1165,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
 
     local sFunctionRef = 'ProcessingEngineerActionForNearbyEnemies'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true end
+    if oEngineer.UnitId == 'ual0309' then bDebugMessages = true end
     local bAreNearbyEnemies = false
     --if oEngineer and not(oEngineer.Dead) then --We already check this in the engineer reassignment before calling this action
 
@@ -1188,9 +1188,15 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
         end
     end
     local bOnPlateau = false
-    if not(oEngineer[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then bOnPlateau = true end
-
     local sPathing = M27UnitInfo.GetUnitPathingType(oEngineer)
+    if not(oEngineer[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
+        if not(oEngineer[M27Transport.refiAssignedPlateau]) then oEngineer[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(sPathing, oEngineer:GetPosition()) end
+        if not(oEngineer[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
+            bOnPlateau = true
+        end
+    end
+
+
 
     --Run away
     if bNearbyPD and bOnPlateau then
@@ -1203,6 +1209,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
             end
         end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': Time='..GetGameTimeSeconds()..'; Eng='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; UC='..GetEngineerUniqueCount(oEngineer)..'; bNearbyPD='..tostring(bNearbyPD)) end
     if bNearbyPD then
         --if oEngineer:IsUnitState('Building') or oEngineer:IsUnitState('Repairing') then bDebugMessages = true M27Utilities.ErrorHandler('Clearing an engineer whose unit state is building or repairing due to nearby PD') end
         bKeepBuilding = false
@@ -1219,6 +1226,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
         bAreNearbyEnemies = not(M27Utilities.IsTableEmpty(tNearbyUnits))
         if bAreNearbyEnemies and bOnPlateau then
             --Is the enemy on the plateau?
+            if bDebugMessages == true then LOG(sFunctionRef..': Have nearby enemies but are on a plateau, will check if in the same plateau') end
             bAreNearbyEnemies = false
             for iUnit, oUnit in tNearbyUnits do
                 if M27MapInfo.GetSegmentGroupOfLocation(sPathing, oUnit:GetPosition()) == oEngineer[M27Transport.refiAssignedPlateau] then
@@ -1228,7 +1236,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
             end
         end
         if bAreNearbyEnemies then
-            if bDebugMessages == true then LOG(sFunctionRef..': oEngineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' UC='..GetEngineerUniqueCount(oEngineer)..' ahs nearby enemies, will consider if want to try and reclaim, keep building, or run. Engineer plateau='..oEngineer[M27Transport.refiAssignedPlateau]) end
+            if bDebugMessages == true then LOG(sFunctionRef..': oEngineer '..(oEngineer.UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oEngineer) or 'nil')..' UC='..(GetEngineerUniqueCount(oEngineer) or 'nil')..' ahs nearby enemies, will consider if want to try and reclaim, keep building, or run. Engineer plateau='..(oEngineer[M27Transport.refiAssignedPlateau] or 'nil')) end
             --Mark nearby reclaim segments as having nearby enemy so will avoid
             UpdateReclaimSegmentsForEngineerDeathOrNearbyEnemy(aiBrain, oEngineer, true)
 
@@ -1269,16 +1277,16 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                     LOG(sFunctionRef..': have nearby enemies within a long search range but no mobile enemies')
                 end
             end
-            local tNearbyEnemiesShort
+            local tNearbyReclaimableEnemiesShort
             if bNearbyMobileEnemies == true then
-                tNearbyEnemiesShort = aiBrain:GetUnitsAroundPoint(categories.LAND - categories.BENIGN, tEngPosition, iSearchRangeShort, 'Enemy')
-                if bDebugMessages == true then LOG(sFunctionRef..': Are mobile enemies within a long range, seeing if are any units within a short range; is table empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemiesShort))) end
+                tNearbyReclaimableEnemiesShort = aiBrain:GetUnitsAroundPoint(categories.LAND - categories.BENIGN - categories.COMMAND - categories.SUBCOMMANDER, tEngPosition, iSearchRangeShort, 'Enemy')
+                if bDebugMessages == true then LOG(sFunctionRef..': Are mobile enemies within a long range, seeing if are any units within a short range; is table empty='..tostring(M27Utilities.IsTableEmpty(tNearbyReclaimableEnemiesShort))) end
             elseif bDebugMessages == true then LOG(sFunctionRef..': No mobile enemies in a long range so wont check for enemies in a short range')
             end
             local oReclaimTarget
             local bCaptureNotReclaim = false
-            if bNearbyMobileEnemies == false or (M27Utilities.IsTableEmpty(tNearbyEnemiesShort) and M27Logic.GetCombatThreatRating(aiBrain, tMobileEnemies, true, nil, nil, false, false) <= 10) then
-                if bDebugMessages == true then LOG(sFunctionRef..': No very close mobile enemies; bNearbyMobileEnemies='..tostring(bNearbyMobileEnemies)..'; M27Utilities.IsTableEmpty(tNearbyEnemiesShort)='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemiesShort))..'; M27Logic.GetCombatThreatRating(aiBrain, tMobileEnemies, true, nil, nil, false, false)='..M27Logic.GetCombatThreatRating(aiBrain, tMobileEnemies, true, nil, nil, false, false)) end
+            if bNearbyMobileEnemies == false or (M27Utilities.IsTableEmpty(tNearbyReclaimableEnemiesShort) and M27Logic.GetCombatThreatRating(aiBrain, tMobileEnemies, true, nil, nil, false, false) <= 10) then
+                if bDebugMessages == true then LOG(sFunctionRef..': No very close mobile enemies; bNearbyMobileEnemies='..tostring(bNearbyMobileEnemies)..'; M27Utilities.IsTableEmpty(tNearbyReclaimableEnemiesShort)='..tostring(M27Utilities.IsTableEmpty(tNearbyReclaimableEnemiesShort))..'; M27Logic.GetCombatThreatRating(aiBrain, tMobileEnemies, true, nil, nil, false, false)='..M27Logic.GetCombatThreatRating(aiBrain, tMobileEnemies, true, nil, nil, false, false)) end
                 --Liekly enemy engineer or scout, so just ignore until it gets close to us; if its a building then instead try to reclaim
                 local tEnemyStructures = EntityCategoryFilterDown(categories.STRUCTURE, tNearbyUnits)
                 if M27Utilities.IsTableEmpty(tEnemyStructures) == false then
@@ -1316,11 +1324,11 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                     if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies but the threat of all enemies in longer range is less than 10 so likely land scout or engi') end
                     bKeepBuilding = true
                 end
-            elseif M27Utilities.IsTableEmpty(tNearbyEnemiesShort) == false then
+            elseif M27Utilities.IsTableEmpty(tNearbyReclaimableEnemiesShort) == false then
                 --Have nearby enemies so try and reclaim
-                oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyEnemiesShort, tEngPosition, aiBrain, true)
+                oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyReclaimableEnemiesShort, tEngPosition, aiBrain, true)
                 if oReclaimTarget.GetFractionComplete and EntityCategoryContains(M27UnitInfo.refCategoryStructure - categories.BENIGN, oReclaimTarget.UnitId) and oReclaimTarget:GetFractionComplete() == 1 and oReclaimTarget:GetHealthPercent() >= 0.8 then bCaptureNotReclaim = true end
-                if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tNearbyEnemiesShort)..' nearby enemies; bCaptureNotReclaim='..tostring(bCaptureNotReclaim)..'; contains structure='..tostring(EntityCategoryContains(categories.STRUCTURE, oReclaimTarget.UnitId))..'; fraction complete='..oReclaimTarget:GetFractionComplete()..'; Health%='..oReclaimTarget:GetHealthPercent()) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tNearbyReclaimableEnemiesShort)..' nearby enemies; bCaptureNotReclaim='..tostring(bCaptureNotReclaim)..'; contains structure='..tostring(EntityCategoryContains(categories.STRUCTURE, oReclaimTarget.UnitId))..'; fraction complete='..oReclaimTarget:GetFractionComplete()..'; Health%='..oReclaimTarget:GetHealthPercent()) end
             else
                 --Have nearby enemies but they're not close, and they have a threat of at least 10 - ignore if we're almost done building
                 local oBeingBuilt, iFractionComplete
@@ -1366,7 +1374,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
             if M27Utilities.IsTableEmpty(tPossibleEngineers) == false and tNearbyEnemiesLong == tNearbyEnemiesLong then
                 tPossibleEngineers = EntityCategoryFilterDown(refCategoryEngineer, tPossibleEngineers)
                 if M27Utilities.IsTableEmpty(tPossibleEngineers) == false and tPossibleEngineers == tNearbyEnemiesLong then
-                    oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyEnemiesShort, oEngineer:GetPosition(), aiBrain, true)
+                    oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyReclaimableEnemiesShort, oEngineer:GetPosition(), aiBrain, true)
                 end
             end--]]
                     else
@@ -1430,7 +1438,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                     else
                         IssueReclaim({oEngineer}, oReclaimTarget)
                     end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have cleared commands for engineer and either issued capture or reclaim order') end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have cleared commands for engineer and either issued capture or reclaim order on target '..oReclaimTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oReclaimTarget)..'. bCaptureNotReclaim='..tostring(bCaptureNotReclaim or false)..'; bKeepBuilding='..tostring(bKeepBuilding)) end
                 end
                 --end
             else
@@ -1551,6 +1559,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
         UpdateEngineerActionTrackers(aiBrain, oEngineer, refActionHasNearbyEnemies, oEngineer:GetPosition(), false, 0)
         oEngineer[refbRecentlyAbortedReclaim] = true
         M27Utilities.DelayChangeVariable(oEngineer, refbRecentlyAbortedReclaim, false, 10)
+        if bDebugMessages == true then LOG(sFunctionRef..': Updated engineer action trackers to show it is on an action that it has nearby enemies') end
     elseif bAreNearbyEnemies and M27Logic.IsUnitIdle(oEngineer, false, false, false) and M27Utilities.IsTableEmpty(tNearbyUnits) == false then
         --Presumably a scout or engineer, attack-move towards them as dont want to get new commands yet
         local oNearestUnit = M27Utilities.GetNearestUnit(tNearbyUnits, oEngineer:GetPosition(), aiBrain, nil, nil)
@@ -8438,7 +8447,7 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                 --If unit is a veteran and is damaged, or is a T2 arti and enemy has nearby T2 structures
 
                 if oUnit.Sync.VeteranLevel > 0 then
-                    if oUnit:GetHealth() / oUnit:GetMaxHealth() < 0.97 or (aiBrain[M27Overseer.refiNearestEnemyT2PlusStructure] <= 200 and EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oUnit.UnitId)) then
+                    if oUnit:GetHealth() / oUnit:GetMaxHealth() < 0.97 or EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oUnit.UnitId) then
                         aiBrain[M27PlatoonFormer.reftPriorityUnitsForShielding][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
                     else
                         aiBrain[M27PlatoonFormer.reftPriorityUnitsForShielding][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = nil
@@ -9719,8 +9728,9 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         if bEngineerIsBusy == false and oEngineer[refiEngineerCurrentAction] == refActionHasNearbyEnemies then
                             if bDebugMessages == true then LOG(sFunctionRef..': Engi action was that it had nearby enemies so will clear action trackers') end
                             ClearEngineerActionTrackers(aiBrain, oEngineer, true)
-                        elseif bEngineerIsBusy and (M27Logic.IsUnitIdle(oEngineer, false, false, false) or oEngineer[M27Logic.refiIdleCount] > 10) then
+                        elseif bEngineerIsBusy and (oEngineer[M27Logic.refiIdleCount] > 10 or (M27Logic.IsUnitIdle(oEngineer, false, false, false) and oEngineer[M27Logic.refiIdleCount] > 3)) then
                             --Have issue where sometimes an engineer can just stay motionless doing nothing if nearby enemies, so this way it will start moving
+                            oEngineer[M27Logic.refiIdleCount] = 0
                             --if bDebugMessages == true then LOG(sFunctionRef..': Issuing aggressive move to engineer UC='..GetEngineerUniqueCount(oEngineer)..' to nearest rally point') end
                             if oEngineer[M27Transport.refiAssignedPlateau] and not (oEngineer[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) and not(oEngineer[refiEngineerCurrentAction] == refActionHasNearbyEnemies) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': will give plateau spare engi action') end

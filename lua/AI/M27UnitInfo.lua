@@ -201,6 +201,7 @@ refCategoryAirAA = categories.AIR * categories.ANTIAIR - categories.BOMBER - cat
 refCategoryBomber = categories.AIR * categories.BOMBER - categories.ANTINAVY - categories.CANNOTUSEAIRSTAGING --excludes mercies
 refCategoryFighterBomber = categories.AIR * categories.ANTIAIR * categories.BOMBER - categories.EXPERIMENTAL
 refCategoryGunship = categories.AIR * categories.GROUNDATTACK
+refCategoryNoFriendlyFireGunships = refCategoryGunship * categories.TECH3 + refCategoryGunship * categories.TECH1 + refCategoryGunship * categories.UEF * categories.TECH2 + refCategoryGunship * categories.SERAPHIM * categories.TECH2
 refCategoryTorpBomber = categories.AIR * categories.BOMBER * categories.ANTINAVY
 refCategoryAllAir = categories.MOBILE * categories.AIR - categories.UNTARGETABLE --Excludes novax
 refCategoryAllNonExpAir = categories.MOBILE * categories.AIR * categories.TECH1 + categories.MOBILE * categories.AIR * categories.TECH2 + categories.MOBILE * categories.AIR * categories.TECH3

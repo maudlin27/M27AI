@@ -10373,8 +10373,8 @@ function OverseerManager(aiBrain)
 
         --TestCustom(aiBrain)
         --if GetGameTimeSeconds() >= 300 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true LOG('GameTime='..GetGameTimeSeconds()) bDebugMessages = false end
-        --if GetGameTimeSeconds() >= 428.8 then bDebugMessages = true M27Config.M27RunProfiling = true ForkThread(M27Utilities.ProfilerActualTimePerTick) end
-        --[[if not(bSetHook) and GetGameTimeSeconds() >= 428.8 then
+        --if GetGameTimeSeconds() >= 149 then bDebugMessages = true M27Config.M27RunProfiling = true ForkThread(M27Utilities.ProfilerActualTimePerTick) end
+        --[[if not(bSetHook) and GetGameTimeSeconds() >= 149 then
             bDebugMessages = true
             bSetHook = true
             M27Utilities.bGlobalDebugOverride = true

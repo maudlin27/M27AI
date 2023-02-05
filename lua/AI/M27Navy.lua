@@ -2580,7 +2580,6 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                         end
                     end
                 end
-                bDebugMessages = false
 
                 local tGlobalNavalDestination
                 local tDestinationForShortRangeUnits --If doing an all out attack/all out sub attack, units whose range is below the min range for engagement should instead go to this destination

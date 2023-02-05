@@ -61,6 +61,10 @@ local refiTimeSinceWantedToScout = 'M27AirTimeSinceWantedToScout'
 local refiSegmentX = 'M27AirSegmentX'
 local refiSegmentZ = 'M27AirSegmentZ'
 
+
+--Whether teleport units are in the game (so bombers will factor in extra logic to their targeting
+bTeleportersInGame = false
+
 --AirAA
 local refiNearToACUThreshold = 'M27AirNearToACUThreshold'
 local refbNonScoutUnassignedAirAATargets = 'M27AirNonScoutUnassignedAirAATargets'
@@ -5123,6 +5127,19 @@ function AirBomberManager(aiBrain)
         local bAvoidCruisers = false
         local tEnemyCruisers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryCruiserCarrier, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxPossibleRange, 'Enemy')
         local tAllRecentlySeenCruisers = {}
+
+        local bConsiderAvoidingTeleporters = false
+        if bTeleportersInGame then
+            --Do we have 3+ Gunships of a suitable category?
+            local iSuitableGunships = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryNoFriendlyFireGunships)
+            if iSuitableGunships >= 3 then
+                --Do we have T3 arti, or SMD with enemy having nuke, or experimental structure?
+                if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == false or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML) > 0 then
+                    bConsiderAvoidingTeleporters = true
+
+                end
+            end
+        end
         --Include recently seen cruisers in this
         --Add any pond AA recently seen but not currently visible to this
         if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy untis by pond empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]))) end
@@ -5206,8 +5223,7 @@ function AirBomberManager(aiBrain)
 
         function AddUnitToShortlist(oUnit, iTechLevel, iOptionalModDistanceToBase, iOptionalMaxStrikeDamageWanted)
             --Optional values - done for performance reasons, so can copy existing entry and feed them back to this function instead of recalculating
-            --First make sure we want to add to the shortlist subject to strike damage (which this will consider)
-
+            --First make sure we want to add to the shortlist subject to strike damage (which this will consider) and special anti-teleport logic (to stop enemy teleporting into a high value unit of ours)
             oUnit[refiMaxStrikeDamageWanted] = (iOptionalMaxStrikeDamageWanted or GetMaxStrikeDamageWanted(oUnit))
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Will add oUnit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' to shortlist unless we have assigned enough strike damage.  oUnit[refiMaxStrikeDamageWanted]=' .. (oUnit[refiMaxStrikeDamageWanted] or 0) .. '; oUnit[refiStrikeDamageAssigned]=' .. (oUnit[refiStrikeDamageAssigned] or 0))
@@ -5220,18 +5236,23 @@ function AirBomberManager(aiBrain)
                     LOG(sFunctionRef .. ': oUnit position=' .. repru(tTargetPosition) .. '; iAssumedAOE=' .. iAssumedAOE .. '; SizeY=' .. (oUnit:GetBlueprint().SizeY or 0) .. '; Underwater height=' .. M27MapInfo.iMapWaterHeight)
                 end
                 if not (M27MapInfo.IsUnderwater({ tTargetPosition[1], tTargetPosition[2] + math.max(0, iAssumedAOE + (oUnit:GetBlueprint().SizeY or 0) - 0.1), tTargetPosition[3] }, false)) then
-                    --This is a duplication in part of checks done in most of hte bomber targeting, but not all of them have an underwater check and this one is more accurate
-                    iTargetCount = iTargetCount + 1
-                    aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount] = {}
-                    aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistPriority] = iCurPriority
-                    aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistUnit] = oUnit
-                    --Increase the mod distance based on the priority so we effectively only consider highest priority first
-                    oUnit[refiBomberDefenceModDistance] = (iOptionalModDistanceToBase or M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false)) + iCurPriority * 10000
-                    aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiBomberDefenceModDistance] = oUnit[refiBomberDefenceModDistance]
-                    aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistStrikeDamageWanted] = oUnit[refiMaxStrikeDamageWanted]
-                    iHighestPriorityFound = math.min(iHighestPriorityFound, iCurPriority)
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Added unit to the shortlist as it isnt underwater')
+                    --Is this a teleporting unit that is by high value friendly units when we want to deal with non-aoe means?
+                    if not(bConsiderAvoidingTeleporters and EntityCategoryContains(categories.COMMAND + categories.SUBCOMMANDER, oUnit.UnitId) and oUnit.HasEnhancement and oUnit:HasEnhancement('Teleporter') and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategorySMD, oUnit:GetPosition(), 10, 'Ally')) == false) then
+                        --This is a duplication in part of checks done in most of hte bomber targeting, but not all of them have an underwater check and this one is more accurate
+                        iTargetCount = iTargetCount + 1
+                        aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount] = {}
+                        aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistPriority] = iCurPriority
+                        aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistUnit] = oUnit
+                        --Increase the mod distance based on the priority so we effectively only consider highest priority first
+                        oUnit[refiBomberDefenceModDistance] = (iOptionalModDistanceToBase or M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false)) + iCurPriority * 10000
+                        aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiBomberDefenceModDistance] = oUnit[refiBomberDefenceModDistance]
+                        aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistStrikeDamageWanted] = oUnit[refiMaxStrikeDamageWanted]
+                        iHighestPriorityFound = math.min(iHighestPriorityFound, iCurPriority)
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Added unit to the shortlist as it isnt underwater')
+                        end
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Dealing with a teleporting unit so will avoid targeting') end
                     end
                 end
             elseif bDebugMessages == true then
@@ -8592,7 +8613,7 @@ function UpdateMexScoutingPriorities(aiBrain)
 end
 
 function GetNovaxTarget(aiBrain, oNovax)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetNovaxTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 

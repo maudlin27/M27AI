@@ -15,13 +15,14 @@ local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27Navy = import('/mods/M27AI/lua/AI/M27Navy.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
+local M27PlatoonFormer = import('/mods/M27AI/lua/AI/M27PlatoonFormer.lua')
 
 --Subteam varaibles
 iTotalSubteamCount = 0 --Number of subteams in the game
 tSubteamData = {} --[x] is the aiBrain.M27Subteam number, similar to tTeamData in how it works
-subrefiTimeOfLastFriendlyDataUpdate = 'M27SubteamTimeOfLastFriendlyUpdate' --Gametime in seconds that we last updated the subteamdata for friendly units/threat vlaues
-subreftoFriendlyBrains = 'M27SubteamFriendlyBrains' --Friendly brains in our subteam
-subrefiFriendlyAirAAThreat = 'M27SubteamFriendlyAirAA' --threat of our entire subteam's airaa
+    subrefiTimeOfLastFriendlyDataUpdate = 'M27SubteamTimeOfLastFriendlyUpdate' --Gametime in seconds that we last updated the subteamdata for friendly units/threat vlaues
+    subreftoFriendlyBrains = 'M27SubteamFriendlyBrains' --Friendly brains in our subteam
+    subrefiFriendlyAirAAThreat = 'M27SubteamFriendlyAirAA' --threat of our entire subteam's airaa
 
 --Team data
 tTeamData = {} --[x] is the aiBrain.M27Team number - stores certain team-wide information
@@ -882,6 +883,45 @@ function RecordSegmentsThatTeamHasVisualOf(aiBrain)
             end
         end
     end
+end
+
+function ConsiderGiftingShieldOrStealthToSubteam(oUnit)
+    --When we finish building oUnit, consider gifting it to a teammate on our subteam
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'ConsiderGiftingShieldOrStealthToSubteam'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local aiBrain = oUnit:GetAIBrain()
+    if aiBrain.M27AI then --redundancy
+        local iFriendlyBrains = table.getn(tSubteamData[aiBrain.M27Subteam][subreftoFriendlyBrains])
+        if bDebugMessages == true then LOG(sFunctionRef..': Start of code, time='..GetGameTimeSeconds()..'; Considering if we want to give '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to an ally; size of brains in subteam='..iFriendlyBrains..'; Unit brain nickname='..oUnit:GetAIBrain().Nickname) end
+        if iFriendlyBrains >= 2 then
+
+            local iCatToUse
+            if EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, oUnit.UnitId) then
+                iCatToUse = M27UnitInfo.refCategoryMobileLandShield
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryMobileLandStealth, oUnit.UnitId) then
+                iCatToUse = M27UnitInfo.refCategoryMobileLandStealth
+            end
+            if iCatToUse then
+                local iOurCurUnits = aiBrain:GetCurrentUnits(iCatToUse)
+                local iOtherBrainUnits
+                if bDebugMessages == true then LOG(sFunctionRef..': iOurCurUnits='..iOurCurUnits) end
+                if iOurCurUnits >= 3 then
+                    for iBrain, oBrain in tSubteamData[aiBrain.M27Subteam][subreftoFriendlyBrains] do
+                        if not(oBrain == aiBrain) and oBrain.M27AI and not(oBrain.M27IsDefeated) then
+                            iOtherBrainUnits = oBrain:GetCurrentUnits(iCatToUse)
+                            if bDebugMessages == true then LOG(sFunctionRef..': iOtherBrainUnits='..iOtherBrainUnits..'; oBrain='..oBrain.Nickname..'; Is table of units wanting shielding for that brain empty='..tostring(M27Utilities.IsTableEmpty(oBrain[M27PlatoonFormer.reftPriorityUnitsForShielding]))) end
+                            if iOtherBrainUnits * 3 < iOurCurUnits and (iOtherBrainUnits == 0 or M27Utilities.IsTableEmpty(oBrain[M27PlatoonFormer.reftPriorityUnitsForShielding]) == false) then
+                                TransferUnitsToPlayer({ oUnit} , oBrain:GetArmyIndex(), false)
+                                break
+                            end
+                        end
+                        end
+                    end
+                end
+            end
+        end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function SubteamInitialisation(iSubteamRef)

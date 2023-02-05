@@ -1791,11 +1791,12 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetCombatThreatRating'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if tUnits[1].UnitId == 'xsl0301' then bDebugMessages = true end
 
 
     if bMustBeVisibleToIntelOrSight == nil then bMustBeVisibleToIntelOrSight = true end
     --IsTableEmpty(tTable, bNotEmptyIfSingleValueNotTable)
-    if bDebugMessages == true then LOG(sFunctionRef..': About to check if table is empty') end
+    if bDebugMessages == true then LOG(sFunctionRef..': About to check if table is empty. bBlueprintThreat='..tostring(bBlueprintThreat)) end
     if M27Utilities.IsTableEmpty(tUnits, true) == true then
         --if tUnits == nil then
         if bDebugMessages == true then LOG(sFunctionRef..': Warning: tUnits is empty, returning 0') end
@@ -1854,7 +1855,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
             --oBP = nil
 
             --Get the base threat for the unit
-            if M27UnitInfo.IsUnitValid(oUnit) then
+            if M27UnitInfo.IsUnitValid(oUnit) and not(bBlueprintThreat) then
                 if oUnit[reftBaseThreat] and oUnit[reftBaseThreat][iThreatRef] then
                     iBaseThreat = oUnit[reftBaseThreat][iThreatRef]
                     if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and not(bBlueprintThreat) then
@@ -1912,11 +1913,17 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                         end
                     end
                     if bCalcActualThreat then
-                        iBaseThreat = tUnitThreatByIDAndType[oUnit.UnitId][iThreatRef]
-                        if not(oUnit[reftBaseThreat]) then oUnit[reftBaseThreat] = {} end
                         if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and not(bBlueprintThreat) then
                             iBaseThreat = GetACUCombatMassRating(oUnit)
+                        else
+                            iBaseThreat = tUnitThreatByIDAndType[oUnit.UnitId][iThreatRef]
                         end
+                        if not(iBaseThreat) and not(bBlueprintThreat) then
+                            M27Utilities.ErrorHandler('Dont have any threat rating for unit iD '..oUnit.UnitId..'; will try re-running this for the blueprint')
+                            iBaseThreat = GetCombatThreatRating(aiBrain, { { ['UnitId'] = oUnit.UnitId } }, false, nil, nil, bIndirectFireThreatOnly, bJustGetMassValue, true, bAntiNavyOnly, bAddAntiNavy, bSubmersibleOnly, bLongRangeThreatOnly)
+                            if bDebugMessages == true then LOG(sFunctionRef..': iBaseThreat after update='..(iBaseThreat or 'nil')) end
+                        end
+                        if not(oUnit[reftBaseThreat]) then oUnit[reftBaseThreat] = {} end
                         oUnit[reftBaseThreat][iThreatRef] = iBaseThreat
                     end
                 end
@@ -1981,8 +1988,9 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                 --Are we calculating blueprint threat (per code at start of game)?
                 if bBlueprintThreat then
                     oBP = __blueprints[oUnit.UnitId]
+                    if oUnit.UnitId == 'xsl0301' then bDebugMessages = true else bDebugMessages = false end
 
-                    if bDebugMessages == true then LOG(sFunctionRef..': Considering unit with ID='..(oUnit.UnitId or 'nil')) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering unit with ID='..(oUnit.UnitId or 'nil')..'; bJustGetMassValue='..tostring(bJustGetMassValue or false)) end
 
                     if bJustGetMassValue == true then iBaseThreat = (oBP.Economy.BuildCostMass or 0)
                     else
@@ -2065,6 +2073,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                         iMassMod = math.max(iMassMod, 0.25) --missile ship
                                     end
                                 end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iMassMod after considering main direct fire type categories='..iMassMod) end
                             end
                         else
                             if EntityCategoryContains(categories.INDIRECTFIRE, oUnit.UnitId) then
@@ -2077,7 +2086,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                             elseif EntityCategoryContains(categories.ANTIMISSILE, oUnit.UnitId) then iMassMod = 2 --Doubled for structures ontop of this, i.e. want 4xmass of TMD in indirect fire so can overwhelm it
                             elseif EntityCategoryContains(categories.SHIELD, oUnit.UnitId) then iMassMod = 1
                             elseif EntityCategoryContains(M27UnitInfo.refCategoryLongRangeDFLand, oUnit.UnitId) then iMassMod = 0.5
-                           end
+                            end
                         end
                         if EntityCategoryContains(M27UnitInfo.refCategoryStructure, oUnit.UnitId) then
                             iMassMod = iMassMod * 2
