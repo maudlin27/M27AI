@@ -1453,11 +1453,11 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ManageTeamNavy'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if GetGameTimeSeconds() >= 1095 and M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.SHIELD, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])) == false then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 600 and M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryMissileShip, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])) == false then bDebugMessages = true end
     --if GetGameTimeSeconds() >= 480 then bDebugMessages = true end
     --if GetGameTimeSeconds() >= 840 and (aiBrain:GetArmyIndex() == 2 or aiBrain:GetArmyIndex() == 4) then bDebugMessages = true end
 
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for iTeam='..iTeam..'; Brain='..aiBrain.Nickname..'; Index='..aiBrain:GetArmyIndex()..'; GameTime='..GetGameTimeSeconds()) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for iTeam='..iTeam..'; Brain='..aiBrain.Nickname..'; Index='..aiBrain:GetArmyIndex()..'; GameTime='..GetGameTimeSeconds()..'; iPond='..iPond) end
 
     local iNavalStrategy = M27Team.refiNavalStrategyRetreat --Default (e.g. including if we have no navy)
 
@@ -3011,7 +3011,6 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                         local iMaxDistanceWithinAttackRangeWanted = nil
                         local iMinDistanceWithinAttackRangeWanted = nil
 
-
                         --Update ranges wanted - keep as nil if want to ignore nearest enemy unit
                         --Do we outrange the enemy with our attack?
                         if iOurBestSurfaceRange > math.max(iEnemyBestSurfaceRange, iEnemyBestAntiNavyRange) then
@@ -3047,6 +3046,14 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                             end
 
                         end
+
+                        --Reduce kiting difference if we have significantly more threat, and also have destoyers use antinavy range or DF range, whichever is lower
+                        local bUseTorpedoRangeForDestroyers = false
+                        if iOurSurfaceThreat > iEnemySurfaceThreat * 1.75 then
+                            bUseTorpedoRangeForDestroyers = true
+                            iMaxDistanceWithinAttackRangeWanted = iMaxDistanceWithinAttackRangeWanted + 2
+                        end
+
                         if bDebugMessages == true then LOG(sFunctionRef..': About to consider attacking with surface units, iOurBestSurfaceRange='..iOurBestSurfaceRange..'; iMaxDistanceWithinAttackRangeWanted='..(iMaxDistanceWithinAttackRangeWanted or 'nil')..'; iMinRangeForEngagement='..iMinRangeForEngagement..'; Is table of tEnemiesBetweenUsAndBase empty='..tostring(M27Utilities.IsTableEmpty(tEnemiesBetweenUsAndBase))) end
 
                         local tPotentialGroundFireTargets = {}
@@ -3155,7 +3162,11 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                                     elseif bUseAntiNavyRangeOnly then
                                         iCurRange = oUnit[M27UnitInfo.refiAntiNavyRange]
                                     else
-                                        iCurRange = math.max(oUnit[M27UnitInfo.refiAntiNavyRange], oUnit[M27UnitInfo.refiDFRange])
+                                        if bUseTorpedoRangeForDestroyers and oUnit[M27UnitInfo.refiAntiNavyRange] > 0 and oUnit[M27UnitInfo.refiDFRange] > 0 and EntityCategoryContains(M27UnitInfo.refCategoryDestroyer, oUnit.UnitId) then
+                                            iCurRange = math.min(oUnit[M27UnitInfo.refiAntiNavyRange], oUnit[M27UnitInfo.refiDFRange])
+                                        else
+                                            iCurRange = math.max(oUnit[M27UnitInfo.refiAntiNavyRange], oUnit[M27UnitInfo.refiDFRange])
+                                        end
                                     end
                                 end
                                 if iCurRange < iMinRangeForEngagement then

@@ -1165,6 +1165,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
 
     local sFunctionRef = 'ProcessingEngineerActionForNearbyEnemies'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true end
 
     local bAreNearbyEnemies = false
     --if oEngineer and not(oEngineer.Dead) then --We already check this in the engineer reassignment before calling this action
@@ -1326,9 +1327,21 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                 end
             elseif M27Utilities.IsTableEmpty(tNearbyReclaimableEnemiesShort) == false then
                 --Have nearby enemies so try and reclaim
-                oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyReclaimableEnemiesShort, tEngPosition, aiBrain, true)
-                if oReclaimTarget.GetFractionComplete and EntityCategoryContains(M27UnitInfo.refCategoryStructure - categories.BENIGN, oReclaimTarget.UnitId) and oReclaimTarget:GetFractionComplete() == 1 and oReclaimTarget:GetHealthPercent() >= 0.8 then bCaptureNotReclaim = true end
-                if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tNearbyReclaimableEnemiesShort)..' nearby enemies; bCaptureNotReclaim='..tostring(bCaptureNotReclaim)..'; contains structure='..tostring(EntityCategoryContains(categories.STRUCTURE, oReclaimTarget.UnitId))..'; fraction complete='..oReclaimTarget:GetFractionComplete()..'; Health%='..oReclaimTarget:GetHealthPercent()) end
+
+                local iNearestUnitDist = 100000
+                local iCurUnitDist
+                for iUnit, oUnit in tNearbyEnemiesShort do
+                    if oUnit:GetFractionComplete() >= 0.25 then
+                        iCurUnitDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tEngPosition)
+                        if iCurUnitDist < iNearestUnitDist then
+                            iNearestUnitDist = iCurUnitDist
+                            oReclaimTarget = oUnit
+                        end
+                    elseif not(oReclaimTarget) then oReclaimTarget = oUnit --redundancy so will reclaim the part-complete unit if no other units that can reclaim
+                    end
+                end
+                if oReclaimTarget.GetFractionComplete and EntityCategoryContains(M27UnitInfo.refCategoryStructure - categories.BENIGN - M27UnitInfo.refCategoryAllFactories - categories.DIRECTFIRE - categories.INDIRECTFIRE, oReclaimTarget.UnitId) and oReclaimTarget:GetFractionComplete() == 1 and oReclaimTarget:GetHealthPercent() >= 0.8 then bCaptureNotReclaim = true end
+                if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tNearbyEnemiesShort)..' nearby enemies; bCaptureNotReclaim='..tostring(bCaptureNotReclaim)..'; contains structure='..tostring(EntityCategoryContains(categories.STRUCTURE, oReclaimTarget.UnitId))..'; fraction complete='..oReclaimTarget:GetFractionComplete()..'; Health%='..oReclaimTarget:GetHealthPercent()) end
             else
                 --Have nearby enemies but they're not close, and they have a threat of at least 10 - ignore if we're almost done building
                 local oBeingBuilt, iFractionComplete
@@ -1402,7 +1415,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
             end
             if oReclaimTarget then
                 bKeepBuilding = false
-                if bDebugMessages == true then LOG(sFunctionRef..': Will tell engineer to reclaim the target. Engineer unitstate='..M27Logic.GetUnitState(oEngineer)) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Will tell engineer to reclaim the target. Engineer unitstate='..M27Logic.GetUnitState(oEngineer)..'; oReclaimTarget='..oReclaimTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oReclaimTarget)..' with fraction complete='..oReclaimTarget:GetFractionComplete()) end
                 --if oEngineer:IsUnitState('Capturing') == false and oEngineer:IsUnitState('Reclaiming') == false then
                 --Do we already have the unit as a target and arent yet in build range, but are moving towards it?
                 local bDontClearCommands = false
