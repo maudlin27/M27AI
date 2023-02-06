@@ -395,12 +395,19 @@ function RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCo
         return iResourceCount
     end
 end
-function RecordMexNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly)
-    return RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, true)
+function RecordMexNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, bReturnCount)
+    if bReturnCount then return RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, true)
+    else RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, true)
+    end
+
 end
 
-function RecordHydroNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly)
-    return RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, false)
+function RecordHydroNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, bReturnCount)
+    if bReturnCount then
+        return RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, false)
+    else
+        RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, false)
+    end
 end
 
 function RecordPlayerStartLocations()

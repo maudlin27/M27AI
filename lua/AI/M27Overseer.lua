@@ -10269,6 +10269,7 @@ function OverseerManager(aiBrain)
     --[[ForkThread(RunLotsOfLoopsPreStart)
     WaitTicks(10)
     LOG('TEMPTEST REPR after 10 ticks='..repru(tTEMPTEST))--]]
+
     ForkThread(M27MapInfo.MappingInitialisation, aiBrain)
 
     if bDebugMessages == true then
@@ -10276,7 +10277,7 @@ function OverseerManager(aiBrain)
     end
     ForkThread(M27MapInfo.RecordPlayerStartLocations, aiBrain)
 
-    --ForkThread(M27MapInfo.RecordResourceLocations, aiBrain) --need to do after 1 tick for adaptive maps - superceded by hook into siminit
+    ForkThread(M27MapInfo.RecordResourceLocations, aiBrain) --need to do after 1 tick for adaptive maps - superceded by hook into siminit
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': aiBrain:GetArmyIndex()=' .. aiBrain:GetArmyIndex() .. '; aiBrain start position=' .. (aiBrain.M27StartPositionNumber or 'nil'))
     end
@@ -10289,6 +10290,7 @@ function OverseerManager(aiBrain)
         --ForkThread(M27MapInfo.DrawHeightMapAstro)
         --ForkThread(M27MapInfo.LogMapTerrainTypes)
     end
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(1)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)

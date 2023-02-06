@@ -7,7 +7,7 @@ local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 
 function M27IsXNearbyMex(aiBrain, bool, iMexNumber)
     --Note: The distance is set to nil to avoid confusion as RecordMexNearStartPosition's distance only matters the first time ever it's called; it's called by aibrain before build conditions, hence whatever number is entered here has no effect
-    local iNearbyMex = M27MapInfo.RecordMexNearStartPosition(M27Utilities.GetAIBrainArmyNumber(aiBrain), nil, true)
+    local iNearbyMex = M27MapInfo.RecordMexNearStartPosition(M27Utilities.GetAIBrainArmyNumber(aiBrain), nil, true, true)
 
     if iNearbyMex == iMexNumber then return bool
     else return not(bool)
@@ -15,7 +15,7 @@ function M27IsXNearbyMex(aiBrain, bool, iMexNumber)
 end
 function M27IsXPlusNearbyMex(aiBrain, bool, iMexNumber)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    local iNearbyMex = M27MapInfo.RecordMexNearStartPosition(M27Utilities.GetAIBrainArmyNumber(aiBrain), nil, true)
+    local iNearbyMex = M27MapInfo.RecordMexNearStartPosition(M27Utilities.GetAIBrainArmyNumber(aiBrain), nil, true, true)
     if bDebugMessages == true then LOG('M27IsXPlusNearbyMex: iNearbyMex='..iNearbyMex) end
     if iNearbyMex >= iMexNumber then return bool
     else return not(bool)
@@ -25,7 +25,7 @@ end
 function M27IsNearbyHydro(aiBrain, bool, iMaxDistance)
     --NOTE: Repalced with M27NearbyHydro for decision on whether ACU should help with building hydro instead of t1 power
     --returns true if hydrocarbon is within iMaxDistance of start location; checks every 5s
-    local iNearbyHydro = M27MapInfo.RecordHydroNearStartPosition(M27Utilities.GetAIBrainArmyNumber(aiBrain), iMaxDistance, true)
+    local iNearbyHydro = M27MapInfo.RecordHydroNearStartPosition(M27Utilities.GetAIBrainArmyNumber(aiBrain), iMaxDistance, true, true)
     if iNearbyHydro >= 1 then return bool
     else return not(bool) end
 end
@@ -55,7 +55,7 @@ function M27IsUnclaimedHydro(aiBrain, bool, bOurSideOfMap)
 end
 
 function M27IsNoNearbyHydro(aiBrain, bool, iMaxDistance)
-    local iNearbyHydro = M27MapInfo.RecordHydroNearStartPosition(M27Utilities.GetAIBrainArmyNumber(aiBrain), iMaxDistance, true)
+    local iNearbyHydro = M27MapInfo.RecordHydroNearStartPosition(M27Utilities.GetAIBrainArmyNumber(aiBrain), iMaxDistance, true, true)
     if iNearbyHydro <= 0 then return bool else return not(bool) end
 end
 
