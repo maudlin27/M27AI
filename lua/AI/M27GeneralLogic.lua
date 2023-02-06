@@ -1791,7 +1791,6 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetCombatThreatRating'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if tUnits[1].UnitId == 'xsl0301' then bDebugMessages = true end
 
 
     if bMustBeVisibleToIntelOrSight == nil then bMustBeVisibleToIntelOrSight = true end
@@ -1988,7 +1987,6 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                 --Are we calculating blueprint threat (per code at start of game)?
                 if bBlueprintThreat then
                     oBP = __blueprints[oUnit.UnitId]
-                    if oUnit.UnitId == 'xsl0301' then bDebugMessages = true else bDebugMessages = false end
 
                     if bDebugMessages == true then LOG(sFunctionRef..': Considering unit with ID='..(oUnit.UnitId or 'nil')..'; bJustGetMassValue='..tostring(bJustGetMassValue or false)) end
 
