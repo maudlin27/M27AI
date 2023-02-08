@@ -920,10 +920,13 @@ function DoesACUHaveUpgrade(aiBrain, oAltACU)
     local sFunctionRef = 'DoesACUHaveUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local oACU = (oAltACU or M27Utilities.GetACU(aiBrain))
-    for sEnhancement, tEnhancement in oACU:GetBlueprint().Enhancements do
-        if oACU:HasEnhancement(sEnhancement) and tEnhancement.BuildCostMass > 1 then
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-            return true
+    local oBP = oACU:GetBlueprint()
+    if M27Utilities.IsTableEmpty(oBP.Enhancements) == false then
+        for sEnhancement, tEnhancement in oACU:GetBlueprint().Enhancements do
+            if oACU:HasEnhancement(sEnhancement) and tEnhancement.BuildCostMass > 1 then
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return true
+            end
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

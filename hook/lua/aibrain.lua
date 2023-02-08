@@ -82,6 +82,14 @@ AIBrain = Class(M27AIBrainClass) {
 
     end,
 
+    BaseMonitorInitialization = function(self, spec)
+        if self.M27AI then
+            --Do nothing (so we dont get the message about navmesh not being generated)
+        else
+            M27AIBrainClass.BaseMonitorInitialization(self, spec)
+        end
+    end,
+
     --[[InitializeSkirmishSystems = function(self)
         if not(self.M27AI) then M27AIBrainClass.InitializeSkirmishSystems(self)
         else
@@ -144,22 +152,22 @@ AIBrain = Class(M27AIBrainClass) {
 
             local plat = self:GetPlatoonUniquelyNamed('ArmyPool')
             --]]
-            --[[if self.Sorian then
-                plat:ForkThread(plat.BaseManagersDistressAISorian)
-            else
-                plat:ForkThread(plat.BaseManagersDistressAI)
-            end]]--
-            --[[
+    --[[if self.Sorian then
+        plat:ForkThread(plat.BaseManagersDistressAISorian)
+    else
+        plat:ForkThread(plat.BaseManagersDistressAI)
+    end]]--
+    --[[
 
 
-            self.DeadBaseThread = self:ForkThread(self.DeadBaseMonitor)
-            if self.Sorian then
-                self.EnemyPickerThread = self:ForkThread(self.PickEnemySorian)
-            else
-                self.EnemyPickerThread = self:ForkThread(self.PickEnemy)
-            end
-        end
-    end,--]]
+    self.DeadBaseThread = self:ForkThread(self.DeadBaseMonitor)
+    if self.Sorian then
+        self.EnemyPickerThread = self:ForkThread(self.PickEnemySorian)
+    else
+        self.EnemyPickerThread = self:ForkThread(self.PickEnemy)
+    end
+end
+end,--]]
 
 
 

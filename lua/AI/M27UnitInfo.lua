@@ -177,7 +177,7 @@ refCategoryIndirect = categories.LAND * categories.MOBILE * categories.INDIRECTF
 refCategoryT3MobileArtillery = categories.ARTILLERY * categories.LAND * categories.MOBILE * categories.TECH3 - categories.UNSELECTABLE - categories.UNTARGETABLE
 refCategoryT3MML = categories.SILO * categories.MOBILE * categories.TECH3 * categories.LAND - categories.UNSELECTABLE - categories.UNTARGETABLE
 refCategoryFatboy = categories.EXPERIMENTAL * categories.UEF * categories.MOBILE * categories.LAND * categories.ARTILLERY - categories.UNSELECTABLE - categories.UNTARGETABLE
-refCategoryLandCombat = categories.MOBILE * categories.LAND * categories.DIRECTFIRE + categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 + categories.FIELDENGINEER + refCategoryFatboy - refCategoryEngineer -refCategoryLandScout -refCategoryMAA - categories.UNSELECTABLE - categories.UNTARGETABLE
+refCategoryLandCombat = categories.MOBILE * categories.LAND * categories.DIRECTFIRE + categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 + categories.FIELDENGINEER + refCategoryFatboy + categories.SUBCOMMANDER - refCategoryEngineer -refCategoryLandScout -refCategoryMAA - categories.UNSELECTABLE - categories.UNTARGETABLE
 refCategoryAmphibiousCombat = refCategoryLandCombat * categories.HOVER + refCategoryLandCombat * categories.AMPHIBIOUS - categories.ANTISHIELD * categories.AEON --Dont include aeon T3 anti-shield here as it sucks unless against shields
 refCategorySurfaceAmphibiousCombat = refCategoryLandCombat * categories.HOVER + categories.ANTINAVY * categories.LAND * categories.MOBILE - categories.UNSELECTABLE - categories.UNTARGETABLE
 refCategoryGroundAA = refCategoryMAA + categories.NAVAL * categories.ANTIAIR + categories.STRUCTURE * categories.ANTIAIR + categories.NAVALCARRIER * categories.EXPERIMENTAL
@@ -201,6 +201,7 @@ refCategoryAirAA = categories.AIR * categories.ANTIAIR - categories.BOMBER - cat
 refCategoryBomber = categories.AIR * categories.BOMBER - categories.ANTINAVY - categories.CANNOTUSEAIRSTAGING --excludes mercies
 refCategoryFighterBomber = categories.AIR * categories.ANTIAIR * categories.BOMBER - categories.EXPERIMENTAL
 refCategoryGunship = categories.AIR * categories.GROUNDATTACK
+refCategoryNoFriendlyFireGunships = refCategoryGunship * categories.TECH3 + refCategoryGunship * categories.TECH1 + refCategoryGunship * categories.UEF * categories.TECH2 + refCategoryGunship * categories.SERAPHIM * categories.TECH2
 refCategoryTorpBomber = categories.AIR * categories.BOMBER * categories.ANTINAVY
 refCategoryAllAir = categories.MOBILE * categories.AIR - categories.UNTARGETABLE --Excludes novax
 refCategoryAllNonExpAir = categories.MOBILE * categories.AIR * categories.TECH1 + categories.MOBILE * categories.AIR * categories.TECH2 + categories.MOBILE * categories.AIR * categories.TECH3
@@ -413,6 +414,17 @@ function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
                 ['xsb0201'] = 'zsb9601',
                 ['xsb0202'] = 'zsb9602',
                 ['xsb0203'] = 'zsb9603',
+
+                --Nomads
+                ['xnb0101'] = 'znb9501',
+                ['znb9501'] = 'znb9601',
+                ['xnb0201'] = 'znb9601',
+                ['xnb0102'] = 'znb9502',
+                ['znb9502'] = 'znb9602',
+                ['xnb0202'] = 'znb9602',
+                ['xnb0103'] = 'znb9503',
+                ['xnb0203'] = 'znb9603',
+                ['znb9503'] = 'znb9603',
             }
 
             local sFactoryBP = oUnitToUpgrade.UnitId

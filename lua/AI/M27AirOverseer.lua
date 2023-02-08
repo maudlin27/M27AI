@@ -61,6 +61,10 @@ local refiTimeSinceWantedToScout = 'M27AirTimeSinceWantedToScout'
 local refiSegmentX = 'M27AirSegmentX'
 local refiSegmentZ = 'M27AirSegmentZ'
 
+
+--Whether teleport units are in the game (so bombers will factor in extra logic to their targeting
+bTeleportersInGame = false
+
 --AirAA
 local refiNearToACUThreshold = 'M27AirNearToACUThreshold'
 local refbNonScoutUnassignedAirAATargets = 'M27AirNonScoutUnassignedAirAATargets'
@@ -3613,7 +3617,7 @@ function ReleaseRefueledUnitsFromAirStaging(aiBrain, oAirStaging)
         end
         if M27Utilities.IsTableEmpty(tRefuelingUnits) == false then
             for iRefuelingUnit, oRefuelingUnit in tRefuelingUnits do
-                if not (oRefuelingUnit.Dead) and not(EntityCategoryContains(categories.UNSELECTABLE, oRefuelingUnit.UnitId)) then
+                if not (oRefuelingUnit.Dead) and not(EntityCategoryContains(categories.UNSELECTABLE + categories.STRUCTURE, oRefuelingUnit.UnitId)) then --Need structure in here to avoid error with blackops which has structure units included as part of the cargo
                     oRefuelingUnit[refbSentRefuelCommand] = false
                     bReadyToLeave = true
                     if bDebugMessages == true then
@@ -5123,6 +5127,19 @@ function AirBomberManager(aiBrain)
         local bAvoidCruisers = false
         local tEnemyCruisers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryCruiserCarrier, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxPossibleRange, 'Enemy')
         local tAllRecentlySeenCruisers = {}
+
+        local bConsiderAvoidingTeleporters = false
+        if bTeleportersInGame then
+            --Do we have 3+ Gunships of a suitable category?
+            local iSuitableGunships = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryNoFriendlyFireGunships)
+            if iSuitableGunships >= 3 then
+                --Do we have T3 arti, or SMD with enemy having nuke, or experimental structure?
+                if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == false or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML) > 0 then
+                    bConsiderAvoidingTeleporters = true
+
+                end
+            end
+        end
         --Include recently seen cruisers in this
         --Add any pond AA recently seen but not currently visible to this
         if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy untis by pond empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]))) end
@@ -5206,8 +5223,7 @@ function AirBomberManager(aiBrain)
 
         function AddUnitToShortlist(oUnit, iTechLevel, iOptionalModDistanceToBase, iOptionalMaxStrikeDamageWanted)
             --Optional values - done for performance reasons, so can copy existing entry and feed them back to this function instead of recalculating
-            --First make sure we want to add to the shortlist subject to strike damage (which this will consider)
-
+            --First make sure we want to add to the shortlist subject to strike damage (which this will consider) and special anti-teleport logic (to stop enemy teleporting into a high value unit of ours)
             oUnit[refiMaxStrikeDamageWanted] = (iOptionalMaxStrikeDamageWanted or GetMaxStrikeDamageWanted(oUnit))
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Will add oUnit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' to shortlist unless we have assigned enough strike damage.  oUnit[refiMaxStrikeDamageWanted]=' .. (oUnit[refiMaxStrikeDamageWanted] or 0) .. '; oUnit[refiStrikeDamageAssigned]=' .. (oUnit[refiStrikeDamageAssigned] or 0))
@@ -5220,18 +5236,23 @@ function AirBomberManager(aiBrain)
                     LOG(sFunctionRef .. ': oUnit position=' .. repru(tTargetPosition) .. '; iAssumedAOE=' .. iAssumedAOE .. '; SizeY=' .. (oUnit:GetBlueprint().SizeY or 0) .. '; Underwater height=' .. M27MapInfo.iMapWaterHeight)
                 end
                 if not (M27MapInfo.IsUnderwater({ tTargetPosition[1], tTargetPosition[2] + math.max(0, iAssumedAOE + (oUnit:GetBlueprint().SizeY or 0) - 0.1), tTargetPosition[3] }, false)) then
-                    --This is a duplication in part of checks done in most of hte bomber targeting, but not all of them have an underwater check and this one is more accurate
-                    iTargetCount = iTargetCount + 1
-                    aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount] = {}
-                    aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistPriority] = iCurPriority
-                    aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistUnit] = oUnit
-                    --Increase the mod distance based on the priority so we effectively only consider highest priority first
-                    oUnit[refiBomberDefenceModDistance] = (iOptionalModDistanceToBase or M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false)) + iCurPriority * 10000
-                    aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiBomberDefenceModDistance] = oUnit[refiBomberDefenceModDistance]
-                    aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistStrikeDamageWanted] = oUnit[refiMaxStrikeDamageWanted]
-                    iHighestPriorityFound = math.min(iHighestPriorityFound, iCurPriority)
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Added unit to the shortlist as it isnt underwater')
+                    --Is this a teleporting unit that is by high value friendly units when we want to deal with non-aoe means?
+                    if not(bConsiderAvoidingTeleporters and EntityCategoryContains(categories.COMMAND + categories.SUBCOMMANDER, oUnit.UnitId) and oUnit.HasEnhancement and oUnit:HasEnhancement('Teleporter') and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategorySMD, oUnit:GetPosition(), 10, 'Ally')) == false) then
+                        --This is a duplication in part of checks done in most of hte bomber targeting, but not all of them have an underwater check and this one is more accurate
+                        iTargetCount = iTargetCount + 1
+                        aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount] = {}
+                        aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistPriority] = iCurPriority
+                        aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistUnit] = oUnit
+                        --Increase the mod distance based on the priority so we effectively only consider highest priority first
+                        oUnit[refiBomberDefenceModDistance] = (iOptionalModDistanceToBase or M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false)) + iCurPriority * 10000
+                        aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiBomberDefenceModDistance] = oUnit[refiBomberDefenceModDistance]
+                        aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistStrikeDamageWanted] = oUnit[refiMaxStrikeDamageWanted]
+                        iHighestPriorityFound = math.min(iHighestPriorityFound, iCurPriority)
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Added unit to the shortlist as it isnt underwater')
+                        end
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Dealing with a teleporting unit so will avoid targeting') end
                     end
                 end
             elseif bDebugMessages == true then
@@ -8602,7 +8623,7 @@ function GetNovaxTarget(aiBrain, oNovax)
 
     --Check for priority override (but still consider shields and ACU even if have a priority target)
     if bDebugMessages == true then
-        LOG(sFunctionRef .. ': Is there a valid target override set=' .. tostring(oNovax[refoPriorityTargetOverride]) .. '; Time since last override=' .. GetGameTimeSeconds() - (oNovax[refiTimeOfLastOverride] or -100))
+        LOG(sFunctionRef .. ': Time='..GetGameTimeSeconds()..'; Is there a valid target override set=' .. tostring(oNovax[refoPriorityTargetOverride]) .. '; Time since last override=' .. GetGameTimeSeconds() - (oNovax[refiTimeOfLastOverride] or -100))
     end
     if M27UnitInfo.IsUnitValid(oNovax[refoPriorityTargetOverride]) and (GetGameTimeSeconds() - oNovax[refiTimeOfLastOverride]) <= 11 then
         --Ignore override if are in ACU kill mode and its assassination
@@ -8611,7 +8632,7 @@ function GetNovaxTarget(aiBrain, oNovax)
         end
         if not (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and ScenarioInfo.Options.Victory == "demoralization") then
             --Are there any near-exposed shields nearby? Then target them instead
-            local tNearbyEnemyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, oNovax[refoPriorityTargetOverride]:GetPosition(), 23, 'Enemy')
+            local tNearbyEnemyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryShieldBoat + M27UnitInfo.refCategoryMobileLandShield * categories.TECH3, oNovax[refoPriorityTargetOverride]:GetPosition(), 23, 'Enemy')
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': is table of nearby shields empty=' .. tostring(M27Utilities.IsTableEmpty(tNearbyEnemyShields)) .. '; target subject to this=' .. oNovax[refoPriorityTargetOverride].UnitId .. M27UnitInfo.GetUnitLifetimeCount(oNovax[refoPriorityTargetOverride]))
             end
@@ -8620,7 +8641,8 @@ function GetNovaxTarget(aiBrain, oNovax)
                 local iLowestShield = 5000
                 for iUnit, oUnit in tNearbyEnemyShields do
                     iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
-                    if iCurShield <= iLowestShield then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to target enemy near-exposed shield, oUnit='..oUnit.UnitId..M28UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurShield='..iCurShield..'; iMaxShield='..iMaxShield) end
+                    if iCurShield <= iLowestShield and iCurShield <= iMaxShield * 0.3 then
                         if not (M27Logic.IsTargetUnderShield(aiBrain, oUnit, iLowestShield + 1, false, false, false)) then
                             oTarget = oUnit
                             iLowestShield = iCurShield
@@ -8745,7 +8767,7 @@ function GetNovaxTarget(aiBrain, oNovax)
                 --HOW BELOW WORKS: all units are treated as euqal priority, the only differencees are thes earch range for these 'high priority' units, and the mass mod value to apply
                 if iCurTargetType == 1 then
                     --Nearby low shields
-                    iCategoriesToSearch = M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryMobileLandShield
+                    iCategoriesToSearch = M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryShieldBoat
                     iSearchRange = 90
                     iMassFactor = 4
                 elseif iCurTargetType == 2 then
@@ -8837,7 +8859,12 @@ function GetNovaxTarget(aiBrain, oNovax)
 
                                 iTimeToKillTarget = (oUnit:GetHealth() + iCurShield + math.min(iMaxShield - iCurShield, iTimeToTarget * iCurDPSMod)) / math.max(0.001, iDPS - iCurDPSMod)
                                 if iMaxShield == 0 and not (EntityCategoryContains(categories.COMMAND, oUnit.UnitId)) then
-                                    iCurValue = iCurValue * math.max(M27UnitInfo.GetUnitHealthPercent(oUnit), 0.25)
+                                    --If target is already in firing range then prioritise low health units; if its outside firing range then instead prioritise higher health units (that are worth a detour to kill)
+                                    if iTimeToTarget > 0 then
+                                        iCurValue = iCurValue * math.max(M27UnitInfo.GetUnitHealthPercent(oUnit), 0.25)
+                                    elseif oUnit:GetMaxHealth() >= 600 then
+                                        iCurValue = iCurValue * (1 + 0.2 * (1-M27UnitInfo.GetUnitHealthPercent(oUnit)))
+                                    end
                                 end
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ' Unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' iCurValue=' .. iCurValue .. '; iTimeToTarget=' .. iTimeToTarget .. '; iTimeToKillTarget=' .. iTimeToKillTarget .. '; iCurShield=' .. iCurShield .. '; iMaxShield=' .. iMaxShield .. '; iCurDPSMod=' .. iCurDPSMod)
@@ -9010,7 +9037,7 @@ function NovaxCoreTargetLoop(aiBrain, oNovax, bCalledFromUnitDeath)
 
     if oTarget then
         if bDebugMessages == true then
-            LOG(sFunctionRef .. ': Have a target ' .. oTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oTarget) .. '; will decide whether to attack or move to it; Distance to target=' .. M27Utilities.GetDistanceBetweenPositions(oTarget:GetPosition(), oNovax:GetPosition()))
+            LOG(sFunctionRef .. ': GameTime='..GetGameTimeSeconds()..'; Have a target ' .. oTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oTarget) .. '; will decide whether to attack or move to it; Distance to target=' .. M27Utilities.GetDistanceBetweenPositions(oTarget:GetPosition(), oNovax:GetPosition()))
         end
         if M27Utilities.GetDistanceBetweenPositions(oTarget:GetPosition(), oNovax:GetPosition()) > iEffectiveRange then
             iOrderType = refOrderMove
@@ -9316,7 +9343,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             LOG(sFunctionRef .. ': ENemy ACU is within 80 of us but we have run recently and its not in combat range')
         end
     else
-        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
+        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) then
             bUpdateLocationAttemptCount = false
             tLocationToMoveTo = aiBrain[M27Overseer.refoACUKillTarget]:GetPosition()
             if bDebugMessages == true then

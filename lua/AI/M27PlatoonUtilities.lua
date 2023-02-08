@@ -2150,12 +2150,12 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
     local sFunctionRef = 'GetUnderwaterActionForLandUnit'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 and oPlatoon:GetBrain():GetArmyIndex() == 4 then bDebugMessages = true end
-    --if oPlatoon:GetPlan() == 'M27GroundExperimental' then bDebugMessages = true end
+    --if oPlatoon:GetPlan() == 'M27GroundExperimental' or oPlatoon[refoFrontUnit].UnitId == 'xsl0401' then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     local iHeightAtWhichConsideredUnderwater = M27MapInfo.IsUnderwater(GetPlatoonFrontPosition(oPlatoon), true)
     local iMaxDistanceForLandSearch = math.max(20, oPlatoon[refiPlatoonMaxRange] * 0.5)
 
-    if bDebugMessages == true then LOG(sFunctionRef..': Checking if underwater; iHeightAtWhichConsideredUnderwater='..iHeightAtWhichConsideredUnderwater..'; Cur Position height='..GetPlatoonFrontPosition(oPlatoon)[2]..'; Surface height='..GetSurfaceHeight(GetPlatoonFrontPosition(oPlatoon)[1], GetPlatoonFrontPosition(oPlatoon)[3])..'; terrain height='..GetTerrainHeight(GetPlatoonFrontPosition(oPlatoon)[1], GetPlatoonFrontPosition(oPlatoon)[3])) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Time='..GetGameTimeSeconds()..'; Checking if underwater; iHeightAtWhichConsideredUnderwater='..iHeightAtWhichConsideredUnderwater..'; Cur Position height='..GetPlatoonFrontPosition(oPlatoon)[2]..'; Surface height='..GetSurfaceHeight(GetPlatoonFrontPosition(oPlatoon)[1], GetPlatoonFrontPosition(oPlatoon)[3])..'; terrain height='..GetTerrainHeight(GetPlatoonFrontPosition(oPlatoon)[1], GetPlatoonFrontPosition(oPlatoon)[3])..'; Front unit position (if dif)='..repru(oPlatoon[refoFrontUnit]:GetPosition())..'; Front unit='..oPlatoon[refoFrontUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit])) end
 
 
     if GetPlatoonFrontPosition(oPlatoon)[2] < iHeightAtWhichConsideredUnderwater then
@@ -2470,13 +2470,13 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
     local bProceed = true
     --if M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and EntityCategoryContains(M27UnitInfo.refCategoryIndirectT2Plus - categories.EXPERIMENTAL - M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) and GetGameTimeSeconds() >= 1380 and oPlatoon[refiEnemyStructuresInRange] > 0 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD * categories.TECH3, oPlatoon[reftEnemyStructuresInRange])) == false then bDebugMessages = true end
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 8 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 7 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
     --if sPlatoonName == 'M27Defender' and oPlatoon[refiPlatoonCount] == 7 and GetGameTimeSeconds() >= 570 then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and GetGameTimeSeconds() >= 300 and EntityCategoryContains(M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) and oPlatoon[refiPlatoonCount] == 9 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true end
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
-    --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refiPlatoonMaxRange] >= 10 then bDebugMessages = true end
+    --if (oPlatoon:GetPlan() == 'M27GroundExperimental' or oPlatoon[refoFrontUnit].UnitId == 'xsl0401') then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 937 and aiBrain:GetArmyIndex() == 4 and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
@@ -2492,7 +2492,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27MobileShield' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
 
 
-    if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonName..oPlatoon[refiPlatoonCount]..': Start of code; platoon action='..(oPlatoon[refiCurrentAction] or 'nil')..' Enemies in range='..oPlatoon[refiEnemiesInRange]..'; Structures in range='..oPlatoon[refiEnemyStructuresInRange]) end
+    if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonName..oPlatoon[refiPlatoonCount]..': Start of code at time '..GetGameTimeSeconds()..'; platoon action='..(oPlatoon[refiCurrentAction] or 'nil')..' Enemies in range='..oPlatoon[refiEnemiesInRange]..'; Structures in range='..oPlatoon[refiEnemyStructuresInRange]..'; platoon front position='..(oPlatoon[refoFrontUnit].UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit]) or 'nil')) end
 
 
     if sPlatoonName == 'M27MobileShield' then
@@ -2927,6 +2927,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
 
                         --Opti: First check we have nearby T2 PD (even if out of range of it), as if none then no point doing more intensive checks
                         if M27Utilities.IsTableEmpty(tEnemyT2PlusPD) == false then
+                            local tEnemyFixedShields = EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedShield, oPlatoon[reftEnemyStructuresInRange])
                             local iPDThreshold = 3
                             if M27Conditions.DoesACUHaveBigGun(aiBrain) then iPDThreshold = 5 end
                             iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU)
@@ -2962,7 +2963,11 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                             if M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], GetPlatoonFrontPosition(oPlatoon)) <= 60 and not(aiBrain[M27Overseer.refbIncludeACUInAllOutAttack]) then
                                 iPDThreshold = math.max(1, iPDThreshold - 2)
                             end
-                            if bDebugMessages == true then LOG(sFunctionRef..': iPDThreshold after checking for nearby ACU='..iPDThreshold..'; Nearest ACU distance='..aiBrain[M27Overseer.refiLastNearestACUDistance]..'; aiBrain[M27Overseer.refbIncludeACUInAllOutAttack]='..tostring(aiBrain[M27Overseer.refbIncludeACUInAllOutAttack])) end
+                            --Reduce threshold if enemy has shields
+                            if M27Utilities.IsTableEmpty(tEnemyFixedShields) == false then
+                                iPDThreshold = math.max(1, iPDThreshold - math.min(2, table.getn(tEnemyFixedShields), table.getn(tEnemyT2PlusPD)))
+                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': iPDThreshold after checking for nearby ACU='..iPDThreshold..'; Nearest ACU distance='..aiBrain[M27Overseer.refiLastNearestACUDistance]..'; aiBrain[M27Overseer.refbIncludeACUInAllOutAttack]='..tostring(aiBrain[M27Overseer.refbIncludeACUInAllOutAttack])..'; Size of enemy T2PD table='..table.getn(tEnemyT2PlusPD)) end
 
                             if table.getn(tEnemyT2PlusPD) >= iPDThreshold then
                                 --How many PD would be in-range if we get within range of the nearest PD (T1 or otherwise)
@@ -3371,6 +3376,20 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
 
                         end
                     end
+                    if not(oPlatoon[refiCurrentAction]) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': No action yet for fatboy, will set kiting flag based on how much enemy DF threat is nearby') end
+                        SetIfPlatoonCanKite(oPlatoon)
+                        if oPlatoon[refiEnemiesInRange] >= 2 and not(oPlatoon[refbKiteEnemies]) then
+                            local tNearbyEnemyDangerousLand = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat * categories.TECH3, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refiPlatoonMaxRange] - 8, 'Enemy')
+                            if M27Utilities.IsTableEmpty(tNearbyEnemyDangerousLand) == false then
+                                local iNearbyT3Plus = table.getn(tNearbyEnemyDangerousLand)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Deciding whether to turn on kiting for fatboy, iNearbyT3Plus='..iNearbyT3Plus..'; Combat threat rating='..M27Logic.GetCombatThreatRating(aiBrain, tNearbyEnemyDangerousLand)) end
+                                if iNearbyT3Plus >= 5 or M27Logic.GetCombatThreatRating(aiBrain, tNearbyEnemyDangerousLand) >= 3000 then
+                                    oPlatoon[refbKiteEnemies] = true
+                                end
+                            end
+                        end
+                    end
 
                 end
             end
@@ -3480,6 +3499,10 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
         if oPlatoon[refiCurrentAction] then
             if bDebugMessages == true then LOG(sFunctionRef..': Have determined platoon action from the above so wont proceed, action='..oPlatoon[refiCurrentAction]) end
             bProceed = false
+            if oPlatoon[refbPlatoonHasUnderwaterLand] == true and not(oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionReturnToBase or oPlatoon[refiCurrentAction] == refActionGoToNearestRallyPoint) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Have an underwater unit, about to run code to check for underwater action') end
+                GetUnderwaterActionForLandUnit(oPlatoon)
+            end
         end
 
         if bProceed then
@@ -6980,6 +7003,21 @@ function GetACUUpgradeWanted(aiBrain, oACU)
             end
             --end
         end
+        if not(sAltUpgrade) then
+            --Find the cheapest upgrade that boosts either rate of fire or range
+            local iLowestMassCost = 1000000
+            for sUpgrade, tUpgrade in oACU:GetBlueprint().Enhancements do
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering sUpgrade='..sUpgrade..'; tUpgrade='..reprs(tUpgrade)) end
+                if tUpgrade.NewMaxRadius or tUpgrade.NewRateOfFire then
+                    if tUpgrade.BuildCostMass < iLowestMassCost and not(tUpgrade.Prerequisite) then
+                        sAltUpgrade = sUpgrade
+                        iLowestMassCost = tUpgrade.BuildCostMass
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have a new preferred upgrade '..sUpgrade..'; iLowestMassCost='..iLowestMassCost) end
+                    end
+                end
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished considering the cheapest gun improving upgrade, sAltUpgrade='..(sAltUpgrade or 'nil')) end
+        end
         if sAltUpgrade then
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': sAltUpgrade=' .. sAltUpgrade)
@@ -8908,7 +8946,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                             if bDebugMessages == true then LOG(sFunctionRef..': Will defend the chokepoint '..repru(tChokepointToDefend)) end
                             --end
                         else
-                            --Do we lack air support and enemy has large air threat?  If so then stay back
+                            --Do we lack air support and enemy has large air threat?  If so then stay back; also stay back if enemy has more experimentals than us
                             local bDefend = false
                             if bDebugMessages == true then LOG(sFunctionRef..': Checking if we want to stay on defence due to enemy air therat. Have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl])..'; Enemy air to ground threat='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]..'; AirAAWanted='..aiBrain[M27AirOverseer.refiAirAAWanted]) end
                             if not(aiBrain[M27AirOverseer.refbHaveAirControl]) and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 3000 and aiBrain[M27AirOverseer.refiAirAAWanted] >= 10 then
@@ -8937,6 +8975,20 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                     end
                                 end
 
+                            end
+                            if not(bDefend) then
+                                --Does the enemy have alot orme threat and we arent using a fatboy
+                                if oPlatoon[refiPlatoonMaxRange] < 80 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then
+                                    local iEnemyExperimentalThreat = M27Logic.GetCombatThreatRating(aiBrain, aiBrain[M27Overseer.reftEnemyLandExperimentals], false, nil, nil, nil, nil, nil, nil, false, false, false)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iEnemyExperimentalThreat='..iEnemyExperimentalThreat..'; Will see if want to switch to defence mode') end
+                                    if iEnemyExperimentalThreat > oPlatoon[refiPlatoonThreatValue] then
+                                        local iNearbyAlliedExperimentalThreat = M27Logic.GetCombatThreatRating(aiBrain, aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandExperimental, GetPlatoonFrontPosition(oPlatoon), 200, 'Ally'), false, nil, nil, nil, nil, nil, nil, false, false, false)
+                                        if iEnemyExperimentalThreat > iNearbyAlliedExperimentalThreat then
+                                            bDefend = true
+                                        end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': iNearbyAlliedExperimentalThreat='..iNearbyAlliedExperimentalThreat..'; bDefend='..tostring(bDefend)) end
+                                    end
+                                end
                             end
                             if bDebugMessages == true then LOG(sFunctionRef..': bDefend='..tostring(bDefend)) end
                             if bDefend then

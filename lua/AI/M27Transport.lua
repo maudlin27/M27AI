@@ -41,7 +41,7 @@ function UpdateTransportForLoadedUnit(oUnitJustLoaded, oTransport)
     oUnitJustLoaded[refoTransportToLoadOnto] = nil
     oUnitJustLoaded[M27UnitInfo.refbSpecialMicroActive] = false
     if M27UnitInfo.IsUnitValid(oTransport) then
-        if oTransport[reftUnitsToldToLoadOntoTransport] then oTransport[reftUnitsToldToLoadOntoTransport] = {} end
+        if not(oTransport[reftUnitsToldToLoadOntoTransport]) then oTransport[reftUnitsToldToLoadOntoTransport] = {} end
 
         oTransport[reftUnitsToldToLoadOntoTransport][oUnitJustLoaded.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitJustLoaded)] = nil
         oTransport[refiUnitsLoaded] = (oTransport[refiUnitsLoaded] or 0) + 1
@@ -158,6 +158,7 @@ function AssignTransportToPlateau(aiBrain, oTransport, iPlateauGroup, iMaxEngisW
     end
     oTransport[refiAssignedPlateau] = iPlateauGroup
     oTransport[reftPlateauNearestMex] = aiBrain[M27MapInfo.reftPlateausOfInterest][iPlateauGroup]
+
     if not(aiBrain[reftTransportsAssignedByPlateauGroup][iPlateauGroup]) then aiBrain[reftTransportsAssignedByPlateauGroup][iPlateauGroup] = {} end
     aiBrain[reftTransportsAssignedByPlateauGroup][iPlateauGroup][oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)] = oTransport
     oTransport[refiMaxEngisWanted] = iMaxEngisWanted
@@ -204,14 +205,20 @@ function SendTransportToPlateau(aiBrain, oTransport)
         local iNearestPathingGroup
         for iPathingGroup, tNearestMex in aiBrain[M27MapInfo.reftPlateausOfInterest] do
             iCurDist = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tNearestMex)
-            if bDebugMessages == true then LOG(sFunctionRef..': Considering plateaus of interest, iPathingGroup='..iPathingGroup..'; iNearestDist='..iNearestDist..'; iCurDist='..iCurDist) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering plateaus of interest, iPathingGroup='..iPathingGroup..'; iNearestDist='..iNearestDist..'; iCurDist='..iCurDist..'; tNearestMex='..repru(tNearestMex)) end
             if iCurDist < iNearestDist then
                 iNearestDist = iCurDist
                 iNearestPathingGroup = iPathingGroup
             end
         end
         ClearTransportTrackers(aiBrain, oTransport)
+        if bDebugMessages == true then LOG(sFunctionRef..': About to assign oTransport '..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)..' to iNearestPathingGroup='..(iNearestPathingGroup or 'nil')) end
         AssignTransportToPlateau(aiBrain, oTransport, iNearestPathingGroup, 0)
+    end
+
+    if not(oTransport[reftPlateauNearestMex]) then
+        if bDebugMessages == true then LOG(sFunctionRef..': No longerh ave a plateau we want to send transport to, so will have it land engineers at its current position') end
+        oTransport[reftPlateauNearestMex] = {oTransport:GetPosition()[1], oTransport:GetPosition()[2], oTransport:GetPosition()[3]}
     end
 
     --Remove transport from list of transports waiting for engineers
@@ -307,13 +314,12 @@ function TransportManager(aiBrain)
         local iDistToMid = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5
         local iDistancePriorityFactor = -3 / iDistToMid
 
-
         for iPathingGroup, tNearestMex in aiBrain[M27MapInfo.reftPlateausOfInterest] do
             iPlateauCount = iPlateauCount + 1
             iCurDist = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tNearestMex)
             iCurPriority = M27MapInfo.tAllPlateausWithMexes[iPathingGroup][M27MapInfo.subrefPlateauTotalMexCount] + iCurDist * iDistancePriorityFactor
             if M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tNearestMex, false) <= iDistToMid then iCurPriority = iCurPriority + 3 end
-            if bDebugMessages == true then LOG(sFunctionRef..': Considering plateau priority for plateau group '..iPathingGroup..'; iCurDist='..iCurDist..'; Total mex count='..M27MapInfo.tAllPlateausWithMexes[iPathingGroup][M27MapInfo.subrefPlateauTotalMexCount]..'; iDistancePriorityFactor='..iDistancePriorityFactor..'; iDistToMid='..iDistToMid..'; Mod distance from start='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tNearestMex, false)..'; iCurPriority='..iCurPriority) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering plateau priority for plateau group '..iPathingGroup..'; iCurDist='..iCurDist..'; Total mex count='..M27MapInfo.tAllPlateausWithMexes[iPathingGroup][M27MapInfo.subrefPlateauTotalMexCount]..'; iDistancePriorityFactor='..iDistancePriorityFactor..'; iDistToMid='..iDistToMid..'; Mod distance from start='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tNearestMex, false)..'; iCurPriority='..iCurPriority..'; tNearestMex='..repru(tNearestMex)) end
             if iCurPriority > iBestPriority then
                 iBestPlateauGroup = iPathingGroup
                 iBestPriority = iCurPriority
@@ -336,7 +342,7 @@ function TransportManager(aiBrain)
             end
 
             --Assign transport to this plateau
-            if bDebugMessages == true then LOG(sFunctionRef..': Assigning transport '..oTransportToAssign.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransportToAssign)..' to the plateau group '..iBestPlateauGroup) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Assigning transport '..oTransportToAssign.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransportToAssign)..' to the plateau group '..(iBestPlateauGroup or 'nil')) end
             AssignTransportToPlateau(aiBrain, oTransportToAssign, iBestPlateauGroup, iMaxEngisWantedForPlateau)
         end
     end

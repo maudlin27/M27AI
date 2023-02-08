@@ -395,16 +395,24 @@ function RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCo
         return iResourceCount
     end
 end
-function RecordMexNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly)
-    return RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, true)
+function RecordMexNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, bReturnCount)
+    if bReturnCount then return RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, true)
+    else RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, true)
+    end
+
 end
 
-function RecordHydroNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly)
-    return RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, false)
+function RecordHydroNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, bReturnCount)
+    if bReturnCount then
+        return RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, false)
+    else
+        RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, false)
+    end
 end
 
 function RecordPlayerStartLocations()
     -- Updates PlayerStartPoints to Record all the possible player start points
+    --Note: The game allows for aiBrain:GetArmyStartPos(); M27 has its own function since this allows recording employ player start positions which gives an indication of if it's likely controlled by the enemy but o ther AI may want to just use GetArmyStartPos()
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordPlayerStartLocations'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -5110,11 +5118,11 @@ function UpdateNewPrimaryBaseLocation(aiBrain)
                 local tAverageTeamPosition = M27Utilities.GetAverageOfLocations(tFriendlyBrainStartPoints)
                 if bDebugMessages == true then LOG(sFunctionRef..': iFriendlyBrainCount='..iFriendlyBrainCount..'; Friendly brain start points='..repru((tFriendlyBrainStartPoints or {'nil'}))..'; tAverageTeamPosition='..repru(tAverageTeamPosition)..'; rMapPlayableArea='..repru(rMapPlayableArea)) end
 
-                if M27Utilities.GetDistanceBetweenPositions(tAverageTeamPosition, {rMapPlayableArea[1] + (rMapPlayableArea[3] - rMapPlayableArea[1])*0.5, 0, rMapPlayableArea[2] + (rMapPlayableArea[4] - rMapPlayableArea[2])*0.5}) <= 50 then
-                    --Average is really close to middle of the map, so just  assume enemy base is in the opposite direction to us
+                if M27Utilities.GetDistanceBetweenPositions(tAverageTeamPosition, {rMapPlayableArea[1] + (rMapPlayableArea[3] - rMapPlayableArea[1])*0.5, 0, rMapPlayableArea[2] + (rMapPlayableArea[4] - rMapPlayableArea[2])*0.5}) > 50 then
+                    --Average isnt really close to middle of the map, so assume enemy base is in the opposite direction to average
                     aiBrain[reftPrimaryEnemyBaseLocation] = GetOppositeLocation(tAverageTeamPosition)
                 else
-                    --Average isnt really close to mid of map, so assume enemy base is in opposite directino to average
+                    --Average is really close to mid of map, so assume enemy base is in opposite directino to our start
                     bUseOurStart = true
                 end
             else

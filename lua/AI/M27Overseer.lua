@@ -1508,7 +1508,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
                                     iMAAAlreadyHave = 0
                                     --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo)
                                 else
-                                    iMAAAlreadyHave = GetAirThreatLevel(aiBrain, tPlatoonCurrentMAAs, false, false, true, false, false, nil, nil, nil, nil, nil)
+                                    iMAAAlreadyHave = M27Logic.GetAirThreatLevel(aiBrain, tPlatoonCurrentMAAs, false, false, true, false, false, nil, nil, nil, nil, nil)
                                 end
                                 if oPlatoon[refoUnitsMAAHelper] then
                                     --tPlatoonCurrentMAAs = oPlatoon[refoUnitsMAAHelper]:GetPlatoonUnits()
@@ -3715,14 +3715,14 @@ function ThreatAssessAndRespond(aiBrain)
                         --Check for ACU flanking
                         if bCheckForACUFlanking and not(bIndirectThreatOnly) and tEnemyThreatGroup[refiTotalThreat] > iThreatThresholdHigh then
                             --How close is threat group to ACU?
-                            if tEnemyThreatGroup[refiModDistanceFromOurStart] < iACUActualDistFromBase and math.abs(tEnemyThreatGroup[refiDistanceFromOurBase] - iACUActualDistFromBase) < 110 then
+                            if tEnemyThreatGroup[refiModDistanceFromOurStart] < iACUActualDistFromBase and math.abs(tEnemyThreatGroup[refiDistanceFromOurBase] - iACUActualDistFromBase) < 125 then
                                 iDistFromThreatGroupToACU = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), tEnemyThreatGroup[reftFrontPosition])
-                                if iDistFromThreatGroupToACU >= 25 and iDistFromThreatGroupToACU <= 110 then
+                                if iDistFromThreatGroupToACU >= 25 and iDistFromThreatGroupToACU <= 125 then
                                     local iACUEnemySearchRange = oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemySearchRadius]
                                     local tUnitsToAdd = {}
                                     for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
                                         iDistFromThreatGroupToACU = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oACU:GetPosition())
-                                        if iDistFromThreatGroupToACU <= 110 and iDistFromThreatGroupToACU > iACUEnemySearchRange then
+                                        if iDistFromThreatGroupToACU <= 125 and iDistFromThreatGroupToACU > iACUEnemySearchRange then
                                             table.insert(tUnitsToAdd, oUnit)
                                         end
                                     end
@@ -9319,11 +9319,11 @@ function GameSettingWarningsAndChecks(aiBrain)
     --Check for non-AI sim-mods.  Thanks to Softles for pointing me towards the __active_mods variable
     local tSimMods = __active_mods or {}
     local tAIModNameWhitelist = {
-        'M27AI', 'AI-Swarm', 'AI-Uveso', 'AI: DilliDalli', 'Dalli AI', 'Dilli AI', 'M20AI', 'Marlo\'s Sorian AI edit', 'RNGAI', 'SACUAI',
+        'M27AI', 'AI-Swarm', 'AI-Uveso', 'AI: DilliDalli', 'Dalli AI', 'Dilli AI', 'M20AI', 'Marlo\'s Sorian AI edit', 'RNGAI', 'SACUAI', 'M28AI'
     }
 
     local tAIModNameWhereExpectAI = {
-        'AI-Swarm', 'AI-Uveso', 'AI: DilliDalli', 'Dalli AI', 'Dilli AI', 'M20AI', 'Marlo\'s Sorian AI edit', 'RNGAI',
+        'AI-Swarm', 'AI-Uveso', 'AI: DilliDalli', 'Dalli AI', 'Dilli AI', 'M20AI', 'Marlo\'s Sorian AI edit', 'RNGAI', 'M28AI'
     }
     local tModIsOk = {}
     local bHaveOtherAI = false
@@ -10269,6 +10269,7 @@ function OverseerManager(aiBrain)
     --[[ForkThread(RunLotsOfLoopsPreStart)
     WaitTicks(10)
     LOG('TEMPTEST REPR after 10 ticks='..repru(tTEMPTEST))--]]
+
     ForkThread(M27MapInfo.MappingInitialisation, aiBrain)
 
     if bDebugMessages == true then
@@ -10276,7 +10277,7 @@ function OverseerManager(aiBrain)
     end
     ForkThread(M27MapInfo.RecordPlayerStartLocations, aiBrain)
 
-    --ForkThread(M27MapInfo.RecordResourceLocations, aiBrain) --need to do after 1 tick for adaptive maps - superceded by hook into siminit
+    ForkThread(M27MapInfo.RecordResourceLocations, aiBrain) --need to do after 1 tick for adaptive maps - superceded by hook into siminit
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': aiBrain:GetArmyIndex()=' .. aiBrain:GetArmyIndex() .. '; aiBrain start position=' .. (aiBrain.M27StartPositionNumber or 'nil'))
     end
@@ -10289,6 +10290,7 @@ function OverseerManager(aiBrain)
         --ForkThread(M27MapInfo.DrawHeightMapAstro)
         --ForkThread(M27MapInfo.LogMapTerrainTypes)
     end
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(1)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -10329,7 +10331,7 @@ function OverseerManager(aiBrain)
     --ForkThread(M27MiscProfiling.LocalVariableImpact)
 
     --Log of basic info to help with debugging any replays we are sent (want this enabled/running as standard)
-    local sBrainInfo = 'M27Brain overseer logic is active. Nickname=' .. aiBrain.Nickname .. '; ArmyIndex=' .. aiBrain:GetArmyIndex() .. '; Start position number=' .. aiBrain.M27StartPositionNumber .. '; Start position=' .. repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) .. '; Nearest enemy brain details: Name=' .. tAllAIBrainsByArmyIndex[M27Logic.GetNearestEnemyIndex(aiBrain)].Nickname .. '; ArmyIndex=' .. M27Logic.GetNearestEnemyIndex(aiBrain) .. '; Start position=' .. M27Logic.GetNearestEnemyStartNumber(aiBrain) .. '; Start position=' .. repru(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+    local sBrainInfo = 'M27Brain overseer logic is active. Nickname=' .. aiBrain.Nickname .. '; ArmyIndex=' .. aiBrain:GetArmyIndex() .. '; Start position number=' .. aiBrain.M27StartPositionNumber .. '; Start position=' .. repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) .. '; Nearest enemy brain details: Name=' .. tAllAIBrainsByArmyIndex[M27Logic.GetNearestEnemyIndex(aiBrain)].Nickname .. '; ArmyIndex=' .. M27Logic.GetNearestEnemyIndex(aiBrain) .. '; Start position=' .. M27Logic.GetNearestEnemyStartNumber(aiBrain) .. '; Start position=' .. repru(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])..'; Plateau '..(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) or 'nil')
     if bDebugMessages == true then LOG(sFunctionRef..': reprs of brain='..reprs(aiBrain)) end
 
     if aiBrain.CheatEnabled then
@@ -10373,8 +10375,8 @@ function OverseerManager(aiBrain)
 
         --TestCustom(aiBrain)
         --if GetGameTimeSeconds() >= 300 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true LOG('GameTime='..GetGameTimeSeconds()) bDebugMessages = false end
-        --if GetGameTimeSeconds() >= 428.8 then bDebugMessages = true M27Config.M27RunProfiling = true ForkThread(M27Utilities.ProfilerActualTimePerTick) end
-        --[[if not(bSetHook) and GetGameTimeSeconds() >= 428.8 then
+        --if GetGameTimeSeconds() >= 149 then bDebugMessages = true M27Config.M27RunProfiling = true ForkThread(M27Utilities.ProfilerActualTimePerTick) end
+        --[[if not(bSetHook) and GetGameTimeSeconds() >= 149 then
             bDebugMessages = true
             bSetHook = true
             M27Utilities.bGlobalDebugOverride = true
