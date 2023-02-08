@@ -674,7 +674,7 @@ function ConsiderDodgingShot(oUnit, oWeapon)
                                     if oWeapon.Blueprint.Damage <= 100 then
                                         bCancelDodge = true
                                     else
-                                        iMaxTimeToRun = math.min(0.7, iMaxTimeToRun)
+                                        iMaxTimeToRun = math.min(0.9, iMaxTimeToRun)
                                     end
                                 elseif EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId) then
                                     --If we are a GC, Monkey or Ythotha that has an enemy experimental nearby but not in range, then cancel dodging as want to get in range to be able to  fire

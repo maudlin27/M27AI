@@ -3954,6 +3954,8 @@ function FactoryMainOverseerLoop(aiBrain, tAllFactories, iTicksWaited)
                                                                             LOG(sFunctionRef .. ': Issuing clear command to unit with lifetime count=' .. M27UnitInfo.GetUnitLifetimeCount(oLastUnit))
                                                                         end
                                                                         oLastUnit:Stop()
+                                                                    elseif EntityCategoryContains(M27UnitInfo.refCategoryNavalSurface, sUnitID) then
+                                                                        --Do nothing as can sometimes have naval units get stuck
                                                                     else
                                                                         if bDebugMessages == true then
                                                                             LOG(sFunctionRef .. ': Issuing clear command to unit with lifetime count=' .. M27UnitInfo.GetUnitLifetimeCount(oLastUnit) .. ' and ID=' .. sUnitID)

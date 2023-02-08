@@ -1279,6 +1279,7 @@ function ShouldWeRefreshUnitOrder(oUnit, iOrderType, tOrderLocation, oOrderUnit)
                 if EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, oUnit.UnitId) then iDistThreshold = 2.5
                 elseif iOrderType == M27PlatoonUtilities.refiOrderIssueGroundAttack then iDistThreshold = 0.5
                 end
+                if ((oUnit[M27UnitInfo.refiDFRange] or 0) > 100 or (oUnit[M27UnitInfo.refiIndirectRange] or 0) > 100) and M27Utilities.GetAngleDifference(M27Utilities.GetAngleFromAToB(oUnit:GetPosition(), oUnit[M27UnitInfo.reftLastOrderTarget]), M27Utilities.GetAngleFromAToB(oUnit:GetPosition(), tOrderLocation)) <= 23 then iDistThreshold = 30 end
                 if M27Utilities.GetDistanceBetweenPositions(tOrderLocation, oUnit[M27UnitInfo.reftLastOrderTarget]) <= iDistThreshold then
                     if not(M27Logic.IsUnitIdle(oUnit, false, true, false, false)) then
                         bRefreshOrder = false
@@ -1300,18 +1301,33 @@ function MoveUnitTowardsTarget(oUnit, tTarget, bAttackMove, sOrderDesc)
     else
         iOrderType = M27PlatoonUtilities.refiOrderIssueMove
     end
-    local bRefreshOrder = ShouldWeRefreshUnitOrder(oUnit, iOrderType, tTarget, nil)
+    local tAltTarget
+    if oUnit[M27UnitInfo.refiTimeConstructed] and GetGameTimeSeconds() - oUnit[M27UnitInfo.refiTimeConstructed] <= 30 then
+        if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTarget) >= 250 then
+            local tAltTarget = M27Utilities.MoveInDirection(oUnit:GetPosition(), M27Utilities.GetAngleFromAToB(oUnit:GetPosition(), tTarget), 250, true, false)
+            if not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, tTarget) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, tAltTarget)) then
+                tAltTarget = nil
+            else
+                sOrderDesc = sOrderDesc..'Alt'
+            end
+        end
+    end
+    local bRefreshOrder = ShouldWeRefreshUnitOrder(oUnit, iOrderType, (tAltTarget or tTarget), nil)
     --LOG('Move Unit Towards Target: oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; bRefreshOrder='..tostring(bRefreshOrder)..'; iOrderType='..iOrderType..'; bAttackMove='..tostring(bAttackMove)..'; Unit last order type='..(oUnit[M27PlatoonUtilities.refiLastOrderType] or 'nil')..'; Distance to last target='..M27Utilities.GetDistanceBetweenPositions((oUnit[M27UnitInfo.reftLastOrderTarget] or {0,0,0}), tTarget))
     if bRefreshOrder then
         M27Utilities.IssueTrackedClearCommands({oUnit})
         oUnit[M27UnitInfo.refoLastOrderUnitTarget] = nil
         if bAttackMove then
-            IssueAggressiveMove({oUnit}, tTarget)
+            IssueAggressiveMove({oUnit}, (tAltTarget or tTarget))
         else
-            IssueMove({oUnit}, tTarget)
+            IssueMove({oUnit}, (tAltTarget or tTarget))
         end
         oUnit[M27PlatoonUtilities.refiLastOrderType] = iOrderType
-        oUnit[M27UnitInfo.reftLastOrderTarget] = {tTarget[1], tTarget[2], tTarget[3]}
+        if tAltTarget then
+            oUnit[M27UnitInfo.reftLastOrderTarget] = {tAltTarget[1], tAltTarget[2], tAltTarget[3]}
+        else
+            oUnit[M27UnitInfo.reftLastOrderTarget] = {tTarget[1], tTarget[2], tTarget[3]}
+        end
         if M27Config.M27ShowUnitNames then M27PlatoonUtilities.UpdateUnitNames({ oUnit}, oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..': Navy: '..(sOrderDesc or 'nil'), true) end
     end
 end
@@ -1453,7 +1469,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ManageTeamNavy'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if GetGameTimeSeconds() >= 600 and M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryMissileShip, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])) == false then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 600 and M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryMissileShip, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])) == false then bDebugMessages = true M27Config.M27ShowUnitNames = true end
     --if GetGameTimeSeconds() >= 480 then bDebugMessages = true end
     --if GetGameTimeSeconds() >= 840 and (aiBrain:GetArmyIndex() == 2 or aiBrain:GetArmyIndex() == 4) then bDebugMessages = true end
 
@@ -3149,7 +3165,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
 
 
 
-
+                            local bIndirectAttackBuilding
 
                             for iUnit, oUnit in tOurSurfaceCombatNavy do
                                 --Do we want to engage the enemy with surface unit?
@@ -3170,14 +3186,14 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                                     end
                                 end
                                 if iCurRange < iMinRangeForEngagement then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': iCurRange='..iCurRange..'; iMinRangeForEngagement='..iMinRangeForEngagement) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Below min engagneemnt range, iCurRange='..iCurRange..'; iMinRangeForEngagement='..iMinRangeForEngagement..'; will consider moving short range unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to the short range rally point') end
                                     if not(ConsiderIssuingGroundFireOrder(oUnit)) then
                                         MoveUnitTowardsTarget(oUnit, tDestinationForShortRangeUnits, false, 'ShortRange')
                                     end
                                 else
                                     iCurDistToClosestEnemy = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tClosestEnemyTargetToUse)
                                     if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': oUnit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; iCurDistToClosestEnemy=' .. iCurDistToClosestEnemy .. '; iMaxDistanceWithinAttackRangeWanted=' .. iMaxDistanceWithinAttackRangeWanted .. '; iMinDistanceWithinAttackRangeWanted=' .. iMinDistanceWithinAttackRangeWanted .. '; Range=' .. M27UnitInfo.GetNavalDirectAndSubRange(oUnit))
+                                        LOG(sFunctionRef .. ': Have at least min engagement range '..iMinRangeForEngagement..', oUnit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; iCurDistToClosestEnemy=' .. iCurDistToClosestEnemy .. '; iMaxDistanceWithinAttackRangeWanted=' .. iMaxDistanceWithinAttackRangeWanted .. '; iMinDistanceWithinAttackRangeWanted=' .. iMinDistanceWithinAttackRangeWanted .. '; Range=' .. M27UnitInfo.GetNavalDirectAndSubRange(oUnit)..'; do we have support naval cat='..tostring(EntityCategoryContains(M27UnitInfo.refCategorySupportNavy, oUnit.UnitId))..'; iCurRange='..iCurRange)
                                     end
                                     if EntityCategoryContains(M27UnitInfo.refCategorySupportNavy, oUnit.UnitId) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oClosestFriendlyUnitToEnemyBase:GetPosition()) <= 40 then
                                         MoveUnitTowardsTarget(oUnit, tOurBase, false, 'SupportRetreat')
@@ -3220,18 +3236,40 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                                             if not(ConsiderIssuingGroundFireOrder(oUnit)) then
                                                 --Retreat if we are in range of any enemy PD
                                                 if not(RetreatFromPD(oUnit)) then
-                                                    MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, not(oUnit[M27UnitInfo.refbLastShotBlocked]), 'AGetInRange')
+                                                    --Attack move with missile ships to reduce risk that they hardly ever fire missile if keep moving closer and further from enemy
+                                                    MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, (not(oUnit[M27UnitInfo.refbLastShotBlocked]) or EntityCategoryContains(M27UnitInfo.refCategoryMissileShip, oUnit.UnitId)), 'AGetInRange')
                                                 end
                                             end
                                         end
                                     else
                                         --Do we have an indirect attack and enemy is within range? then move back
-                                        if (oUnit[M27UnitInfo.refiIndirectRange] or 0) > iCurDistToClosestEnemy - 3 then
+                                        if (oUnit[M27UnitInfo.refiIndirectRange] or 0) > iCurDistToClosestEnemy - 10 then
                                             MoveUnitTowardsTarget(oUnit, tOurBase, false, 'IndirectRetreat')
                                         elseif not(ConsiderIssuingGroundFireOrder(oUnit)) then
                                             --Move towards target (non-attack move)
                                             if not(RetreatFromPD(oUnit)) then
-                                                MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, false, 'MGetInRange')
+                                                --Exception - we are a unit with indirect range that has enemy shield or TMD in range
+                                                bIndirectAttackBuilding = false
+                                                if (oUnit[M27UnitInfo.refiIndirectRange] or 0) > 120 then
+
+                                                    local tNearbyPriorityBuildings = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryTMD + M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryExperimentalLevel - categories.MOBILE, oUnit:GetPosition(), oUnit[M27UnitInfo.refiIndirectRange] - 20, 'Enemy')
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Unit range is at least 120, is table ofn earby priority buildings empty='..tostring(M27Utilities.IsTableEmpty(tNearbyPriorityBuildings))) end
+                                                    if M27Utilities.IsTableEmpty(tNearbyPriorityBuildings) == false then
+                                                        bIndirectAttackBuilding = true
+                                                        --Attack closest priority building
+                                                        local oUnitToAttack
+                                                        local tEnemyShieldsAndTMD = EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryTMD, tNearbyPriorityBuildings)
+                                                        if M27Utilities.IsTableEmpty(tEnemyShieldsAndTMD) == false then
+                                                            oUnitToAttack = M27Utilities.GetNearestUnit(tEnemyShieldsAndTMD, oUnit:GetPosition())
+                                                        else
+                                                            oUnitToAttack = M27Utilities.GetNearestUnit(tNearbyPriorityBuildings, oUnit:GetPosition())
+                                                        end
+                                                        TellUnitToAttackTarget(oUnit, oUnitToAttack, 'AUnit')
+                                                    end
+                                                end
+                                                if not(bIndirectAttackBuilding) then
+                                                    MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, false, 'MGetInRange')
+                                                end
                                             end
                                         end
                                     end

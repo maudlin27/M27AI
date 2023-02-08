@@ -174,8 +174,8 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                     local oKillerUnit
 
                     if instigator and not(instigator:BeenDestroyed()) and not(instigator.Dead) then
-                        if instigator.Launcher then
-                            oKillerUnit = instigator.Launcher
+                        if instigator.GetLauncher and instigator:GetLauncher() then
+                            oKillerUnit = instigator:GetLauncher()
                         elseif instigator.DamageData and not(instigator.unit) and not(instigator.UnitId) then
                             --Can get errors for artillery shells when running IsProjectile
                         elseif IsProjectile(instigator) or IsCollisionBeam(instigator) then
@@ -287,7 +287,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                 elseif bDebugMessages == true then LOG(sFunctionRef..': Unit killed doesnt belogn to M27. Killed unit brain nickname='..oUnitKilled:GetAIBrain().Nickname)
                 end
                 --Did a PD or skirmisher we own kill something?
-                if instigator and not(instigator.Launcher) and instigator.UnitId and IsUnit(instigator) then
+                if instigator and not(instigator.GetLauncher and instigator:GetLauncher()) and instigator.UnitId and IsUnit(instigator) then
                     local oKillerBrain = instigator:GetAIBrain()
                     if oKillerBrain.M27AI then
                         --Chat message for experimentals
@@ -400,8 +400,8 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                 oUnitKilled[refbAlreadyRun] = true
                 local oKillerUnit
                 if instigator then
-                    if instigator.Launcher then
-                        oKillerUnit = instigator.Launcher
+                    if instigator.GetLauncher and instigator:GetLauncher() then
+                        oKillerUnit = instigator:GetLauncher()
                     elseif instigator.DamageData and not(instigator.unit) and not(instigator.UnitId) then
                         --Can get errors for artillery shells when running IsProjectile
                     elseif IsProjectile(instigator) or IsCollisionBeam(instigator) then
@@ -733,8 +733,8 @@ function OnShieldBubbleDamaged(self, instigator)
                 --Have we just taken damage from an unseen indirect unit?
                 local oKillerUnit
                 if instigator and not(instigator:BeenDestroyed()) then
-                    if instigator.Launcher then
-                        oKillerUnit = instigator.Launcher
+                    if instigator.GetLauncher and instigator:GetLauncher() then
+                        oKillerUnit = instigator:GetLauncher()
                     elseif instigator.DamageData and not(instigator.unit) and not(instigator.UnitId) then
                         --Can get errors for artillery shells when running IsProjectile
                     elseif IsProjectile(instigator) or IsCollisionBeam(instigator) then
@@ -776,8 +776,8 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                     if aiBrain.M27AI then
                         local oUnitCausingDamage
                         if instigator and not(instigator:BeenDestroyed()) then
-                            if instigator.Launcher then
-                                oUnitCausingDamage = instigator.Launcher
+                            if instigator.GetLauncher and instigator:GetLauncher() then
+                                oUnitCausingDamage = instigator:GetLauncher()
                             elseif instigator.DamageData and not(instigator.unit) and not(instigator.UnitId) then
                                 --Can get errors for artillery shells when running IsProjectile
                             elseif IsProjectile(instigator) or IsCollisionBeam(instigator) then
@@ -912,7 +912,7 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                     end
                 end
             end
-            if instigator and not(instigator.Launcher) and IsUnit(instigator) and instigator.GetAIBrain and instigator:GetAIBrain().M27AI then
+            if instigator and not(instigator.GetLauncher and instigator:GetLauncher()) and IsUnit(instigator) and instigator.GetAIBrain and instigator:GetAIBrain().M27AI then
                 instigator[M27UnitInfo.refbRecentlyDealtDamage] = true
                 instigator[M27UnitInfo.refiGameTimeDamageLastDealt] = math.floor(GetGameTimeSeconds())
                 M27Utilities.DelayChangeVariable(instigator, M27UnitInfo.refbRecentlyDealtDamage, false, 5, M27UnitInfo.refiGameTimeDamageLastDealt, instigator[M27UnitInfo.refiGameTimeDamageLastDealt] + 1, nil, nil)

@@ -2080,10 +2080,10 @@ end
 function IssueTrackedClearCommands(tUnits)
     --Intended so we can add logging to make it easier to confirm if we are clearing a unit's orders
     --Below is example if want to give an alert in the log when a unit has its orders cleared
-    --[[if GetGameTimeSeconds() >= 360 and tUnits[1]:GetAIBrain():GetArmyIndex() == 5 and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, tUnits[1]) then
+    --[[if tUnits[1].UnitId == 'xas0306' then
         for iUnit, oUnit in tUnits do
             --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uel01052' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uel01054' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uel01055' or oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uel010516' then
-                LOG('About to issue clear commands for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                LOG('About to issue clear commands for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' with unit state='..M27Logic.GetUnitState(oUnit))
                 ErrorHandler('Audit trail game time='..GetGameTimeSeconds(), true)
             --end
         end
