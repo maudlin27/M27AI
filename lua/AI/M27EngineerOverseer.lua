@@ -1330,7 +1330,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
 
                 local iNearestUnitDist = 100000
                 local iCurUnitDist
-                for iUnit, oUnit in tNearbyEnemiesShort do
+                for iUnit, oUnit in tNearbyReclaimableEnemiesShort do
                     if oUnit:GetFractionComplete() >= 0.25 then
                         iCurUnitDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tEngPosition)
                         if iCurUnitDist < iNearestUnitDist then
@@ -1341,7 +1341,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                     end
                 end
                 if oReclaimTarget.GetFractionComplete and EntityCategoryContains(M27UnitInfo.refCategoryStructure - categories.BENIGN - M27UnitInfo.refCategoryAllFactories - categories.DIRECTFIRE - categories.INDIRECTFIRE, oReclaimTarget.UnitId) and oReclaimTarget:GetFractionComplete() == 1 and oReclaimTarget:GetHealthPercent() >= 0.8 then bCaptureNotReclaim = true end
-                if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tNearbyEnemiesShort)..' nearby enemies; bCaptureNotReclaim='..tostring(bCaptureNotReclaim)..'; contains structure='..tostring(EntityCategoryContains(categories.STRUCTURE, oReclaimTarget.UnitId))..'; fraction complete='..oReclaimTarget:GetFractionComplete()..'; Health%='..oReclaimTarget:GetHealthPercent()) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tNearbyReclaimableEnemiesShort)..' nearby enemies; bCaptureNotReclaim='..tostring(bCaptureNotReclaim)..'; contains structure='..tostring(EntityCategoryContains(categories.STRUCTURE, oReclaimTarget.UnitId))..'; fraction complete='..oReclaimTarget:GetFractionComplete()..'; Health%='..oReclaimTarget:GetHealthPercent()) end
             else
                 --Have nearby enemies but they're not close, and they have a threat of at least 10 - ignore if we're almost done building
                 local oBeingBuilt, iFractionComplete

@@ -1768,7 +1768,6 @@ function OnReclaimFinished(oEngineer, oReclaim)
         local sFunctionRef = 'OnReclaimFinished'
         local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-        if GetGameTimeSeconds() >= 420 and not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oEngineer:GetPosition()) == 13635) then bDebugMessages = true end
         if bDebugMessages == true then LOG(sFunctionRef..': oEngineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' has just finished reclaiming, gametime='..GetGameTimeSeconds()) end
 
         if oReclaim and oReclaim.CachePosition then

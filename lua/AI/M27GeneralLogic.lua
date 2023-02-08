@@ -1792,7 +1792,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
     local sFunctionRef = 'GetCombatThreatRating'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-
+    if bBlueprintThreat then bDebugMessages = true end
     if bMustBeVisibleToIntelOrSight == nil then bMustBeVisibleToIntelOrSight = true end
     --IsTableEmpty(tTable, bNotEmptyIfSingleValueNotTable)
     if bDebugMessages == true then LOG(sFunctionRef..': About to check if table is empty. bBlueprintThreat='..tostring(bBlueprintThreat)) end
@@ -1843,9 +1843,13 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
         if bSubmersibleOnly then iThreatRef = iThreatRef .. '1' else iThreatRef = iThreatRef .. '0' end
         if bLongRangeThreatOnly then iThreatRef = iThreatRef..'1' else iThreatRef = iThreatRef .. '0' end
 
+        if iThreatRef == '1000000' then bDebugMessages = true end
+
         if not(tiThreatRefsCalculated[iThreatRef]) then M27Utilities.ErrorHandler('Havent calculated threat values for iThreatRef='..iThreatRef..' refer to CalculateUnitThreatsByType') end
 
         local iBaseThreat = 0
+
+        if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through relevant units based on iThreatRef='..iThreatRef..'; First unit ID='..(tUnits[1].UnitId or 'nil')..'; bBlueprintThreat='..tostring(bBlueprintThreat or false)) end
 
         for iUnit, oUnit in tUnits do
             iCurThreat = 0
@@ -1918,7 +1922,8 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                             iBaseThreat = tUnitThreatByIDAndType[oUnit.UnitId][iThreatRef]
                         end
                         if not(iBaseThreat) and not(bBlueprintThreat) then
-                            M27Utilities.ErrorHandler('Dont have any threat rating for unit iD '..oUnit.UnitId..'; will try re-running this for the blueprint')
+                            --Not sure why this happens - seems like various blueprints aren't picked up when cycling through __blueprints at the start of the game, e.g. more of an issue if using custom FAF initialisation
+                            M27Utilities.ErrorHandler('Dont have any threat rating for threat ref '..iThreatRef..' with unit iD '..oUnit.UnitId..'; will try re-running this for the blueprint', true)
                             iBaseThreat = GetCombatThreatRating(aiBrain, { { ['UnitId'] = oUnit.UnitId } }, false, nil, nil, bIndirectFireThreatOnly, bJustGetMassValue, true, bAntiNavyOnly, bAddAntiNavy, bSubmersibleOnly, bLongRangeThreatOnly)
                             if bDebugMessages == true then LOG(sFunctionRef..': iBaseThreat after update='..(iBaseThreat or 'nil')) end
                         end
@@ -6161,11 +6166,11 @@ function CalculateUnitThreatsByType()
 
         function RecordBlueprintThreatValues(oBP, sUnitId)
 
-            tUnitThreatByIDAndType[sUnitId] = {}
+            if not(tUnitThreatByIDAndType[sUnitId]) then tUnitThreatByIDAndType[sUnitId] = {} end
             if bDebugMessages == true then LOG(sFunctionRef..': About to consider different land threat values for unit '..sUnitId..' Name='..LOCF((oBP.General.UnitName) or 'nil')) end
             for iRef, tConditions in tiLandAndNavyThreatTypes do
-                        --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue, bBlueprintThreat, bAntiNavyOnly, bAddAntiNavy, bSubmersibleOnly, bLongRangeThreatOnly)
-                        --{bIndirectFireThreatOnly, bJustGetMassValue, bAntiNavyOnly, bAddAntiNavy, bSubmersibleOnly, bLongRangeThreatOnly}
+                --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue, bBlueprintThreat, bAntiNavyOnly, bAddAntiNavy, bSubmersibleOnly, bLongRangeThreatOnly)
+                --{bIndirectFireThreatOnly, bJustGetMassValue, bAntiNavyOnly, bAddAntiNavy, bSubmersibleOnly, bLongRangeThreatOnly}
                 tUnitThreatByIDAndType[sUnitId][iRef] = GetCombatThreatRating(nil, { {['UnitId']=sUnitId }}, nil, nil, nil, tConditions[1], tConditions[2], true, tConditions[3], tConditions[4], tConditions[5], tConditions[6])
             end
             if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating land threat values for '..LOCF((oBP.General.UnitName or 'nil'))..', result='..reprs(tUnitThreatByIDAndType[sUnitId])) end
