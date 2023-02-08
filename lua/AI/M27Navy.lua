@@ -3014,7 +3014,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                             sOrderDesc = 'Consolidate'
                         end
                         for iUnit, oUnit in tOurSubmersibles do
-                            MoveUnitTowardsTarget(oUnit, tGlobalNavalDestination, sOrderDesc)
+                            MoveUnitTowardsTarget(oUnit, tGlobalNavalDestination, false, sOrderDesc)
                         end
                     end
                 end
@@ -3066,6 +3066,10 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                         --Reduce kiting difference if we have significantly more threat, and also have destoyers use antinavy range or DF range, whichever is lower
                         local bUseTorpedoRangeForDestroyers = false
                         if iOurSurfaceThreat > iEnemySurfaceThreat * 1.75 then
+                            if not(iMaxDistanceWithinAttackRangeWanted) then
+                                iMaxDistanceWithinAttackRangeWanted = 0.5
+                                iMinDistanceWithinAttackRangeWanted = -7.5
+                            end
                             bUseTorpedoRangeForDestroyers = true
                             iMaxDistanceWithinAttackRangeWanted = iMaxDistanceWithinAttackRangeWanted + 2
                         end

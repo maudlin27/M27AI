@@ -1792,7 +1792,6 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
     local sFunctionRef = 'GetCombatThreatRating'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    if bBlueprintThreat then bDebugMessages = true end
     if bMustBeVisibleToIntelOrSight == nil then bMustBeVisibleToIntelOrSight = true end
     --IsTableEmpty(tTable, bNotEmptyIfSingleValueNotTable)
     if bDebugMessages == true then LOG(sFunctionRef..': About to check if table is empty. bBlueprintThreat='..tostring(bBlueprintThreat)) end
@@ -1842,8 +1841,6 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
         if bAddAntiNavy then iThreatRef = iThreatRef .. '1' else iThreatRef = iThreatRef .. '0' end
         if bSubmersibleOnly then iThreatRef = iThreatRef .. '1' else iThreatRef = iThreatRef .. '0' end
         if bLongRangeThreatOnly then iThreatRef = iThreatRef..'1' else iThreatRef = iThreatRef .. '0' end
-
-        if iThreatRef == '1000000' then bDebugMessages = true end
 
         if not(tiThreatRefsCalculated[iThreatRef]) then M27Utilities.ErrorHandler('Havent calculated threat values for iThreatRef='..iThreatRef..' refer to CalculateUnitThreatsByType') end
 
