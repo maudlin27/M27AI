@@ -3200,6 +3200,8 @@ function ThreatAssessAndRespond(aiBrain)
     local sFunctionRef = 'ThreatAssessAndRespond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    --if aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
+
     --if GetGameTimeSeconds() >= 245 then bDebugMessages = true end
 
     --Key config variables:
@@ -3275,9 +3277,9 @@ function ThreatAssessAndRespond(aiBrain)
     local iTMDAndShieldSearchRange = 25 --If dealing with T2+ PD will look for nearby shields and TMD
     local iT2ArtiSearchRange = 50 --Will look for nearby T2 arti within this range
     local iNavyUnitCategories = M27UnitInfo.refCategoryNavyThatCanBeTorpedoed
-    local tCategoriesToSearch = { refCategoryMobileLand, M27UnitInfo.refCategoryPD + M27UnitInfo.refCategoryStructure - categories.TECH1 }
+    local tCategoriesToSearch = { refCategoryMobileLand, M27UnitInfo.refCategoryPD + (M27UnitInfo.refCategoryStructure - categories.TECH1) }
     if M27MapInfo.bMapHasWater == true then
-        tCategoriesToSearch = { refCategoryMobileLand, M27UnitInfo.refCategoryPD + M27UnitInfo.refCategoryStructure - categories.TECH1, iNavyUnitCategories }
+        tCategoriesToSearch = { refCategoryMobileLand, M27UnitInfo.refCategoryPD + (M27UnitInfo.refCategoryStructure - categories.TECH1), iNavyUnitCategories }
     end
 
     local iCategoryTypeLand = 1
@@ -4303,6 +4305,7 @@ function ThreatAssessAndRespond(aiBrain)
                                                 oBasePlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = true
                                             else
                                                 oBasePlatoon:SetAIPlan(sDefenderPlatoonRef)
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Have set base platoon to sue defender AI') end
                                             end
                                         end
                                         sPlan = oBasePlatoon:GetPlan()
