@@ -2628,7 +2628,7 @@ function UpgradeMainLoop(aiBrain)
                                                                 --Do we own any of these
                                                                 for iUpgradable, oUpgradable in tNearbyUpgradables do
                                                                     if oUpgradable:GetAIBrain() == aiBrain and not (oUpgradable:IsUnitState('Upgrading')) then
-                                                                        M27Utilities.ErrorHandler('Couldnt find unit to upgrade after trying all backup options; oUpgradable='..oUpgradable.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUpgradable)..'; Unit state='..M27Logic.GetUnitState(oUpgradable)..'; nearest enemy to base=' .. math.floor(aiBrain[M27Overseer.refiModDistFromStartNearestThreat]) .. '; Have a T2 or below mex or factory within 100 of our base, which includes ' .. oUpgradable.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUpgradable), nil, true)
+                                                                        M27Utilities.ErrorHandler('Couldnt find unit to upgrade after trying all backup options; oUpgradable='..oUpgradable.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUpgradable)..'; Unit state='..M27Logic.GetUnitState(oUpgradable)..'; nearest enemy to base=' .. math.floor(aiBrain[M27Overseer.refiModDistFromStartNearestThreat]) .. '; Have a T2 or below mex or factory within 100 of our base, which includes ' .. oUpgradable.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUpgradable), true)
                                                                         break
                                                                     end
                                                                 end

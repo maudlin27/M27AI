@@ -10280,7 +10280,7 @@ function OverseerManager(aiBrain)
     end
     ForkThread(M27MapInfo.RecordPlayerStartLocations, aiBrain)
 
-    ForkThread(M27MapInfo.RecordResourceLocations, aiBrain) --need to do after 1 tick for adaptive maps - superceded by hook into siminit
+    --ForkThread(M27MapInfo.RecordResourceLocations, aiBrain) --need to do after 1 tick for adaptive maps - superceded by hook into siminit
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': aiBrain:GetArmyIndex()=' .. aiBrain:GetArmyIndex() .. '; aiBrain start position=' .. (aiBrain.M27StartPositionNumber or 'nil'))
     end
