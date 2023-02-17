@@ -580,7 +580,7 @@ function GetACUHealthRegenRate(oUnit)
     local iRegenRate = (oBP.Defense.RegenRate or 0)
 
     --Adjust for veterancy:
-    local iVetLevel = (oUnit.Sync.VeteranLevel or 0)
+    local iVetLevel = (oUnit.VetLevel or oUnit.Sync.VeteranLevel or 0)
     if iVetLevel > 0 and oBP.Buffs.Regen then
         local iCurVet = 0
         for iVet, iRegenMod in oBP.Buffs.Regen do

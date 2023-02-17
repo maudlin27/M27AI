@@ -601,7 +601,7 @@ function UpdateBomberEffectiveness(aiBrain, oBomber, bBomberNotDead)
 
         if not (EntityCategoryContains(M27UnitInfo.refCategoryTorpBomber, oBomber:GetBlueprint().BlueprintId)) then
             if bDebugMessages == true then LOG(sFunctionRef..': Dealing with a normal bomber') end
-            local iMassKilled = oBomber.Sync.totalMassKilled or 0
+            local iMassKilled = (oBomber.VetExperience or oBomber.Sync.totalMassKilled or 0)
             if iMassKilled == nil then
                 iMassKilled = 0
             end
@@ -618,7 +618,7 @@ function UpdateBomberEffectiveness(aiBrain, oBomber, bBomberNotDead)
                 iExistingEntries = table.getn(aiBrain[reftBomberEffectiveness][iTechLevel])
             end
             tNewEntry[refiBomberMassCost] = oBomber:GetBlueprint().Economy.BuildCostMass
-            tNewEntry[refiBomberMassKilled] = (oBomber.Sync.totalMassKilled or 0)
+            tNewEntry[refiBomberMassKilled] = (oBomber.VetExperience or oBomber.Sync.totalMassKilled or 0)
             tNewEntry[subrefoBomber] = oBomber
 
             if not (bBomberNotDead) or iExistingEntries == 0 then
@@ -2134,11 +2134,11 @@ function TrackBombImpact(aiBrain, oBomber, oTarget, projectile, bConsiderChangin
         end
     else
         if M27UnitInfo.IsUnitValid(oBomber) and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 and not(M27Chat.tiM27VoiceTauntByType['Effective Bomber']) then
-            local iVetLevel = oBomber.Sync.VeteranLevel
-            if bDebugMessages == true then LOG(sFunctionRef..': Bomber vet level='..(iVetLevel or 'nil')..'; Mass killed='..(oBomber.Sync.totalMassKilled or 'nil')) end
+            local iVetLevel = (oBomber.VetLevel or oBomber.Sync.VeteranLevel)
+            if bDebugMessages == true then LOG(sFunctionRef..': Bomber vet level='..(iVetLevel or 'nil')..'; Mass killed='..(oBomber.VetExperience or oBomber.Sync.totalMassKilled or 'nil')) end
             local iVetLevelWanted = 3
             if EntityCategoryContains(categories.TECH3 + categories.EXPERIMENTAL, oBomber.UnitId) then iVetLevelWanted = 2 end
-            if iVetLevel >= iVetLevelWanted or (not(EntityCategoryContains(categories.EXPERIMENTAL, oBomber.UnitId)) and oBomber.Sync.totalMassKilled >= 6000) or (oBomber.Sync.totalMassKilled >= 30000) then
+            if iVetLevel >= iVetLevelWanted or (not(EntityCategoryContains(categories.EXPERIMENTAL, oBomber.UnitId)) and (oBomber.VetExperience or oBomber.Sync.totalMassKilled) >= 6000) or ((oBomber.VetExperience or oBomber.Sync.totalMassKilled) >= 30000) then
                 local sMessage = 'How are you enjoying the shock and awe, Commander?'
                 if math.random(1,2) == 1 then
                     if EntityCategoryContains(categories.TECH3, oBomber.UnitId) and __blueprints[oTarget.UnitId].Economy.BuildCostMass >= 800 then sMessage = 'Ouch! That must have been expensive!'

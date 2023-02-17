@@ -1946,9 +1946,9 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
 
                         iHealthPercentage = (oUnit:GetHealth() + iCurShield) / iMaxHealth
 
-                        if oUnit.Sync.VeteranLevel > 0 then
-                            iHealthPercentage = iHealthPercentage * ((iMaxHealth) / (oUnit[refiMaxHealth] + iMaxShield) + oUnit.Sync.VeteranLevel * 0.04)
-                            if bDebugMessages == true then LOG(sFunctionRef..': Unit '..(oUnit.UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oUnit) or 'nil')..' veterancy level='..(oUnit.Sync.VeteranLevel or 'nil')..'; max health='..(iMaxHealth or 'nil')..'; BP max health='..(oBP.Defense.MaxHealth or 'nil')..'; Unit max health='..(oUnit:GetMaxHealth() or 'nil')..'; iMaxShield='..(iMaxShield or 0)..'; iHealthPercentage='..(iHealthPercentage or 'nil')) end
+                        if (oUnit.VetLevel or oUnit.Sync.VeteranLevel) > 0 then
+                            iHealthPercentage = iHealthPercentage * ((iMaxHealth) / (oUnit[refiMaxHealth] + iMaxShield) + (oUnit.VetLevel or oUnit.Sync.VeteranLevel) * 0.04)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Unit '..(oUnit.UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oUnit) or 'nil')..' veterancy level='..(oUnit.VetLevel or oUnit.Sync.VeteranLevel or 'nil')..'; max health='..(iMaxHealth or 'nil')..'; BP max health='..(oBP.Defense.MaxHealth or 'nil')..'; Unit max health='..(oUnit:GetMaxHealth() or 'nil')..'; iMaxShield='..(iMaxShield or 0)..'; iHealthPercentage='..(iHealthPercentage or 'nil')) end
                         end
 
                         --Calculate max unit health (used elsewhere in code e.g. to calculate energy storage wanted for overcharge)
@@ -5200,7 +5200,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                             tTarget = oBestTarget:GetPosition()
                             oBestTarget[M27EngineerOverseer.refiTMLShotsFired] = (oBestTarget[M27EngineerOverseer.refiTMLShotsFired] or 0) + 1
                             oLauncher[M27EngineerOverseer.refoLastTMLTarget] = oBestTarget
-                            oLauncher[M27EngineerOverseer.refiLastTMLMassKills] = (oLauncher.Sync.totalMassKilled or 0)
+                            oLauncher[M27EngineerOverseer.refiLastTMLMassKills] = (oLauncher.VetExperience or oLauncher.Sync.totalMassKilled or 0)
                         end
                     end
                     if bDebugMessages == true then LOG(sFunctionRef..': iValidTargets='..iValidTargets..'; tTarget='..repru((tTarget or {'nil'}))) end
@@ -6120,7 +6120,7 @@ function YthothaDeathBallSearchAndSlow(oOwnerBrain, tLikelyPosition)
 end
 
 function CalculateUnitThreatsByType()
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CalculateUnitThreatsByType'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -6183,6 +6183,7 @@ function CalculateUnitThreatsByType()
         for iBP, oBP in __blueprints do
             --Updates tUnitThreatByIDAndType
             sUnitId = oBP.BlueprintId
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering sUnitId='..(sUnitId or 'nil')..'; Is tUnitThreatByIDAndType not nil='..tostring(not(tUnitThreatByIDAndType[sUnitId]))..'; oBP.Economy.BuildCostMass='..(oBP.Economy.BuildCostMass or 'nil')..'; oBP.General.UnitName='..(oBP.General.UnitName or 'nil')) end
             if not(tUnitThreatByIDAndType[sUnitId]) and oBP.Economy.BuildCostMass and oBP.General.UnitName then
                 --iCount = iCount + 1
                 --if iCount >= 10 then break end

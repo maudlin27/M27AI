@@ -8459,7 +8459,7 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                 end
                 --If unit is a veteran and is damaged, or is a T2 arti and enemy has nearby T2 structures
 
-                if oUnit.Sync.VeteranLevel > 0 then
+                if (oUnit.VetLevel or oUnit.Sync.VeteranLevel) > 0 then
                     if oUnit:GetHealth() / oUnit:GetMaxHealth() < 0.97 or EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oUnit.UnitId) then
                         aiBrain[M27PlatoonFormer.reftPriorityUnitsForShielding][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
                     else
@@ -8819,9 +8819,9 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                                     if M27Utilities.IsTableEmpty(tExistingT2Arti) == false then
                                         for iUnit, oUnit in tExistingT2Arti do
                                             if M27UnitInfo.IsUnitValid(oUnit) then
-                                                iTotalMassKilled = iTotalMassKilled + (oUnit.Sync.totalMassKilled or 0)
+                                                iTotalMassKilled = iTotalMassKilled + (oUnit.VetExperience or oUnit.Sync.totalMassKilled or 0)
                                                 iTotalMassCost = iTotalMassCost + oUnit:GetBlueprint().Economy.BuildCostMass
-                                                if (oUnit.Sync.totalMassKilled or 0) <= 150 then
+                                                if (oUnit.VetExperience or oUnit.Sync.totalMassKilled or 0) <= 150 then
                                                     iArtiWithNoKills = iArtiWithNoKills + 1
                                                 end
                                             end
@@ -8936,12 +8936,12 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                                         if bDebugMessages == true then LOG(sFunctionRef..': About to calculate mass killed and cost of all PD in the firebase.  Initial values based on dead PD are a cost of '..iTotalMassCost..' and total mass kills of '..iTotalMassKilled) end
                                         for iUnit, oUnit in tT2PlusPD do
                                             if M27UnitInfo.IsUnitValid(oUnit) then
-                                                iTotalMassKilled = iTotalMassKilled + (oUnit.Sync.totalMassKilled or 0)
+                                                iTotalMassKilled = iTotalMassKilled + (oUnit.VetExperience or oUnit.Sync.totalMassKilled or 0)
                                                 iTotalMassCost = iTotalMassCost + oUnit:GetBlueprint().Economy.BuildCostMass
-                                                if (oUnit.Sync.totalMassKilled or 0) <= 25 then
+                                                if (oUnit.VetExperience or oUnit.Sync.totalMassKilled or 0) <= 25 then
                                                     iPDWithNoKills = iPDWithNoKills + 1
                                                 end
-                                                if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit mass killed='..(oUnit.Sync.totalMassKilled or 0)..'; iTotalMassKilled='..iTotalMassKilled..'; iTotalMassCost='..iTotalMassCost..'; iPDWithNoKills='..iPDWithNoKills) end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit mass killed='..(oUnit.VetExperience or oUnit.Sync.totalMassKilled or 0)..'; iTotalMassKilled='..iTotalMassKilled..'; iTotalMassCost='..iTotalMassCost..'; iPDWithNoKills='..iPDWithNoKills) end
                                             end
                                         end
                                         local iPercentFactor = 1
@@ -14089,7 +14089,7 @@ end--]]
                                             iMaxEngisWanted = 3
                                             if bHaveLowMass then
                                                 iMaxEngisWanted = 1
-                                            elseif oTML.Sync.totalMassKilled >= 1000 then
+                                            elseif (oTML.VetExperience or oTML.Sync.totalMassKilled) >= 1000 then
                                                 iMaxEngisWanted = 5
                                             end
                                             break

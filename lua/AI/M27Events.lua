@@ -196,14 +196,14 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
 
 
                             if EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oKillerUnit.UnitId) then
-                                if oKillerUnit.Sync.totalMassKilled >= 250 and IsEnemy(oKilledBrain:GetArmyIndex(), oKillerUnit:GetAIBrain():GetArmyIndex()) then
+                                if (oKillerUnit.VetExperience or oKillerUnit.Sync.totalMassKilled) >= 250 and IsEnemy(oKilledBrain:GetArmyIndex(), oKillerUnit:GetAIBrain():GetArmyIndex()) then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to add oKillerUnit='..oKillerUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oKillerUnit)..' owned by brain '..oKillerUnit:GetAIBrain().Nickname..' that just killed '..oUnitKilled.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitKilled)..' that was owned by '..oUnitKilled:GetAIBrain().Nickname..' to list of T2 arti to avoid') end
                                     M27Team.RecordUnseenArti(oKilledBrain, oKillerUnit)
                                 end
                                 --Record dangerous AA that we may struggle to overwhelm with t1 bombers so can avoid
                             elseif EntityCategoryContains(M27UnitInfo.refCategoryMAA * categories.LAND, oKillerUnit.UnitId) and EntityCategoryContains(categories.TECH3 * categories.UEF + categories.TECH3 * categories.SERAPHIM + categories.TECH2, oKillerUnit.UnitId) and EntityCategoryContains(categories.AIR, oUnitKilled.UnitId) then
-                                if bDebugMessages == true then LOG(sFunctionRef..': MAA just killed a unit, check if want to record as dangerous AA. Total mass killed='..oKillerUnit.Sync.totalMassKilled..'; Is killer an enemy='..tostring(IsEnemy(oKilledBrain:GetArmyIndex(), oKillerUnit:GetAIBrain():GetArmyIndex()))) end
-                                if oKillerUnit.Sync.totalMassKilled >= 2000 and IsEnemy(oKilledBrain:GetArmyIndex(), oKillerUnit:GetAIBrain():GetArmyIndex()) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': MAA just killed a unit, check if want to record as dangerous AA. Total mass killed='..(oKillerUnit.VetExperience or oKillerUnit.Sync.totalMassKilled)..'; Is killer an enemy='..tostring(IsEnemy(oKilledBrain:GetArmyIndex(), oKillerUnit:GetAIBrain():GetArmyIndex()))) end
+                                if (oKillerUnit.VetExperience or oKillerUnit.Sync.totalMassKilled) >= 2000 and IsEnemy(oKilledBrain:GetArmyIndex(), oKillerUnit:GetAIBrain():GetArmyIndex()) then
                                     --if not(EntityCategoryContains(categories.STRUCTURE * categories.TECH3, oKillerUnit.UnitId)) or oKillerUnit.Sync.totalMassKilled >= 2500 then
                                     M27Team.RecordDangerousAA(oKilledBrain, oKillerUnit)
                                     --end
@@ -215,7 +215,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
 
                     --Gunship effectiveness
                     if EntityCategoryContains(M27UnitInfo.refCategoryGunship, oUnitKilled.UnitId) then
-                        oKilledBrain[M27AirOverseer.refiGunshipMassLost] = oKilledBrain[M27AirOverseer.refiGunshipMassLost] + math.min(2000, (oUnitKilled:GetBlueprint().Economy.BuildCostMass or 0), oKillerUnit.Sync.totalMassKilled)
+                        oKilledBrain[M27AirOverseer.refiGunshipMassLost] = oKilledBrain[M27AirOverseer.refiGunshipMassLost] + math.min(2000, (oUnitKilled:GetBlueprint().Economy.BuildCostMass or 0), (oKillerUnit.VetExperience or oKillerUnit.Sync.totalMassKilled))
                         if oKilledBrain[M27AirOverseer.refiGunshipMassKilled] < 2000 then
                             oKilledBrain[M27AirOverseer.refiGunshipMassKilled] = math.max(oKilledBrain[M27AirOverseer.refiGunshipMassKilled], oUnitKilled:GetBlueprint().Economy.BuildCostMass)
                         end
@@ -260,7 +260,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                         --Adjust firebase overall PD mass values
                         if oUnitKilled[M27EngineerOverseer.refiAssignedFirebase] then
                             oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassCost][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] = (oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassCost][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] or 0) + oUnitKilled:GetBlueprint().Economy.BuildCostMass * oUnitKilled:GetFractionComplete()
-                            oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassKills][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] = (oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassKills][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] or 0) + (oUnitKilled.Sync.totalMassKilled or 0)
+                            oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassKills][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] = (oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassKills][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] or 0) + (oUnitKilled.VetExperience or oUnitKilled.Sync.totalMassKilled or 0)
                         end
                     end
 
@@ -292,7 +292,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                     if oKillerBrain.M27AI then
                         --Chat message for experimentals
                         if bDebugMessages == true then LOG(sFunctionRef..': Instigator='..instigator.UnitId..'; Time since last OC='..GetGameTimeSeconds() - (instigator[M27UnitInfo.refiTimeOfLastOverchargeShot] or -100)..'; oUnitKilled='..oUnitKilled.UnitId..'; killed nearby experimental value='..(M27Chat.tiM27VoiceTauntByType['Killed nearby experimental'] or 'nil')..'; Did we kill a land experimental='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, oUnitKilled.UnitId))..'; Did we kill it with an ACU='..tostring(EntityCategoryContains(categories.COMMAND, instigator.UnitId))..'; repru of M27Chat.tiM27VoiceTauntByType='..repru(M27Chat.tiM27VoiceTauntByType)) end
-                        if EntityCategoryContains(categories.EXPERIMENTAL, oUnitKilled.UnitId) and not(M27Chat.tiM27VoiceTauntByType['Killed nearby experimental']) and (oUnitKilled.Sync.totalMassKilled or 0) <= math.min(10000, oUnitKilled:GetBlueprint().Economy.BuildCostMass * 0.35) and M27Utilities.GetDistanceBetweenPositions(oUnitKilled:GetPosition(), M27MapInfo.PlayerStartPoints[oKillerBrain.M27StartPositionNumber]) <= 150 and M27Logic.GetCombatThreatRating(oKillerBrain, oKillerBrain:GetUnitsAroundPoint(categories.EXPERIMENTAL, oUnitKilled:GetPosition(), 150, 'Enemy')) <= 5000 then
+                        if EntityCategoryContains(categories.EXPERIMENTAL, oUnitKilled.UnitId) and not(M27Chat.tiM27VoiceTauntByType['Killed nearby experimental']) and (oUnitKilled.VetExperience or oUnitKilled.Sync.totalMassKilled or 0) <= math.min(10000, oUnitKilled:GetBlueprint().Economy.BuildCostMass * 0.35) and M27Utilities.GetDistanceBetweenPositions(oUnitKilled:GetPosition(), M27MapInfo.PlayerStartPoints[oKillerBrain.M27StartPositionNumber]) <= 150 and M27Logic.GetCombatThreatRating(oKillerBrain, oKillerBrain:GetUnitsAroundPoint(categories.EXPERIMENTAL, oUnitKilled:GetPosition(), 150, 'Enemy')) <= 5000 then
                             M27Chat.SendMessage(oKillerBrain, 'Killed nearby experimental', 'Thanks for the mass', 5, 10000)
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, oUnitKilled.UnitId) and EntityCategoryContains(categories.COMMAND, instigator.UnitId) and GetGameTimeSeconds() - (instigator[M27UnitInfo.refiTimeOfLastOverchargeShot] or -100) <= 5 then
                             --Dont send message if enemy still have nearby dangerous units
@@ -307,10 +307,10 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                         else
                             if bDebugMessages == true then LOG(sFunctionRef..': Will consider if we killed a target that got lots of kills') end
 
-                            local iMassKilled = (oUnitKilled.Sync.totalMassKilled or 0)
-                            if bDebugMessages == true then LOG(sFunctionRef..': Just killed '..oUnitKilled.UnitId..'; Mass that unit had killed='..iMassKilled..'; Is this chat message empty='..(M27Chat.tiM27VoiceTauntByType['Killed deadly unit'] or 'nil')..'; BP mass cost='..(oUnitKilled:GetBlueprint().Economy.BuildCostMass or 'nil')..'; Vet level='..(oUnitKilled.Sync.VeteranLevel or 'nil')) end
+                            local iMassKilled = (oUnitKilled.VetExperience or oUnitKilled.Sync.totalMassKilled or 0)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Just killed '..oUnitKilled.UnitId..'; Mass that unit had killed='..iMassKilled..'; Is this chat message empty='..(M27Chat.tiM27VoiceTauntByType['Killed deadly unit'] or 'nil')..'; BP mass cost='..(oUnitKilled:GetBlueprint().Economy.BuildCostMass or 'nil')..'; Vet level='..(oUnitKilled.VetLevel or oUnitKilled.Sync.VeteranLevel or 'nil')) end
                             --Dont send message unless the killer is still alive (to avoid e.g. ACU killing something via its death explosion)
-                            if iMassKilled >= 4000 and M27UnitInfo.IsUnitValid(instigator) and not(M27Chat.tiM27VoiceTauntByType['Killed deadly unit']) and not(EntityCategoryContains(categories.COMMAND, oUnitKilled.UnitId)) and oUnitKilled.Sync.VeteranLevel >= 5 and oUnitKilled.GetAIBrain and not(M27Logic.IsCivilianBrain(oUnitKilled:GetAIBrain())) then
+                            if iMassKilled >= 4000 and M27UnitInfo.IsUnitValid(instigator) and not(M27Chat.tiM27VoiceTauntByType['Killed deadly unit']) and not(EntityCategoryContains(categories.COMMAND, oUnitKilled.UnitId)) and (oUnitKilled.VetLevel or oUnitKilled.Sync.VeteranLevel) >= 5 and oUnitKilled.GetAIBrain and not(M27Logic.IsCivilianBrain(oUnitKilled:GetAIBrain())) then
                                 --local oBP = oUnitKilled:GetBlueprint()
                                 --if iMassKilled >= oBP.Economy.BuildCostMass * 7 then
                                 if not(EntityCategoryContains(categories.COMMAND, instigator.UnitId)) or M27UnitInfo.GetUnitHealthPercent(instigator) >= 0.9 then
@@ -333,7 +333,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryTML, instigator.UnitId) then
                             --Did we kill something with a TML that wasnt our last target (so e.g. a unit might have managed to block the TML missile meaning we can try again)?
                             if M27UnitInfo.IsUnitValid(instigator[M27EngineerOverseer.refoLastTMLTarget]) then
-                                if bDebugMessages == true then LOG(sFunctionRef..': TML last target='..instigator[M27EngineerOverseer.refoLastTMLTarget].UnitId..M27UnitInfo.GetUnitLifetimeCount(instigator[M27EngineerOverseer.refoLastTMLTarget])..'; shots fired at last target='..(instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 0)..'; Mass killed currently='..instigator.Sync.totalMassKilled..'; mass killed when fired missile='..instigator[M27EngineerOverseer.refiLastTMLMassKills]) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': TML last target='..instigator[M27EngineerOverseer.refoLastTMLTarget].UnitId..M27UnitInfo.GetUnitLifetimeCount(instigator[M27EngineerOverseer.refoLastTMLTarget])..'; shots fired at last target='..(instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 0)..'; Mass killed currently='..(instigator.VetExperience or instigator.Sync.totalMassKilled)..'; mass killed when fired missile='..instigator[M27EngineerOverseer.refiLastTMLMassKills]) end
                                 --if instigator[M27EngineerOverseer.refiLastTMLMassKills] < (instigator.Sync.totalMassKilled or 0) and (instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 0) > 0 then
                                 --if bDebugMessages == true then LOG(sFunctionRef..': TML killed a unit that wasnt its last target so missile may have been blocked') end
 
@@ -593,7 +593,7 @@ function OnUnitDeath(oUnit)
                             end
                             if M27Utilities.IsTableEmpty(tUnitsWantingTMD) == false then M27Logic.DetermineTMDWantedForUnits(aiBrain, tUnitsWantingTMD) end
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryTML, sUnitBP) then
-                            if (oUnit.Sync.totalMassKilled or 0) >= 800 then
+                            if (oUnit.VetExperience or oUnit.Sync.totalMassKilled or 0) >= 800 then
                                 aiBrain[M27EngineerOverseer.refiTimeOfLastFailedTML] = nil
                             else
                                 local iTime = GetGameTimeSeconds()
