@@ -6175,7 +6175,14 @@ function CalculateUnitThreatsByType()
             for iRef, tConditions in tiAirThreatTypes do
                 tUnitThreatByIDAndType[sUnitId][iRef] = GetAirThreatLevel(nil, { {['UnitId']=sUnitId }}, nil, tConditions[1], tConditions[2], tConditions[3], tConditions[4], nil, nil, nil, nil, tConditions[5], true)
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating air threat values, result of land and air for '..LOCF(oBP.General.UnitName)..'='..reprs(tUnitThreatByIDAndType[sUnitId])) end
+            if bDebugMessages == true then
+                local sName
+                if oBP.General.UnitName then sName = LOCF(oBP.General.UnitName)
+                else sName = sUnitId
+                end
+                LOG(sFunctionRef..': Finished calculating air threat values, result of land and air for '..sName..'='..reprs(tUnitThreatByIDAndType[sUnitId]))
+
+            end
         end
 
         local iCount = 0
@@ -6184,7 +6191,8 @@ function CalculateUnitThreatsByType()
             --Updates tUnitThreatByIDAndType
             sUnitId = oBP.BlueprintId
             if bDebugMessages == true then LOG(sFunctionRef..': Considering sUnitId='..(sUnitId or 'nil')..'; Is tUnitThreatByIDAndType not nil='..tostring(not(tUnitThreatByIDAndType[sUnitId]))..'; oBP.Economy.BuildCostMass='..(oBP.Economy.BuildCostMass or 'nil')..'; oBP.General.UnitName='..(oBP.General.UnitName or 'nil')) end
-            if not(tUnitThreatByIDAndType[sUnitId]) and oBP.Economy.BuildCostMass and oBP.General.UnitName then
+            --if not(tUnitThreatByIDAndType[sUnitId]) and oBP.Economy.BuildCostMass and oBP.General.UnitName then
+            if not(tUnitThreatByIDAndType[sUnitId]) and oBP.Economy.BuildCostMass then
                 --iCount = iCount + 1
                 --if iCount >= 10 then break end
                 ForkThread(RecordBlueprintThreatValues, oBP, sUnitId)
