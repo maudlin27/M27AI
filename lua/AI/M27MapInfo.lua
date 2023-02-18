@@ -5393,7 +5393,6 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
                 for iPlateauGroup, tSubtable in tAllPlateausWithMexes do
                     if M27Utilities.IsTableEmpty(tSubtable[subrefPlateauMexes]) == false then
                         --Ignore plateaus that we already have engies or factories on
-                        if aiBrain:GetArmyIndex() == 3 and GetGameTimeSeconds() >= 2400 and table.getn(tSubtable[subrefPlateauMexes]) == 3 and M27Utilities.GetDistanceBetweenPositions(tAllPlateausWithMexes[iPlateauGroup][subrefPlateauMidpoint], tStartPos) <= 325 then bDebugMessages = true else bDebugMessages = false end
 
                         iExistingEngis = 0
                         iExistingFactories = 0

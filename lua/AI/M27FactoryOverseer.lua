@@ -1852,7 +1852,6 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                             --=======AIR FACTORY------------------
                         elseif bIsAirFactory then
-                            if aiBrain:GetArmyIndex() == 6 and GetGameTimeSeconds() >= 1140 then bDebugMessages = true end
                             --if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableAirAA]) == false and table.getsize(aiBrain[M27AirOverseer.reftAvailableAirAA]) >= 20 then bDebugMessages = true end
 
 

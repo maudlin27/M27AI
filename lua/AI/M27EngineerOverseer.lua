@@ -4334,7 +4334,6 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
 
     --if iOptionalEngiActionRef == refActionBuildHive then bDebugMessages = true end
     --if iOptionalEngiActionRef == refActionBuildShield or iCategoryToBuild == M27UnitInfo.refCategoryFixedShield then bDebugMessages = true end
-    if GetEngineerUniqueCount(oEngineer) == 41 and iOptionalEngiActionRef == refActionFortifyFirebase and GetGameTimeSeconds() >= 1020 and aiBrain:GetArmyIndex() == 6 then bDebugMessages = true end
 
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, Engineer UC='..GetEngineerUniqueCount(oEngineer)..'; Engineer LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; Techlevel='..M27UnitInfo.GetUnitTechLevel(oEngineer)..'; tAlternativePositionToLookFrom='..repru(tAlternativePositionToLookFrom or {'nil'})..'; bBuildCheapestStructure='..tostring((bBuildCheapestStructure or false))..'; bNeverBuildRandom='..tostring((bNeverBuildRandom or false))..'; All blueprints that meet the category='..repru(EntityCategoryGetUnitList(iCategoryToBuild))..'; iMaxAreaToSearch='..(iMaxAreaToSearch or 'nil')) end
@@ -9681,11 +9680,10 @@ function ConsiderBuildingTMD(aiBrain, iCurPlateau, iActionRef, bHaveLowMass, bHa
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ConsiderBuildingTMD'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if aiBrain:GetArmyIndex() == 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTMD) >= 4 then bDebugMessages = true end
     local iActionToAssign, iMaxEngisWanted, tExistingLocationsToPickFrom
     local iMinEngiTechLevelWanted = 2
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code at time '..GetGameTimeSeconds()..', aiBrain='..aiBrain.Nickname..'; iCurPlateau='..iCurPlateau..'; bHaveLowMass='..tostring(bHaveLowMass or false)..'; bHaveVeryLowPower='..tostring(bHaveVeryLowPower or false)..'; tiAvailableEngineersByTech[2]='..(tiAvailableEngineersByTech[2] or 'nil')..'; Is table of TML empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]))..'; Is table of units wanting TMD for this plateau empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftUnitsWantingTMDByPlateau][iCurPlateau]))..'; Is table of engis building TMD emptpy='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][iActionRef]))) end
-    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false and (M27Utilities.IsTableEmpty(aiBrain[reftUnitsWantingTMDByPlateau][iCurPlateau]) == false or M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][iActionRef]) == false) then
+    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false and M27Utilities.IsTableEmpty(aiBrain[reftUnitsWantingTMDByPlateau][iCurPlateau]) == false then
         iActionToAssign = iActionRef
         iMaxEngisWanted = 3
         tExistingLocationsToPickFrom = {}
@@ -9825,7 +9823,7 @@ function ConsiderBuildingTMD(aiBrain, iCurPlateau, iActionRef, bHaveLowMass, bHa
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': No better alternative so will stick with current location; will allow T1 engis to assist if we have no more t2 available')
                 end
-                if tiAvailableEngineersByTech[2] + tiAvailableEngineersByTech[3] == 0 then
+                if (tiAvailableEngineersByTech[2] or 0) + (tiAvailableEngineersByTech[3] or 0) == 0 then
                     iMinEngiTechLevelWanted = 1 --Can have T1 engis assist a T2 engi to build TMD since we have no T2 or T3 available
                 end
             end
@@ -10348,7 +10346,6 @@ end--]]
                 bUseNormalAssignments = false
             end
 
-            if tiAvailableEngineersByTech[2] > 0 and aiBrain:GetArmyIndex() == 6 and GetGameTimeSeconds() >= 1140 then bDebugMessages = true end
 
             while iEngineersToConsider >= 0 do
                 --want >= rather than > so get correct calculation of engineers needed
@@ -11971,9 +11968,7 @@ end--]]
                             LOG(sFunctionRef .. ': Is table of transports waiting for engineers empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27Transport.reftTransportsWaitingForEngi])))
                         end
                         if M27Utilities.IsTableEmpty(aiBrain[M27Transport.reftTransportsWaitingForEngi]) == false then
-                            bDebugMessages = true
                             for iUnit, oUnit in aiBrain[M27Transport.reftTransportsWaitingForEngi] do
-                                bDebugMessages = true
                                 if bDebugMessages == true then LOG(sFunctionRef..': Considering oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                                 if M27UnitInfo.IsUnitValid(oUnit) and (M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 or (oUnit.GetCargo and EntityCategoryContains(M27UnitInfo.refCategoryTransport, oUnit.UnitId) and M27Utilities.IsTableEmpty(oUnit:GetCargo()) == false)) then
                                     iActionToAssign = refActionLoadOnTransport
@@ -11984,7 +11979,6 @@ end--]]
                                     break
                                 end
                             end
-                            bDebugMessages = false
 
                         end
 
@@ -15741,7 +15735,6 @@ function ReassignPlateauEngineer(aiBrain, oEngineer)
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ReassignPlateauEngineer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if aiBrain:GetArmyIndex() == 3 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if GetEngineerUniqueCount(oEngineer) == 61 and GetGameTimeSeconds() >= 780 then bDebugMessages = true end
 
     local iPlateauGroup = oEngineer[M27Transport.refiAssignedPlateau]
