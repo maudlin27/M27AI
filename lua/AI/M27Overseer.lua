@@ -7111,7 +7111,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             end
         else
             --No TML - remove the flag that we need TMD from units
-            aiBrain[M27EngineerOverseer.reftUnitsWantingTMD] = {}
+            aiBrain[M27EngineerOverseer.reftUnitsWantingTMDByPlateau] = {}
         end
 
         --Record when we have first had sight of SMD (so can factor in if we decide to fire a nuke)
@@ -9887,7 +9887,7 @@ function TestCustom(aiBrain)
         reprsl(aiBrain[E.reftFriendlyScathis])
         reprsl(aiBrain[E.reftUnclaimedMexOrHydroByCondition])
         reprsl(aiBrain[E.reftResourceLocations])
-        reprsl(aiBrain[E.reftUnitsWantingTMD])
+        reprsl(aiBrain[E.reftUnitsWantingTMDByPlateau])
         reprsl(aiBrain[E.reftFirebaseUnitsByFirebaseRef])
         reprsl(aiBrain[E.reftFirebasesWantingFortification])
         reprsl(aiBrain[E.reftFirebasePosition])

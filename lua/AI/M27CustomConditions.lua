@@ -104,10 +104,14 @@ function SafeToUpgradeUnit(oUnit)
 
     --TML extra logic for mexes (in reality will only stop T2 mexes upgrading to T3; t1 mex would be harder since would need to recreate the 'protected from TMD' logic here for T1 mexes, without recording the mex as wanting an upgrade, and would then risk never upgrading mexes
     if bSafeToGetUpgrade and EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then
-        if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftUnitsWantingTMD]) == false then
-            for iAltUnit, oAltUnit in aiBrain[M27EngineerOverseer.reftUnitsWantingTMD] do
-                if oUnit == oAltUnit then
-                    bSafeToGetUpgrade = false
+        if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftUnitsWantingTMDByPlateau]) == false then
+            for iPlateau, toUnits in aiBrain[M27EngineerOverseer.reftUnitsWantingTMDByPlateau] do
+                if M27Utilities.IsTableEmpty(toUnits) == false then
+                    for iAltUnit, oAltUnit in toUnits do
+                        if oUnit == oAltUnit then
+                            bSafeToGetUpgrade = false
+                        end
+                    end
                 end
             end
         end

@@ -9383,7 +9383,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
 
                             --Backup in case we dont have any high priority mexes yet or none are pathable
                             if M27Utilities.IsTableEmpty(tPriorityMex) then
-                                if GetGameTimeSeconds() >= 15 and not(aiBrain[M27Overseer.refbNoEnemies]) then M27Utilities.ErrorHandler('Dont have any high priority mexes recorded, so platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..' cant get a target and will move towards enemy base instead') end
+                                if GetGameTimeSeconds() >= 15 and not(aiBrain[M27Overseer.refbNoEnemies]) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then M27Utilities.ErrorHandler('Dont have any high priority mexes recorded, so platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..' cant get a target and will move towards enemy base instead') end
                                 --Just move towards the enemy by 20
 
                                 local tBackupLocation = M27Utilities.MoveInDirection(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)), 20 + oPlatoon[refiCurrentUnits], true)
@@ -13441,7 +13441,7 @@ function ProcessPlatoonAction(oPlatoon)
                                     local iDistToTarget = M27Utilities.GetDistanceBetweenPositions(oDFUnit:GetPosition(), aiBrain[M27Overseer.reftACUKillTarget])
                                     if iDistToTarget < iPlatoonRange - iDistanceWithinAttackRange then
                                         if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoACUKillTarget], true) then
-                                            if bEnemyACUUnderwater and not(EntityCategoryFilterDown(categories.ANTINAVY + categories.OVERLAYANTINAVY, oDFUnit.UnitId)) then
+                                            if bEnemyACUUnderwater and not(EntityCategoryContains(categories.ANTINAVY + categories.OVERLAYANTINAVY, oDFUnit.UnitId)) then
                                                 oPlatoon[refiLastOrderType] = refiOrderIssueAggressiveMove
                                                 oPlatoon[reftLastOrderPosition] = tPositionBehindEnemyACU
                                                 IssueAggressiveMove({oDFUnit}, tPositionBehindEnemyACU)

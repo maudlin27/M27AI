@@ -713,7 +713,7 @@ function GetUnitFacingAngle(oUnit)
 
     --T3 arti - get the angle of the turret
     if EntityCategoryContains(categories.STRUCTURE, oUnit.UnitId) then
-        if oUnit.GetWeapon then
+        if oUnit.GetWeapon and oUnit:GetWeaponCount() > 0 then
             local oWeapon = oUnit:GetWeapon(1)
             if oWeapon and oWeapon.GetAimManipulator then
                 return M27Utilities.ConvertRadiansToAngle(oWeapon:GetAimManipulator():GetHeadingPitch())

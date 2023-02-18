@@ -25,6 +25,7 @@ refiMaxEngisWanted = 'M27TransportEngisWanted' --max number of engineers a trans
 refiWaitingForEngiCount = 'M27TransportWaitingForEngiCount' --Will increase by 1 for each cycle that transport is near base and engi and waiting to be loaded
 refbMoreUnitsWanted = 'M27TransportMoreUnitsWanted' --against transport, true if when we last loaded a unit we wanted more units before leaving (used to stop the transport unloading its units)
 
+refiTimeSinceLastHadAvailableTransport = 'M27TransportTimeSinceLastHadTransport' --Gametimeseconds that we last had a transport to consider giving orders to
 refiTimeSinceFirstInactive = 'M27TransportTimeSincFirstInactive' --Against transport; gives gametimeseconds; if unit state suggests not idle then this gets reset
 reftLocationWhenFirstInactive = 'M27TransportLocationWhenFirstInactive' --against transport
 
@@ -265,6 +266,7 @@ function TransportManager(aiBrain)
     local iTransportsWaitingForEngis = 0
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, is table of avaialble transports empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]))..'; Is table of plateaus of interest empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]))..'; Plateau group of base='..aiBrain[M27MapInfo.refiOurBasePlateauGroup]) end
     if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTransports]) == false then
+        aiBrain[refiTimeSinceLastHadAvailableTransport] = GetGameTimeSeconds()
         for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableTransports] do
             iAvailableTransports = iAvailableTransports + 1
         end

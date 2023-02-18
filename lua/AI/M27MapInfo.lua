@@ -5393,13 +5393,14 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
                 for iPlateauGroup, tSubtable in tAllPlateausWithMexes do
                     if M27Utilities.IsTableEmpty(tSubtable[subrefPlateauMexes]) == false then
                         --Ignore plateaus that we already have engies or factories on
+                        if aiBrain:GetArmyIndex() == 3 and GetGameTimeSeconds() >= 2400 and table.getn(tSubtable[subrefPlateauMexes]) == 3 and M27Utilities.GetDistanceBetweenPositions(tAllPlateausWithMexes[iPlateauGroup][subrefPlateauMidpoint], tStartPos) <= 325 then bDebugMessages = true else bDebugMessages = false end
 
                         iExistingEngis = 0
                         iExistingFactories = 0
                         iAlliedMexes = 0
                         iExistingTransports = 0
                         bAlreadyOwnOrAssignedPlateau = false
-                        if bDebugMessages == true then LOG(sFunctionRef..': Considering plateaugroup='..iPlateauGroup..'; considering if we have friendly units in the plateau already') end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering plateaugroup='..iPlateauGroup..'; with '..table.getn(tSubtable[subrefPlateauMexes])..' mexes which is '..M27Utilities.GetDistanceBetweenPositions(tAllPlateausWithMexes[iPlateauGroup][subrefPlateauMidpoint], tStartPos)..' away from brain '..aiBrain.Nickname..' start position '..repru(tStartPos)..'; considering if we have friendly units in the plateau already') end
 
                         for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering brain '..oBrain.Nickname..'; is its table of plateau info empty for group '..iPlateauGroup..'='..tostring(M27Utilities.IsTableEmpty(oBrain[reftOurPlateauInformation][iPlateauGroup]))..'; is table of assigned transports empty='..tostring(oBrain[M27Transport.reftTransportsAssignedByPlateauGroup][iPlateauGroup])) end
@@ -5483,6 +5484,7 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
                                     if not(bNoRushActive) or M27Utilities.GetDistanceBetweenPositions(tClosestMex, aiBrain[reftNoRushCentre]) <= iNoRushRange then
 
                                         --Is there any enemy AA in range of this mex?
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Is target position for closest mex covered by AA='..tostring(M27AirOverseer.IsTargetPositionCoveredByAA(tClosestMex, tEnemyAA, tStartPos, false))) end
                                         if not (M27AirOverseer.IsTargetPositionCoveredByAA(tClosestMex, tEnemyAA, tStartPos, false)) then
                                             bNearbyEnemyLand = false
                                             tEnemyGround = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, tClosestMex, 100, 'Enemy')
@@ -5494,14 +5496,17 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
                                                     end
                                                 end
                                             end
-
+                                            if bDebugMessages == true then LOG(sFunctionRef..': bNearbyEnemyLand='..tostring(bNearbyEnemyLand)) end
                                             if not (bNearbyEnemyLand) then
                                                 --Have we tried targeting this mex recently?
                                                 sLocationRef = M27Utilities.ConvertLocationToStringRef(tClosestMex)
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Time since we last tried targeting this mex='..GetGameTimeSeconds() - (M27Team.tTeamData[aiBrain.M27Team][M27Team.reftTimeOfTransportLastLocationAttempt][sLocationRef] or -300)) end
                                                 if GetGameTimeSeconds() - (M27Team.tTeamData[aiBrain.M27Team][M27Team.reftTimeOfTransportLastLocationAttempt][sLocationRef] or -300) >= 300 then
                                                     --Add to shortlist of locations to try and expand to; either the 'dangerous' shortlist if no intel and far away mod distance, or both shortlists
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Add to shortlist of locations, either dangerous or both; iCurModDistance='..iCurModDistance..'; nearest threat from start='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; have Intel coverage of mex='..tostring(M27Logic.GetIntelCoverageOfPosition(aiBrain, tClosestMex, nil, true))) end
                                                     if iCurModDistance <= (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] + 60) or M27Logic.GetIntelCoverageOfPosition(aiBrain, tClosestMex, nil, true) then
                                                         aiBrain[reftPlateausOfInterest][iPlateauGroup] = tClosestMex
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Recorded plateau '..iPlateauGroup..'; in plateaus of interest') end
                                                     end
                                                     if iCurModDistance <= iClosestDangerousPlateauDist then
                                                         iClosestDangerousPlateauDist = iCurModDistance

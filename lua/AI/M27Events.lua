@@ -1262,7 +1262,7 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                 --Decide if we want to shield the construction
                 if EntityCategoryContains(categories.STRUCTURE + M27UnitInfo.refCategoryExperimentalStructure, oConstruction.UnitId) then
                     local oBP = oConstruction:GetBlueprint()
-                    if oBP.Economy.BuildCostMass >= 2000 then
+                    if oBP.Economy.BuildCostMass >= 1650 and (oBP.Defense.Shield.ShieldMaxHealth or 0) == 0  then
                         if oBP.Defense.Health / oBP.Economy.BuildCostMass < 1 or EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oConstruction.UnitId) or (aiBrain[M27Overseer.refbDefendAgainstArti] and oBP.Economy.BuildCostMass >= 3000 and EntityCategoryContains(M27UnitInfo.refCategoryStructure, oConstruction.UnitId)) then
                             oConstruction[M27EngineerOverseer.refiShieldsWanted] = 1
                             table.insert(aiBrain[M27EngineerOverseer.reftUnitsWantingFixedShield], oConstruction)
@@ -1655,7 +1655,9 @@ function OnConstructed(oEngineer, oJustBuilt)
                         M27Logic.DetermineTMDWantedForUnits(aiBrain, { oJustBuilt })
                     elseif EntityCategoryContains(M27UnitInfo.refCategoryTMD, oJustBuilt.UnitId) then
                         --Update list of units wanting TMD to factor in if they have TMD coverage from all threats now that we have just built a TMD
-                        M27Logic.DetermineTMDWantedForUnits(aiBrain, aiBrain[M27EngineerOverseer.reftUnitsWantingTMD])
+                        for iPlateau, toUnits in aiBrain[M27EngineerOverseer.reftUnitsWantingTMDByPlateau] do
+                            M27Logic.DetermineTMDWantedForUnits(aiBrain, toUnits)
+                        end
                     end
                 end
                 if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, oJustBuilt.UnitId) and not (oJustBuilt[M27UnitInfo.refbActiveTargetChecker]) then
