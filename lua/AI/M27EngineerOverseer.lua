@@ -96,6 +96,7 @@ refActionBuildPlateauMex = 1002
 refActionPlateauReclaim = 1003
 refActionPlateauSpareAction = 1004
 refActionPlateauBuildTMD = 1005
+refActionPlateauAssistUpgrade = 1006
 
 
 --Build order related variables
@@ -15752,6 +15753,7 @@ function ReassignPlateauEngineer(aiBrain, oEngineer)
     local iExistingEngineersAssigned
     local oExistingBuilder
     local tActionTargetLocation
+    local oActionTargetOverride
 
     --Common conditions
     local bHaveLowMass = M27Conditions.HaveLowMass(aiBrain)
@@ -15842,6 +15844,7 @@ function ReassignPlateauEngineer(aiBrain, oEngineer)
             iActionToAssign = nil
             oExistingBuilder = nil
             tActionTargetLocation = nil
+            oActionTargetOverride = nil
 
             if iCurrentConditionToTry == 1 then
                 --Land factory to secure plateau
@@ -15983,6 +15986,19 @@ function ReassignPlateauEngineer(aiBrain, oEngineer)
                     end
                 end
             elseif iCurrentConditionToTry == 6 then
+                --Assist upgrade
+                if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftUpgrading]) == false then
+                    for iUpgrading, oUpgrading in aiBrain[M27EconomyOverseer.reftUpgrading] do
+                        if not(oUpgrading[M27Transport.refiAssignedPlateau]) then oUpgrading[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUpgrading:GetPosition()) end
+                        if oUpgrading[M27Transport.refiAssignedPlateau] == iPlateauGroup then
+                            iActionToAssign = refActionPlateauAssistUpgrade
+                            iMaxEngisWanted = 5
+                            oActionTargetOverride = oUpgrading
+                            break
+                        end
+                    end
+                end
+            elseif iCurrentConditionToTry == 7 then
                 --Spare
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': No more actions so will give spare action')
@@ -15993,7 +16009,7 @@ function ReassignPlateauEngineer(aiBrain, oEngineer)
 
             if iActionToAssign then
 
-                --Check we havent recently failed to assign this action
+            --Check we havent recently failed to assign this action
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': Have iActionToAssign=' .. iActionToAssign)
                 end
@@ -16027,7 +16043,7 @@ function ReassignPlateauEngineer(aiBrain, oEngineer)
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': Want to assign more engis, if action is to buidl factory then will tell engis to assist existing builder. iActionToAssign=' .. iActionToAssign .. '; iExistingEngineersAssigned=' .. iExistingEngineersAssigned)
                     end
-                    local oActionTargetObject = nil
+                    local oActionTargetObject = oActionTargetOverride
                     if iActionToAssign == refActionBuildPlateauFactory and iExistingEngineersAssigned > 0 then
                         oActionTargetObject = oExistingBuilder
                         if bDebugMessages == true then
@@ -16092,7 +16108,7 @@ function ReassignPlateauEngineer(aiBrain, oEngineer)
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': About to assign ' .. iActionToAssign .. ' action to the engineer ' .. oEngineer.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oEngineer) .. '; UC=' .. GetEngineerUniqueCount(oEngineer))
                     end
-
+                    --AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTargetLocation, oActionTargetObject, iConditionNumber, bIgnoreAdjacency)
                     AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTargetLocation, oActionTargetObject, iCurrentConditionToTry)
                 else
                     if bDebugMessages == true then

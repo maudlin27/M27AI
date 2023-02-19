@@ -5084,6 +5084,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ConsiderLaunchingMissile'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     if M27UnitInfo.IsUnitValid(oLauncher) then
         oLauncher[M27UnitInfo.refbActiveMissileChecker] = true
@@ -5191,12 +5192,14 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                         for iUnit, oUnit in tValidTargets do
                             iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
                             if EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then iCurTargetValue = iCurTargetValue * 1.5 end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Potential TML target '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurTargetValue='..iCurTargetValue) end
                             if iBestTargetValue < iCurTargetValue then
                                 iBestTargetValue = iCurTargetValue
                                 oBestTarget = oUnit
                             end
                         end
                         if oBestTarget then
+                            if bDebugMessages == true then LOG(sFunctionRef..': oBestTarget='..oBestTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBestTarget)) end
                             tTarget = oBestTarget:GetPosition()
                             oBestTarget[M27EngineerOverseer.refiTMLShotsFired] = (oBestTarget[M27EngineerOverseer.refiTMLShotsFired] or 0) + 1
                             oLauncher[M27EngineerOverseer.refoLastTMLTarget] = oBestTarget

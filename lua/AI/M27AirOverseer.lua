@@ -2665,649 +2665,651 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordAvailableAndLowFuelAirUnits'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local iAirAACategories = refCategoryAirAA
-    local iBomberCategories = refCategoryBomber
-    if aiBrain[refiAirAANeeded] > 0 and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 2 then
-        --Make idle fighter bombers attack air units as we need airaa
-        iAirAACategories = M27UnitInfo.refCategoryFighterBomber
-        iBomberCategories = refCategoryBomber - M27UnitInfo.refCategoryFighterBomber
-    end
-
-    --Updates aiBrain trackers to record units with and without enough fuel
-    local tAllScouts = aiBrain:GetListOfUnits(refCategoryAirScout, false, true)
-    local tAllBombers = aiBrain:GetListOfUnits(refCategoryBomber, false, true)
-    local tAllAirAA = aiBrain:GetListOfUnits(refCategoryAirAA, false, true)
-    local tTorpBombers = aiBrain:GetListOfUnits(refCategoryTorpBomber, false, true)
-    local tTransports = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryTransport, false, true)
-    local tGunships = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryGunship - categories.EXPERIMENTAL, false, true)
-    --Every 10s update list of closest enemy AA in case we dont have the bomber logic triggering and we have airaa that needs checking aginst this; hgowever only decrease the range dont increase it
-    if M27Utilities.IsTableEmpty(tAllAirAA) == false and math.floor(GetGameTimeSeconds() / 10) * 10 == math.floor(GetGameTimeSeconds()) then
-        local iAACategoryToConsider
-
-        if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 then
-            iAACategoryToConsider = M27UnitInfo.refCategoryCruiser + M27UnitInfo.refCategoryGroundAA * categories.TECH3
-        elseif aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 2 then
-            iAACategoryToConsider = M27UnitInfo.refCategoryGroundAA - categories.TECH1
-        else
-            iAACategoryToConsider = M27UnitInfo.refCategoryGroundAA
+    if not(aiBrain.M27IsDefeated) then
+        local iAirAACategories = refCategoryAirAA
+        local iBomberCategories = refCategoryBomber
+        if aiBrain[refiAirAANeeded] > 0 and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 2 then
+            --Make idle fighter bombers attack air units as we need airaa
+            iAirAACategories = M27UnitInfo.refCategoryFighterBomber
+            iBomberCategories = refCategoryBomber - M27UnitInfo.refCategoryFighterBomber
         end
-        local tClosestEnemyAA = aiBrain:GetUnitsAroundPoint(iAACategoryToConsider, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], math.min(aiBrain[refiClosestEnemyDangerousAADistToOurBase] + 1, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]), 'Enemy')
-        if M27Utilities.IsTableEmpty(tClosestEnemyAA) == false then
-            local oClosestEnemyAA = M27Utilities.GetNearestUnit(tClosestEnemyAA, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-            aiBrain[refiClosestEnemyDangerousAADistToOurBase] = math.min(aiBrain[refiClosestEnemyDangerousAADistToOurBase], aiBrain[M27Overseer.refiDistanceToNearestEnemyBase], M27Utilities.GetDistanceBetweenPositions(oClosestEnemyAA:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) - M27UnitInfo.GetUnitAARange(oClosestEnemyAA) - 20) --If changing the -20 adjustment here also change in the bombermanager update
-            if bDebugMessages == true then LOG(sFunctionRef..': Closest enemy dangerous AA dist to our base post update='.. aiBrain[refiClosestEnemyDangerousAADistToOurBase]) end
+
+        --Updates aiBrain trackers to record units with and without enough fuel
+        local tAllScouts = aiBrain:GetListOfUnits(refCategoryAirScout, false, true)
+        local tAllBombers = aiBrain:GetListOfUnits(refCategoryBomber, false, true)
+        local tAllAirAA = aiBrain:GetListOfUnits(refCategoryAirAA, false, true)
+        local tTorpBombers = aiBrain:GetListOfUnits(refCategoryTorpBomber, false, true)
+        local tTransports = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryTransport, false, true)
+        local tGunships = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryGunship - categories.EXPERIMENTAL, false, true)
+        --Every 10s update list of closest enemy AA in case we dont have the bomber logic triggering and we have airaa that needs checking aginst this; hgowever only decrease the range dont increase it
+        if M27Utilities.IsTableEmpty(tAllAirAA) == false and math.floor(GetGameTimeSeconds() / 10) * 10 == math.floor(GetGameTimeSeconds()) then
+            local iAACategoryToConsider
+
+            if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 then
+                iAACategoryToConsider = M27UnitInfo.refCategoryCruiser + M27UnitInfo.refCategoryGroundAA * categories.TECH3
+            elseif aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 2 then
+                iAACategoryToConsider = M27UnitInfo.refCategoryGroundAA - categories.TECH1
+            else
+                iAACategoryToConsider = M27UnitInfo.refCategoryGroundAA
+            end
+            local tClosestEnemyAA = aiBrain:GetUnitsAroundPoint(iAACategoryToConsider, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], math.min(aiBrain[refiClosestEnemyDangerousAADistToOurBase] + 1, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]), 'Enemy')
+            if M27Utilities.IsTableEmpty(tClosestEnemyAA) == false then
+                local oClosestEnemyAA = M27Utilities.GetNearestUnit(tClosestEnemyAA, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                aiBrain[refiClosestEnemyDangerousAADistToOurBase] = math.min(aiBrain[refiClosestEnemyDangerousAADistToOurBase], aiBrain[M27Overseer.refiDistanceToNearestEnemyBase], M27Utilities.GetDistanceBetweenPositions(oClosestEnemyAA:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) - M27UnitInfo.GetUnitAARange(oClosestEnemyAA) - 20) --If changing the -20 adjustment here also change in the bombermanager update
+                if bDebugMessages == true then LOG(sFunctionRef..': Closest enemy dangerous AA dist to our base post update='.. aiBrain[refiClosestEnemyDangerousAADistToOurBase]) end
+            end
         end
-    end
 
-    local iCurUnitsWithFuel, iCurUnitsWithLowFuel
-    local tAllAirUnits = { tAllScouts, tAllBombers, tAllAirAA, tTorpBombers, tTransports, tGunships }
-    local tAvailableUnitRef = { reftAvailableScouts, reftAvailableBombers, reftAvailableAirAA, reftAvailableTorpBombers, reftAvailableTransports, reftAvailableGunships }
-    local iTypeScout = 1
-    local iTypeBomber = 2
-    local iTypeAirAA = 3
-    local iTypeTorpBomber = 4
-    local iTypeTransport = 5
-    local iTypeGunship = 6
-    local sAvailableUnitRef
-    local bUnitIsUnassigned
-    local iTimeStamp = GetGameTimeSeconds()
-    local sTargetBP, tTargetPos, tOurPosition, bClearAirAATargets, bReturnToRallyPoint
-    --local tTargetDestination
-    local tNearbyEnemyAA
-    local tNearbyFriendlies
-    local iCurTechLevel
+        local iCurUnitsWithFuel, iCurUnitsWithLowFuel
+        local tAllAirUnits = { tAllScouts, tAllBombers, tAllAirAA, tTorpBombers, tTransports, tGunships }
+        local tAvailableUnitRef = { reftAvailableScouts, reftAvailableBombers, reftAvailableAirAA, reftAvailableTorpBombers, reftAvailableTransports, reftAvailableGunships }
+        local iTypeScout = 1
+        local iTypeBomber = 2
+        local iTypeAirAA = 3
+        local iTypeTorpBomber = 4
+        local iTypeTransport = 5
+        local iTypeGunship = 6
+        local sAvailableUnitRef
+        local bUnitIsUnassigned
+        local iTimeStamp = GetGameTimeSeconds()
+        local sTargetBP, tTargetPos, tOurPosition, bClearAirAATargets, bReturnToRallyPoint
+        --local tTargetDestination
+        local tNearbyEnemyAA
+        local tNearbyFriendlies
+        local iCurTechLevel
 
-    local iClosestBomberDistanceToEnemy = 10000
-    local iCurDistanceToEnemyBase
-    if M27Utilities.IsTableEmpty(tAllBombers) == false then
-        for iUnit, oBomber in tAllBombers do
-            if M27UnitInfo.IsUnitValid(oBomber) then
-                iCurDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-                if iCurDistanceToEnemyBase < iClosestBomberDistanceToEnemy then
-                    iClosestBomberDistanceToEnemy = iCurDistanceToEnemyBase
+        local iClosestBomberDistanceToEnemy = 10000
+        local iCurDistanceToEnemyBase
+        if M27Utilities.IsTableEmpty(tAllBombers) == false then
+            for iUnit, oBomber in tAllBombers do
+                if M27UnitInfo.IsUnitValid(oBomber) then
+                    iCurDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                    if iCurDistanceToEnemyBase < iClosestBomberDistanceToEnemy then
+                        iClosestBomberDistanceToEnemy = iCurDistanceToEnemyBase
+                    end
                 end
             end
         end
-    end
-    if M27Utilities.IsTableEmpty(tTorpBombers) == false then
-        for iUnit, oBomber in tTorpBombers do
-            if M27UnitInfo.IsUnitValid(oBomber) then
-                iCurDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-                if iCurDistanceToEnemyBase < iClosestBomberDistanceToEnemy then
-                    iClosestBomberDistanceToEnemy = iCurDistanceToEnemyBase
+        if M27Utilities.IsTableEmpty(tTorpBombers) == false then
+            for iUnit, oBomber in tTorpBombers do
+                if M27UnitInfo.IsUnitValid(oBomber) then
+                    iCurDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                    if iCurDistanceToEnemyBase < iClosestBomberDistanceToEnemy then
+                        iClosestBomberDistanceToEnemy = iCurDistanceToEnemyBase
+                    end
                 end
             end
         end
-    end
 
-    --Get details of recently seen cruisers so AirAA can abort:
-    local iRecentlySeenCruiserSearchRange = 100
-    local tAllRecentlySeenCruisers = {}
-    --Add any pond AA recently seen but not currently visible to this
-    if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy untis by pond empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]))) end
-    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]) == false then
-        for iPond, tEnemyUnits in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond] do
-            if bDebugMessages == true then LOG(sFunctionRef..': Considering iPond='..iPond..'; is table of enemy units empty for this='..tostring(M27Utilities.IsTableEmpty(tEnemyUnits))) end
-            if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
-                local tEnemyT2PlusNavalAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiserCarrier, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPond])
-                if bDebugMessages == true then LOG(sFunctionRef..': Is table of cruisers and carriers empty='..tostring(M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA))) end
-                if M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA) == false then
-                    for iUnit, oUnit in tEnemyT2PlusNavalAA do
-                        if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Is valid='..tostring(M27UnitInfo.IsUnitValid(oUnit))..'; Is last known position empty='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]))..'; Can see unit='..tostring(M27Utilities.CanSeeUnit(aiBrain, oUnit, true))) end
-                        if M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]) == false and not(M27Utilities.CanSeeUnit(aiBrain, oUnit, true)) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': About to add naval unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to AA threats') end
-                            table.insert( tAllRecentlySeenCruisers, oUnit)
+        --Get details of recently seen cruisers so AirAA can abort:
+        local iRecentlySeenCruiserSearchRange = 100
+        local tAllRecentlySeenCruisers = {}
+        --Add any pond AA recently seen but not currently visible to this
+        if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy untis by pond empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]))) end
+        if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]) == false then
+            for iPond, tEnemyUnits in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond] do
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering iPond='..iPond..'; is table of enemy units empty for this='..tostring(M27Utilities.IsTableEmpty(tEnemyUnits))) end
+                if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                    local tEnemyT2PlusNavalAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiserCarrier, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPond])
+                    if bDebugMessages == true then LOG(sFunctionRef..': Is table of cruisers and carriers empty='..tostring(M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA))) end
+                    if M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA) == false then
+                        for iUnit, oUnit in tEnemyT2PlusNavalAA do
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Is valid='..tostring(M27UnitInfo.IsUnitValid(oUnit))..'; Is last known position empty='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]))..'; Can see unit='..tostring(M27Utilities.CanSeeUnit(aiBrain, oUnit, true))) end
+                            if M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]) == false and not(M27Utilities.CanSeeUnit(aiBrain, oUnit, true)) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': About to add naval unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to AA threats') end
+                                table.insert( tAllRecentlySeenCruisers, oUnit)
+                            end
                         end
                     end
                 end
             end
         end
-    end
 
-    aiBrain[reftLowFuelAir] = {}
-    iCurUnitsWithLowFuel = 0
-    aiBrain[refiPreviousAvailableBombers] = 0
-    local iAirStaging = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirStaging)
-    if iAirStaging == 0 and aiBrain[refiAirStagingWanted] == 0 and (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory) >= 2 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllAir) >= 10) then
-        aiBrain[refiAirStagingWanted] = 1
-    end
+        aiBrain[reftLowFuelAir] = {}
+        iCurUnitsWithLowFuel = 0
+        aiBrain[refiPreviousAvailableBombers] = 0
+        local iAirStaging = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirStaging)
+        if iAirStaging == 0 and aiBrain[refiAirStagingWanted] == 0 and (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory) >= 2 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllAir) >= 10) then
+            aiBrain[refiAirStagingWanted] = 1
+        end
 
-    --First update the list of engihunter bombers
-    if M27Utilities.IsTableEmpty(aiBrain[reftEngiHunterBombers]) == false then
-        for iUnit, oUnit in aiBrain[reftEngiHunterBombers] do
-            if not (M27UnitInfo.IsUnitValid) or not (oUnit[refbEngiHunterMode]) then
-                aiBrain[reftEngiHunterBombers][iUnit] = nil
+        --First update the list of engihunter bombers
+        if M27Utilities.IsTableEmpty(aiBrain[reftEngiHunterBombers]) == false then
+            for iUnit, oUnit in aiBrain[reftEngiHunterBombers] do
+                if not (M27UnitInfo.IsUnitValid) or not (oUnit[refbEngiHunterMode]) then
+                    aiBrain[reftEngiHunterBombers][iUnit] = nil
+                end
             end
         end
-    end
 
-    local bCheckForMobileAirStaging = false
+        local bCheckForMobileAirStaging = false
 
-    for iUnitType, tAllAirOfType in tAllAirUnits do
-        sAvailableUnitRef = tAvailableUnitRef[iUnitType]
-        aiBrain[sAvailableUnitRef] = {}
-        iCurUnitsWithFuel = 0
-        if M27Utilities.IsTableEmpty(tAllAirOfType) == false then
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Going through all air units to see if any have low fuel')
-            end
-            local tCurWaypointTarget, iDistanceToComplete, tUnitCurPosition, iTotalMovementPaths, iCurLoopCount, iCurAirSegmentX, iCurAirSegmentZ, oNavigator
-            local iMaxLoopCount = 50
-            local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-            local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
-            local iDistanceFromStartForReset = 20 --If unit is this close to start then will reset it if its not on its first assignment/doesnt have a target thats further away
-            local iFuelPercent, iCurTechLevel
-            local iDistToOurBase --used e.g. for airaa to decide whether to retreat
-            local iDistToEnemyBase --used e.g. for airaa to decide whether to retreat
-            local iNavigationDistToEnemybase
-            local iTargetUnitDistToEnemyBase
-            for iUnit, oUnit in tAllAirOfType do
-                --if iUnitType == iTypeGunship and aiBrain:GetArmyIndex() == 7 and GetGameTimeSeconds() >= 1730 and oUnit.UnitId == 'xsa0203' and oUnit:GetHealth() <= 600 then bDebugMessages = true M27Config.M27ShowUnitNames = true else bDebugMessages = false end
-                --if M27UnitInfo.GetUnitTechLevel(oUnit) == 4 then bDebugMessages = true else bDebugMessages = false end
-                --if M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 then bDebugMessages = true else bDebugMessages = false end
-                --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uaa03034' and GetGameTimeSeconds() >= 140 then bDebugMessages = true else bDebugMessages = false end
-                bUnitIsUnassigned = false
+        for iUnitType, tAllAirOfType in tAllAirUnits do
+            sAvailableUnitRef = tAvailableUnitRef[iUnitType]
+            aiBrain[sAvailableUnitRef] = {}
+            iCurUnitsWithFuel = 0
+            if M27Utilities.IsTableEmpty(tAllAirOfType) == false then
                 if bDebugMessages == true then
-                    LOG(sFunctionRef .. '; iUnitType=' .. iUnitType .. '; iUnit=' .. iUnit .. '; ID and LC=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; checking if unit is dead and has fuel and whether its on assignment; oUnit[refbSentRefuelCommand]=' .. tostring(oUnit[refbSentRefuelCommand] or false))
+                    LOG(sFunctionRef .. ': Going through all air units to see if any have low fuel')
                 end
-                if not (oUnit.Dead) and oUnit.GetFractionComplete and oUnit:GetFractionComplete() == 1 then
+                local tCurWaypointTarget, iDistanceToComplete, tUnitCurPosition, iTotalMovementPaths, iCurLoopCount, iCurAirSegmentX, iCurAirSegmentZ, oNavigator
+                local iMaxLoopCount = 50
+                local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+                local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                local iDistanceFromStartForReset = 20 --If unit is this close to start then will reset it if its not on its first assignment/doesnt have a target thats further away
+                local iFuelPercent, iCurTechLevel
+                local iDistToOurBase --used e.g. for airaa to decide whether to retreat
+                local iDistToEnemyBase --used e.g. for airaa to decide whether to retreat
+                local iNavigationDistToEnemybase
+                local iTargetUnitDistToEnemyBase
+                for iUnit, oUnit in tAllAirOfType do
+                    --if iUnitType == iTypeGunship and aiBrain:GetArmyIndex() == 7 and GetGameTimeSeconds() >= 1730 and oUnit.UnitId == 'xsa0203' and oUnit:GetHealth() <= 600 then bDebugMessages = true M27Config.M27ShowUnitNames = true else bDebugMessages = false end
+                    --if M27UnitInfo.GetUnitTechLevel(oUnit) == 4 then bDebugMessages = true else bDebugMessages = false end
+                    --if M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 then bDebugMessages = true else bDebugMessages = false end
+                    --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uaa03034' and GetGameTimeSeconds() >= 140 then bDebugMessages = true else bDebugMessages = false end
+                    bUnitIsUnassigned = false
                     if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': oUnit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; Unit state=' .. M27Logic.GetUnitState(oUnit) .. '; Health percent=' .. oUnit:GetHealthPercent() .. '; Fuel ratio=' .. oUnit:GetFuelRatio() .. '; Unit[refbOnAssignment]=' .. tostring(oUnit[refbOnAssignment] or false) .. '; special micro active=' .. tostring(oUnit[M27UnitInfo.refbSpecialMicroActive] or false))
+                        LOG(sFunctionRef .. '; iUnitType=' .. iUnitType .. '; iUnit=' .. iUnit .. '; ID and LC=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; checking if unit is dead and has fuel and whether its on assignment; oUnit[refbSentRefuelCommand]=' .. tostring(oUnit[refbSentRefuelCommand] or false))
                     end
-                    --Backup logic for units attached to a non-air staging structure (that wont get sent an order to issue the units)
-                    iFuelPercent = 0
-                    if oUnit.GetFuelRatio then
-                        iFuelPercent = oUnit:GetFuelRatio()
-                    end
-                    if iFuelPercent == 1 and not (bCheckForMobileAirStaging) and oUnit:IsUnitState('Attached') then
-                        bCheckForMobileAirStaging = true
-                    end
-                    if not (oUnit[refbSentRefuelCommand]) then
+                    if not (oUnit.Dead) and oUnit.GetFractionComplete and oUnit:GetFractionComplete() == 1 then
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': oUnit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; Unit state=' .. M27Logic.GetUnitState(oUnit) .. '; Health percent=' .. oUnit:GetHealthPercent() .. '; Fuel ratio=' .. oUnit:GetFuelRatio() .. '; Unit[refbOnAssignment]=' .. tostring(oUnit[refbOnAssignment] or false) .. '; special micro active=' .. tostring(oUnit[M27UnitInfo.refbSpecialMicroActive] or false))
+                        end
+                        --Backup logic for units attached to a non-air staging structure (that wont get sent an order to issue the units)
+                        iFuelPercent = 0
+                        if oUnit.GetFuelRatio then
+                            iFuelPercent = oUnit:GetFuelRatio()
+                        end
+                        if iFuelPercent == 1 and not (bCheckForMobileAirStaging) and oUnit:IsUnitState('Attached') then
+                            bCheckForMobileAirStaging = true
+                        end
+                        if not (oUnit[refbSentRefuelCommand]) then
 
-                        iCurTechLevel = M27UnitInfo.GetUnitTechLevel(oUnit)
+                            iCurTechLevel = M27UnitInfo.GetUnitTechLevel(oUnit)
 
-                        if iAirStaging == 0 or iFuelPercent >= iLowFuelPercent or iCurTechLevel >= 4 or EntityCategoryContains(categories.CANNOTUSEAIRSTAGING, oUnit.UnitId) then
-                            if oUnit[refbOnAssignment] == true then
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Unit is on assignment')
-                                end
-                                --Check there's not a rare error where unit is on assignment but is actually idle
-                                --This might also be used for transports (havent bothered debugging to confirm since they work as desired)
-                                if M27Logic.IsUnitIdle(oUnit, true, false, nil) then
-                                    local iIdleTime = math.floor(GetGameTimeSeconds())
-                                    if not (oUnit[reftIdleChecker]) then
-                                        oUnit[reftIdleChecker] = {}
+                            if iAirStaging == 0 or iFuelPercent >= iLowFuelPercent or iCurTechLevel >= 4 or EntityCategoryContains(categories.CANNOTUSEAIRSTAGING, oUnit.UnitId) then
+                                if oUnit[refbOnAssignment] == true then
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. ': Unit is on assignment')
                                     end
-                                    oUnit[reftIdleChecker][iIdleTime] = true
-                                    if oUnit[reftIdleChecker][iIdleTime - 1] then
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': Air unit is idle so clearing its commands')
-                                            if oUnit[refoAirAATarget] and oUnit[refoAirAATarget].GetUnitId then
-                                                LOG('Units target that will be cleared=' .. oUnit[refoAirAATarget].UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit[refoAirAATarget]))
-                                            end
+                                    --Check there's not a rare error where unit is on assignment but is actually idle
+                                    --This might also be used for transports (havent bothered debugging to confirm since they work as desired)
+                                    if M27Logic.IsUnitIdle(oUnit, true, false, nil) then
+                                        local iIdleTime = math.floor(GetGameTimeSeconds())
+                                        if not (oUnit[reftIdleChecker]) then
+                                            oUnit[reftIdleChecker] = {}
                                         end
-                                        oUnit[refbOnAssignment] = false
-                                        ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
-                                        --IssueMove({oUnit}, M27Logic.GetNearestRallyPoint(aiBrain, oUnit:GetPosition()))
-                                        bUnitIsUnassigned = true
-                                    end
-                                else
-
-
-                                    --Unit on assignment - check if its reached it, unless special micro is active
-                                    if not (oUnit[M27UnitInfo.refbSpecialMicroActive]) then
-                                        if iUnitType == iTypeScout then
-                                            --Check its not a scout with a dedicated assist target which uses its own logic`
-                                            if not (oUnit[refoAssignedAirScout]) then
-                                                tCurWaypointTarget = oUnit[reftMovementPath][oUnit[refiCurMovementPath]]
-                                                if bDebugMessages == true then
-                                                    LOG(sFunctionRef .. ': Checking if iUnit=' .. iUnit .. ' has reached its target; cur target=' .. repru(tCurWaypointTarget))
+                                        oUnit[reftIdleChecker][iIdleTime] = true
+                                        if oUnit[reftIdleChecker][iIdleTime - 1] then
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef .. ': Air unit is idle so clearing its commands')
+                                                if oUnit[refoAirAATarget] and oUnit[refoAirAATarget].GetUnitId then
+                                                    LOG('Units target that will be cleared=' .. oUnit[refoAirAATarget].UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit[refoAirAATarget]))
                                                 end
-                                                if M27Utilities.IsTableEmpty(tCurWaypointTarget) == false then
-                                                    if bDebugMessages == true then
-                                                        LOG(sFunctionRef .. ': tCurWaypointTarget=' .. repru(tCurWaypointTarget))
-                                                    end
-                                                    iDistanceToComplete = oUnit:GetBlueprint().Intel.VisionRadius * 0.8
-                                                    tUnitCurPosition = oUnit:GetPosition()
-                                                    local iDistanceToCurTarget = M27Utilities.GetDistanceBetweenPositions(tUnitCurPosition, tCurWaypointTarget)
-                                                    iCurLoopCount = 0
+                                            end
+                                            oUnit[refbOnAssignment] = false
+                                            ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
+                                            --IssueMove({oUnit}, M27Logic.GetNearestRallyPoint(aiBrain, oUnit:GetPosition()))
+                                            bUnitIsUnassigned = true
+                                        end
+                                    else
 
-                                                    iTotalMovementPaths = table.getn(oUnit[reftMovementPath])
-                                                    iCurAirSegmentX, iCurAirSegmentZ = GetAirSegmentFromPosition(tCurWaypointTarget)
-                                                    if bDebugMessages == true then
-                                                        LOG(sFunctionRef .. ': iDistanceToCurTarget=' .. iDistanceToCurTarget .. '; iDistanceToComplete=' .. iDistanceToComplete .. '; aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted]=' .. aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted] .. '; iTimeStamp=' .. iTimeStamp)
-                                                    end
-                                                    --Check if are either close to the target, or have had recent visual of the target
 
-                                                    while iDistanceToCurTarget <= iDistanceToComplete or GetTimeSinceLastScoutedLocation(aiBrain, tCurWaypointTarget) <= math.max(2, aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval] or 500 - 10) do
+                                        --Unit on assignment - check if its reached it, unless special micro is active
+                                        if not (oUnit[M27UnitInfo.refbSpecialMicroActive]) then
+                                            if iUnitType == iTypeScout then
+                                                --Check its not a scout with a dedicated assist target which uses its own logic`
+                                                if not (oUnit[refoAssignedAirScout]) then
+                                                    tCurWaypointTarget = oUnit[reftMovementPath][oUnit[refiCurMovementPath]]
+                                                    if bDebugMessages == true then
+                                                        LOG(sFunctionRef .. ': Checking if iUnit=' .. iUnit .. ' has reached its target; cur target=' .. repru(tCurWaypointTarget))
+                                                    end
+                                                    if M27Utilities.IsTableEmpty(tCurWaypointTarget) == false then
                                                         if bDebugMessages == true then
-                                                            LOG(sFunctionRef .. ': Are close enough to target or have already had recent visual of the target, checking unit on assignment, iCurLoopCount=' .. iCurLoopCount .. '; iTimeStamp=' .. iTimeStamp .. '; [refiLastScouted]=' .. aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted] .. '; iCurAirSegmentX-Z=' .. iCurAirSegmentX .. '-' .. iCurAirSegmentZ)
+                                                            LOG(sFunctionRef .. ': tCurWaypointTarget=' .. repru(tCurWaypointTarget))
                                                         end
-                                                        iCurLoopCount = iCurLoopCount + 1
-                                                        if iCurLoopCount > iMaxLoopCount then
-                                                            M27Utilities.ErrorHandler('Infinite loop')
-                                                            break
-                                                        end
+                                                        iDistanceToComplete = oUnit:GetBlueprint().Intel.VisionRadius * 0.8
+                                                        tUnitCurPosition = oUnit:GetPosition()
+                                                        local iDistanceToCurTarget = M27Utilities.GetDistanceBetweenPositions(tUnitCurPosition, tCurWaypointTarget)
+                                                        iCurLoopCount = 0
 
-                                                        aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned] = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned] - 1
-                                                        oUnit[refiCurMovementPath] = oUnit[refiCurMovementPath] + 1
-                                                        if oUnit[refiCurMovementPath] > iTotalMovementPaths then
+                                                        iTotalMovementPaths = table.getn(oUnit[reftMovementPath])
+                                                        iCurAirSegmentX, iCurAirSegmentZ = GetAirSegmentFromPosition(tCurWaypointTarget)
+                                                        if bDebugMessages == true then
+                                                            LOG(sFunctionRef .. ': iDistanceToCurTarget=' .. iDistanceToCurTarget .. '; iDistanceToComplete=' .. iDistanceToComplete .. '; aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted]=' .. aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted] .. '; iTimeStamp=' .. iTimeStamp)
+                                                        end
+                                                        --Check if are either close to the target, or have had recent visual of the target
+
+                                                        while iDistanceToCurTarget <= iDistanceToComplete or GetTimeSinceLastScoutedLocation(aiBrain, tCurWaypointTarget) <= math.max(2, aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval] or 500 - 10) do
                                                             if bDebugMessages == true then
-                                                                LOG(sFunctionRef .. ': Unit has reached all its movement paths so making it available')
+                                                                LOG(sFunctionRef .. ': Are close enough to target or have already had recent visual of the target, checking unit on assignment, iCurLoopCount=' .. iCurLoopCount .. '; iTimeStamp=' .. iTimeStamp .. '; [refiLastScouted]=' .. aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted] .. '; iCurAirSegmentX-Z=' .. iCurAirSegmentX .. '-' .. iCurAirSegmentZ)
                                                             end
-                                                            ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
-                                                            bUnitIsUnassigned = true
-                                                            break
-                                                            --oUnit[refbOnAssignment] = false
-                                                        else
-                                                            tCurWaypointTarget = oUnit[reftMovementPath][oUnit[refiCurMovementPath]]
-                                                            if bDebugMessages == true then
-                                                                LOG(sFunctionRef .. ': Scout has reached target, increasing its movement path 1 to ' .. oUnit[refiCurMovementPath] .. '; location of this=' .. repru(tCurWaypointTarget))
+                                                            iCurLoopCount = iCurLoopCount + 1
+                                                            if iCurLoopCount > iMaxLoopCount then
+                                                                M27Utilities.ErrorHandler('Infinite loop')
+                                                                break
                                                             end
-                                                            if M27Utilities.IsTableEmpty(tCurWaypointTarget) == true then
+
+                                                            aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned] = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned] - 1
+                                                            oUnit[refiCurMovementPath] = oUnit[refiCurMovementPath] + 1
+                                                            if oUnit[refiCurMovementPath] > iTotalMovementPaths then
                                                                 if bDebugMessages == true then
-                                                                    LOG(sFunctionRef .. ': Units current target is empty so making it available again')
+                                                                    LOG(sFunctionRef .. ': Unit has reached all its movement paths so making it available')
                                                                 end
                                                                 ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
                                                                 bUnitIsUnassigned = true
-                                                                --oUnit[refbOnAssignment] = false
                                                                 break
+                                                                --oUnit[refbOnAssignment] = false
                                                             else
-                                                                iDistanceToCurTarget = M27Utilities.GetDistanceBetweenPositions(tUnitCurPosition, tCurWaypointTarget)
-                                                                iCurAirSegmentX, iCurAirSegmentZ = GetAirSegmentFromPosition(tCurWaypointTarget)
+                                                                tCurWaypointTarget = oUnit[reftMovementPath][oUnit[refiCurMovementPath]]
+                                                                if bDebugMessages == true then
+                                                                    LOG(sFunctionRef .. ': Scout has reached target, increasing its movement path 1 to ' .. oUnit[refiCurMovementPath] .. '; location of this=' .. repru(tCurWaypointTarget))
+                                                                end
+                                                                if M27Utilities.IsTableEmpty(tCurWaypointTarget) == true then
+                                                                    if bDebugMessages == true then
+                                                                        LOG(sFunctionRef .. ': Units current target is empty so making it available again')
+                                                                    end
+                                                                    ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
+                                                                    bUnitIsUnassigned = true
+                                                                    --oUnit[refbOnAssignment] = false
+                                                                    break
+                                                                else
+                                                                    iDistanceToCurTarget = M27Utilities.GetDistanceBetweenPositions(tUnitCurPosition, tCurWaypointTarget)
+                                                                    iCurAirSegmentX, iCurAirSegmentZ = GetAirSegmentFromPosition(tCurWaypointTarget)
+                                                                end
                                                             end
                                                         end
-                                                    end
-                                                    if iCurLoopCount == 0 then
-                                                        --Scout not close to any destination, check if it's close to the start and reset if it is (unless it has an action to move away and hasnt scouted anywhere yet)
-                                                        if M27Utilities.GetDistanceBetweenPositions(tStartPosition, tUnitCurPosition) < iDistanceFromStartForReset then
-                                                            local bConsiderForReset = false
-                                                            if not (oUnit[M27UnitInfo.refbSpecialMicroActive]) then
-                                                                if oUnit[refiCurMovementPath] > 1 then
-                                                                    bConsiderForReset = true
-                                                                else
-                                                                    if oUnit.GetNavigator then
-                                                                        oNavigator = oUnit:GetNavigator()
-                                                                        if oNavigator.GetCurrentTargetPos then
-                                                                            if M27Utilities.GetDistanceBetweenPositions(oNavigator:GetCurrentTargetPos(), tStartPosition) < iDistanceFromStartForReset then
-                                                                                bConsiderForReset = true
+                                                        if iCurLoopCount == 0 then
+                                                            --Scout not close to any destination, check if it's close to the start and reset if it is (unless it has an action to move away and hasnt scouted anywhere yet)
+                                                            if M27Utilities.GetDistanceBetweenPositions(tStartPosition, tUnitCurPosition) < iDistanceFromStartForReset then
+                                                                local bConsiderForReset = false
+                                                                if not (oUnit[M27UnitInfo.refbSpecialMicroActive]) then
+                                                                    if oUnit[refiCurMovementPath] > 1 then
+                                                                        bConsiderForReset = true
+                                                                    else
+                                                                        if oUnit.GetNavigator then
+                                                                            oNavigator = oUnit:GetNavigator()
+                                                                            if oNavigator.GetCurrentTargetPos then
+                                                                                if M27Utilities.GetDistanceBetweenPositions(oNavigator:GetCurrentTargetPos(), tStartPosition) < iDistanceFromStartForReset then
+                                                                                    bConsiderForReset = true
+                                                                                end
                                                                             end
                                                                         end
                                                                     end
                                                                 end
-                                                            end
-                                                            if bConsiderForReset == true then
-                                                                --Reset scout to prevent risk of it reaching a movement path but not registering in above code
-                                                                if bDebugMessages == true then
-                                                                    LOG(sFunctionRef .. ': Reseting scout trackers and clearing its orders')
+                                                                if bConsiderForReset == true then
+                                                                    --Reset scout to prevent risk of it reaching a movement path but not registering in above code
+                                                                    if bDebugMessages == true then
+                                                                        LOG(sFunctionRef .. ': Reseting scout trackers and clearing its orders')
+                                                                    end
+                                                                    ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
                                                                 end
-                                                                ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
-                                                            end
-                                                        end
-                                                    else
-                                                        if bDebugMessages == true then
-                                                            LOG(sFunctionRef .. ': iCurLoopCount=' .. iCurLoopCount .. '; so scout managed to reach at least one destination')
-                                                        end
-                                                        --Scout managed to reach at least one destination
-                                                        if oUnit[refiCurMovementPath] <= iTotalMovementPaths then
-                                                            if bDebugMessages == true then
-                                                                local iLifetimeCount = M27UnitInfo.GetUnitLifetimeCount(oUnit)
-                                                                LOG(sFunctionRef .. ': About to clear scouts path and then reissue remaining paths that scout hasnt reached yet; scout unique count=' .. iLifetimeCount)
-                                                            end
-                                                            M27Utilities.IssueTrackedClearCommands({ oUnit })
-                                                            ClearPreviousMovementEntries(aiBrain, oUnit) --Will remove earlier movement path entries and update assignment trackers
-
-                                                            for iPath, tPath in oUnit[reftMovementPath] do
-                                                                IssueMove({ oUnit }, tPath)
                                                             end
                                                         else
                                                             if bDebugMessages == true then
-                                                                LOG(sFunctionRef .. ': CurMovementPath > total movement paths so scout must have reached all its destinations - making scout available again')
+                                                                LOG(sFunctionRef .. ': iCurLoopCount=' .. iCurLoopCount .. '; so scout managed to reach at least one destination')
                                                             end
-                                                            bUnitIsUnassigned = true
-                                                            ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
-                                                            --oUnit[refbOnAssignment] = false
-                                                        end
-                                                    end
+                                                            --Scout managed to reach at least one destination
+                                                            if oUnit[refiCurMovementPath] <= iTotalMovementPaths then
+                                                                if bDebugMessages == true then
+                                                                    local iLifetimeCount = M27UnitInfo.GetUnitLifetimeCount(oUnit)
+                                                                    LOG(sFunctionRef .. ': About to clear scouts path and then reissue remaining paths that scout hasnt reached yet; scout unique count=' .. iLifetimeCount)
+                                                                end
+                                                                M27Utilities.IssueTrackedClearCommands({ oUnit })
+                                                                ClearPreviousMovementEntries(aiBrain, oUnit) --Will remove earlier movement path entries and update assignment trackers
 
-                                                else
-                                                    if bDebugMessages == true then
-                                                        LOG(sFunctionRef .. ': Current movement path is empty so making scout available')
+                                                                for iPath, tPath in oUnit[reftMovementPath] do
+                                                                    IssueMove({ oUnit }, tPath)
+                                                                end
+                                                            else
+                                                                if bDebugMessages == true then
+                                                                    LOG(sFunctionRef .. ': CurMovementPath > total movement paths so scout must have reached all its destinations - making scout available again')
+                                                                end
+                                                                bUnitIsUnassigned = true
+                                                                ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
+                                                                --oUnit[refbOnAssignment] = false
+                                                            end
+                                                        end
+
+                                                    else
+                                                        if bDebugMessages == true then
+                                                            LOG(sFunctionRef .. ': Current movement path is empty so making scout available')
+                                                        end
+                                                        --oUnit[refbOnAssignment] = false
+                                                        ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
+                                                        bUnitIsUnassigned = true
                                                     end
-                                                    --oUnit[refbOnAssignment] = false
+                                                elseif bDebugMessages == true then
+                                                    LOG(sFunctionRef .. ': Scout ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' is assigned to assist unit ' .. oUnit[refoAssignedAirScout].UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit[refoAssignedAirScout]))
+                                                end
+                                            elseif iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber then
+                                                if bDebugMessages == true then
+                                                    LOG(sFunctionRef .. ': Have a bomber or torp bomber, will check its targets; refbOnAssignment pre check=' .. tostring(oUnit[refbOnAssignment]))
+                                                end
+                                                UpdateBomberTargets(oUnit)
+                                                if oUnit[refbOnAssignment] == false and not (oUnit[M27UnitInfo.refbSpecialMicroActive]) then
+                                                    bUnitIsUnassigned = true
+                                                end
+                                                if bDebugMessages == true then
+                                                    LOG(sFunctionRef .. ': Unit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; refbOnAssignment post check=' .. tostring(oUnit[refbOnAssignment]))
+                                                end
+                                            elseif iUnitType == iTypeGunship then
+                                                --Stop if gunship low health and send it back to our base
+                                                if M27UnitInfo.GetUnitHealthPercent() <= iGunshipLowHealthPercent then
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Gunship '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' has health percent='..M27UnitInfo.GetUnitHealthPercent()..' so will clear any trackers') end
                                                     ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
                                                     bUnitIsUnassigned = true
                                                 end
-                                            elseif bDebugMessages == true then
-                                                LOG(sFunctionRef .. ': Scout ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' is assigned to assist unit ' .. oUnit[refoAssignedAirScout].UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit[refoAssignedAirScout]))
-                                            end
-                                        elseif iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber then
-                                            if bDebugMessages == true then
-                                                LOG(sFunctionRef .. ': Have a bomber or torp bomber, will check its targets; refbOnAssignment pre check=' .. tostring(oUnit[refbOnAssignment]))
-                                            end
-                                            UpdateBomberTargets(oUnit)
-                                            if oUnit[refbOnAssignment] == false and not (oUnit[M27UnitInfo.refbSpecialMicroActive]) then
-                                                bUnitIsUnassigned = true
-                                            end
-                                            if bDebugMessages == true then
-                                                LOG(sFunctionRef .. ': Unit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; refbOnAssignment post check=' .. tostring(oUnit[refbOnAssignment]))
-                                            end
-                                        elseif iUnitType == iTypeGunship then
-                                            --Stop if gunship low health and send it back to our base
-                                            if M27UnitInfo.GetUnitHealthPercent() <= iGunshipLowHealthPercent then
-                                                if bDebugMessages == true then LOG(sFunctionRef..': Gunship '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' has health percent='..M27UnitInfo.GetUnitHealthPercent()..' so will clear any trackers') end
-                                                ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
-                                                bUnitIsUnassigned = true
-                                            end
-                                        elseif iUnitType == iTypeAirAA then
-                                            bClearAirAATargets = false
-                                            bReturnToRallyPoint = false
-                                            if oUnit[refoAirAATarget] == nil or oUnit[refoAirAATarget].Dead then
-                                                bClearAirAATargets = true
-                                            else
-                                                --Check if want to stop chasing the target
-                                                if bDebugMessages == true then
-                                                    LOG(sFunctionRef .. ': Our unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' is currently targetting enemy unit ' .. oUnit[refoAirAATarget].UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit[refoAirAATarget]))
-                                                end
-                                                if not (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance) then
-                                                    --Want to continue chasing regardless of how far away we go if we're in air dominance mode
-
-                                                    sTargetBP = oUnit[refoAirAATarget].UnitId
+                                            elseif iUnitType == iTypeAirAA then
+                                                bClearAirAATargets = false
+                                                bReturnToRallyPoint = false
+                                                if oUnit[refoAirAATarget] == nil or oUnit[refoAirAATarget].Dead then
+                                                    bClearAirAATargets = true
+                                                else
+                                                    --Check if want to stop chasing the target
                                                     if bDebugMessages == true then
-                                                        LOG(sFunctionRef .. ': Checking if sTargetBP ' .. sTargetBP .. ' is an air scout or airAA unit')
+                                                        LOG(sFunctionRef .. ': Our unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' is currently targetting enemy unit ' .. oUnit[refoAirAATarget].UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit[refoAirAATarget]))
                                                     end
-                                                    if EntityCategoryContains(refCategoryAirScout, sTargetBP) and aiBrain[refbNonScoutUnassignedAirAATargets] then
-                                                        if bDebugMessages == true then
-                                                            LOG(sFunctionRef .. ': Clearing target as its an air scout and we have bigger fish to fry')
-                                                        end
-                                                        bClearAirAATargets = true
-                                                        bReturnToRallyPoint = true
-                                                    else
-                                                        --Non-scout target - consider not following if we arent on our side of the map
-                                                        --Are we closer to enemy base than ours, or might be near dangerous enemy airaa?
-                                                        tOurPosition = oUnit:GetPosition()
+                                                    if not (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance) then
+                                                        --Want to continue chasing regardless of how far away we go if we're in air dominance mode
 
-                                                        iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tEnemyStartPosition, tOurPosition)
-                                                        iDistToOurBase = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tOurPosition)
+                                                        sTargetBP = oUnit[refoAirAATarget].UnitId
                                                         if bDebugMessages == true then
-                                                            LOG(sFunctionRef .. ': Checking how close we are to our start and enemy start; distance to enemy=' .. iDistToEnemyBase .. '; distance to our start=' .. iDistToOurBase..'; aiBrain[refiClosestEnemyDangerousAADistToOurBase]='..aiBrain[refiClosestEnemyDangerousAADistToOurBase])
+                                                            LOG(sFunctionRef .. ': Checking if sTargetBP ' .. sTargetBP .. ' is an air scout or airAA unit')
                                                         end
-
-                                                        if iDistToEnemyBase < iDistToOurBase or iDistToOurBase >= aiBrain[refiClosestEnemyDangerousAADistToOurBase] then
-                                                            --are we not in combat range of the enemy target?
-                                                            tTargetPos = oUnit[refoAirAATarget]:GetPosition()
+                                                        if EntityCategoryContains(refCategoryAirScout, sTargetBP) and aiBrain[refbNonScoutUnassignedAirAATargets] then
                                                             if bDebugMessages == true then
-                                                                LOG(sFunctionRef .. ': Checking if enemy unit is within our combat range; our range=' .. oUnit:GetBlueprint().Weapon[1].MaxRadius..'; Dist to target units position='..M27Utilities.GetDistanceBetweenPositions(tTargetPos, tOurPosition)..'; target unit facing angle='..M27UnitInfo.GetUnitFacingAngle(oUnit[refoAirAATarget])..'; Angle from target unit to our base='..M27Utilities.GetAngleFromAToB(oUnit[refoAirAATarget]:GetPosition(), tStartPosition)..'; Angle dif='..M27Utilities.GetAngleDifference(M27UnitInfo.GetUnitFacingAngle(oUnit[refoAirAATarget]), M27Utilities.GetAngleFromAToB(oUnit[refoAirAATarget]:GetPosition(), tStartPosition)))
+                                                                LOG(sFunctionRef .. ': Clearing target as its an air scout and we have bigger fish to fry')
+                                                            end
+                                                            bClearAirAATargets = true
+                                                            bReturnToRallyPoint = true
+                                                        else
+                                                            --Non-scout target - consider not following if we arent on our side of the map
+                                                            --Are we closer to enemy base than ours, or might be near dangerous enemy airaa?
+                                                            tOurPosition = oUnit:GetPosition()
+
+                                                            iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tEnemyStartPosition, tOurPosition)
+                                                            iDistToOurBase = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tOurPosition)
+                                                            if bDebugMessages == true then
+                                                                LOG(sFunctionRef .. ': Checking how close we are to our start and enemy start; distance to enemy=' .. iDistToEnemyBase .. '; distance to our start=' .. iDistToOurBase..'; aiBrain[refiClosestEnemyDangerousAADistToOurBase]='..aiBrain[refiClosestEnemyDangerousAADistToOurBase])
                                                             end
 
-                                                            if M27Utilities.GetDistanceBetweenPositions(tTargetPos, tOurPosition) - 1 > oUnit:GetBlueprint().Weapon[1].MaxRadius then
-                                                                --is it moving further away from our base? Approximate by getting the unit's facing angle
-                                                                --[[if oUnit[refoAirAATarget].GetNavigator then
-                                                                    tTargetDestination = oUnit[refoAirAATarget]:GetNavigator():GetCurrentTargetPos()
-                                                                else
-                                                                    tTargetDestination = oUnit[refoAirAATarget]:GetPosition()
-                                                                end
+                                                            if iDistToEnemyBase < iDistToOurBase or iDistToOurBase >= aiBrain[refiClosestEnemyDangerousAADistToOurBase] then
+                                                                --are we not in combat range of the enemy target?
+                                                                tTargetPos = oUnit[refoAirAATarget]:GetPosition()
                                                                 if bDebugMessages == true then
-                                                                    LOG(sFunctionRef .. ': Checking if enemy unit navigator target is closer to enemy base than the unit; dist for navigator target to enemy base='..M27Utilities.GetDistanceBetweenPositions(tTargetDestination, tEnemyStartPosition))
+                                                                    LOG(sFunctionRef .. ': Checking if enemy unit is within our combat range; our range=' .. oUnit:GetBlueprint().Weapon[1].MaxRadius..'; Dist to target units position='..M27Utilities.GetDistanceBetweenPositions(tTargetPos, tOurPosition)..'; target unit facing angle='..M27UnitInfo.GetUnitFacingAngle(oUnit[refoAirAATarget])..'; Angle from target unit to our base='..M27Utilities.GetAngleFromAToB(oUnit[refoAirAATarget]:GetPosition(), tStartPosition)..'; Angle dif='..M27Utilities.GetAngleDifference(M27UnitInfo.GetUnitFacingAngle(oUnit[refoAirAATarget]), M27Utilities.GetAngleFromAToB(oUnit[refoAirAATarget]:GetPosition(), tStartPosition)))
                                                                 end
-                                                                iNavigationDistToEnemybase = M27Utilities.GetDistanceBetweenPositions(tTargetDestination, tEnemyStartPosition)--]]
-                                                                --Is the destination of the target unit opposite direction to our base?
-                                                                if M27Utilities.GetAngleDifference(M27UnitInfo.GetUnitFacingAngle(oUnit[refoAirAATarget]), M27Utilities.GetAngleFromAToB(oUnit[refoAirAATarget]:GetPosition(), tStartPosition)) >= 100 then
-                                                                    --Is it not near our ACU? (use double normal threshold)
-                                                                    if bDebugMessages == true then
-                                                                        LOG(sFunctionRef .. ': Checking if enemy unit is near our ACU, distance between ACU and target unit=' .. M27Utilities.GetDistanceBetweenPositions(tTargetPos, M27Utilities.GetACU(aiBrain):GetPosition()))
-                                                                    end
-                                                                    if M27Utilities.GetDistanceBetweenPositions(tTargetPos, M27Utilities.GetACU(aiBrain):GetPosition()) > aiBrain[refiNearToACUThreshold] + math.min(aiBrain[refiNearToACUThreshold], 40) then
-                                                                        --Dont run if we have friendly units and there is no AA of our current tech level or better
 
-                                                                        --NOTE: if making changes to below, also consider whether to change the logic for assigning the target in the first place which has a similar check for if enemy air near friendly units
-                                                                        --currently have set range to double the range when target first assigned
-                                                                        tNearbyFriendlies = M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure + categories.LAND + categories.NAVAL + M27UnitInfo.refCategoryTorpBomber + M27UnitInfo.refCategoryBomber, tTargetPos, iAssistNearbyUnitRange + math.min(iAssistNearbyUnitRange, 40), 'Ally'))
-                                                                        --Do we have any friendly units nearby, and/or our closest bomber to the enemy base is a similar distance from the base to the air unit we are targetting and our target is significantly slower than us? (as e.g. strat bombers can outpace inties meaning the intie ends up out of range until the strat bomber turns)
-                                                                        if M27Utilities.IsTableEmpty(tNearbyFriendlies) and (M27Utilities.GetDistanceBetweenPositions(tTargetPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) - 50 < iClosestBomberDistanceToEnemy or oUnit[refoAirAATarget]:GetBlueprint().Air.MaxAirspeed > oUnit:GetBlueprint().Air.MaxAirspeed) then
-                                                                            if bDebugMessages == true then
-                                                                                LOG(sFunctionRef .. ': Will clear target since its heading towards enemy base and we dont want to follow it')
+                                                                if M27Utilities.GetDistanceBetweenPositions(tTargetPos, tOurPosition) - 1 > oUnit:GetBlueprint().Weapon[1].MaxRadius then
+                                                                    --is it moving further away from our base? Approximate by getting the unit's facing angle
+                                                                    --[[if oUnit[refoAirAATarget].GetNavigator then
+                                                                        tTargetDestination = oUnit[refoAirAATarget]:GetNavigator():GetCurrentTargetPos()
+                                                                    else
+                                                                        tTargetDestination = oUnit[refoAirAATarget]:GetPosition()
+                                                                    end
+                                                                    if bDebugMessages == true then
+                                                                        LOG(sFunctionRef .. ': Checking if enemy unit navigator target is closer to enemy base than the unit; dist for navigator target to enemy base='..M27Utilities.GetDistanceBetweenPositions(tTargetDestination, tEnemyStartPosition))
+                                                                    end
+                                                                    iNavigationDistToEnemybase = M27Utilities.GetDistanceBetweenPositions(tTargetDestination, tEnemyStartPosition)--]]
+                                                                    --Is the destination of the target unit opposite direction to our base?
+                                                                    if M27Utilities.GetAngleDifference(M27UnitInfo.GetUnitFacingAngle(oUnit[refoAirAATarget]), M27Utilities.GetAngleFromAToB(oUnit[refoAirAATarget]:GetPosition(), tStartPosition)) >= 100 then
+                                                                        --Is it not near our ACU? (use double normal threshold)
+                                                                        if bDebugMessages == true then
+                                                                            LOG(sFunctionRef .. ': Checking if enemy unit is near our ACU, distance between ACU and target unit=' .. M27Utilities.GetDistanceBetweenPositions(tTargetPos, M27Utilities.GetACU(aiBrain):GetPosition()))
+                                                                        end
+                                                                        if M27Utilities.GetDistanceBetweenPositions(tTargetPos, M27Utilities.GetACU(aiBrain):GetPosition()) > aiBrain[refiNearToACUThreshold] + math.min(aiBrain[refiNearToACUThreshold], 40) then
+                                                                            --Dont run if we have friendly units and there is no AA of our current tech level or better
+
+                                                                            --NOTE: if making changes to below, also consider whether to change the logic for assigning the target in the first place which has a similar check for if enemy air near friendly units
+                                                                            --currently have set range to double the range when target first assigned
+                                                                            tNearbyFriendlies = M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure + categories.LAND + categories.NAVAL + M27UnitInfo.refCategoryTorpBomber + M27UnitInfo.refCategoryBomber, tTargetPos, iAssistNearbyUnitRange + math.min(iAssistNearbyUnitRange, 40), 'Ally'))
+                                                                            --Do we have any friendly units nearby, and/or our closest bomber to the enemy base is a similar distance from the base to the air unit we are targetting and our target is significantly slower than us? (as e.g. strat bombers can outpace inties meaning the intie ends up out of range until the strat bomber turns)
+                                                                            if M27Utilities.IsTableEmpty(tNearbyFriendlies) and (M27Utilities.GetDistanceBetweenPositions(tTargetPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) - 50 < iClosestBomberDistanceToEnemy or oUnit[refoAirAATarget]:GetBlueprint().Air.MaxAirspeed > oUnit:GetBlueprint().Air.MaxAirspeed) then
+                                                                                if bDebugMessages == true then
+                                                                                    LOG(sFunctionRef .. ': Will clear target since its heading towards enemy base and we dont want to follow it')
+                                                                                end
+                                                                                bClearAirAATargets = true
+                                                                                bReturnToRallyPoint = true
+                                                                            else
+                                                                                if bDebugMessages == true then
+                                                                                    LOG(sFunctionRef .. ': Have nearby friendly units, will check if any enemy AA')
+                                                                                end
+                                                                                --Have nearby friendly units, but still abort if significant enemy groundAA near us since we arent near our ACU
+                                                                                tNearbyEnemyAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, tOurPosition, 110, 'Enemy')
+                                                                                if M27Utilities.IsTableEmpty(tNearbyEnemyAA) == false then
+                                                                                    --Is any of the ground AA at our tech level or greater?
+                                                                                    iCurTechLevel = M27UnitInfo.GetUnitTechLevel(oUnit)
+                                                                                    for iEnemy, oEnemy in tNearbyEnemyAA do
+                                                                                        if M27UnitInfo.GetUnitTechLevel(oEnemy) >= iCurTechLevel then
+                                                                                            if bDebugMessages == true then
+                                                                                                LOG(sFunctionRef .. ': Enemy has AA of at least teh same tech level as us; iCurTechLevel=' .. iCurTechLevel .. '; Enemy AA unit=' .. oEnemy.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oEnemy))
+                                                                                            end
+                                                                                            bClearAirAATargets = true
+                                                                                            bReturnToRallyPoint = true
+                                                                                            break
+                                                                                        end
+                                                                                    end
+                                                                                end
+                                                                                if not(bClearAirAATargets) and M27Utilities.IsTableEmpty(tAllRecentlySeenCruisers) == false then
+                                                                                    for iCruiser, oCruiser in tAllRecentlySeenCruisers do
+                                                                                        if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oCruiser:GetPosition()) <= iRecentlySeenCruiserSearchRange then
+                                                                                            bClearAirAATargets = true
+                                                                                            bReturnToRallyPoint = true
+                                                                                            if bDebugMessages == true then LOG(sFunctionRef..': Enemy cruiser recently detected nearby='..oCruiser.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCruiser)..'; Dist away='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oCruiser:GetPosition())) end
+                                                                                            break
+                                                                                        end
+                                                                                    end
+                                                                                end
+                                                                                if bDebugMessages == true then LOG(sFunctionRef..': Finished checking for nearby AA. bClearAirAATargets='..tostring(bClearAirAATargets)..'; bReturnToRallyPoint='..tostring(bReturnToRallyPoint)) end
                                                                             end
-                                                                            bClearAirAATargets = true
-                                                                            bReturnToRallyPoint = true
                                                                         else
                                                                             if bDebugMessages == true then
-                                                                                LOG(sFunctionRef .. ': Have nearby friendly units, will check if any enemy AA')
+                                                                                LOG(sFunctionRef .. ': Air unit is on enemy side of map but near our ACU so will still intercept it')
                                                                             end
-                                                                            --Have nearby friendly units, but still abort if significant enemy groundAA near us since we arent near our ACU
-                                                                            tNearbyEnemyAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, tOurPosition, 110, 'Enemy')
-                                                                            if M27Utilities.IsTableEmpty(tNearbyEnemyAA) == false then
-                                                                                --Is any of the ground AA at our tech level or greater?
-                                                                                iCurTechLevel = M27UnitInfo.GetUnitTechLevel(oUnit)
-                                                                                for iEnemy, oEnemy in tNearbyEnemyAA do
-                                                                                    if M27UnitInfo.GetUnitTechLevel(oEnemy) >= iCurTechLevel then
-                                                                                        if bDebugMessages == true then
-                                                                                            LOG(sFunctionRef .. ': Enemy has AA of at least teh same tech level as us; iCurTechLevel=' .. iCurTechLevel .. '; Enemy AA unit=' .. oEnemy.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oEnemy))
-                                                                                        end
-                                                                                        bClearAirAATargets = true
-                                                                                        bReturnToRallyPoint = true
-                                                                                        break
-                                                                                    end
-                                                                                end
-                                                                            end
-                                                                            if not(bClearAirAATargets) and M27Utilities.IsTableEmpty(tAllRecentlySeenCruisers) == false then
-                                                                                for iCruiser, oCruiser in tAllRecentlySeenCruisers do
-                                                                                    if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oCruiser:GetPosition()) <= iRecentlySeenCruiserSearchRange then
-                                                                                        bClearAirAATargets = true
-                                                                                        bReturnToRallyPoint = true
-                                                                                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy cruiser recently detected nearby='..oCruiser.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCruiser)..'; Dist away='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oCruiser:GetPosition())) end
-                                                                                        break
-                                                                                    end
-                                                                                end
-                                                                            end
-                                                                            if bDebugMessages == true then LOG(sFunctionRef..': Finished checking for nearby AA. bClearAirAATargets='..tostring(bClearAirAATargets)..'; bReturnToRallyPoint='..tostring(bReturnToRallyPoint)) end
                                                                         end
                                                                     else
                                                                         if bDebugMessages == true then
-                                                                            LOG(sFunctionRef .. ': Air unit is on enemy side of map but near our ACU so will still intercept it')
+                                                                            LOG(sFunctionRef .. ': navigator target destination is closer to our start than the enemy start')
                                                                         end
-                                                                    end
-                                                                else
-                                                                    if bDebugMessages == true then
-                                                                        LOG(sFunctionRef .. ': navigator target destination is closer to our start than the enemy start')
                                                                     end
                                                                 end
                                                             end
                                                         end
                                                     end
                                                 end
-                                            end
-                                            if bClearAirAATargets == true then
-                                                if bDebugMessages == true then
-                                                    if oUnit[refoAirAATarget].GetUnitId then
-                                                        LOG(sFunctionRef .. ': Clearing airAA targets; Target about to be cleared=' .. oUnit[refoAirAATarget].UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit[refoAirAATarget]))
-                                                    else
-                                                        LOG(sFunctionRef .. ': Clearing airAA targets, dont appear to have a valid target')
-                                                    end
-                                                end
-                                                ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
-                                                bUnitIsUnassigned = true
-                                                if bReturnToRallyPoint == true then
-                                                    --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
-                                                    M27Utilities.IssueTrackedClearCommands({ oUnit })
-
-                                                    local tAirRally = GetAirRallyPoint(aiBrain)
-                                                    oUnit[M27PlatoonUtilities.refiLastOrderType] = M27PlatoonUtilities.refiOrderIssueMove
-                                                    oUnit[M27UnitInfo.reftLastOrderTarget] = {tAirRally[1], tAirRally[2], tAirRally[3]}
-                                                    IssueMove({ oUnit }, tAirRally)
+                                                if bClearAirAATargets == true then
                                                     if bDebugMessages == true then
-                                                        LOG(sFunctionRef .. ': Cleared commants for unit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                                                        if oUnit[refoAirAATarget].GetUnitId then
+                                                            LOG(sFunctionRef .. ': Clearing airAA targets; Target about to be cleared=' .. oUnit[refoAirAATarget].UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit[refoAirAATarget]))
+                                                        else
+                                                            LOG(sFunctionRef .. ': Clearing airAA targets, dont appear to have a valid target')
+                                                        end
                                                     end
+                                                    ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
+                                                    bUnitIsUnassigned = true
+                                                    if bReturnToRallyPoint == true then
+                                                        --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
+                                                        M27Utilities.IssueTrackedClearCommands({ oUnit })
+
+                                                        local tAirRally = GetAirRallyPoint(aiBrain)
+                                                        oUnit[M27PlatoonUtilities.refiLastOrderType] = M27PlatoonUtilities.refiOrderIssueMove
+                                                        oUnit[M27UnitInfo.reftLastOrderTarget] = {tAirRally[1], tAirRally[2], tAirRally[3]}
+                                                        IssueMove({ oUnit }, tAirRally)
+                                                        if bDebugMessages == true then
+                                                            LOG(sFunctionRef .. ': Cleared commants for unit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                                                        end
+                                                    end
+                                                    --oUnit[refbOnAssignment] = false
                                                 end
-                                                --oUnit[refbOnAssignment] = false
+                                            elseif iUnitType == iTypeTorpBomber then
+                                                --Do nothing
+                                            elseif iUnitType == iTypeTransport then
+                                                --Do nothing - idle transport logic is handled by M27Transport manager
+                                            else
+                                                M27Utilities.ErrorHandler('Unrecognised unit type. iUnitType=' .. iUnitType) --Redundancy
                                             end
-                                        elseif iUnitType == iTypeTorpBomber then
-                                            --Do nothing
-                                        elseif iUnitType == iTypeTransport then
-                                            --Do nothing - idle transport logic is handled by M27Transport manager
-                                        else
-                                            M27Utilities.ErrorHandler('Unrecognised unit type. iUnitType=' .. iUnitType) --Redundancy
+                                        elseif bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Unit has special micro active so wont do normal checks')
                                         end
-                                    elseif bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Unit has special micro active so wont do normal checks')
-                                    end
-                                end
-                            else
-                                if oUnit[M27UnitInfo.refbSpecialMicroActive] then
-                                    bUnitIsUnassigned = false
-
-                                    --Transport backup logic for if transport been idle for a minute
-                                    if EntityCategoryContains(M27UnitInfo.refCategoryTransport, oUnit.UnitId) then
-                                        if M27Logic.GetUnitState(oUnit) == '' then
-                                            if M27Utilities.IsTableEmpty(oUnit[M27Transport.reftLocationWhenFirstInactive]) or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oUnit[M27Transport.reftLocationWhenFirstInactive]) <= 1 then
-                                                --Havent moved since last location when idle
-                                                oUnit[M27Transport.refiTimeSinceFirstInactive] = math.min((oUnit[M27Transport.refiTimeSinceFirstInactive] or GetGameTimeSeconds()), GetGameTimeSeconds())
-                                            end
-                                            if GetGameTimeSeconds() - oUnit[M27Transport.refiTimeSinceFirstInactive] >= 60 then
-                                                M27Utilities.ErrorHandler('Transport has been idle for more than 1m with an active micro flag, will reset the flag')
-                                                oUnit[M27UnitInfo.refbSpecialMicroActive] = false
-                                                M27Transport.ClearTransportTrackers(aiBrain, oUnit)
-                                            end
-                                        else
-                                            oUnit[M27Transport.refiTimeSinceFirstInactive] = nil
-                                            oUnit[M27Transport.reftLocationWhenFirstInactive] = nil
-                                        end
-                                    end
-
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Special micro is active for the unit so wont treat it as idle. Unit state='..M27Logic.GetUnitState(oUnit)..'; Is unit state empty='..tostring(M27Logic.GetUnitState(oUnit)==''))
                                     end
                                 else
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Unit doesnt have an assignment')
-                                    end
-                                    if not (oUnit[refbSentRefuelCommand]) then
-                                        bUnitIsUnassigned = true
-                                        --T1 bomber override for the first couple of T1 bombers
-                                        if iUnitType == iTypeBomber and M27UnitInfo.GetUnitLifetimeCount(oUnit) <= aiBrain[refiEngiHuntersToGet] and iCurTechLevel == 1 then
-                                            if bDebugMessages == true then
-                                                LOG(sFunctionRef .. ': Dealing with early T1 bomber so want it to hunt for engineers rather tahn being available for normal target logic')
+                                    if oUnit[M27UnitInfo.refbSpecialMicroActive] then
+                                        bUnitIsUnassigned = false
+
+                                        --Transport backup logic for if transport been idle for a minute
+                                        if EntityCategoryContains(M27UnitInfo.refCategoryTransport, oUnit.UnitId) then
+                                            if M27Logic.GetUnitState(oUnit) == '' then
+                                                if M27Utilities.IsTableEmpty(oUnit[M27Transport.reftLocationWhenFirstInactive]) or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oUnit[M27Transport.reftLocationWhenFirstInactive]) <= 1 then
+                                                    --Havent moved since last location when idle
+                                                    oUnit[M27Transport.refiTimeSinceFirstInactive] = math.min((oUnit[M27Transport.refiTimeSinceFirstInactive] or GetGameTimeSeconds()), GetGameTimeSeconds())
+                                                end
+                                                if GetGameTimeSeconds() - oUnit[M27Transport.refiTimeSinceFirstInactive] >= 60 then
+                                                    M27Utilities.ErrorHandler('Transport has been idle for more than 1m with an active micro flag, will reset the flag')
+                                                    oUnit[M27UnitInfo.refbSpecialMicroActive] = false
+                                                    M27Transport.ClearTransportTrackers(aiBrain, oUnit)
+                                                end
+                                            else
+                                                oUnit[M27Transport.refiTimeSinceFirstInactive] = nil
+                                                oUnit[M27Transport.reftLocationWhenFirstInactive] = nil
                                             end
-                                            bUnitIsUnassigned = false
-                                            if not (oUnit[refbEngiHunterMode]) then
-                                                oUnit[refbEngiHunterMode] = true
-                                                aiBrain[reftEngiHunterBombers][oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
-                                            end
-                                            UpdateBomberTargets(oUnit)
+                                        end
+
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Special micro is active for the unit so wont treat it as idle. Unit state='..M27Logic.GetUnitState(oUnit)..'; Is unit state empty='..tostring(M27Logic.GetUnitState(oUnit)==''))
                                         end
                                     else
-                                        --Error check in case unit somehow gained full health and fuel
-                                        if iFuelPercent >= 0.99 then
-                                            if M27UnitInfo.GetUnitHealthPercent(oUnit) >= 0.99 then
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Unit doesnt have an assignment')
+                                        end
+                                        if not (oUnit[refbSentRefuelCommand]) then
+                                            bUnitIsUnassigned = true
+                                            --T1 bomber override for the first couple of T1 bombers
+                                            if iUnitType == iTypeBomber and M27UnitInfo.GetUnitLifetimeCount(oUnit) <= aiBrain[refiEngiHuntersToGet] and iCurTechLevel == 1 then
                                                 if bDebugMessages == true then
-                                                    LOG('Warning - Unit has its status as refueling, but its health and fuel percent are >=99%.  Will remove its status as refueling')
+                                                    LOG(sFunctionRef .. ': Dealing with early T1 bomber so want it to hunt for engineers rather tahn being available for normal target logic')
                                                 end
-                                                oUnit[refbSentRefuelCommand] = false
+                                                bUnitIsUnassigned = false
+                                                if not (oUnit[refbEngiHunterMode]) then
+                                                    oUnit[refbEngiHunterMode] = true
+                                                    aiBrain[reftEngiHunterBombers][oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
+                                                end
+                                                UpdateBomberTargets(oUnit)
+                                            end
+                                        else
+                                            --Error check in case unit somehow gained full health and fuel
+                                            if iFuelPercent >= 0.99 then
+                                                if M27UnitInfo.GetUnitHealthPercent(oUnit) >= 0.99 then
+                                                    if bDebugMessages == true then
+                                                        LOG('Warning - Unit has its status as refueling, but its health and fuel percent are >=99%.  Will remove its status as refueling')
+                                                    end
+                                                    oUnit[refbSentRefuelCommand] = false
+                                                end
                                             end
                                         end
                                     end
                                 end
-                            end
-                            if bUnitIsUnassigned == true then
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Unit is unassigned, will treat as available unless it is a low health bomber or t3 air or any tech gunship and we have air staging. iAirStaging=' .. iAirStaging .. '; M27UnitInfo.GetUnitHealthPercent(oUnit)=' .. M27UnitInfo.GetUnitHealthPercent(oUnit) .. '; Tech level=' .. M27UnitInfo.GetUnitTechLevel(oUnit) .. '; iUnitType=' .. iUnitType .. '; ')
-                                end
+                                if bUnitIsUnassigned == true then
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. ': Unit is unassigned, will treat as available unless it is a low health bomber or t3 air or any tech gunship and we have air staging. iAirStaging=' .. iAirStaging .. '; M27UnitInfo.GetUnitHealthPercent(oUnit)=' .. M27UnitInfo.GetUnitHealthPercent(oUnit) .. '; Tech level=' .. M27UnitInfo.GetUnitTechLevel(oUnit) .. '; iUnitType=' .. iUnitType .. '; ')
+                                    end
 
-                                --Torp bomber when in attackACU mode - attack ACU if its underwater
-                                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and iUnitType == iTypeTorpBomber and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoACUKillTarget]) then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': In ACU kill mode so will get the torp bomber to target enemy ACU which is underwater') end
-                                    ManualTellTorpedoBomberToAttackTarget(aiBrain, oUnit, aiBrain[M27Overseer.refoACUKillTarget])
-                                else
-
-                                    --Send low health bombers and T3 air to heal up provided no T2+ airAA units nearby
-                                    if iCurTechLevel < 4 and iAirStaging > 0 and ((iUnitType == iTypeGunship and M27UnitInfo.GetUnitHealthPercent(oUnit) <= iGunshipLowHealthPercent) or M27UnitInfo.GetUnitHealthPercent(oUnit) <= iLowHealthPercent) and (iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber or iUnitType == iTypeGunship or iCurTechLevel == 3) and
-                                            (iUnitType == iTypeGunship or ((M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA - categories.TECH1, oUnit:GetPosition(), 100, 'Enemy'))) or (M27UnitInfo.GetUnitTechLevel(oUnit) <= 2 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA, oUnit:GetPosition(), 100, 'Enemy'))))) and
-                                            (oUnit[refiBombsDropped] >= 2 or not (iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber)) then
-                                        iCurUnitsWithLowFuel = iCurUnitsWithLowFuel + 1
-                                        aiBrain[reftLowFuelAir][iCurUnitsWithLowFuel] = oUnit
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' has low health or fuel so wont make it available; instead will add to list of units with low fuel; iCurUnitsWithLowFuel=' .. iCurUnitsWithLowFuel)
-                                        end
+                                    --Torp bomber when in attackACU mode - attack ACU if its underwater
+                                    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and iUnitType == iTypeTorpBomber and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoACUKillTarget]) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': In ACU kill mode so will get the torp bomber to target enemy ACU which is underwater') end
+                                        ManualTellTorpedoBomberToAttackTarget(aiBrain, oUnit, aiBrain[M27Overseer.refoACUKillTarget])
                                     else
-                                        iCurUnitsWithFuel = iCurUnitsWithFuel + 1
-                                        aiBrain[sAvailableUnitRef][iCurUnitsWithFuel] = oUnit
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': have an air unit with enough fuel and either good health or nearby enemy air units, iCurUnitsWithFuel=' .. iCurUnitsWithFuel)
+
+                                        --Send low health bombers and T3 air to heal up provided no T2+ airAA units nearby
+                                        if iCurTechLevel < 4 and iAirStaging > 0 and ((iUnitType == iTypeGunship and M27UnitInfo.GetUnitHealthPercent(oUnit) <= iGunshipLowHealthPercent) or M27UnitInfo.GetUnitHealthPercent(oUnit) <= iLowHealthPercent) and (iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber or iUnitType == iTypeGunship or iCurTechLevel == 3) and
+                                                (iUnitType == iTypeGunship or ((M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA - categories.TECH1, oUnit:GetPosition(), 100, 'Enemy'))) or (M27UnitInfo.GetUnitTechLevel(oUnit) <= 2 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA, oUnit:GetPosition(), 100, 'Enemy'))))) and
+                                                (oUnit[refiBombsDropped] >= 2 or not (iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber)) then
+                                            iCurUnitsWithLowFuel = iCurUnitsWithLowFuel + 1
+                                            aiBrain[reftLowFuelAir][iCurUnitsWithLowFuel] = oUnit
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef .. ': unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' has low health or fuel so wont make it available; instead will add to list of units with low fuel; iCurUnitsWithLowFuel=' .. iCurUnitsWithLowFuel)
+                                            end
+                                        else
+                                            iCurUnitsWithFuel = iCurUnitsWithFuel + 1
+                                            aiBrain[sAvailableUnitRef][iCurUnitsWithFuel] = oUnit
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef .. ': have an air unit with enough fuel and either good health or nearby enemy air units, iCurUnitsWithFuel=' .. iCurUnitsWithFuel)
+                                            end
                                         end
                                     end
                                 end
-                            end
-                        else
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' has low fuel')
-                            end
-                            iCurUnitsWithLowFuel = iCurUnitsWithLowFuel + 1
-                            aiBrain[reftLowFuelAir][iCurUnitsWithLowFuel] = oUnit
-                        end
-                    else
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Unit is trying to refuel so wont mark it as available or as a unit with low fuel unless it has high fuel and health')
-                        end
-                        if (M27UnitInfo.GetUnitHealthPercent(oUnit) >= 0.98 and oUnit:GetFuelRatio() >= 0.98) or EntityCategoryContains(categories.CANNOTUSEAIRSTAGING, oUnit.UnitId) then
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Unit has high health and fuel so clearing order so it is seen as being available next cycle')
-                            end
-                            oUnit[refbSentRefuelCommand] = false
-                        else
-                            --Is the unit sat on the ground for a while near air staging or has no unit state? If so then clear its flag as likely it got overridden
-                            --Air staging size z varies between 2.75 to 3
-                            if bDebugMessages == true then LOG(sFunctionRef..': Checking if unit refuel command may have been overridden. Unit position='..repru(oUnit:GetPosition())..'; Surface height='..GetSurfaceHeight(oUnit:GetPosition()[1], oUnit:GetPosition()[3])) end
-                            local bReaddToLowFuel = false
-                            if not(M27UnitInfo.IsUnitValid(oUnit[refoAirStagingAssigned])) then
-                                bReaddToLowFuel = true
                             else
-                                if oUnit:GetPosition()[2] - GetSurfaceHeight(oUnit:GetPosition()[1], oUnit:GetPosition()[3]) <= 7 or oUnit:IsUnitState('MovingDown') then
-                                    oUnit[refiCyclesOnGroundWaitingToRefuel] = (oUnit[refiCyclesOnGroundWaitingToRefuel] or 0) + 1
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit state='..M27Logic.GetUnitState(oUnit)..'; Distance above surface height='..oUnit:GetPosition()[2] - GetSurfaceHeight(oUnit:GetPosition()[1], oUnit:GetPosition()[3])..'; Cycles in this position='..oUnit[refiCyclesOnGroundWaitingToRefuel]) end
-                                    if oUnit[refiCyclesOnGroundWaitingToRefuel] >= 20 or (oUnit[refiCyclesOnGroundWaitingToRefuel] >= 5 and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(),oUnit[refoAirStagingAssigned]:GetPosition()) >= 75) then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Will readd unit to those wanting a new refuel command') end
-                                        bReaddToLowFuel = true
-                                        oUnit[refiCyclesOnGroundWaitingToRefuel] = 0
-                                    end
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': Unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' has low fuel')
                                 end
-                            end
-                            if bReaddToLowFuel then
-                                --Clear flag but also send unit back for refueling
-                                ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
                                 iCurUnitsWithLowFuel = iCurUnitsWithLowFuel + 1
                                 aiBrain[reftLowFuelAir][iCurUnitsWithLowFuel] = oUnit
                             end
+                        else
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': Unit is trying to refuel so wont mark it as available or as a unit with low fuel unless it has high fuel and health')
+                            end
+                            if (M27UnitInfo.GetUnitHealthPercent(oUnit) >= 0.98 and oUnit:GetFuelRatio() >= 0.98) or EntityCategoryContains(categories.CANNOTUSEAIRSTAGING, oUnit.UnitId) then
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': Unit has high health and fuel so clearing order so it is seen as being available next cycle')
+                                end
+                                oUnit[refbSentRefuelCommand] = false
+                            else
+                                --Is the unit sat on the ground for a while near air staging or has no unit state? If so then clear its flag as likely it got overridden
+                                --Air staging size z varies between 2.75 to 3
+                                if bDebugMessages == true then LOG(sFunctionRef..': Checking if unit refuel command may have been overridden. Unit position='..repru(oUnit:GetPosition())..'; Surface height='..GetSurfaceHeight(oUnit:GetPosition()[1], oUnit:GetPosition()[3])) end
+                                local bReaddToLowFuel = false
+                                if not(M27UnitInfo.IsUnitValid(oUnit[refoAirStagingAssigned])) then
+                                    bReaddToLowFuel = true
+                                else
+                                    if oUnit:GetPosition()[2] - GetSurfaceHeight(oUnit:GetPosition()[1], oUnit:GetPosition()[3]) <= 7 or oUnit:IsUnitState('MovingDown') then
+                                        oUnit[refiCyclesOnGroundWaitingToRefuel] = (oUnit[refiCyclesOnGroundWaitingToRefuel] or 0) + 1
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit state='..M27Logic.GetUnitState(oUnit)..'; Distance above surface height='..oUnit:GetPosition()[2] - GetSurfaceHeight(oUnit:GetPosition()[1], oUnit:GetPosition()[3])..'; Cycles in this position='..oUnit[refiCyclesOnGroundWaitingToRefuel]) end
+                                        if oUnit[refiCyclesOnGroundWaitingToRefuel] >= 20 or (oUnit[refiCyclesOnGroundWaitingToRefuel] >= 5 and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(),oUnit[refoAirStagingAssigned]:GetPosition()) >= 75) then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Will readd unit to those wanting a new refuel command') end
+                                            bReaddToLowFuel = true
+                                            oUnit[refiCyclesOnGroundWaitingToRefuel] = 0
+                                        end
+                                    end
+                                end
+                                if bReaddToLowFuel then
+                                    --Clear flag but also send unit back for refueling
+                                    ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
+                                    iCurUnitsWithLowFuel = iCurUnitsWithLowFuel + 1
+                                    aiBrain[reftLowFuelAir][iCurUnitsWithLowFuel] = oUnit
+                                end
+                            end
+                        end
+                    else
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Unit is dead or not constructed')
                         end
                     end
-                else
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Unit is dead or not constructed')
-                    end
                 end
-            end
-            if sAvailableUnitRef == reftAvailableBombers then
-                aiBrain[refiPreviousAvailableBombers] = table.getn(aiBrain[sAvailableUnitRef])
-            end
+                if sAvailableUnitRef == reftAvailableBombers then
+                    aiBrain[refiPreviousAvailableBombers] = table.getn(aiBrain[sAvailableUnitRef])
+                end
 
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Finished getting all units with type ref=' .. sAvailableUnitRef .. '; size of available unit ref table=' .. table.getn(aiBrain[sAvailableUnitRef]) .. '; will list out all available units')
-                if table.getn(aiBrain[sAvailableUnitRef]) > 0 then
-                    for iUnit, oUnit in aiBrain[sAvailableUnitRef] do
-                        LOG(sFunctionRef .. ': UnitTYpe=' .. iUnitType .. '; bomber=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Finished getting all units with type ref=' .. sAvailableUnitRef .. '; size of available unit ref table=' .. table.getn(aiBrain[sAvailableUnitRef]) .. '; will list out all available units')
+                    if table.getn(aiBrain[sAvailableUnitRef]) > 0 then
+                        for iUnit, oUnit in aiBrain[sAvailableUnitRef] do
+                            LOG(sFunctionRef .. ': UnitTYpe=' .. iUnitType .. '; bomber=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                        end
                     end
+                    LOG('IsAvailableTorpBombersEmpty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftAvailableTorpBombers])))
                 end
-                LOG('IsAvailableTorpBombersEmpty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftAvailableTorpBombers])))
             end
         end
-    end
 
-    --If have flagged that have full fuel air units attached to something, then do a check of all non-structure units with air staging platforms
-    if bCheckForMobileAirStaging then
-        local tMobileAirStaging = aiBrain:GetListOfUnits(categories.AIRSTAGINGPLATFORM - categories.STRUCTURE, false, true)
-        if M27Utilities.IsTableEmpty(tMobileAirStaging) == false then
-            for iUnit, oUnit in tMobileAirStaging do
-                if oUnit:GetFractionComplete() == 1 then
-                    ReleaseRefueledUnitsFromAirStaging(aiBrain, oUnit)
+        --If have flagged that have full fuel air units attached to something, then do a check of all non-structure units with air staging platforms
+        if bCheckForMobileAirStaging then
+            local tMobileAirStaging = aiBrain:GetListOfUnits(categories.AIRSTAGINGPLATFORM - categories.STRUCTURE, false, true)
+            if M27Utilities.IsTableEmpty(tMobileAirStaging) == false then
+                for iUnit, oUnit in tMobileAirStaging do
+                    if oUnit:GetFractionComplete() == 1 then
+                        ReleaseRefueledUnitsFromAirStaging(aiBrain, oUnit)
+                    end
                 end
             end
         end
@@ -10114,6 +10116,7 @@ function GunshipManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GunshipManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if aiBrain:GetArmyIndex() == 3 and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
 
     if M27Utilities.IsTableEmpty(aiBrain[reftAvailableGunships]) == false then
         --First get the nearest threat that we want to focus on, then decide how we will approach it
@@ -10289,6 +10292,7 @@ function GunshipManager(aiBrain)
         local oFrontGunship
         local iSmallestBasePlacement = 10000
         for iUnit, oUnit in aiBrain[reftAvailableGunships] do
+            if bDebugMessages == true then LOG(sFunctionRef..': Checking for front gunship, oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Gunship placement='..(oUnit[refiGunshipPlacement] or 10000)) end
             if (oUnit[refiGunshipPlacement] or 10000) < iSmallestBasePlacement then
                 iSmallestBasePlacement = oUnit[refiGunshipPlacement]
                 oFrontGunship = oUnit
@@ -10298,15 +10302,18 @@ function GunshipManager(aiBrain)
         if not(oFrontGunship) then
             local iCurGunshipDist
             local iClosestGunshipDist = 10000
+            local tEnemyBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
 
             for iUnit, oUnit in aiBrain[reftAvailableGunships] do
-                iCurGunshipDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                iCurGunshipDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tEnemyBase)
+                if bDebugMessages == true then LOG(sFunctionRef..': Dont have any front gunship, so will pick the gunship closest to the nearest enemy base, oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurGunshipDist='..iCurGunshipDist) end
                 if iCurGunshipDist < iClosestGunshipDist then
                     iClosestGunshipDist = iCurGunshipDist
                     oFrontGunship = oUnit
                 end
             end
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': Front gunship='..oFrontGunship.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFrontGunship)) end
         aiBrain[refoFrontGunship] = oFrontGunship
 
         --Does the enemy have AirAA near our front gunship or lots of T3 AA? If so then retreat unless are in ACU kill/protect mode
@@ -10448,7 +10455,7 @@ function GunshipManager(aiBrain)
             if oClosestEnemy then
                 --Factor in enemy AA around the target and dont engage if it's too much to try and attack attritionally, unless it's in critical defence range
                 if bDebugMessages == true then LOG(sFunctionRef..': Have a potential enemy near our gunship to target, will check for AA around it. iClosestEnemyDist='..iClosestEnemyDist..'; aiBrain[refiBomberDefenceCriticalThreatDistance]='..aiBrain[refiBomberDefenceCriticalThreatDistance]) end
-                if iClosestEnemyDist > aiBrain[refiBomberDefenceCriticalThreatDistance] then
+                if iClosestEnemyDist > aiBrain[refiBomberDefenceCriticalThreatDistance] then --Dont want to check for AA if enemy at our base
                     local tPotentialGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, oFrontGunship:GetPosition(), M27Utilities.GetDistanceBetweenPositions(oFrontGunship:GetPosition(), oClosestEnemy:GetPosition()) + 75, 'Enemy')
                     if M27Utilities.IsTableEmpty(tPotentialGroundAA) == false then
                         --Filter to just those AA that would be within 20 of our front gunship
@@ -10456,9 +10463,11 @@ function GunshipManager(aiBrain)
                         if M27Utilities.IsTableEmpty(tAACoverage) == false then
                             --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo, bBlueprintThreat)
                             local iAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tAACoverage, false, false, true, false, false, nil, nil, nil, nil, false)
+                            if bDebugMessages == true then LOG(sFunctionRef..': COnsidering if AA threat such that we want to ignore the closest enemy so that we retreat to air rally, iAAThreat='..iAAThreat) end
                             if iAAThreat >= 50 then
-                                if bDebugMessages == true then LOG(sFunctionRef..': iAAThreat='..iAAThreat) end
-                                if iAAThreat >= 1600 then --Equivalent to 1 SAM
+                                --Low levels of AA threat - apply different ratio to higher levels where SAM is more likely
+
+                                if iAAThreat >= 1900 and (iAAThreat >= 3300 or table.getn(aiBrain[reftAvailableGunships]) < 10) then --Equivalent to 1 SAM plus some other AA
                                     oClosestEnemy = nil
                                 else
                                     local tNearbyGunships = {}
@@ -10468,7 +10477,9 @@ function GunshipManager(aiBrain)
                                         end
                                     end
                                     local iOurThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyGunships, false, false, false, true, false)
-                                    if iOurThreat < iAAThreat * 3 then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iOurThreat='..iOurThreat) end
+                                    if (iAAThreat >= 600 and iOurThreat < iAAThreat * 3) or iOurThreat < iAAThreat * 2.25 then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy has too much AA so wont attack') end
                                         oClosestEnemy = nil
                                     end
                                 end

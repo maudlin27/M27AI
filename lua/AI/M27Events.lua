@@ -433,11 +433,15 @@ function OnMexDeath(oUnit)
                 aiBrain[M27EngineerOverseer.reftiResourceClaimedStatus][sLocationRef][M27EngineerOverseer.refiResourceStatus] = M27EngineerOverseer.refiStatusAvailable
             end
         end
+        local aiBrain = oUnit:GetAIBrain()
         if EntityCategoryContains(categories.TECH3, oUnit.UnitId) then
-            local aiBrain = oUnit:GetAIBrain()
             if aiBrain.M27AI and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftT3MexesUnderConstruction]) then
                 ForkThread(M27EngineerOverseer.RefreshUnderConstructionT3MexList, aiBrain)
             end
+        end
+        --Plateau tracking
+        if oUnit[M27Transport.refiAssignedPlateau] and not(oUnit[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
+            if aiBrain[M27MapInfo.reftOurPlateauInformation][oUnit[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauMexBuildings] then aiBrain[M27MapInfo.reftOurPlateauInformation][oUnit[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauMexBuildings][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = nil end
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end
@@ -1511,6 +1515,20 @@ function OnConstructed(oEngineer, oJustBuilt)
                 --T3 mexes - flag as wanting AA coverage
                 if EntityCategoryContains(categories.TECH3, oJustBuilt.UnitId) then
                     ForkThread(M27EngineerOverseer.CheckIfMexWantsAACoverage, aiBrain, oJustBuilt)
+                end
+
+                --Record plateau that mex is on
+                local iPlateauGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oJustBuilt:GetPosition())
+                if not (iPlateauGroup == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
+                    oJustBuilt[M27Transport.refiAssignedPlateau] = iPlateauGroup
+                    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup]) then
+                        aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup] = {}
+                    end
+                    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauMexBuildings]) then
+                        aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauMexBuildings] = {}
+                    end
+                    aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauMexBuildings][oJustBuilt.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)] = oJustBuilt
+                    LOG('Have just recorded factory ' .. oJustBuilt.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oJustBuilt) .. ' in the list of factories for iPlateauGroup=' .. iPlateauGroup)
                 end
             end
 

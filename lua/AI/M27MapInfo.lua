@@ -32,6 +32,7 @@ iHighestReclaimInASegment = 0 --WARNING - reference the higher of this and previ
 iPreviousHighestReclaimInASegment = 0
 refiPreviousThreatPercentCoverage = 'M27MapPreviousThreatPercentCoverage'
 refiPreviousFrontUnitPercentFromOurBase = 'M27MapPreviousFrontUnitPercentFromOurBase'
+bStoppedSomePathingChecks = false
 
 bReclaimManagerActive = false --used to spread updates of reclaim areas over each second
 tReclaimSegmentsToUpdate = {} --[n] where n is the count, returns {segmentX,segmentZ} as value; i.e. update by using table.insert
@@ -145,6 +146,7 @@ subrefPlateauContainsActiveStart = 'M27PlateauContainsActiveStart' --True if the
 
     --reftOurPlateauInformation subrefs (NOTE: If adding more info here need to update in several places, including ReRecordUnitsAndPlatoonsInPlateaus)
 subrefPlateauLandFactories = 'M27PlateauLandFactories'
+subrefPlateauMexBuildings = 'M27PlateauMexes' --table of mex buildings, similar to table of land factories
 
 subrefPlateauLandCombatPlatoons = 'M27PlateauLandCombatPlatoons'
 subrefPlateauIndirectPlatoons = 'M27PlateauIndirectPlatoons'
@@ -689,7 +691,10 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
             --Do nothing, dont want to risk constant slowdowns which can happen on larger maps if a unit manages to break out of a plateau
             if not(oPathingUnit['M27UnitMapPathingCheckAbort']) then
                 oPathingUnit['M27UnitMapPathingCheckAbort'] = true
-                M27Utilities.ErrorHandler('Wont do any more pathing checks for unit being considered as want to avoid major slowdowns', true)
+                if not(bStoppedSomePathingChecks) then
+                    M27Utilities.ErrorHandler('Wont do any more pathing checks for unit being considered as want to avoid major slowdowns', true)
+                    bStoppedSomePathingChecks = true
+                end
             end
         else
 
@@ -5302,6 +5307,21 @@ function ReRecordUnitsAndPlatoonsInPlateaus(aiBrain)
                     if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]) then aiBrain[reftOurPlateauInformation][iPlateauGroup] = {} end
                     if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories]) then aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories] = {} end
                     aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
+                end
+            end
+        end
+
+        --Record mexes
+        local tMexes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryMex, false, true)
+        if M27Utilities.IsTableEmpty(tMexes) == false then
+            for iUnit, oUnit in tMexes do
+                iPlateauGroup = GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
+                oUnit[M27Transport.refiAssignedPlateau] = iPlateauGroup
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering mex '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iPlateauGroup='..iPlateauGroup..'; aiBrain[refiOurBasePlateauGroup]='..aiBrain[refiOurBasePlateauGroup]) end
+                if not(iPlateauGroup == aiBrain[refiOurBasePlateauGroup]) then
+                    if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]) then aiBrain[reftOurPlateauInformation][iPlateauGroup] = {} end
+                    if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauMexBuildings]) then aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauMexBuildings] = {} end
+                    aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauMexBuildings][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
                 end
             end
         end
