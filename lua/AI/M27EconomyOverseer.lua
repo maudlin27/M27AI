@@ -2691,7 +2691,7 @@ function GetCategoriesAndActionsToPause(aiBrain, bStallingMass)
             --(smd is high priority because it only gets paused if it has 1 missile)
             tCategoriesByPriority = { M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryEngineerStation, M27UnitInfo.refCategoryRASSACU, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryAirFactory, iSpecialHQCategory, M27UnitInfo.refCategoryTML, categories.COMMAND, M27UnitInfo.refCategoryEngineer }
         else
-            tCategoriesByPriority = { M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryEngineerStation, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryRASSACU, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryAirFactory, iSpecialHQCategory, M27UnitInfo.refCategoryTML, categories.COMMAND, M27UnitInfo.refCategoryEngineer }
+            tCategoriesByPriority = { M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryEngineerStation, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryRASSACU, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryAirFactory, iSpecialHQCategory, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryTML, categories.COMMAND, M27UnitInfo.refCategoryEngineer }
         end
 
 

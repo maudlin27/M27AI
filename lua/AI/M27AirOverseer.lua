@@ -10116,7 +10116,7 @@ function GunshipManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GunshipManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if aiBrain:GetArmyIndex() == 3 and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
+    --if aiBrain:GetArmyIndex() == 3 and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
 
     if M27Utilities.IsTableEmpty(aiBrain[reftAvailableGunships]) == false then
         --First get the nearest threat that we want to focus on, then decide how we will approach it

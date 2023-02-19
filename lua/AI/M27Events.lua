@@ -621,6 +621,14 @@ function OnUnitDeath(oUnit)
                                     end
                                 end
                             end
+                        elseif EntityCategoryContains(M27UnitInfo.refCategoryTransport, sUnitBP) then
+                            if M27Utilities.IsTableEmpty(aiBrain[M27Transport.reftTransportsAssignedByPlateauGroup]) == false then
+                                for iPlateauGroup, tTransports in aiBrain[M27Transport.reftTransportsAssignedByPlateauGroup] do
+                                    if M27Utilities.IsTableEmpty(tTransports) == false then
+                                        if tTransports[oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] then tTransports[oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = nil end
+                                    end
+                                end
+                            end
                         end
 
                         --All non-mex/hydro - if have shield locations that cant build on, then check if this was near any of them

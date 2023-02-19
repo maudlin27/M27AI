@@ -11328,7 +11328,7 @@ end--]]
                             end
                             if bHaveLowPower == false and aiBrain:GetCurrentUnits(refCategoryAirStaging) == 0 then
                                 local iLCT2PlusAirBuilt = M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAirNonScout - categories.TECH1)
-                                if ((aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) >= 3 or iLCT2PlusAirBuilt >= 5 or ((aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) > 0 and iLCT2PlusAirBuilt >= 2)) then
+                                if GetGameTimeSeconds() >= 270 and ((aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) >= 3 or iLCT2PlusAirBuilt >= 5 or ((aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) > 0 and iLCT2PlusAirBuilt >= 2)) then
                                     iActionToAssign = refActionBuildAirStaging
                                     iSearchRangeForNearestEngi = 100
                                     iMaxEngisWanted = 1
@@ -13408,7 +13408,7 @@ end--]]
                             local iCurGunships = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryGunship)
                             local iLCT2PlusAirBuilt = M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAirNonScout - categories.TECH1)
 
-                            if (aiBrain[M27AirOverseer.refiAirStagingWanted] or 0 > 0 and iCurGunships > 0) or (aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) >= 3 or iLCT2PlusAirBuilt >= 5 or ((aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) > 0 and iLCT2PlusAirBuilt >= 2) then
+                            if GetGameTimeSeconds() >= 270 and (aiBrain[M27AirOverseer.refiAirStagingWanted] or 0 > 0 and iCurGunships > 0) or (aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) >= 3 or iLCT2PlusAirBuilt >= 5 or ((aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) > 0 and iLCT2PlusAirBuilt >= 2) then
                                 iActionToAssign = refActionBuildAirStaging
                                 iSearchRangeForNearestEngi = 100
                                 iMaxEngisWanted = 1
@@ -14160,7 +14160,7 @@ end--]]
                         end
                         if bHaveLowPower == false and aiBrain:GetCurrentUnits(refCategoryAirStaging) == 0 then
                             local iLCT2PlusAirBuilt = M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAirNonScout - categories.TECH1)
-                            if ((aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) >= 3 or iLCT2PlusAirBuilt >= 5 or ((aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) > 0 and iLCT2PlusAirBuilt >= 2)) then
+                            if GetGameTimeSeconds() >= 270 and ((aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) >= 3 or iLCT2PlusAirBuilt >= 5 or ((aiBrain[M27AirOverseer.refiAirStagingWanted] or 0) > 0 and iLCT2PlusAirBuilt >= 2)) then
                                 iActionToAssign = refActionBuildAirStaging
                                 iSearchRangeForNearestEngi = 100
                                 iMaxEngisWanted = 1
@@ -14587,7 +14587,7 @@ end--]]
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': iCurAirStaging=' .. iCurAirStaging .. '; M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAllAir, (1+iCurAirStaging)*5)=' .. tostring(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAllAir, (1 + iCurAirStaging) * 5)) .. '; (1+iCurAirStaging)*5=' .. (1 + iCurAirStaging) * 5)
                             end
-                            if (not (bHaveLowMass) or aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 3) and aiBrain[M27AirOverseer.refiAirStagingWanted] > iCurAirStaging and iCurAirStaging < 5 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] > iCurAirStaging * 5 and not (M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAllAir, (1 + iCurAirStaging) * 5)) then
+                            if GetGameTimeSeconds() >= 270 and (not (bHaveLowMass) or aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 3) and aiBrain[M27AirOverseer.refiAirStagingWanted] > iCurAirStaging and iCurAirStaging < 5 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] > iCurAirStaging * 5 and not (M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAllAir, (1 + iCurAirStaging) * 5)) then
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Dont have enough air staging so will build more')
                                 end

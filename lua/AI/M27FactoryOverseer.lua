@@ -2221,12 +2221,24 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 7 then --High priority transport if we have plateaus to expand to and it has been a while and we have reasonabler eco
+                                elseif iCurrentConditionToTry == 7 then --High priority transport if we have plateaus to expand to and it has been a while and we have reasonabler eco, or we havent built any transports yet and there are lots of high value plateaus
                                     if bDebugMessages == true then LOG(sFunctionRef..': High priority transport builder: iFactoryTechLevel='..iFactoryTechLevel..'; Is plateaus of interest empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]))..'; Time since last had available transport='..GetGameTimeSeconds() - (aiBrain[M27Transport.refiTimeSinceLastHadAvailableTransport] or -300)..'; aiBrain[M27AirOverseer.refiOurMassInAirAA]='..aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; Current transport='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTransport)..'; Is nearest enemy air threat valid='..tostring(M27UnitInfo.IsUnitValid(aiBrain[M27AirOverseer.refoNearestEnemyAirThreat]))..'; Dist to nearest enemy threat='..M27Utilities.GetDistanceBetweenPositions(aiBrain[M27AirOverseer.reftNearestEnemyAirThreat] or {0,0,0}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
                                     if iFactoryTechLevel >= 3 and M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]) == false and GetGameTimeSeconds() - (aiBrain[M27Transport.refiTimeSinceLastHadAvailableTransport] or 0) >= 480 and aiBrain[M27AirOverseer.refiOurMassInAirAA] >= 2500 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTransport) == 0 and (not(M27UnitInfo.IsUnitValid(aiBrain[M27AirOverseer.refoNearestEnemyAirThreat])) or M27Utilities.GetDistanceBetweenPositions(aiBrain[M27AirOverseer.reftNearestEnemyAirThreat], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 150) then
                                         iTotalWanted = 1
                                         iCategoryToBuild = M27UnitInfo.refCategoryTransport - categories.TECH3
                                         if bDebugMessages == true then LOG(sFunctionRef..': Will build T2 transport') end
+                                    elseif iFactoryTechLevel == 1 and M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]) == false and (aiBrain[M27Transport.refiTimeSinceLastHadAvailableTransport] or 0) == 0 then
+                                        local iMexesInPlateaus = 0
+                                        for iPathingGroup, tNearestMex in aiBrain[M27MapInfo.reftPlateausOfInterest] do
+                                            if M27MapInfo.tAllPlateausWithMexes[iPathingGroup][M27MapInfo.subrefPlateauTotalMexCount] >= 4 or M27Utilities.GetDistanceBetweenPositions(tNearestMex, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 300 then
+                                                iMexesInPlateaus = iMexesInPlateaus + M27MapInfo.tAllPlateausWithMexes[iPathingGroup][M27MapInfo.subrefPlateauTotalMexCount]
+                                            end
+                                        end
+                                        if iMexesInPlateaus >= 4 then
+                                            iTotalWanted = 1
+                                            iCategoryToBuild = M27UnitInfo.refCategoryTransport - categories.TECH3
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Will build T1 transport as top priority, iMexesInPlateaus='..iMexesInPlateaus) end
+                                        end
                                     end
                                 elseif iCurrentConditionToTry == 8 then --far behidn on air so little point trying to e.g. rush a strat bomber if we only have the 1 air factory
                                     if aiBrain[M27AirOverseer.refbFarBehindOnAir] then
