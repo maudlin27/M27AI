@@ -17,6 +17,7 @@ local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 tUnitThreatByIDAndType = {} --Calculated at the start of the game
 reftBaseThreat = 'M27BaseThreatTable' --Against unit, stores the base threat value for different combinations
 tiThreatRefsCalculated = {} --table of the threat ID references that have done blueprint checks on
+tbExpectMissileBlockedByCliff = 'M27TMLExpectedBlocked' --table with [x] as the TML location ref, which returns true, false or nil based on if we have considered if a TML shot is likely to be blocked
 
 --Other:
 refbNearestEnemyBugDisplayed = 'M27NearestEnemyBug' --true if have already given error messages for no nearest enemy
@@ -5189,10 +5190,20 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                         --Have at least 1 valid target, so want to pick the best one
 
                         iBestTargetValue = 0
+                        local sLauncherLocationRef = M27Utilities.ConvertLocationToReference(oLauncher:GetPosition())
                         for iUnit, oUnit in tValidTargets do
                             iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
                             if EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then iCurTargetValue = iCurTargetValue * 1.5 end
-                            if bDebugMessages == true then LOG(sFunctionRef..': Potential TML target '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurTargetValue='..iCurTargetValue) end
+                            --Adjust value if we think the missile will hit a cliff
+                            if oUnit[tbExpectMissileBlockedByCliff][sLauncherLocationRef] == nil then
+                                if not(oUnit[tbExpectMissileBlockedByCliff]) then oUnit[tbExpectMissileBlockedByCliff] = {} end
+                                local tExpectedMissileVertical = M27Utilities.MoveInDirection(oLauncher:GetPosition(), M27Utilities.GetAngleFromAToB(oLauncher:GetPosition(), oUnit:GetPosition()), 31, true)
+                                tExpectedMissileVertical[2] = tExpectedMissileVertical[2] + 60 --Doing testing, it actually only goes up by 50, but I think it travels in an arc from here to the target, as in a test scenario doing at less than +60 meant it thought it would hit a cliff when it didnt
+                                -- {oLauncher:GetPosition()[1], oLauncher:GetPosition()[2] + 65, oLauncher:GetPosition()[3]}
+                                oUnit[tbExpectMissileBlockedByCliff][sLauncherLocationRef] = IsLineBlocked(aiBrain, tExpectedMissileVertical, oUnit:GetPosition(), iAOE, false)
+                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Potential TML target '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurTargetValue before adj for blocked='..iCurTargetValue..'; oUnit[tbExpectMissileBlockedByCliff][sLauncherLocationRef]='..tostring(oUnit[tbExpectMissileBlockedByCliff][sLauncherLocationRef])) end
+                            if oUnit[tbExpectMissileBlockedByCliff][sLauncherLocationRef] then iCurTargetValue = iCurTargetValue * 0.2 end
                             if iBestTargetValue < iCurTargetValue then
                                 iBestTargetValue = iCurTargetValue
                                 oBestTarget = oUnit
@@ -5395,6 +5406,16 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                         IssueTactical({oLauncher}, tTarget)
                         oLauncher:SetAutoMode(true)
                         oLauncher:SetPaused(false)
+                        if bDebugMessages == true then
+                            local tExpectedMissileVertical = M27Utilities.MoveInDirection(oLauncher:GetPosition(), M27Utilities.GetAngleFromAToB(oLauncher:GetPosition(), tTarget), 31, true)
+                            tExpectedMissileVertical[2] = tExpectedMissileVertical[2] + 60 --Doing testing, it actually only goes up by 50, but I think it travels in an arc from here to the target, as in a test scenario doing at less than +60 meant it thought it would hit a cliff when it didnt
+                            -- {oLauncher:GetPosition()[1], oLauncher:GetPosition()[2] + 65, oLauncher:GetPosition()[3]}
+                            local bShotBlocked = IsLineBlocked(aiBrain, tExpectedMissileVertical, tTarget, iAOE, false)
+                            LOG(sFunctionRef..': Just launched tactical missile at tTarget='..repru(tTarget)..'; oLauncher position='..repru(oLauncher:GetPosition())..'; will draw in blue if think shot will hit, red if think shot blocked')
+                            local iColour = 1
+                            if bShotBlocked then iColour = 2 end
+                            M27Utilities.DrawLocation(tTarget, nil, iColour)
+                        end
                     else
                         IssueNuke({oLauncher}, tTarget)
                         M27Team.tTeamData[aiBrain.M27Team][M27Team.subrefNukeLaunchLocations][GetGameTimeSeconds()] = tTarget

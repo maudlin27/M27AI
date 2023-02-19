@@ -1168,16 +1168,28 @@ function OnMissileBuilt(self, weapon)
     end
 end
 
---[[
-function OnProjectileFired(oWeapon, oMuzzle)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+function TrackProjectile(oProjectile)
+    for i = 1, 110 do
+        WaitTicks(1)
+        LOG('i='..i..'; oProjectile position='..reprs(oProjectile:GetPosition()))
+    end
+end
+--[[function OnProjectileFired(oWeapon, oMuzzle, oProjectile)
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OnProjectileFired'
+
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     if oWeapon.GetBlueprint then
         LOG('OnWeaponFired hook for blueprint='..repru(oWeapon:GetBlueprint()))
     end
     if oWeapon.unit then
         LOG('Have a unit; unit position='..repru(oWeapon.unit:GetPosition()))
+    end
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': reprs of oMuzzle='..reprs(oMuzzle))
+        LOG(sFunctionRef..': reprs of oProjectile='..reprs(oProjectile))
+        ForkThread(TrackProjectile, oProjectile)
+
     end
 end--]]
 
