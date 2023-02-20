@@ -13,9 +13,9 @@ DefaultProjectileWeapon = Class(M27DefaultProjectileWeapon) {
         --LOG('CalculateBallisticAcceleration: reprs of projectile='..reprs(projectile))
         ForkThread(M27Events.OnBombFired, self, projectile)
         return M27DefaultProjectileWeapon.CalculateBallisticAcceleration(self, projectile)
-    end
+    end,
     --[[CreateProjectileAtMuzzle = function(self, muzzle)
-        M27DefaultProjectileWeapon.CreateProjectileAtMuzzle(self, muzzle)
-        M27Events.OnProjectileFired(self, muzzle)
+        local oProjectile = M27DefaultProjectileWeapon.CreateProjectileAtMuzzle(self, muzzle)
+        M27Events.OnProjectileFired(self, muzzle, oProjectile)
     end,--]]
 }

@@ -32,6 +32,7 @@ iHighestReclaimInASegment = 0 --WARNING - reference the higher of this and previ
 iPreviousHighestReclaimInASegment = 0
 refiPreviousThreatPercentCoverage = 'M27MapPreviousThreatPercentCoverage'
 refiPreviousFrontUnitPercentFromOurBase = 'M27MapPreviousFrontUnitPercentFromOurBase'
+bStoppedSomePathingChecks = false
 
 bReclaimManagerActive = false --used to spread updates of reclaim areas over each second
 tReclaimSegmentsToUpdate = {} --[n] where n is the count, returns {segmentX,segmentZ} as value; i.e. update by using table.insert
@@ -145,6 +146,7 @@ subrefPlateauContainsActiveStart = 'M27PlateauContainsActiveStart' --True if the
 
     --reftOurPlateauInformation subrefs (NOTE: If adding more info here need to update in several places, including ReRecordUnitsAndPlatoonsInPlateaus)
 subrefPlateauLandFactories = 'M27PlateauLandFactories'
+subrefPlateauMexBuildings = 'M27PlateauMexes' --table of mex buildings, similar to table of land factories
 
 subrefPlateauLandCombatPlatoons = 'M27PlateauLandCombatPlatoons'
 subrefPlateauIndirectPlatoons = 'M27PlateauIndirectPlatoons'
@@ -689,7 +691,10 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
             --Do nothing, dont want to risk constant slowdowns which can happen on larger maps if a unit manages to break out of a plateau
             if not(oPathingUnit['M27UnitMapPathingCheckAbort']) then
                 oPathingUnit['M27UnitMapPathingCheckAbort'] = true
-                M27Utilities.ErrorHandler('Wont do any more pathing checks for unit being considered as want to avoid major slowdowns', true)
+                if not(bStoppedSomePathingChecks) then
+                    M27Utilities.ErrorHandler('Wont do any more pathing checks for unit being considered as want to avoid major slowdowns', true)
+                    bStoppedSomePathingChecks = true
+                end
             end
         else
 
@@ -5305,16 +5310,31 @@ function ReRecordUnitsAndPlatoonsInPlateaus(aiBrain)
                 end
             end
         end
+
+        --Record mexes
+        local tMexes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryMex, false, true)
+        if M27Utilities.IsTableEmpty(tMexes) == false then
+            for iUnit, oUnit in tMexes do
+                iPlateauGroup = GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
+                oUnit[M27Transport.refiAssignedPlateau] = iPlateauGroup
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering mex '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iPlateauGroup='..iPlateauGroup..'; aiBrain[refiOurBasePlateauGroup]='..aiBrain[refiOurBasePlateauGroup]) end
+                if not(iPlateauGroup == aiBrain[refiOurBasePlateauGroup]) then
+                    if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]) then aiBrain[reftOurPlateauInformation][iPlateauGroup] = {} end
+                    if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauMexBuildings]) then aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauMexBuildings] = {} end
+                    aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauMexBuildings][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
+                end
+            end
+        end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
+function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange, oTransportRefreshingFor)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdatePlateausToExpandTo'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if bForceRefresh and aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
+    --if aiBrain:GetArmyIndex() == 5 then bDebugMessages = true end
 
     --Records table with the amphibious pathing group of plateaus that we are interested in expanding to
     --tAllPlateausWithMexes = 'M27PlateausWithMexes' --[x] = AmphibiousPathingGroup
@@ -5322,7 +5342,7 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
     --refiLastPlateausUpdate = 'M27LastTimeUpdatedPlateau' --gametime that we last updated the plateaus
 
     --First time calling - update variables for all plateaus that require aibrain info
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code. bForceRefresh='..tostring(bForceRefresh or false)..'; bPathingChange='..tostring(bPathingChange or false)) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for game time of '..GetGameTimeSeconds()..'. bForceRefresh='..tostring(bForceRefresh or false)..'; bPathingChange='..tostring(bPathingChange or false)) end
     if not(aiBrain[refiLastPlateausUpdate]) or bPathingChange then
         local iCurPathingGroup
         local tiBasePathingGroups = {}
@@ -5399,7 +5419,7 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
                         iAlliedMexes = 0
                         iExistingTransports = 0
                         bAlreadyOwnOrAssignedPlateau = false
-                        if bDebugMessages == true then LOG(sFunctionRef..': Considering plateaugroup='..iPlateauGroup..'; considering if we have friendly units in the plateau already') end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering plateaugroup='..iPlateauGroup..'; with '..table.getn(tSubtable[subrefPlateauMexes])..' mexes which is '..M27Utilities.GetDistanceBetweenPositions(tAllPlateausWithMexes[iPlateauGroup][subrefPlateauMidpoint], tStartPos)..' away from brain '..aiBrain.Nickname..' start position '..repru(tStartPos)..'; considering if we have friendly units in the plateau already') end
 
                         for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering brain '..oBrain.Nickname..'; is its table of plateau info empty for group '..iPlateauGroup..'='..tostring(M27Utilities.IsTableEmpty(oBrain[reftOurPlateauInformation][iPlateauGroup]))..'; is table of assigned transports empty='..tostring(oBrain[M27Transport.reftTransportsAssignedByPlateauGroup][iPlateauGroup])) end
@@ -5421,13 +5441,24 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
                             --Do allied M27 brains other than ourselves already have transports assigned to this plateau?
                             if M27Utilities.IsTableEmpty(oBrain[M27Transport.reftTransportsAssignedByPlateauGroup][iPlateauGroup]) == false and not(oBrain == aiBrain) then
                                 for iTransport, oTransport in oBrain[M27Transport.reftTransportsAssignedByPlateauGroup][iPlateauGroup] do
-                                    iExistingTransports = iExistingTransports + 1
+                                    if M27UnitInfo.IsUnitValid(oTransport) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Transport '..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)..' owend by '..oTransport:GetAIBrain().Nickname..' is recorded as being assigned already to plateau group '..iPlateauGroup..'; oTransportRefreshingFor='..(oTransportRefreshingFor.UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oTransportRefreshingFor) or 'nil')) end
+                                        if not(oTransport == oTransportRefreshingFor) then
+                                            iExistingTransports = iExistingTransports + 1
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Transport assigned here already') end
+                                        end
+                                    end
                                 end
                             end
                         end
 
                         if iExistingFactories > 0 or iExistingEngis >= 2 or (iExistingEngis == 1 and tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount] <= 4) or iExistingTransports > 0 then
                             bAlreadyOwnOrAssignedPlateau = true
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef..': Will draw midpoint of plateau that we think we already have covered')
+                                M27Utilities.DrawLocation(tAllPlateausWithMexes[iPlateauGroup][subrefPlateauMidpoint])
+                            end
+
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': iExistingEngis='..iExistingEngis..'; iExistingFactories='..iExistingFactories..'; Mexes on plateau='..tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount]..'; bAlreadyOwnOrAssignedPlateau='..tostring(bAlreadyOwnOrAssignedPlateau)) end
                         if not(bAlreadyOwnOrAssignedPlateau) then
@@ -5483,7 +5514,10 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
                                     if not(bNoRushActive) or M27Utilities.GetDistanceBetweenPositions(tClosestMex, aiBrain[reftNoRushCentre]) <= iNoRushRange then
 
                                         --Is there any enemy AA in range of this mex?
-                                        if not (M27AirOverseer.IsTargetPositionCoveredByAA(tClosestMex, tEnemyAA, tStartPos, false)) then
+                                        local bIgnoreEnemies = false
+                                        if ((M27Team.tTeamData[aiBrain.M27Team][M27Team.reftTimeOfTransportLastLocationAttempt][sLocationRef] or 0) == 0 and iCurModDistance <= math.max(175, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)) then bIgnoreEnemies = true end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Is target position for closest mex covered by AA='..tostring(M27AirOverseer.IsTargetPositionCoveredByAA(tClosestMex, tEnemyAA, tStartPos, false))) end
+                                        if bIgnoreEnemies or not (M27AirOverseer.IsTargetPositionCoveredByAA(tClosestMex, tEnemyAA, tStartPos, false)) then
                                             bNearbyEnemyLand = false
                                             tEnemyGround = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, tClosestMex, 100, 'Enemy')
                                             if M27Utilities.IsTableEmpty(tEnemyGround) == false then
@@ -5494,14 +5528,17 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
                                                     end
                                                 end
                                             end
-
-                                            if not (bNearbyEnemyLand) then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': bNearbyEnemyLand='..tostring(bNearbyEnemyLand)) end
+                                            if bIgnoreEnemies or not (bNearbyEnemyLand) then
                                                 --Have we tried targeting this mex recently?
                                                 sLocationRef = M27Utilities.ConvertLocationToStringRef(tClosestMex)
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Time since we last tried targeting this mex='..GetGameTimeSeconds() - (M27Team.tTeamData[aiBrain.M27Team][M27Team.reftTimeOfTransportLastLocationAttempt][sLocationRef] or -300)) end
                                                 if GetGameTimeSeconds() - (M27Team.tTeamData[aiBrain.M27Team][M27Team.reftTimeOfTransportLastLocationAttempt][sLocationRef] or -300) >= 300 then
                                                     --Add to shortlist of locations to try and expand to; either the 'dangerous' shortlist if no intel and far away mod distance, or both shortlists
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Add to shortlist of locations, either dangerous or both; iCurModDistance='..iCurModDistance..'; nearest threat from start='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; have Intel coverage of mex='..tostring(M27Logic.GetIntelCoverageOfPosition(aiBrain, tClosestMex, nil, true))) end
                                                     if iCurModDistance <= (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] + 60) or M27Logic.GetIntelCoverageOfPosition(aiBrain, tClosestMex, nil, true) then
                                                         aiBrain[reftPlateausOfInterest][iPlateauGroup] = tClosestMex
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Recorded plateau '..iPlateauGroup..'; in plateaus of interest') end
                                                     end
                                                     if iCurModDistance <= iClosestDangerousPlateauDist then
                                                         iClosestDangerousPlateauDist = iCurModDistance

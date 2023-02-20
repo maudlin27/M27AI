@@ -104,10 +104,14 @@ function SafeToUpgradeUnit(oUnit)
 
     --TML extra logic for mexes (in reality will only stop T2 mexes upgrading to T3; t1 mex would be harder since would need to recreate the 'protected from TMD' logic here for T1 mexes, without recording the mex as wanting an upgrade, and would then risk never upgrading mexes
     if bSafeToGetUpgrade and EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then
-        if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftUnitsWantingTMD]) == false then
-            for iAltUnit, oAltUnit in aiBrain[M27EngineerOverseer.reftUnitsWantingTMD] do
-                if oUnit == oAltUnit then
-                    bSafeToGetUpgrade = false
+        if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftUnitsWantingTMDByPlateau]) == false then
+            for iPlateau, toUnits in aiBrain[M27EngineerOverseer.reftUnitsWantingTMDByPlateau] do
+                if M27Utilities.IsTableEmpty(toUnits) == false then
+                    for iAltUnit, oAltUnit in toUnits do
+                        if oUnit == oAltUnit then
+                            bSafeToGetUpgrade = false
+                        end
+                    end
                 end
             end
         end
@@ -201,7 +205,6 @@ function SafeToGetACUUpgrade(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SafeToGetACUUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if GetGameTimeSeconds() >= 600 then bDebugMessages = true end
 
     local bIsSafe = false
     local iSearchRange = 33
@@ -435,21 +438,28 @@ function SafeToGetACUUpgrade(aiBrain)
                                 end
                                 --Check no enemy T2 arti or T3 PD nearby, or TML
                                 if not (M27UnitInfo.IsUnitUnderwater(oACU)) then
-                                    tNearbyEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryPD * categories.TECH3 + M27UnitInfo.refCategoryFixedT2Arti, tACUPos, 128, 'Enemy')
-                                    bIsSafe = M27Utilities.IsTableEmpty(tNearbyEnemies)
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': bIsSafe after checking for nearby enemies=' .. tostring(bIsSafe))
-                                    end
-                                    if bIsSafe and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
-                                        local iTMLInRange = 0
-                                        for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyTML] do
-                                            if EntityCategoryContains(M27UnitInfo.refCategoryTML, oUnit.UnitId) and M27Utilities.GetDistanceBetweenPositions(tACUPos, oUnit:GetPosition()) <= 259 then
-                                                if bDebugMessages == true then
-                                                    LOG(sFunctionRef .. ': In range of TML')
-                                                end
-                                                iTMLInRange = iTMLInRange + 1
-                                                if iTMLInRange >= 2 then
-                                                    break
+                                    --Is enemy ACU near us?
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if enemy ACU nearby, aiBrain[M27Overseer.refbEnemyACUNearOurs]='..tostring(aiBrain[M27Overseer.refbEnemyACUNearOurs])..'; Dist to nearest ACU='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), aiBrain[M27Overseer.refoLastNearestACU]:GetPosition())) end
+                                    if aiBrain[M27Overseer.refbEnemyACUNearOurs] or (aiBrain[M27Overseer.refoLastNearestACU] and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()) <= 90) then
+                                        bIsSafe = false
+                                    else
+                                        tNearbyEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryPD * categories.TECH3 + M27UnitInfo.refCategoryFixedT2Arti, tACUPos, 128, 'Enemy')
+                                        bIsSafe = M27Utilities.IsTableEmpty(tNearbyEnemies)
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': bIsSafe after checking for nearby enemies=' .. tostring(bIsSafe))
+                                        end
+                                        if bIsSafe and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
+                                            local iTMLInRange = 0
+                                            for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyTML] do
+                                                if EntityCategoryContains(M27UnitInfo.refCategoryTML, oUnit.UnitId) and M27Utilities.GetDistanceBetweenPositions(tACUPos, oUnit:GetPosition()) <= 259 then
+                                                    if bDebugMessages == true then
+                                                        LOG(sFunctionRef .. ': In range of TML')
+                                                    end
+                                                    iTMLInRange = iTMLInRange + 1
+                                                    if iTMLInRange >= 2 then
+                                                        bIsSafe = false
+                                                        break
+                                                    end
                                                 end
                                             end
                                         end

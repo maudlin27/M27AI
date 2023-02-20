@@ -114,14 +114,16 @@ function CheckForPondNearNavalUnit(oUnit)
                     for iXAdj = iMinX / iSegmentSize, iMaxX / iSegmentSize, 1 do
                         for iZAdj = iMinZ / iSegmentSize, iMaxZ / iSegmentSize, 1 do
                             if not(tPondDetails[M27MapInfo.tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX + iXAdj][iBaseSegmentZ + iZAdj]]) or (tPondDetails[M27MapInfo.tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX + iXAdj][iBaseSegmentZ + iZAdj]] or 0) < iMinPondSize then
-                                M27MapInfo.tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX + iXAdj][iBaseSegmentZ + iZAdj] = iPond
-                                if bDebugMessages == true then
-                                    local iSegmentX = iBaseSegmentX + iXAdj
-                                    local iSegmentZ = iBaseSegmentX + iZAdj
-                                    local tSegmentLocation = M27MapInfo.GetPositionFromPathingSegments(iSegmentX, iSegmentZ)
-                                    LOG(sFunctionRef..': Updating pond for segment X='..iSegmentX..'; Z='..iSegmentZ..' to pond '..iPond..'; whill draw in white, position='..repru(tSegmentLocation))
+                                if M27MapInfo.tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX + iXAdj] then
+                                    M27MapInfo.tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX + iXAdj][iBaseSegmentZ + iZAdj] = iPond
+                                    if bDebugMessages == true then
+                                        local iSegmentX = iBaseSegmentX + iXAdj
+                                        local iSegmentZ = iBaseSegmentX + iZAdj
+                                        local tSegmentLocation = M27MapInfo.GetPositionFromPathingSegments(iSegmentX, iSegmentZ)
+                                        LOG(sFunctionRef..': Updating pond for segment X='..iSegmentX..'; Z='..iSegmentZ..' to pond '..iPond..'; whill draw in white, position='..repru(tSegmentLocation))
 
-                                    M27Utilities.DrawLocation(tSegmentLocation, nil, 7, 200)
+                                        M27Utilities.DrawLocation(tSegmentLocation, nil, 7, 200)
+                                    end
                                 end
                             end
                         end
@@ -3871,11 +3873,14 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                 if M27Utilities.IsTableEmpty(tShieldsToAssign) == false then
                     local oRemainingUnitPriority = oClosestFriendlyUnitToEnemyBase
                     if bAllOutSubAttack and EntityCategoryContains(categories.SUBMERSIBLE + categories.AMPHIBIOUS - categories.HOVER, oClosestFriendlyUnitToEnemyBase.UnitId) then
-                        local tSurfaceUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAllAmphibiousAndNavy - categories.SUBMIERSIBLE, tFriendlyNavalExcludingIntercept)
-                        if M27Utilities.IsTableEmpty(tSurfaceUnits) == false then
-                            oRemainingUnitPriority = M27Utilities.GetNearestUnit(tSurfaceUnits, tEnemyBase)
-                        else
-                            M27Utilities.ErrorHandler('Dont have any surface units but should at least have the shields that are considering')
+                        local tSurfaceUnits
+                        if M27Utilities.IsTableEmpty(tFriendlyNavalExcludingIntercept) == false then
+                            tSurfaceUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAllAmphibiousAndNavy - categories.SUBMIERSIBLE, tFriendlyNavalExcludingIntercept)
+                            if M27Utilities.IsTableEmpty(tSurfaceUnits) == false then
+                                oRemainingUnitPriority = M27Utilities.GetNearestUnit(tSurfaceUnits, tEnemyBase)
+                            else
+                                M27Utilities.ErrorHandler('Dont have any surface units but should at least have the shields that are considering')
+                            end
                         end
                     end
                     for iShield, oClosestShield in tShieldsToAssign do

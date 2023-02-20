@@ -189,7 +189,7 @@ refCategoryIndirectT3 = categories.MOBILE * categories.LAND * categories.INDIREC
 refCategoryObsidian = categories.AEON * categories.TECH2 * categories.SHIELD * categories.DIRECTFIRE * categories.MOBILE * categories.LAND * categories.TANK --
 refCategoryMobileLandShield = categories.LAND * categories.MOBILE * categories.SHIELD - refCategoryObsidian  --Miscategorised obsidian tank
 refCategoryPersonalShield = categories.PERSONALSHIELD + refCategoryObsidian
-refCategoryMobileLandStealth = categories.LAND * categories.MOBILE * categories.STEALTHFIELD
+refCategoryMobileLandStealth = categories.LAND * categories.MOBILE * categories.STEALTHFIELD - categories.EXPERIMENTAL --dont want monkeylords treated as a mobile stealth unit!
 refCategorySniperBot = categories.MOBILE * categories.SNIPER * categories.LAND
 refCategorySkirmisher = refCategorySniperBot * categories.TECH3 + refCategoryDFTank * categories.UEF * categories.TECH2 * categories.BOT + refCategoryDFTank * categories.CYBRAN * categories.TECH2 * categories.BOT - categories.BOMB --Mongoose, Hoplite, sniperbot
 refCategoryShieldDisruptor = categories.LAND * categories.MOBILE * categories.ANTISHIELD
@@ -580,7 +580,7 @@ function GetACUHealthRegenRate(oUnit)
     local iRegenRate = (oBP.Defense.RegenRate or 0)
 
     --Adjust for veterancy:
-    local iVetLevel = (oUnit.Sync.VeteranLevel or 0)
+    local iVetLevel = (oUnit.VetLevel or oUnit.Sync.VeteranLevel or 0)
     if iVetLevel > 0 and oBP.Buffs.Regen then
         local iCurVet = 0
         for iVet, iRegenMod in oBP.Buffs.Regen do
@@ -713,7 +713,7 @@ function GetUnitFacingAngle(oUnit)
 
     --T3 arti - get the angle of the turret
     if EntityCategoryContains(categories.STRUCTURE, oUnit.UnitId) then
-        if oUnit.GetWeapon then
+        if oUnit.GetWeapon and oUnit:GetWeaponCount() > 0 then
             local oWeapon = oUnit:GetWeapon(1)
             if oWeapon and oWeapon.GetAimManipulator then
                 return M27Utilities.ConvertRadiansToAngle(oWeapon:GetAimManipulator():GetHeadingPitch())

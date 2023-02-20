@@ -2917,46 +2917,59 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     if table.getn(M27EngineerOverseer.GetUnclaimedMexes(aiBrain, M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), true, false, true)) < table.getn(M27MapInfo.tMexByPathingAndGrouping[M27UnitInfo.refPathingTypeAmphibious][M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])]) * 0.4 then
                         bHaveMostMexes = true
                     end
-                    --Are we significantly outnumbered in threat and/or up against alot of T2+ PD and not near our base?
-                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if ACU significantly outnumbered or lots of T2 PD nearby') end
+                    --Are we significantly outnumbered in threat and/or up against alot of T2+ PD and not near our base? (or T1 PD if we dont have gun)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if ACU significantly outnumbered or lots of T2 PD nearby (or T1 if we dont have gun)') end
                     local iEnemyThreatRating = 0
                     --if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > M27Overseer.iDistanceFromBaseToBeSafe then
                     local iCurShield, iMaxShield, iMaxHealth
                     if oPlatoon[refiEnemyStructuresInRange] > 0 then
-                        tEnemyT2PlusPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryT2PlusPD, oPlatoon[reftEnemyStructuresInRange])
+                        local iPDSearchCategory
+                        local bDoesACUHaveGun = M27Conditions.DoesACUHaveGun(aiBrain, false, oACU)
+                        if bDoesACUHaveGun then iPDSearchCategory = M27UnitInfo.refCategoryT2PlusPD
+                        else
+                            iPDSearchCategory = M27UnitInfo.refCategoryPD
+                        end
+                        tEnemyT2PlusPD = EntityCategoryFilterDown(iPDSearchCategory, oPlatoon[reftEnemyStructuresInRange])
 
                         --Opti: First check we have nearby T2 PD (even if out of range of it), as if none then no point doing more intensive checks
                         if M27Utilities.IsTableEmpty(tEnemyT2PlusPD) == false then
                             local tEnemyFixedShields = EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedShield, oPlatoon[reftEnemyStructuresInRange])
                             local iPDThreshold = 3
-                            if M27Conditions.DoesACUHaveBigGun(aiBrain) then iPDThreshold = 5 end
-                            iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU)
-                            iMaxHealth = 1
-                            if M27UnitInfo.GetUnitHealthPercent(oACU) > 0 then iMaxHealth = oACU:GetHealth() / M27UnitInfo.GetUnitHealthPercent(oACU) end
-                            if bDebugMessages == true then LOG(sFunctionRef..': ACU shield curhealth='..iCurShield..'; shield maxhealth='..iMaxShield..'; ACU health='..iMaxHealth) end
-                            iMaxHealth = iMaxShield + iMaxHealth
-
-                            if iMaxHealth >= 18000 and (iCurShield + oACU:GetHealth()) / iMaxHealth >= 0.75 then
-                                if iMaxHealth >= 30000 then
-                                    iPDThreshold = iPDThreshold + 2
-                                else iPDThreshold = iPDThreshold + 1
-                                end
-                            elseif iCurShield <= 1000 and oACU:GetHealth() <= 9000 then
-                                if oACU:GetHealth() <= 7000 then iPDThreshold = 1
-                                else iPDThreshold = math.min(2, iPDThreshold)
-                                end
+                            if bDoesACUHaveGun then
+                                if M27Conditions.DoesACUHaveBigGun(aiBrain) then iPDThreshold = 5 end
+                            else
+                                iPDThreshold = 1 --If we dont have gun then want to run from all PD
                             end
-
                             if iPDThreshold > 1 then
-                                --If we have nearby T2+ indirect then reduce threshold to 1
-                                if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryIndirectT2Plus, GetPlatoonFrontPosition(oPlatoon), 60, 'Ally')) then
-                                    iPDThreshold = 1
+                                iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU)
+                                iMaxHealth = 1
+                                if M27UnitInfo.GetUnitHealthPercent(oACU) > 0 then iMaxHealth = oACU:GetHealth() / M27UnitInfo.GetUnitHealthPercent(oACU) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': ACU shield curhealth='..iCurShield..'; shield maxhealth='..iMaxShield..'; ACU health='..iMaxHealth) end
+                                iMaxHealth = iMaxShield + iMaxHealth
+
+                                if iMaxHealth >= 18000 and (iCurShield + oACU:GetHealth()) / iMaxHealth >= 0.75 then
+                                    if iMaxHealth >= 30000 then
+                                        iPDThreshold = iPDThreshold + 2
+                                    else iPDThreshold = iPDThreshold + 1
+                                    end
+                                elseif iCurShield <= 1000 and oACU:GetHealth() <= 9000 then
+                                    if oACU:GetHealth() <= 7000 then iPDThreshold = 1
+                                    else iPDThreshold = math.min(2, iPDThreshold)
+                                    end
+                                end
+
+
+                                if iPDThreshold > 1 then
+                                    --If we have nearby T2+ indirect then reduce threshold to 1
+                                    if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryIndirectT2Plus, GetPlatoonFrontPosition(oPlatoon), 60, 'Ally')) then
+                                        iPDThreshold = 1
+                                    end
                                 end
                             end
                             --Reduce threshold if we have most mexes on the map
 
 
-                            if bHaveMostMexes then iPDThreshold = iPDThreshold - 1 end
+                            if bHaveMostMexes then iPDThreshold = math.max(1, iPDThreshold - 1) end
                             if bDebugMessages == true then LOG(sFunctionRef..': iPDThreshold after increasing for health and big gun and reduing for low health='..iPDThreshold) end
 
                             --Reduce threshold if enemy ACU nearby
@@ -2969,7 +2982,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                             end
                             if bDebugMessages == true then LOG(sFunctionRef..': iPDThreshold after checking for nearby ACU='..iPDThreshold..'; Nearest ACU distance='..aiBrain[M27Overseer.refiLastNearestACUDistance]..'; aiBrain[M27Overseer.refbIncludeACUInAllOutAttack]='..tostring(aiBrain[M27Overseer.refbIncludeACUInAllOutAttack])..'; Size of enemy T2PD table='..table.getn(tEnemyT2PlusPD)) end
 
-                            if table.getn(tEnemyT2PlusPD) >= iPDThreshold then
+                            if table.getn(tEnemyT2PlusPD) >= math.max(1, iPDThreshold) then
                                 --How many PD would be in-range if we get within range of the nearest PD (T1 or otherwise)
                                 --First reduce PD threshold by 1 as more dangerous if enemy PD close by even if not in range of us
                                 if iPDThreshold >= 3 then iPDThreshold = iPDThreshold - 1 end
@@ -7603,7 +7616,7 @@ function DeterminePlatoonAction(oPlatoon)
         local sPlatoonName = oPlatoon:GetPlan()
         --if M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and EntityCategoryContains(M27UnitInfo.refCategoryIndirectT2Plus - categories.EXPERIMENTAL - M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) and GetGameTimeSeconds() >= 1380 and oPlatoon[refiEnemyStructuresInRange] > 0 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD * categories.TECH3, oPlatoon[reftEnemyStructuresInRange])) == false then bDebugMessages = true end
         --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 8 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
-        --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 25 then bDebugMessages = true end
+        --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 3 then bDebugMessages = true end
         --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
         --if sPlatoonName == 'M27Skirmisher' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and GetGameTimeSeconds() >= 300 and EntityCategoryContains(M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) and oPlatoon[refiPlatoonCount] == 9 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true end
         --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
@@ -8823,7 +8836,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
             --if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
             --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
             --if sPlatoonName == 'M27PlateauLandCombat' then bDebugMessages = true end
-            --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 25 then bDebugMessages = true end
+            --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 3 then bDebugMessages = true end
 
             local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
             --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Start of code') end
@@ -9370,7 +9383,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
 
                             --Backup in case we dont have any high priority mexes yet or none are pathable
                             if M27Utilities.IsTableEmpty(tPriorityMex) then
-                                if GetGameTimeSeconds() >= 15 and not(aiBrain[M27Overseer.refbNoEnemies]) then M27Utilities.ErrorHandler('Dont have any high priority mexes recorded, so platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..' cant get a target and will move towards enemy base instead') end
+                                if GetGameTimeSeconds() >= 15 and not(aiBrain[M27Overseer.refbNoEnemies]) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then M27Utilities.ErrorHandler('Dont have any high priority mexes recorded, so platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..' cant get a target and will move towards enemy base instead') end
                                 --Just move towards the enemy by 20
 
                                 local tBackupLocation = M27Utilities.MoveInDirection(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)), 20 + oPlatoon[refiCurrentUnits], true)
@@ -11189,7 +11202,7 @@ function ProcessPlatoonAction(oPlatoon)
             local sPlatoonName = oPlatoon:GetPlan()
             --if M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and EntityCategoryContains(M27UnitInfo.refCategoryIndirectT2Plus - categories.EXPERIMENTAL - M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) and GetGameTimeSeconds() >= 1380 and oPlatoon[refiEnemyStructuresInRange] > 0 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD * categories.TECH3, oPlatoon[reftEnemyStructuresInRange])) == false then bDebugMessages = true end
             --if oPlatoon[refbACUInPlatoon] == true and oPlatoon[refoFrontUnit] and EntityCategoryContains(categories.COMMAND, oPlatoon[refoFrontUnit]) and oPlatoon[refoFrontUnit]:HasEnhancement('CloakingGenerator') and oPlatoon[refiEnemiesInRange] > 0 then bDebugMessages = true end
-            --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 25 then bDebugMessages = true end
+            --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 3 then bDebugMessages = true end
             --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
             --if GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
@@ -13428,7 +13441,7 @@ function ProcessPlatoonAction(oPlatoon)
                                     local iDistToTarget = M27Utilities.GetDistanceBetweenPositions(oDFUnit:GetPosition(), aiBrain[M27Overseer.reftACUKillTarget])
                                     if iDistToTarget < iPlatoonRange - iDistanceWithinAttackRange then
                                         if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoACUKillTarget], true) then
-                                            if bEnemyACUUnderwater and not(EntityCategoryFilterDown(categories.ANTINAVY + categories.OVERLAYANTINAVY, oDFUnit.UnitId)) then
+                                            if bEnemyACUUnderwater and not(EntityCategoryContains(categories.ANTINAVY + categories.OVERLAYANTINAVY, oDFUnit.UnitId)) then
                                                 oPlatoon[refiLastOrderType] = refiOrderIssueAggressiveMove
                                                 oPlatoon[reftLastOrderPosition] = tPositionBehindEnemyACU
                                                 IssueAggressiveMove({oDFUnit}, tPositionBehindEnemyACU)
