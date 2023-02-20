@@ -3873,11 +3873,14 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                 if M27Utilities.IsTableEmpty(tShieldsToAssign) == false then
                     local oRemainingUnitPriority = oClosestFriendlyUnitToEnemyBase
                     if bAllOutSubAttack and EntityCategoryContains(categories.SUBMERSIBLE + categories.AMPHIBIOUS - categories.HOVER, oClosestFriendlyUnitToEnemyBase.UnitId) then
-                        local tSurfaceUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAllAmphibiousAndNavy - categories.SUBMIERSIBLE, tFriendlyNavalExcludingIntercept)
-                        if M27Utilities.IsTableEmpty(tSurfaceUnits) == false then
-                            oRemainingUnitPriority = M27Utilities.GetNearestUnit(tSurfaceUnits, tEnemyBase)
-                        else
-                            M27Utilities.ErrorHandler('Dont have any surface units but should at least have the shields that are considering')
+                        local tSurfaceUnits
+                        if M27Utilities.IsTableEmpty(tFriendlyNavalExcludingIntercept) == false then
+                            tSurfaceUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAllAmphibiousAndNavy - categories.SUBMIERSIBLE, tFriendlyNavalExcludingIntercept)
+                            if M27Utilities.IsTableEmpty(tSurfaceUnits) == false then
+                                oRemainingUnitPriority = M27Utilities.GetNearestUnit(tSurfaceUnits, tEnemyBase)
+                            else
+                                M27Utilities.ErrorHandler('Dont have any surface units but should at least have the shields that are considering')
+                            end
                         end
                     end
                     for iShield, oClosestShield in tShieldsToAssign do

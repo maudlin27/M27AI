@@ -6102,7 +6102,7 @@ end
 function RecordNearbyTMD(oUnit)
     --Should have alreayd called isunitvalid before calling this
     if oUnit.GetAIBrain then
-        local aiBrain = oUnit:GetAIBrain()
+        local aiBrain = oUnit:GetAIBrain() --sometimes this will cause an error, but have already checked we have IsUnitValid() for every case where this is called so not much can do about this
         if aiBrain then
             local tNearbyTMD = oUnit:GetAIBrain():GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, oUnit:GetPosition(), iTMDNearbyRange, 'Ally')
             oUnit[M27UnitInfo.refiNearbyTMD] = 0
@@ -6713,7 +6713,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                             else
                                 if bDebugMessages == true then LOG(sFunctionRef..': Are assisting an object') end
                                 bAreAssisting = true
-                                if oActionTargetObject.GetUnitId then
+                                if M27UnitInfo.IsUnitValid(oActionTargetObject) then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Telling engineer '..GetEngineerUniqueCount(oEngineer)..'to assist object '..oActionTargetObject.UnitId..M27UnitInfo.GetUnitLifetimeCount(oActionTargetObject)) end
                                     if oActionTargetObject.GetFractionComplete and oActionTargetObject:GetFractionComplete() < 1 then
                                         IssueRepair({ oEngineer}, oActionTargetObject)
@@ -6746,7 +6746,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
 
                                     UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tActionTargetLocation, true, iConditionNumber, oActionTargetObject)
                                 else
-                                    LOG('oActionTargetObject isnt a unit, will see if it has a subtable with a unit and use that (workaround for strange issue)')
+                                    if bDebugMessages == true then LOG('oActionTargetObject isnt a unit, will see if it has a subtable with a unit and use that (workaround for strange issue)') end
                                     if oActionTargetObject[2] and oActionTargetObject[2].GetUnitId then
                                         LOG(sFunctionRef..': Have a valid unit in a subtable, so will make this the target')
                                         oActionTargetObject = oActionTargetObject[2]
