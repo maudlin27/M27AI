@@ -52,8 +52,6 @@ function UpdateTransportForLoadedUnit(oUnitJustLoaded, oTransport)
         if not(oTransport[reftUnitsLoadedOntoTransport]) then oTransport[reftUnitsLoadedOntoTransport] = {} end
 
 
-
-
         --Is the transport full?
         local bSendTransportToTarget = false
         local iMaxTechLevel = 1
@@ -193,14 +191,16 @@ function SendTransportToPlateau(aiBrain, oTransport)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SendTransportToPlateau'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if oTransport:GetAIBrain():GetArmyIndex() == 5 then bDebugMessages = true end
+    --if oTransport:GetAIBrain():GetArmyIndex() == 1 then bDebugMessages = true end
     --Check if target still safe and if not switches to an alternative target if there's a better one
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code at time='..GetGameTimeSeconds()..', will update plateaus that we want to expand to. oTransport='..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)..'; oTransport[refiAssignedPlateau]='..(oTransport[refiAssignedPlateau] or 'nil')) end
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': Start of code at time='..GetGameTimeSeconds()..', will update plateaus that we want to expand to. oTransport='..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)..'; oTransport[refiAssignedPlateau]='..(oTransport[refiAssignedPlateau] or 'nil')..'; Units loaded onto oTransport='..(oTransport[refiUnitsLoaded] or 'nil'))
+        M27Utilities.ErrorHandler('Audit trail')
+    end
     M27MapInfo.UpdatePlateausToExpandTo(aiBrain, true, false, oTransport)
 
-    if bDebugMessages == true then LOG(sFunctionRef..': About to check if current assigned plateau for the transport is still one we want to expand to.  oTransport[refiAssignedPlateau]='..(oTransport[refiAssignedPlateau] or 'nil')..'; Is PlateauOfInterst table for this empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest][oTransport[refiAssignedPlateau]]))) end
-    if not(aiBrain[M27MapInfo.reftPlateausOfInterest][oTransport[refiAssignedPlateau]]) and M27Utilities.IsTableEmpty( aiBrain[M27MapInfo.reftPlateausOfInterest]) == false then
-        --Current target isnt safe but we have a better one
+    if bDebugMessages == true then LOG(sFunctionRef..': About to check if current assigned plateau for the transport is still the best one to expand to.  oTransport[refiAssignedPlateau]='..(oTransport[refiAssignedPlateau] or 'nil')..'; Is PlateauOfInterst table for this empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest][oTransport[refiAssignedPlateau]]))) end
+    if M27Utilities.IsTableEmpty( aiBrain[M27MapInfo.reftPlateausOfInterest]) == false then
         local iCurDist
         local iNearestDist = 10000
         local iNearestPathingGroup
@@ -212,9 +212,11 @@ function SendTransportToPlateau(aiBrain, oTransport)
                 iNearestPathingGroup = iPathingGroup
             end
         end
-        ClearTransportTrackers(aiBrain, oTransport)
-        if bDebugMessages == true then LOG(sFunctionRef..': About to assign oTransport '..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)..' to iNearestPathingGroup='..(iNearestPathingGroup or 'nil')) end
-        AssignTransportToPlateau(aiBrain, oTransport, iNearestPathingGroup, 0)
+        if not(oTransport[refiAssignedPlateau] == iNearestPathingGroup) then
+            ClearTransportTrackers(aiBrain, oTransport)
+            if bDebugMessages == true then LOG(sFunctionRef..': About to assign oTransport '..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)..' to iNearestPathingGroup='..(iNearestPathingGroup or 'nil')) end
+            AssignTransportToPlateau(aiBrain, oTransport, iNearestPathingGroup, 0)
+        end
     end
 
     if not(oTransport[reftPlateauNearestMex]) then
@@ -233,6 +235,7 @@ function SendTransportToPlateau(aiBrain, oTransport)
 
     IssueTransportUnload({oTransport}, oTransport[reftPlateauNearestMex])
     M27Team.tTeamData[aiBrain.M27Team][M27Team.reftTimeOfTransportLastLocationAttempt][M27Utilities.ConvertLocationToReference(oTransport[reftPlateauNearestMex])] = GetGameTimeSeconds()
+    if bDebugMessages == true then LOG(sFunctionRef..': Just told transport '..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)..' owned by '..oTransport:GetAIBrain().Nickname..' to go to a plateau, oTransport[refiAssignedPlateau]='..(oTransport[refiAssignedPlateau] or 'nil')..'; will go to the mex with location '..repru(oTransport[reftPlateauNearestMex])..'; Brain start position='..repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Dist between start position and mex='..M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oTransport[reftPlateauNearestMex])) end
 
     oTransport[reftLocationWhenFirstInactive] = nil
     oTransport[refiTimeSinceFirstInactive] = nil
@@ -255,7 +258,7 @@ function TransportManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'TransportManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if aiBrain:GetArmyIndex() == 5 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTransport) > 0 then bDebugMessages = true end
+    --if aiBrain:GetArmyIndex() == 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTransport) > 0 then bDebugMessages = true end
 
     --Called via forkthread from airoverseer after identifying available transports
 
