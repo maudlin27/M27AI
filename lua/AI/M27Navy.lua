@@ -2977,12 +2977,17 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                     if iOurBestSubmersibleRange > iEnemyBestAntiNavyRange then
                         iMaxDistanceWithinAttackRangeWanted = 0.5
                         iMinDistanceWithinAttackRangeWanted = -7.5
+                        if iOurBestSubmersibleRange - 8 > iEnemyBestAntiNavyRange then
+                            iMinDistanceWithinAttackRangeWanted = iMinDistanceWithinAttackRangeWanted + 3
+                            iMaxDistanceWithinAttackRangeWanted = iMaxDistanceWithinAttackRangeWanted + 3
+                        end
                     elseif bAllOutAttack or bAllOutSubAttack then
                         iMaxDistanceWithinAttackRangeWanted = 8.5
                         iMinDistanceWithinAttackRangeWanted = 1.3
                     end
 
                     if iMaxDistanceWithinAttackRangeWanted then
+                        bDebugMessages = true
                         --Want to either move towards enemy or do kiting retreat
                         --Move towards nearest enemy unit until within range
                         local iCurDistToClosestEnemy
@@ -2993,7 +2998,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                                 MoveUnitTowardsTarget(oUnit, tDestinationForShortRangeUnits, false, 'ShortRange')
                             else
                                 iCurDistToClosestEnemy = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tClosestEnemyTargetToUse)
-
+                                if bDebugMessages == true then LOG(sFunctionRef..': iCurDistToClosestEnemy='..iCurDistToClosestEnemy..'; iMaxDistanceWithinAttackRangeWanted='..iMaxDistanceWithinAttackRangeWanted..'; oUnit[M27UnitInfo.refiAntiNavyRange]='..(oUnit[M27UnitInfo.refiAntiNavyRange] or 'nil')) end
                                 if iCurDistToClosestEnemy + iMaxDistanceWithinAttackRangeWanted < oUnit[M27UnitInfo.refiAntiNavyRange] then
                                     if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tOurBase) <= 20 then
                                         MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, not(oUnit[M27UnitInfo.refbLastShotBlocked]), 'ASKitingRetreat')
@@ -3043,6 +3048,10 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                                 else
                                     iMaxDistanceWithinAttackRangeWanted = 0.5
                                     iMinDistanceWithinAttackRangeWanted = -7.5
+                                    if iOurBestSurfaceRange - 15 > iEnemyBestSurfaceRange then
+                                        iMaxDistanceWithinAttackRangeWanted = iMaxDistanceWithinAttackRangeWanted + 3
+                                        iMinDistanceWithinAttackRangeWanted = iMinDistanceWithinAttackRangeWanted + 3
+                                    end
                                 end
                             elseif iOurBestSurfaceAntiNavyRange > iEnemyBestSubmersibleRange then
                                 iMaxDistanceWithinAttackRangeWanted = 0.5

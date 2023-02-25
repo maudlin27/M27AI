@@ -1209,7 +1209,7 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
             local bCancelAndReclaim = false
             local oUnitToSwitchTo
             if bDebugMessages == true then LOG(sFunctionRef..': Construction started for unit '..oConstruction.UnitId..M27UnitInfo.GetUnitLifetimeCount(oConstruction)..'; Is it an experimental structure='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryExperimentalLevel, oConstruction.UnitId))) end
-            if EntityCategoryContains(M27UnitInfo.refCategoryExperimentalLevel, oConstruction.UnitId) then
+            if EntityCategoryContains(M27UnitInfo.refCategoryExperimentalLevel, oConstruction.UnitId) and oConstruction:GetFractionComplete() <= 0.04 then --redundancy - ignore this logic if are already 4%+ done with the experimental
                 local tNearbyGameEnders = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryExperimentalStructure, oConstruction:GetPosition(), 150, 'Ally')
                 if bDebugMessages == true then LOG(sFunctionRef..': Is table of nearby gameenders empty='..tostring(M27Utilities.IsTableEmpty(tNearbyGameEnders))) end
                 if M27Utilities.IsTableEmpty(tNearbyGameEnders) == false then

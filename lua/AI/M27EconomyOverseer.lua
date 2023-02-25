@@ -2765,9 +2765,15 @@ function ManageMassStalls(aiBrain)
     local bChangeRequired = false
     local iUnitsAdjusted = 0
     local iMassStallPercentAdjust = 0
-    if aiBrain[M27EngineerOverseer.refbNeedResourcesForMissile] then iMassStallPercentAdjust = 0.02 end
+    if aiBrain[M27EngineerOverseer.refbNeedResourcesForMissile] then
+        if aiBrain:GetEconomyStored('MASS') <= aiBrain[refiGrossMassBaseIncome] * 5 or aiBrain[refiNetMassBaseIncome] < 0 then
+            iMassStallPercentAdjust = 0.04
+        else
+            iMassStallPercentAdjust = 0.02
+        end
+    end
     --Dont consider pausing or unpausing if are stalling energy or early game, as our energy stall manager is likely to be operating
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, GetGameTimeSeconds='..GetGameTimeSeconds()..'; aiBrain[refiGrossMassBaseIncome]='..aiBrain[refiGrossMassBaseIncome]..'; aiBrain[refbStallingEnergy]='..tostring(aiBrain[refbStallingEnergy])..'; time since last energy stall='..GetGameTimeSeconds() - (aiBrain[refiLastEnergyStall] or -100)..'; energy stored='..aiBrain:GetEconomyStoredRatio('ENERGY')) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, GetGameTimeSeconds='..GetGameTimeSeconds()..'; aiBrain[refiGrossMassBaseIncome]='..aiBrain[refiGrossMassBaseIncome]..'; aiBrain[refbStallingEnergy]='..tostring(aiBrain[refbStallingEnergy])..'; time since last energy stall='..GetGameTimeSeconds() - (aiBrain[refiLastEnergyStall] or -100)..'; energy stored='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; refbNeedResourcesForMissile='..tostring(aiBrain[M27EngineerOverseer.refbNeedResourcesForMissile] or false)) end
     if aiBrain[refbStallingMass] or (GetGameTimeSeconds() >= 120 and aiBrain[refiGrossMassBaseIncome] >= 3 and not(aiBrain[refbStallingEnergy]) and GetGameTimeSeconds() - (aiBrain[refiLastEnergyStall] or -100) >= 10 and aiBrain:GetEconomyStoredRatio('ENERGY') == 1) then
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': About to consider if we have a mass stall or not. aiBrain:GetEconomyStoredRatio(MASS)=' .. aiBrain:GetEconomyStoredRatio('MASS') .. '; aiBrain[refiNetMassBaseIncome]=' .. aiBrain[refiNetMassBaseIncome] .. '; aiBrain:GetEconomyTrend(MASS)=' .. aiBrain:GetEconomyTrend('MASS') .. '; aiBrain[refbStallingMass]=' .. tostring(aiBrain[refbStallingMass])..'; aiBrain:GetEconomyRequested(MASS)='..aiBrain:GetEconomyRequested('MASS'))
@@ -2805,7 +2811,8 @@ function ManageMassStalls(aiBrain)
 
             local iMassPerTickSavingNeeded
             if aiBrain[refbStallingMass] then
-                if aiBrain[M27EngineerOverseer.refbNeedResourcesForMissile] then iMassPerTickSavingNeeded = math.max(1, -aiBrain[refiNetMassBaseIncome])
+                if aiBrain[M27EngineerOverseer.refbNeedResourcesForMissile] and aiBrain:GetEconomyStored('MASS') <= math.max(500, aiBrain[refiGrossMassBaseIncome] * 4) then
+                    iMassPerTickSavingNeeded = math.max(1, -aiBrain[refiNetMassBaseIncome] * 0.6)
                 else
                     iMassPerTickSavingNeeded = math.max(1, -aiBrain[refiNetMassBaseIncome] * 0.8)
                 end

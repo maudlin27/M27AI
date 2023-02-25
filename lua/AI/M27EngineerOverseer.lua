@@ -7724,7 +7724,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     local sFunctionRef = 'GetActionTargetAndObject'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if GetGameTimeSeconds() >= 1560 and iActionRefToAssign == refActionBuildSecondShield then bDebugMessages = true end    
+    --if GetGameTimeSeconds() >= 1560 and iActionRefToAssign == refActionBuildSecondShield then bDebugMessages = true end
 
 
     local tLocationsToGoThrough = tExistingLocationsToPickFrom
@@ -11886,10 +11886,14 @@ end--]]
 
                                 --TML builder instead of T2 arti if lowish mass and have none
                                 local bGetTMLInstead = false
-                                if not(bEnemyHasFatboy) and M27Utilities.IsTableEmpty(tNearbyEnemyNavy) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTML) == 0 then
+                                if bEnemyHasNearbyT2StructureOrLongRange and not(bEnemyHasFatboy) and M27Utilities.IsTableEmpty(tNearbyEnemyNavy) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTML) == 0 then
                                     local tNearbyEnemyTMDAndShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryTMD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 200, 'Enemy')
                                     if M27Utilities.IsTableEmpty(tNearbyEnemyTMDAndShields) then
-                                        bGetTMLInstead = true
+                                        RecordPossibleTMLTargets(aiBrain, false)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Want to get TML unless no targets, is aiBrain[reftoTMLTargetsOfInterest] empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftoTMLTargetsOfInterest]))..', bEnemyHasNearbyT2StructureOrLongRange='..tostring(bEnemyHasNearbyT2StructureOrLongRange)..'; Enemy nearby navy is empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyNavy))) end
+                                        if M27Utilities.IsTableEmpty(aiBrain[reftoTMLTargetsOfInterest]) == false then
+                                            bGetTMLInstead = true
+                                        end
                                     end
                                 end
                                 if bGetTMLInstead then
@@ -12705,8 +12709,13 @@ end--]]
                                 LOG(sFunctionRef .. ': No SML detected but will build SMD anyway as a precaution as we have a good economy')
                             end
                             iEnemyNukes = math.max(iEnemyNormalNukes, iEnemyBattleshipNukes, 1) --Redundancy - if table isnt empty enemy must have at least one, and will assume they have 1 if we are building as a precaution
+                            --Increase nuke number for enemy build multiplier
+                            local iBuildCheat = tonumber(ScenarioInfo.Options.BuildMult) or 1
+                            if iBuildCheat > 1.2 then --1.3 AiX or better
+                                iEnemyNukes = math.ceil(iEnemyNukes * iBuildCheat)
+                            end
                             if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': iSMDsWeHave=' .. iSMDsWeHave .. '; iEnemyNukes=' .. iEnemyNukes .. '; iSMDsWithNoMissiles=' .. iSMDsWithNoMissiles)
+                                LOG(sFunctionRef .. ': iSMDsWeHave=' .. iSMDsWeHave .. '; iEnemyNukes after adjusting for build mult=' .. iEnemyNukes .. '; iSMDsWithNoMissiles=' .. iSMDsWithNoMissiles..'; iBuildCheat='..iBuildCheat)
                                 if iEnemyNukes > 1 then
 
                                     LOG(sFunctionRef .. ': Will now list out each nuke unit ID')
@@ -12715,7 +12724,7 @@ end--]]
                                     end
                                 end
                             end
-                            local iSMDWanted = math.min(4, iEnemyNukes, math.max(1, math.floor(aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 5)))
+                            local iSMDWanted = math.min(math.max(4, math.min(6, iEnemyNukes - 1)), iEnemyNukes, math.max(1, math.floor(aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 5)))
                             if bHaveLowMass then
                                 iSMDWanted = math.min(3, iSMDWanted)
                             end
@@ -12748,7 +12757,7 @@ end--]]
                                     end
                                 end
                             else
-                                aiBrain[refbNeedResourcesForMissile] = false
+                                if aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySML) == 0 then aiBrain[refbNeedResourcesForMissile] = false end
                                 --Have SMDs but they all have anti-nuke loaded; check if we have any engineers already assigned to this action and if so clear them
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Checking if any engineers have been assigned to assist SMD, if so will clear their actions')
