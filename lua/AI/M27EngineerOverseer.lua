@@ -11839,8 +11839,14 @@ end--]]
                                 if aiBrain[M27Overseer.refiNearestEnemyT2PlusStructure] <= 175 then
                                     bEnemyHasNearbyT2StructureOrLongRange = true
                                 else
-                                    --Do the enemy have nearby indirect fire?
-                                    local tNearbyIndirectOrT2Structure = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLongRangeMobile + M27UnitInfo.refCategoryStructure - categories.TECH1, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 175, 'Enemy')
+                                    --Do the enemy have nearby indirect fire? (Ignore T2 MMLs if we have T3 land fac)
+                                    local iSearchCategory
+                                    if aiBrain[M27Overseer.refiOurHighestLandFactoryTech] >= 3 then
+                                        iSearchCategory = M27UnitInfo.refCategoryLongRangeMobile + M27UnitInfo.refCategoryStructure - categories.TECH1 - categories.TECH2 * categories.LAND * categories.MOBILE
+                                    else
+                                        iSearchCategory = M27UnitInfo.refCategoryLongRangeMobile + M27UnitInfo.refCategoryStructure - categories.TECH1
+                                    end
+                                    local tNearbyIndirectOrT2Structure = aiBrain:GetUnitsAroundPoint(iSearchCategory, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 175, 'Enemy')
                                     if M27Utilities.IsTableEmpty(tNearbyIndirectOrT2Structure) == false then
                                         bEnemyHasNearbyT2StructureOrLongRange = true
                                         --ignore if structures are owned by civilian and none of them have direct or indirect fire

@@ -1350,7 +1350,7 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                                 local oACUTarget = oACU:GetFocusUnit()
                                 if M27UnitInfo.IsUnitValid(oACUTarget) then
                                     if bDebugMessages == true then LOG(sFunctionRef..': oACUTarget='..oACUTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oACUTarget)..'; Fraction complete='..oACUTarget:GetFractionComplete()..'; Dist to oConstruction='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition())) end
-                                    if oACUTarget:GetFractionComplete() < 1 and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition()) <= 35 then
+                                    if oACUTarget:GetFractionComplete() < 1 and  aiBrain[M27EngineerOverseer.refiFirebaseCategoryWanted][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]] and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition()) <= 35 then
                                         --Is the ACU building a firebase category, and is that our action?
                                         if EntityCategoryContains(aiBrain[M27EngineerOverseer.refiFirebaseCategoryWanted][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]], oACUTarget.UnitId) then
                                             if bDebugMessages == true then LOG(sFunctionRef..': Will switch so we assist this unit instead') end

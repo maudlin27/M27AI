@@ -2987,7 +2987,6 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                     end
 
                     if iMaxDistanceWithinAttackRangeWanted then
-                        bDebugMessages = true
                         --Want to either move towards enemy or do kiting retreat
                         --Move towards nearest enemy unit until within range
                         local iCurDistToClosestEnemy
