@@ -1224,12 +1224,12 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                 end
                 if not(bCancelAndReclaim) then
                     --Have we just started an experimental level unit and we have the same unit under construction nearby and we aren't close to overflowing, and we dont have loads of mass?
-                    if bDebugMessages == true then LOG(sFunctionRef..': Gross mass income='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; Mass stored ratio='..aiBrain:GetEconomyStoredRatio('MASS')..'; Have low mass='..tostring(M27Conditions.HaveLowMass(aiBrain))) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Gross mass income='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; Mass stored ratio='..aiBrain:GetEconomyStoredRatio('MASS')..'; Have low mass='..tostring(M27Conditions.HaveLowMass(aiBrain))..'; oConstruction='..oConstruction.UnitId..M27UnitInfo.GetUnitLifetimeCount(oConstruction)) end
                     if (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] <= 50 or aiBrain:GetEconomyStoredRatio('MASS') <= 0.25) and (M27Conditions.HaveLowMass(aiBrain) or aiBrain:GetEconomyStoredRatio('MASS') <= 0.4) then
                         local tNearbyExperimentalLevel = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryExperimentalLevel, oConstruction:GetPosition(), 150, 'Ally')
                         for iUnit, oUnit in tNearbyExperimentalLevel do
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering nearby unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Fraction complete='..oUnit:GetFractionComplete()) end
-                            if oUnit.UnitId == oConstruction.UnitId and not(oUnit == oConstruction) and (oUnit:GetFractionComplete() < 0.9 or (oUnit:GetFractionComplete() < 1 and aiBrain:GetEconomyStoredRatio('MASS') < 0.1)) then
+                            if not(oUnit == oConstruction) and (oUnit:GetFractionComplete() < 0.9 or (oUnit:GetFractionComplete() < 1 and aiBrain:GetEconomyStoredRatio('MASS') < 0.1)) and (oUnit.UnitId == oConstruction.UnitId or (EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oConstruction.UnitId) and EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oUnit.UnitId))) then
                                 bCancelAndReclaim = true
                                 oUnitToSwitchTo = oUnit
                                 if bDebugMessages == true then LOG(sFunctionRef..': Are buildling the same unit nearby so will switch to this, oUnitToSwitchTo='..oUnitToSwitchTo.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToSwitchTo)..' with fraction complete='..oUnitToSwitchTo:GetFractionComplete()) end
@@ -1241,9 +1241,13 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
 
             end
             if bCancelAndReclaim then
+                oConstruction['M27FirstConstructionStart'] = false --redundancy so if we arent able to find all the other engineers assigned to help construct this unit we will rerun this code whenever an engineer starts construction
                 local iActionRef = oEngineer[M27EngineerOverseer.refiEngineerCurrentAction]
                 local iUniqueRef = M27EngineerOverseer.GetEngineerUniqueCount(oEngineer)
                 local sLocationRef = aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][iUniqueRef][1][M27EngineerOverseer.refEngineerAssignmentLocationRef]
+                if not(sLocationRef) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find the locationref but will rerun this code whenever an engineer starts construction on this unit') end
+                end
 
 
                 M27Utilities.IssueTrackedClearCommands({oEngineer})
@@ -1252,10 +1256,10 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                     IssueRepair({oEngineer}, oUnitToSwitchTo)
                 end
 
-                if bDebugMessages == true then LOG(sFunctionRef..': iActionRef='..(iActionRef or 'nil')..'; iUniqueRef='..iUniqueRef..'; sLocationRef='..sLocationRef..'; Is table of assignemnts for this empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef]))) end
+                if bDebugMessages == true then LOG(sFunctionRef..': iActionRef='..(iActionRef or 'nil')..'; iUniqueRef='..(iUniqueRef or 'nil')..'; sLocationRef='..(sLocationRef or 'nil')..'; Is table of assignemnts for this empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef]))) end
 
 
-                if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) == false and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef]) == false then
+                if sLocationRef and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) == false and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef]) == false then
                     for iOtherEngi, oOtherEngi in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef] do
                         M27Utilities.IssueTrackedClearCommands({oOtherEngi})
 
@@ -1490,6 +1494,9 @@ function OnConstructed(oEngineer, oJustBuilt)
                 ForkThread(M27EngineerOverseer.UpdateMassFabPotentialLocations, oJustBuilt)
             elseif EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryMobileLandStealth, oJustBuilt.UnitId) then
                 ForkThread(M27Team.ConsiderGiftingShieldOrStealthToSubteam, oJustBuilt)
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryPower - categories.TECH1, oJustBuilt.UnitId) then
+                --Power - flag if we have just built a lot of power
+                ForkThread(M27EconomyOverseer.UpdateIfJustBuiltLotsOfPower, oJustBuilt)
             end
 
             --Firebase tracking

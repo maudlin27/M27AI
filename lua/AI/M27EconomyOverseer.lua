@@ -55,6 +55,7 @@ refbStallingEnergy = 'M27EconomyStallingEnergy'
 refiGrossEnergyWhenStalled = 'M27EconomyGrossEnergyWhenStalled' --Energy per tick
 refbStallingMass = 'M27EconomyStallingMass'
 refiLastEnergyStall = 'M27EconomyLastEnergyStall' --Game time in seconds of last power stall
+refbJustBuiltLotsOfPower = 'M27EconomyJustBuiltLotsPower' --true if we have just built a lot of power (so we are less likely to build more in the short period after)
 reftPausedUnits = 'M27EconomyPausedUnits'
 iSpecialHQCategory = 'M27EconomyFactoryHQ' --Used as a way of choosing to pause HQ
 
@@ -2480,7 +2481,7 @@ function RefreshEconomyData(aiBrain)
 
     local iCheatMod = 1
     if aiBrain.CheatEnabled then
-        iCheatMod = tonumber(ScenarioInfo.Options.CheatMult) or 2
+        iCheatMod = tonumber(ScenarioInfo.Options.CheatMult) or 2 --.CheatMult is the resource bonus; Build bonus is .BuildMult
     end
     aiBrain[refiGrossEnergyBaseIncome] = (iParagonCount * iParagonEnergy + iACUEnergy + iT3PowerCount * iEnergyT3Power + iT2PowerCount * iEnergyT2Power + iT1PowerCount * iEnergyT1Power + iHydroCount * iEnergyHydro + iRASSACUCount * iRASSACUEnergy + iSeraphimSACUCount * iSeraphimSACUEnergy) * iPerTickFactor * iCheatMod
 
@@ -3876,5 +3877,32 @@ function UpgradeManager(aiBrain)
             LOG(sFunctionRef .. ': End of loop after waiting ticks')
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function UpdateIfJustBuiltLotsOfPower(oJustBuilt)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'UpdateIfJustBuiltLotsOfPower'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local iMassGen
+    local iEnergyGen
+    local aiBrain = oJustBuilt:GetAIBrain()
+    if EntityCategoryContains(M27UnitInfo.refCategoryParagon, oJustBuilt.UnitId) then
+        iMassGen = 10000
+        iEnergyGen = 1000000
+    else
+        local oBP = oJustBuilt:GetBlueprint()
+        iMassGen = math.max(oBP.Economy.ProductionPerSecondMass or 0) * 0.1
+        iEnergyGen = math.max(oBP.Economy.ProductionPerSecondEnergy or 0) * 0.1
+    end
+    --Set temporary flag that we have just built a lot of power (if we have)
+    if bDebugMessages == true then LOG(sFunctionRef..': Considering if should temporarily say we have enough power; iEnergyGen='..iEnergyGen..'; Gross energy='..(M28Team.tTeamData[aiBrain.M28Team][M28Team.subrefiTeamGrossEnergy] or 'nil')..'; Net energy='..(M28Team.tTeamData[aiBrain.M28Team][M28Team.subrefiTeamNetEnergy] or 'nil')..'; Flag for lots of power='..tostring(M28Team.tTeamData[aiBrain.M28Team][M28Team.refbJustBuiltLotsOfPower] or false)) end
+    if iEnergyGen >= math.max(20, (aiBrain[refiGrossEnergyBaseIncome] * 0.2), -(aiBrain[refiNetEnergyBaseIncome] or 0)) and not(aiBrain[refbJustBuiltLotsOfPower]) then
+        aiBrain[refbJustBuiltLotsOfPower] = true
+        M27Utilities.DelayChangeVariable(aiBrain, refbJustBuiltLotsOfPower, false, 10)
+        if bDebugMessages == true then LOG(sFunctionRef..': Just built a lot of power so will temporarily say we dont need more power') end
+    end
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

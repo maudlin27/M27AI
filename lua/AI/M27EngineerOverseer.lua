@@ -7724,9 +7724,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     local sFunctionRef = 'GetActionTargetAndObject'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if GetGameTimeSeconds() >= 1560 and iActionRefToAssign == refActionBuildSecondShield then bDebugMessages = true end
-    --if iActionRefToAssign == refActionBuildNavalFactory then bDebugMessages = true end
-
+    --if GetGameTimeSeconds() >= 1560 and iActionRefToAssign == refActionBuildSecondShield then bDebugMessages = true end    
 
 
     local tLocationsToGoThrough = tExistingLocationsToPickFrom
@@ -7748,7 +7746,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
 
     local bClearCurrentlyAssignedEngineer = false --e.g. if want to switch to T2 unit then will clear actions of the currently assigned engineer
 
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code. iActionRefToAssign='..iActionRefToAssign) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, time='..GetGameTimeSeconds()..'. iActionRefToAssign='..iActionRefToAssign) end
 
     --Are we assisting a building?
     if iActionRefToAssign == refActionUpgradeBuilding or iActionRefToAssign == refActionAssistSMD or iActionRefToAssign == refActionAssistTML or iActionRefToAssign == refActionAssistNuke or iActionRefToAssign == refActionAssistAirFactory or iActionRefToAssign == refActionAssistNavalFactory or iActionRefToAssign == refActionUpgradeHQ or iActionRefToAssign == refActionAssistShield or iActionRefToAssign == refActionAssistMexUpgrade then
@@ -10145,7 +10143,7 @@ end--]]
 
             iNetCurEnergyIncome = aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome]
             iEnergyStored = aiBrain:GetEconomyStored('ENERGY')
-
+            local bHaveLowMass = M27Conditions.HaveLowMass(aiBrain)
 
             if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush then
                 bWantMorePower = false
@@ -10314,7 +10312,18 @@ end--]]
                 bHaveVeryLowPower = false
             end
 
-            if bDebugMessages == true then LOG(sFunctionRef .. ': Power calcs: bHaveLowPower=' .. tostring(bHaveLowPower) .. '; bWantMorePower=' .. tostring(bWantMorePower) .. '; iPowerWantedPerTick=' .. iPowerWantedPerTick .. '; iNetCurEnergyIncome=' .. iNetCurEnergyIncome .. '; % energy stored=' .. aiBrain:GetEconomyStoredRatio('ENERGY') .. '; aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] .. '; aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] .. '; Time since last power stall=' .. (GetGameTimeSeconds() - (aiBrain[M27EconomyOverseer.refiLastEnergyStall] or -100))) end
+            --Dont treat as having low power if have just built significant amount; also dont want more power if have low mass
+            if (bHaveLowPower or bHaveVeryLowPower) and aiBrain[M27EconomyOverseer.refbJustBuiltLotsOfPower] and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] >= aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] * 0.1 and aiBrain[M27EconomyOverseer.refbJustBuiltLotsOfPower] then
+                bHaveLowPower = false
+                bHaveVeryLowPower = false
+                if bDebugMessages == true then LOG(sFunctionRef..': Just built ltos of power and have positive net energy so wont flag as wanting more power for now') end
+            end
+            if not(bHaveLowPower) and bHaveLowMass and bWantMorePower then
+                if aiBrain:GetEconomyStoredRatio('MASS') <= 0.01 or (aiBrain[M27EconomyOverseer.refbJustBuiltLotsOfPower] and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] >= aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] * 0.15) then bWantMorePower = false end
+            end
+
+
+            if bDebugMessages == true then LOG(sFunctionRef .. ': Power calcs: bHaveLowPower=' .. tostring(bHaveLowPower) .. '; bWantMorePower=' .. tostring(bWantMorePower) .. '; iPowerWantedPerTick=' .. iPowerWantedPerTick .. '; iNetCurEnergyIncome=' .. iNetCurEnergyIncome .. '; % energy stored=' .. aiBrain:GetEconomyStoredRatio('ENERGY') .. '; aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] .. '; aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] .. '; Time since last power stall=' .. (GetGameTimeSeconds() - (aiBrain[M27EconomyOverseer.refiLastEnergyStall] or -100))..'; aiBrain[M27EconomyOverseer.refbJustBuiltLotsOfPower]='..tostring(aiBrain[M27EconomyOverseer.refbJustBuiltLotsOfPower] or false)) end
 
 
 
@@ -10330,7 +10339,6 @@ end--]]
             local iT2Power, iT3Power
             local iCurRadarCount, iCurT2RadarCount
             local iNearbyOmniCount
-            local bHaveLowMass = M27Conditions.HaveLowMass(aiBrain)
 
             local iCount = 0
 
@@ -10349,6 +10357,7 @@ end--]]
 
 
             while iEngineersToConsider >= 0 do
+                --if tiAvailableEngineersByTech[2] > 0 and aiBrain:GetArmyIndex() == 3 then bDebugMessages = true else bDebugMessages = false end
                 --want >= rather than > so get correct calculation of engineers needed
 
                 --if iEngineersToConsider > 0 then bDebugMessages = true else bDebugMessages = false end

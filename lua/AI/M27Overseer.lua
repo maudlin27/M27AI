@@ -9815,7 +9815,10 @@ end
 
 function TestCustom(aiBrain)
     local sFunctionRef = 'TestCustom'
+    --Scenario info.Options
+    LOG('Scenario info options reprs:'..reprs(ScenarioInfo.Options))
 
+    --[[
     --Call T3 arti logic when first spawn via cheat
     local tAlliedT3Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Ally')
     LOG('GameTime='..GetGameTimeSeconds())
@@ -9831,7 +9834,7 @@ function TestCustom(aiBrain)
     local tEnemyT3Engineers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryEngineer * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Enemy')
     if M27Utilities.IsTableEmpty(tEnemyT3Engineers) == false then
         LOG('Enemy T3 engi count='..table.getn(tEnemyT3Engineers))
-    end
+    end--]]
 
 
     --Calc range of SACUs - test
@@ -10362,7 +10365,7 @@ function OverseerManager(aiBrain)
     end
 
     --ForkThread(ConstantBomberLocation, aiBrain)
-    --TestCustom(aiBrain)
+    TestCustom(aiBrain)
 
 
 
