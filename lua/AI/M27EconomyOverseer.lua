@@ -3174,9 +3174,21 @@ function ManageMassStalls(aiBrain)
                                 M27UnitInfo.PauseOrUnpauseMassUsage(aiBrain, oUnit, bPauseNotUnpause)
                                 --Cant move the below into unitinfo as get a crash if unitinfo tries to refernce the table of paused units
                                 if bPauseNotUnpause then
-                                    table.insert(aiBrain[reftPausedUnits], oUnit)
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Added unit to tracker table, size=' .. table.getn(aiBrain[reftPausedUnits]))
+                                    local bRecordUnit = true
+                                    if M27Utilities.IsTableEmpty(aiBrain[reftPausedUnits]) == false then
+                                        for iExistingUnit, oExistingUnit in aiBrain[reftPausedUnits] do
+                                            if oExistingUnit == oUnit then
+                                                bRecordUnit = false
+                                                break
+                                            end
+                                        end
+                                    end
+                                    if bRecordUnit then
+                                        table.insert(aiBrain[reftPausedUnits], oUnit)
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Added unit to tracker table, size=' .. table.getn(aiBrain[reftPausedUnits]))
+                                        end
+                                    elseif bDebugMessages == true then LOG(sFunctionRef..': Unit is already recorded in table of paused units')
                                     end
                                 else
                                     if bDebugMessages == true then
@@ -3673,9 +3685,21 @@ function ManageEnergyStalls(aiBrain)
                                 M27UnitInfo.PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
                                 --Cant move the below into unitinfo as get a crash if unitinfo tries to refernce the table of paused units
                                 if bPauseNotUnpause then
-                                    table.insert(aiBrain[reftPausedUnits], oUnit)
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Added unit to tracker table, size=' .. table.getn(aiBrain[reftPausedUnits]))
+                                    local bRecordUnit = true
+                                    if M27Utilities.IsTableEmpty(aiBrain[reftPausedUnits]) == false then
+                                        for iExistingUnit, oExistingUnit in aiBrain[reftPausedUnits] do
+                                            if oExistingUnit == oUnit then
+                                                bRecordUnit = false
+                                                break
+                                            end
+                                        end
+                                    end
+                                    if bRecordUnit then
+                                        table.insert(aiBrain[reftPausedUnits], oUnit)
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Added unit to tracker table, size=' .. table.getn(aiBrain[reftPausedUnits]))
+                                        end
+                                    elseif bDebugMessages == true then LOG(sFunctionRef..': Unit is already recorded in table of paused units')
                                     end
                                 else
                                     if bDebugMessages == true then
