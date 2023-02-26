@@ -929,7 +929,7 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                 instigator[M27UnitInfo.refiGameTimeDamageLastDealt] = math.floor(GetGameTimeSeconds())
                 M27Utilities.DelayChangeVariable(instigator, M27UnitInfo.refbRecentlyDealtDamage, false, 5, M27UnitInfo.refiGameTimeDamageLastDealt, instigator[M27UnitInfo.refiGameTimeDamageLastDealt] + 1, nil, nil)
                 --If just damaged T2+ mex or high value building with surface naval unit then have it attack that unit specifically until it is dead
-                if EntityCategoryContains(M27UnitInfo.refCategoryNavalSurface, instigator.UnitId) and EntityCategoryContains(M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex + categories.VOLATILE * categories.STRUCTURE - M27UnitInfo.refCategoryT1Power + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + categories.EXPERIMENTAL * categories.STRUCTURE, self.UnitId) then
+                if EntityCategoryContains(M27UnitInfo.refCategoryNavalSurface, instigator.UnitId) and EntityCategoryContains(M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex + categories.VOLATILE * categories.STRUCTURE - M27UnitInfo.refCategoryT1Power + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML * categories.STRUCTURE + categories.EXPERIMENTAL * categories.STRUCTURE, self.UnitId) then
                     ForkThread(M27UnitMicro.FocusDownTarget, instigator, self)
                 elseif EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, instigator.UnitId) then
                     if M27UnitInfo.IsUnitValid(self) then self[M27Logic.refiT3ArtiShotCount] = 0 end --reset count of missed arti shots
@@ -1005,6 +1005,9 @@ function OnWeaponFired(oWeapon)
                 --Dodge logic for certain other attacks (conditions for this are in considerdodgingshot)
                 if bDebugMessages == true then LOG(sFunctionRef..': Will consider whether we want to dodge the shot') end
                 ForkThread(M27UnitMicro.ConsiderDodgingShot, oUnit, oWeapon)
+
+                --Update last known position if have one
+                if oUnit[M27UnitInfo.reftLastKnownPosition] then oUnit[M27UnitInfo.reftLastKnownPosition] = {oUnit:GetPosition()[1], oUnit:GetPosition()[2], oUnit:GetPosition()[3]} end
             end
 
             --Overcharge
@@ -1014,12 +1017,14 @@ function OnWeaponFired(oWeapon)
                 oUnit[M27UnitInfo.refiTimeOfLastOverchargeShot] = GetGameTimeSeconds()
             end
 
-            --SML fired - have all enemy M27 brains build SMD if they havent already (better late than never...)
+            --SML fired - have all enemy M27 brains build SMD if they havent already (better late than never...); also have ACUs run to SMD if have any loaded
             if EntityCategoryContains(M27UnitInfo.refCategorySML, oUnit.UnitId) then
                 local iEnemyIndex = oUnit:GetAIBrain():GetArmyIndex()
                 for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
                     if IsEnemy(oBrain:GetArmyIndex(), iEnemyIndex) then
                         oBrain[M27Overseer.refbEnemyFiredNuke] = true
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to setup forked thread to run from nuke for the ACU of brain '..oBrain.Nickname) end
+                        ForkThread(M27UnitMicro.RunFromNuke, M27Utilities.GetACU(oBrain), oUnit)
                     end
                 end
             end
@@ -1175,7 +1180,7 @@ function TrackProjectile(oProjectile)
     end
 end
 --[[function OnProjectileFired(oWeapon, oMuzzle, oProjectile)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OnProjectileFired'
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
@@ -1209,7 +1214,7 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
             local bCancelAndReclaim = false
             local oUnitToSwitchTo
             if bDebugMessages == true then LOG(sFunctionRef..': Construction started for unit '..oConstruction.UnitId..M27UnitInfo.GetUnitLifetimeCount(oConstruction)..'; Is it an experimental structure='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryExperimentalLevel, oConstruction.UnitId))) end
-            if EntityCategoryContains(M27UnitInfo.refCategoryExperimentalLevel, oConstruction.UnitId) then
+            if EntityCategoryContains(M27UnitInfo.refCategoryExperimentalLevel, oConstruction.UnitId) and oConstruction:GetFractionComplete() <= 0.04 then --redundancy - ignore this logic if are already 4%+ done with the experimental
                 local tNearbyGameEnders = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryExperimentalStructure, oConstruction:GetPosition(), 150, 'Ally')
                 if bDebugMessages == true then LOG(sFunctionRef..': Is table of nearby gameenders empty='..tostring(M27Utilities.IsTableEmpty(tNearbyGameEnders))) end
                 if M27Utilities.IsTableEmpty(tNearbyGameEnders) == false then
@@ -1224,12 +1229,12 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                 end
                 if not(bCancelAndReclaim) then
                     --Have we just started an experimental level unit and we have the same unit under construction nearby and we aren't close to overflowing, and we dont have loads of mass?
-                    if bDebugMessages == true then LOG(sFunctionRef..': Gross mass income='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; Mass stored ratio='..aiBrain:GetEconomyStoredRatio('MASS')..'; Have low mass='..tostring(M27Conditions.HaveLowMass(aiBrain))) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Gross mass income='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; Mass stored ratio='..aiBrain:GetEconomyStoredRatio('MASS')..'; Have low mass='..tostring(M27Conditions.HaveLowMass(aiBrain))..'; oConstruction='..oConstruction.UnitId..M27UnitInfo.GetUnitLifetimeCount(oConstruction)) end
                     if (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] <= 50 or aiBrain:GetEconomyStoredRatio('MASS') <= 0.25) and (M27Conditions.HaveLowMass(aiBrain) or aiBrain:GetEconomyStoredRatio('MASS') <= 0.4) then
                         local tNearbyExperimentalLevel = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryExperimentalLevel, oConstruction:GetPosition(), 150, 'Ally')
                         for iUnit, oUnit in tNearbyExperimentalLevel do
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering nearby unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Fraction complete='..oUnit:GetFractionComplete()) end
-                            if oUnit.UnitId == oConstruction.UnitId and not(oUnit == oConstruction) and (oUnit:GetFractionComplete() < 0.9 or (oUnit:GetFractionComplete() < 1 and aiBrain:GetEconomyStoredRatio('MASS') < 0.1)) then
+                            if not(oUnit == oConstruction) and (oUnit:GetFractionComplete() < 0.9 or (oUnit:GetFractionComplete() < 1 and aiBrain:GetEconomyStoredRatio('MASS') < 0.1)) and (oUnit.UnitId == oConstruction.UnitId or (EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oConstruction.UnitId) and EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oUnit.UnitId))) then
                                 bCancelAndReclaim = true
                                 oUnitToSwitchTo = oUnit
                                 if bDebugMessages == true then LOG(sFunctionRef..': Are buildling the same unit nearby so will switch to this, oUnitToSwitchTo='..oUnitToSwitchTo.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToSwitchTo)..' with fraction complete='..oUnitToSwitchTo:GetFractionComplete()) end
@@ -1241,9 +1246,13 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
 
             end
             if bCancelAndReclaim then
+                oConstruction['M27FirstConstructionStart'] = false --redundancy so if we arent able to find all the other engineers assigned to help construct this unit we will rerun this code whenever an engineer starts construction
                 local iActionRef = oEngineer[M27EngineerOverseer.refiEngineerCurrentAction]
                 local iUniqueRef = M27EngineerOverseer.GetEngineerUniqueCount(oEngineer)
                 local sLocationRef = aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][iUniqueRef][1][M27EngineerOverseer.refEngineerAssignmentLocationRef]
+                if not(sLocationRef) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find the locationref but will rerun this code whenever an engineer starts construction on this unit') end
+                end
 
 
                 M27Utilities.IssueTrackedClearCommands({oEngineer})
@@ -1252,10 +1261,10 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                     IssueRepair({oEngineer}, oUnitToSwitchTo)
                 end
 
-                if bDebugMessages == true then LOG(sFunctionRef..': iActionRef='..(iActionRef or 'nil')..'; iUniqueRef='..iUniqueRef..'; sLocationRef='..sLocationRef..'; Is table of assignemnts for this empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef]))) end
+                if bDebugMessages == true then LOG(sFunctionRef..': iActionRef='..(iActionRef or 'nil')..'; iUniqueRef='..(iUniqueRef or 'nil')..'; sLocationRef='..(sLocationRef or 'nil')..'; Is table of assignemnts for this empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef]))) end
 
 
-                if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) == false and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef]) == false then
+                if sLocationRef and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) == false and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef]) == false then
                     for iOtherEngi, oOtherEngi in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef] do
                         M27Utilities.IssueTrackedClearCommands({oOtherEngi})
 
@@ -1346,7 +1355,7 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                                 local oACUTarget = oACU:GetFocusUnit()
                                 if M27UnitInfo.IsUnitValid(oACUTarget) then
                                     if bDebugMessages == true then LOG(sFunctionRef..': oACUTarget='..oACUTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oACUTarget)..'; Fraction complete='..oACUTarget:GetFractionComplete()..'; Dist to oConstruction='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition())) end
-                                    if oACUTarget:GetFractionComplete() < 1 and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition()) <= 35 then
+                                    if oACUTarget:GetFractionComplete() < 1 and  aiBrain[M27EngineerOverseer.refiFirebaseCategoryWanted][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]] and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition()) <= 35 then
                                         --Is the ACU building a firebase category, and is that our action?
                                         if EntityCategoryContains(aiBrain[M27EngineerOverseer.refiFirebaseCategoryWanted][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]], oACUTarget.UnitId) then
                                             if bDebugMessages == true then LOG(sFunctionRef..': Will switch so we assist this unit instead') end
@@ -1490,6 +1499,9 @@ function OnConstructed(oEngineer, oJustBuilt)
                 ForkThread(M27EngineerOverseer.UpdateMassFabPotentialLocations, oJustBuilt)
             elseif EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryMobileLandStealth, oJustBuilt.UnitId) then
                 ForkThread(M27Team.ConsiderGiftingShieldOrStealthToSubteam, oJustBuilt)
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryPower - categories.TECH1, oJustBuilt.UnitId) then
+                --Power - flag if we have just built a lot of power
+                ForkThread(M27EconomyOverseer.UpdateIfJustBuiltLotsOfPower, oJustBuilt)
             end
 
             --Firebase tracking
@@ -1673,11 +1685,10 @@ function OnConstructed(oEngineer, oJustBuilt)
                         end
                     end
                     if M27Utilities.IsTableEmpty(oEngineer[M27Navy.reftInitialFactoryRallyPointOverride]) == false then
-                        oJustBuilt[M27UnitInfo.refbSpecialMicroActive] = true
+                        M27UnitMicro.TrackTemporaryUnitMicro(oJustBuilt, 10)
                         M27Utilities.IssueTrackedClearCommands({oJustBuilt})
                         IssueMove({oJustBuilt}, oEngineer[M27Navy.reftInitialFactoryRallyPointOverride])
                         if bDebugMessages == true then LOG(sFunctionRef..': Sent special micro order to the unit '..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)..' to try and move to open water') end
-                        M27Utilities.DelayChangeVariable(oJustBuilt, M27UnitInfo.refbSpecialMicroActive, false, 10)
                     end
                 end
 

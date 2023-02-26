@@ -1032,7 +1032,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         iTotalWanted = math.max(1, aiBrain[M27Overseer.refiMAAShortfallBase])
                                     end
                                 elseif iCurrentConditionToTry == 3 then --High priority for small number of mobile shields if we have decent power and multiple land facs
-                                    if iFactoryTechLevel >= 2 then
+                                    if iFactoryTechLevel >= 2 and (iFactoryTechLevel == 2 or M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryEngineer * categories.TECH3) > 3) then
                                         if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 75 and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] >= 17.5 then
                                             if iMobileShields == nil then iMobileShields = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryMobileLandShield) end
                                             if bDebugMessages == true then LOG(sFunctionRef..': iMobileShields='..iMobileShields..'; Cur T2+ land facs='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory - categories.TECH1)..'; Cur DF+Indirect units='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandCombat + M27UnitInfo.refCategoryIndirect - categories.TECH1)) end
@@ -1049,8 +1049,18 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                         end
                                                     end
                                                 end
+                                                --Override for seraphim so we get sniperbots if we can path to enemy with land
+                                                local bDontPrioritiseShields = false
+                                                if iMobileShields >= 1 and iFactoryTechLevel >= 3 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and EntityCategoryContains(categories.SERAPHIM * categories.TECH3, oFactory.UnitId) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * categories.TECH3) < 3 then
+                                                    --We dont have many T3 land factories, so only build mobile shield if we have 3 times as many T3 land combat units
+                                                    local iCurT3LandCombat = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandCombat * categories.TECH3)
+                                                    if iCurT3LandCombat < 3 * iMobileShields then
+                                                        bDontPrioritiseShields = true
+                                                    end
+                                                end
+
                                                 if bDebugMessages == true then LOG(sFunctionRef..': iShieldsWanted='..iShieldsWanted) end
-                                                if iShieldsWanted == 0 and iMobileShields < 4 then
+                                                if iShieldsWanted == 0 and iMobileShields < 4 and not(bDontPrioritiseShields) then
                                                     --Do any allies want mobile shields and have none?
                                                     for iBrain, oBrain in M27Team.tSubteamData[aiBrain.M27Subteam][M27Team.subreftoFriendlyBrains] do
                                                         if not(oBrain == aiBrain) and oBrain.M27AI and not(oBrain.M27IsDefeated) then
@@ -1060,7 +1070,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                         end
                                                     end
                                                 end
-                                                if iShieldsWanted > 0 then
+                                                if iShieldsWanted > 0 and not(bDontPrioritiseShields) then
                                                     if bDebugMessages == true then LOG(sFunctionRef..': Have units wanting shieldin, so will get mobile shield') end
                                                     iCategoryToBuild = M27UnitInfo.refCategoryMobileLandShield
                                                     iTotalWanted = 1
@@ -3058,7 +3068,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     end
                                 end
                             elseif iCurrentConditionToTry == 9 then --Stealth boat (cybran specific)
-                                if iFactoryTechLevel >= 2 and EntityCategoryContains(categories.CYBRAN, oFactory.UnitId) and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] >= 13 then
+                                if iFactoryTechLevel >= 2 and EntityCategoryContains(categories.CYBRAN, oFactory.UnitId) and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] >= 13 and not(aiBrain[M27AirOverseer.refbEnemyHasOmniVision]) then
                                     local tT2PlusNavy = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalSurface - categories.TECH1 - M27UnitInfo.refCategoryStealthBoat, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
                                     if M27Utilities.IsTableEmpty(tT2PlusNavy) == false then
                                         local iT2PlusNavy = table.getn(tT2PlusNavy)

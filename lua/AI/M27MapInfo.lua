@@ -5334,7 +5334,8 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange, oTrans
     local sFunctionRef = 'UpdatePlateausToExpandTo'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if aiBrain:GetArmyIndex() == 5 then bDebugMessages = true end
+
+    --if aiBrain:GetArmyIndex() == 1 or aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
 
     --Records table with the amphibious pathing group of plateaus that we are interested in expanding to
     --tAllPlateausWithMexes = 'M27PlateausWithMexes' --[x] = AmphibiousPathingGroup
@@ -5342,7 +5343,7 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange, oTrans
     --refiLastPlateausUpdate = 'M27LastTimeUpdatedPlateau' --gametime that we last updated the plateaus
 
     --First time calling - update variables for all plateaus that require aibrain info
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for game time of '..GetGameTimeSeconds()..'. bForceRefresh='..tostring(bForceRefresh or false)..'; bPathingChange='..tostring(bPathingChange or false)) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for game time of '..GetGameTimeSeconds()..' for brain '..aiBrain.Nickname..'; bForceRefresh='..tostring(bForceRefresh or false)..'; bPathingChange='..tostring(bPathingChange or false)) end
     if not(aiBrain[refiLastPlateausUpdate]) or bPathingChange then
         local iCurPathingGroup
         local tiBasePathingGroups = {}
@@ -5422,7 +5423,7 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange, oTrans
                         if bDebugMessages == true then LOG(sFunctionRef..': Considering plateaugroup='..iPlateauGroup..'; with '..table.getn(tSubtable[subrefPlateauMexes])..' mexes which is '..M27Utilities.GetDistanceBetweenPositions(tAllPlateausWithMexes[iPlateauGroup][subrefPlateauMidpoint], tStartPos)..' away from brain '..aiBrain.Nickname..' start position '..repru(tStartPos)..'; considering if we have friendly units in the plateau already') end
 
                         for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
-                            if bDebugMessages == true then LOG(sFunctionRef..': Considering brain '..oBrain.Nickname..'; is its table of plateau info empty for group '..iPlateauGroup..'='..tostring(M27Utilities.IsTableEmpty(oBrain[reftOurPlateauInformation][iPlateauGroup]))..'; is table of assigned transports empty='..tostring(oBrain[M27Transport.reftTransportsAssignedByPlateauGroup][iPlateauGroup])) end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering brain '..oBrain.Nickname..'; is its table of plateau info empty for group '..iPlateauGroup..'='..tostring(M27Utilities.IsTableEmpty(oBrain[reftOurPlateauInformation][iPlateauGroup]))..'; is table of assigned transports empty='..tostring(M27Utilities.IsTableEmpty(oBrain[M27Transport.reftTransportsAssignedByPlateauGroup][iPlateauGroup]))) end
 
                             if M27Utilities.IsTableEmpty(oBrain[reftOurPlateauInformation][iPlateauGroup]) == false then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Is table of engineers assigned to plateau empty='..tostring(M27Utilities.IsTableEmpty(oBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers]))..'; is table of land factories empty='..tostring(M27Utilities.IsTableEmpty(oBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories]))..'; is table of transports empty='..tostring(M27Utilities.IsTableEmpty(oBrain[M27Transport.reftTransportsAssignedByPlateauGroup][iPlateauGroup]))) end
@@ -5442,8 +5443,8 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange, oTrans
                             if M27Utilities.IsTableEmpty(oBrain[M27Transport.reftTransportsAssignedByPlateauGroup][iPlateauGroup]) == false and not(oBrain == aiBrain) then
                                 for iTransport, oTransport in oBrain[M27Transport.reftTransportsAssignedByPlateauGroup][iPlateauGroup] do
                                     if M27UnitInfo.IsUnitValid(oTransport) then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Transport '..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)..' owend by '..oTransport:GetAIBrain().Nickname..' is recorded as being assigned already to plateau group '..iPlateauGroup..'; oTransportRefreshingFor='..(oTransportRefreshingFor.UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oTransportRefreshingFor) or 'nil')) end
-                                        if not(oTransport == oTransportRefreshingFor) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Transport '..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)..' owend by '..oTransport:GetAIBrain().Nickname..' is recorded as being assigned already to plateau group '..iPlateauGroup..'; oTransportRefreshingFor='..(oTransportRefreshingFor.UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oTransportRefreshingFor) or 'nil')..'; oTransport[M27AirOverseer.refbOnAssignment]='..tostring(oTransport[M27AirOverseer.refbOnAssignment] or false)) end
+                                        if not(oTransport == oTransportRefreshingFor) and (not(oTransportRefreshingFor) or oTransport[M27AirOverseer.refbOnAssignment]) then
                                             iExistingTransports = iExistingTransports + 1
                                             if bDebugMessages == true then LOG(sFunctionRef..': Transport assigned here already') end
                                         end

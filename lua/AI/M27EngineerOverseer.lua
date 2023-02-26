@@ -7725,8 +7725,6 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --if GetGameTimeSeconds() >= 1560 and iActionRefToAssign == refActionBuildSecondShield then bDebugMessages = true end
-    --if iActionRefToAssign == refActionBuildNavalFactory then bDebugMessages = true end
-
 
 
     local tLocationsToGoThrough = tExistingLocationsToPickFrom
@@ -7748,7 +7746,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
 
     local bClearCurrentlyAssignedEngineer = false --e.g. if want to switch to T2 unit then will clear actions of the currently assigned engineer
 
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code. iActionRefToAssign='..iActionRefToAssign) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, time='..GetGameTimeSeconds()..'. iActionRefToAssign='..iActionRefToAssign) end
 
     --Are we assisting a building?
     if iActionRefToAssign == refActionUpgradeBuilding or iActionRefToAssign == refActionAssistSMD or iActionRefToAssign == refActionAssistTML or iActionRefToAssign == refActionAssistNuke or iActionRefToAssign == refActionAssistAirFactory or iActionRefToAssign == refActionAssistNavalFactory or iActionRefToAssign == refActionUpgradeHQ or iActionRefToAssign == refActionAssistShield or iActionRefToAssign == refActionAssistMexUpgrade then
@@ -10145,7 +10143,7 @@ end--]]
 
             iNetCurEnergyIncome = aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome]
             iEnergyStored = aiBrain:GetEconomyStored('ENERGY')
-
+            local bHaveLowMass = M27Conditions.HaveLowMass(aiBrain)
 
             if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandRush then
                 bWantMorePower = false
@@ -10314,7 +10312,18 @@ end--]]
                 bHaveVeryLowPower = false
             end
 
-            if bDebugMessages == true then LOG(sFunctionRef .. ': Power calcs: bHaveLowPower=' .. tostring(bHaveLowPower) .. '; bWantMorePower=' .. tostring(bWantMorePower) .. '; iPowerWantedPerTick=' .. iPowerWantedPerTick .. '; iNetCurEnergyIncome=' .. iNetCurEnergyIncome .. '; % energy stored=' .. aiBrain:GetEconomyStoredRatio('ENERGY') .. '; aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] .. '; aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] .. '; Time since last power stall=' .. (GetGameTimeSeconds() - (aiBrain[M27EconomyOverseer.refiLastEnergyStall] or -100))) end
+            --Dont treat as having low power if have just built significant amount; also dont want more power if have low mass
+            if (bHaveLowPower or bHaveVeryLowPower) and aiBrain[M27EconomyOverseer.refbJustBuiltLotsOfPower] and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] >= aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] * 0.1 and aiBrain[M27EconomyOverseer.refbJustBuiltLotsOfPower] then
+                bHaveLowPower = false
+                bHaveVeryLowPower = false
+                if bDebugMessages == true then LOG(sFunctionRef..': Just built ltos of power and have positive net energy so wont flag as wanting more power for now') end
+            end
+            if not(bHaveLowPower) and bHaveLowMass and bWantMorePower then
+                if aiBrain:GetEconomyStoredRatio('MASS') <= 0.01 or (aiBrain[M27EconomyOverseer.refbJustBuiltLotsOfPower] and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] >= aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] * 0.15) then bWantMorePower = false end
+            end
+
+
+            if bDebugMessages == true then LOG(sFunctionRef .. ': Power calcs: bHaveLowPower=' .. tostring(bHaveLowPower) .. '; bWantMorePower=' .. tostring(bWantMorePower) .. '; iPowerWantedPerTick=' .. iPowerWantedPerTick .. '; iNetCurEnergyIncome=' .. iNetCurEnergyIncome .. '; % energy stored=' .. aiBrain:GetEconomyStoredRatio('ENERGY') .. '; aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] .. '; aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] .. '; Time since last power stall=' .. (GetGameTimeSeconds() - (aiBrain[M27EconomyOverseer.refiLastEnergyStall] or -100))..'; aiBrain[M27EconomyOverseer.refbJustBuiltLotsOfPower]='..tostring(aiBrain[M27EconomyOverseer.refbJustBuiltLotsOfPower] or false)) end
 
 
 
@@ -10330,7 +10339,6 @@ end--]]
             local iT2Power, iT3Power
             local iCurRadarCount, iCurT2RadarCount
             local iNearbyOmniCount
-            local bHaveLowMass = M27Conditions.HaveLowMass(aiBrain)
 
             local iCount = 0
 
@@ -10349,6 +10357,7 @@ end--]]
 
 
             while iEngineersToConsider >= 0 do
+                --if tiAvailableEngineersByTech[2] > 0 and aiBrain:GetArmyIndex() == 3 then bDebugMessages = true else bDebugMessages = false end
                 --want >= rather than > so get correct calculation of engineers needed
 
                 --if iEngineersToConsider > 0 then bDebugMessages = true else bDebugMessages = false end
@@ -11830,8 +11839,14 @@ end--]]
                                 if aiBrain[M27Overseer.refiNearestEnemyT2PlusStructure] <= 175 then
                                     bEnemyHasNearbyT2StructureOrLongRange = true
                                 else
-                                    --Do the enemy have nearby indirect fire?
-                                    local tNearbyIndirectOrT2Structure = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLongRangeMobile + M27UnitInfo.refCategoryStructure - categories.TECH1, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 175, 'Enemy')
+                                    --Do the enemy have nearby indirect fire? (Ignore T2 MMLs if we have T3 land fac)
+                                    local iSearchCategory
+                                    if aiBrain[M27Overseer.refiOurHighestLandFactoryTech] >= 3 then
+                                        iSearchCategory = M27UnitInfo.refCategoryLongRangeMobile + M27UnitInfo.refCategoryStructure - categories.TECH1 - categories.TECH2 * categories.LAND * categories.MOBILE
+                                    else
+                                        iSearchCategory = M27UnitInfo.refCategoryLongRangeMobile + M27UnitInfo.refCategoryStructure - categories.TECH1
+                                    end
+                                    local tNearbyIndirectOrT2Structure = aiBrain:GetUnitsAroundPoint(iSearchCategory, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 175, 'Enemy')
                                     if M27Utilities.IsTableEmpty(tNearbyIndirectOrT2Structure) == false then
                                         bEnemyHasNearbyT2StructureOrLongRange = true
                                         --ignore if structures are owned by civilian and none of them have direct or indirect fire
@@ -11877,10 +11892,14 @@ end--]]
 
                                 --TML builder instead of T2 arti if lowish mass and have none
                                 local bGetTMLInstead = false
-                                if not(bEnemyHasFatboy) and M27Utilities.IsTableEmpty(tNearbyEnemyNavy) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTML) == 0 then
+                                if bEnemyHasNearbyT2StructureOrLongRange and not(bEnemyHasFatboy) and M27Utilities.IsTableEmpty(tNearbyEnemyNavy) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTML) == 0 then
                                     local tNearbyEnemyTMDAndShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryTMD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 200, 'Enemy')
                                     if M27Utilities.IsTableEmpty(tNearbyEnemyTMDAndShields) then
-                                        bGetTMLInstead = true
+                                        RecordPossibleTMLTargets(aiBrain, false)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Want to get TML unless no targets, is aiBrain[reftoTMLTargetsOfInterest] empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftoTMLTargetsOfInterest]))..', bEnemyHasNearbyT2StructureOrLongRange='..tostring(bEnemyHasNearbyT2StructureOrLongRange)..'; Enemy nearby navy is empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyNavy))) end
+                                        if M27Utilities.IsTableEmpty(aiBrain[reftoTMLTargetsOfInterest]) == false then
+                                            bGetTMLInstead = true
+                                        end
                                     end
                                 end
                                 if bGetTMLInstead then
@@ -12696,8 +12715,13 @@ end--]]
                                 LOG(sFunctionRef .. ': No SML detected but will build SMD anyway as a precaution as we have a good economy')
                             end
                             iEnemyNukes = math.max(iEnemyNormalNukes, iEnemyBattleshipNukes, 1) --Redundancy - if table isnt empty enemy must have at least one, and will assume they have 1 if we are building as a precaution
+                            --Increase nuke number for enemy build multiplier
+                            local iBuildCheat = tonumber(ScenarioInfo.Options.BuildMult) or 1
+                            if iBuildCheat > 1.2 then --1.3 AiX or better
+                                iEnemyNukes = math.ceil(iEnemyNukes * iBuildCheat)
+                            end
                             if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': iSMDsWeHave=' .. iSMDsWeHave .. '; iEnemyNukes=' .. iEnemyNukes .. '; iSMDsWithNoMissiles=' .. iSMDsWithNoMissiles)
+                                LOG(sFunctionRef .. ': iSMDsWeHave=' .. iSMDsWeHave .. '; iEnemyNukes after adjusting for build mult=' .. iEnemyNukes .. '; iSMDsWithNoMissiles=' .. iSMDsWithNoMissiles..'; iBuildCheat='..iBuildCheat)
                                 if iEnemyNukes > 1 then
 
                                     LOG(sFunctionRef .. ': Will now list out each nuke unit ID')
@@ -12706,7 +12730,7 @@ end--]]
                                     end
                                 end
                             end
-                            local iSMDWanted = math.min(4, iEnemyNukes, math.max(1, math.floor(aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 5)))
+                            local iSMDWanted = math.min(math.max(4, math.min(6, iEnemyNukes - 1)), iEnemyNukes, math.max(1, math.floor(aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] / 5)))
                             if bHaveLowMass then
                                 iSMDWanted = math.min(3, iSMDWanted)
                             end
@@ -12739,7 +12763,7 @@ end--]]
                                     end
                                 end
                             else
-                                aiBrain[refbNeedResourcesForMissile] = false
+                                if aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySML) == 0 then aiBrain[refbNeedResourcesForMissile] = false end
                                 --Have SMDs but they all have anti-nuke loaded; check if we have any engineers already assigned to this action and if so clear them
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Checking if any engineers have been assigned to assist SMD, if so will clear their actions')

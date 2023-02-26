@@ -2665,6 +2665,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordAvailableAndLowFuelAirUnits'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if aiBrain:GetArmyIndex() == 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTransport) > 0 then bDebugMessages = true end
     if not(aiBrain.M27IsDefeated) then
         local iAirAACategories = refCategoryAirAA
         local iBomberCategories = refCategoryBomber
@@ -3163,6 +3164,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                                 if M27Utilities.IsTableEmpty(oUnit[M27Transport.reftLocationWhenFirstInactive]) or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oUnit[M27Transport.reftLocationWhenFirstInactive]) <= 1 then
                                                     --Havent moved since last location when idle
                                                     oUnit[M27Transport.refiTimeSinceFirstInactive] = math.min((oUnit[M27Transport.refiTimeSinceFirstInactive] or GetGameTimeSeconds()), GetGameTimeSeconds())
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Updating time that transport has been inactive if we havent recorded a value yet, oUnit[M27Transport.refiTimeSinceFirstInactive]='..(oUnit[M27Transport.refiTimeSinceFirstInactive] or 'nil')) end
                                                 end
                                                 if GetGameTimeSeconds() - oUnit[M27Transport.refiTimeSinceFirstInactive] >= 60 then
                                                     M27Utilities.ErrorHandler('Transport has been idle for more than 1m with an active micro flag, will reset the flag')

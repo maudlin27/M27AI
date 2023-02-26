@@ -9,6 +9,7 @@ local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
+local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 function MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
@@ -453,7 +454,10 @@ end
 function TrackTemporaryUnitMicro(oUnit, iTimeActiveFor, sAdditionalTrackingVar)
     --Where we are doing all actions upfront can call this to enable micro and then turn the flag off after set period of time
     --Note that air logic currently doesnt make use of this
-
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'TrackTemporaryUnitMicro'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then LOG(sFunctionRef..': Setting special micro active flag to true for oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..', cur time='..GetGameTimeSeconds()..'; iTimeActiveFor='..iTimeActiveFor) end
     oUnit[M27UnitInfo.refbSpecialMicroActive] = true
     oUnit[M27UnitInfo.refiGameTimeMicroStarted] = GetGameTimeSeconds()
     oUnit[M27UnitInfo.refiGameTimeToResetMicroActive] = GetGameTimeSeconds() + iTimeActiveFor
@@ -471,6 +475,7 @@ function TrackTemporaryUnitMicro(oUnit, iTimeActiveFor, sAdditionalTrackingVar)
         oUnit[sAdditionalTrackingVar] = true
         M27Utilities.DelayChangeVariable(oUnit, sAdditionalTrackingVar, false, iTimeActiveFor - 0.01)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DodgeShot(oTarget, oWeapon, oAttacker, iTimeToDodge)
@@ -556,9 +561,9 @@ function ConsiderDodgingShot(oUnit, oWeapon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ConsiderDodgingShot'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if EntityCategoryContains(categories.TECH2, oUnit.UnitId) then bDebugMessages = true end
+    --if EntityCategoryContains(categories.TECH3, oUnit.UnitId) then bDebugMessages = true end
     if bDebugMessages == true then
-        LOG(sFunctionRef..': Just fired, oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+        LOG(sFunctionRef..': Just fired, oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Time='..GetGameTimeSeconds())
         if oWeapon.GetCurrentTarget then
             LOG(sFunctionRef..': Is current target valid='..tostring(M27UnitInfo.IsUnitValid(oWeapon:GetCurrentTarget()))..'; Weapon category='..oWeapon.Blueprint.WeaponCategory)
             if not(M27UnitInfo.IsUnitValid(oWeapon:GetCurrentTarget())) then
@@ -580,7 +585,7 @@ function ConsiderDodgingShot(oUnit, oWeapon)
 
         local tUnitsToConsiderDodgeFor = {}
         function ConsiderAddingUnitToTable(oCurUnit, bIncludeBusyUnits)
-            if bDebugMessages == true then LOG(sFunctionRef..': Considering if we should add oCurUnit='..oCurUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCurUnit)..'; Brain='..oCurUnit:GetAIBrain().Nickname..'; Unit state='..M27Logic.GetUnitState(oCurUnit)..'; Special micro active='..tostring(oCurUnit[M27UnitInfo.refbSpecialMicroActive] or false)) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering if we should add oCurUnit='..oCurUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCurUnit)..'; Brain='..oCurUnit:GetAIBrain().Nickname..'; Unit state='..M27Logic.GetUnitState(oCurUnit)..'; Special micro active='..tostring(oCurUnit[M27UnitInfo.refbSpecialMicroActive] or false)..'; oUnit[M27UnitInfo.refiGameTimeToResetMicroActive]='..(oUnit[M27UnitInfo.refiGameTimeToResetMicroActive] or 'nil')) end
             if oCurUnit:GetAIBrain().M27AI and (bIncludeBusyUnits or (not(oCurUnit:IsUnitState('Upgrading')) and not(oCurUnit[M27UnitInfo.refbSpecialMicroActive]))) then
                 if EntityCategoryContains(categories.AIR + categories.STRUCTURE, oCurUnit.UnitId) then
                     --Do nothing
@@ -2118,6 +2123,7 @@ function FocusDownTarget(oUnit, oTarget)
 
         local sFocusDownTargetActive = 'M27MicroFocusDownTargetActive' --against unit, true if are focusing down the unit
         if not(oUnit[sFocusDownTargetActive]) then
+            if bDebugMessages == true then LOG(sFunctionRef..': Time='..GetGameTimeSeconds()..'; will get unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to focus down target '..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)) end
             oUnit[sFocusDownTargetActive] = true
             oUnit[M27UnitInfo.refbSpecialMicroActive] = true
             local iReloadRate = 5 --default; will hard code exceptions as cant be bothered to figure out code
@@ -2150,6 +2156,62 @@ function FocusDownTarget(oUnit, oTarget)
             if M27UnitInfo.IsUnitValid(oUnit) then
                 oUnit[sFocusDownTargetActive] = false
                 oUnit[M27UnitInfo.refbSpecialMicroActive] = false
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function RunFromNuke(oUnit, oSML)
+    --Checks if is a nearby SMD and if so have oUnit run towards it
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'RunFromNuke'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+
+    local aiBrain = oUnit:GetAIBrain()
+    if aiBrain.M27AI then
+        local tNearbySMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySMD, oUnit:GetPosition(), 180, 'Ally')
+        if bDebugMessages == true then LOG(sFunctionRef..': Time='..GetGameTimeSeconds()..'; oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Brani='..aiBrain.Nickname..'; Is tNearbySMD empty='..tostring(M27Utilities.IsTableEmpty(tNearbySMD))) end
+        if M27Utilities.IsTableEmpty(tNearbySMD) == false then
+            local oNearestLoadedSMD
+            local iClosestLoadedSMD = 100000
+            local oNearestUnloadedSMD
+            local iClosestUnloadedSMD = 100000
+            local iCurDist
+            local bLoaded
+            for iSMD, oSMD in tNearbySMD do
+                if oSMD:GetFractionComplete() >= 1 then
+                    bLoaded = true
+                    iCurDist = M27Utilities.GetDistanceBetweenPositions(oSMD:GetPosition(), oUnit:GetPosition())
+                    if oSMD.GetTacticalSiloAmmoCount and oSMD:GetTacticalSiloAmmoCount() < 1 and not (oSMD[M27EngineerOverseer.refbMissileRecentlyBuilt]) then
+                        bLoaded = false
+                    end
+                    if bLoaded then
+                        if iCurDist < iClosestLoadedSMD then
+                            oNearestLoadedSMD = oSMD
+                            iClosestLoadedSMD = iCurDist
+                        end
+                    else
+                        if iCurDist < iClosestUnloadedSMD then
+                            oNearestUnloadedSMD = oSMD
+                            iClosestUnloadedSMD = iCurDist
+                        end
+                    end
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': Finished considering oSMD='..oSMD.UnitId..M27UnitInfo.GetUnitLifetimeCount(oSMD)..'; iCurDist='..(iCurDist or 'nil')..'; Fraction complete='..oSMD:GetFractionComplete()..'; iClosestLoadedSMD='..(iClosestLoadedSMD or 'nil')..'; iClosestUnloadedSMD='..(iClosestUnloadedSMD or 'nil')..'; bLoaded='..tostring(bLoaded or false)) end
+            end
+            if oNearestLoadedSMD or oNearestUnloadedSMD then
+                if bDebugMessages == true then LOG(sFunctionRef..': Will move towards closest SMD unless it is too close, math.min(iClosestLoadedSMD, iClosestUnloadedSMD)='..math.min(iClosestLoadedSMD, iClosestUnloadedSMD)) end
+                if math.min(iClosestLoadedSMD, iClosestUnloadedSMD) >= 35 then --Arent that close to SMD so want to move closer
+                    local iDistFromNuke = M27Utilities.GetDistanceBetweenPositions(oSML:GetPosition(), oUnit:GetPosition())
+                    local iTimeToRun = 13 + iDistFromNuke / 40 --approximation
+                    local tSMDToRunTo = (oNearestLoadedSMD or oNearestUnloadedSMD):GetPosition()
+                    M27Utilities.IssueTrackedClearCommands({oUnit})
+                    IssueMove({oUnit}, tSMDToRunTo)
+                    TrackTemporaryUnitMicro(oUnit, iTimeToRun)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Told unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to run towards the SMD '..(oNearestLoadedSMD or oNearestUnloadedSMD).UnitId..M27UnitInfo.GetUnitLifetimeCount((oNearestLoadedSMD or oNearestUnloadedSMD))) end
+                end
             end
         end
     end

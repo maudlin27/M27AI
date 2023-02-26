@@ -55,6 +55,7 @@ refbStallingEnergy = 'M27EconomyStallingEnergy'
 refiGrossEnergyWhenStalled = 'M27EconomyGrossEnergyWhenStalled' --Energy per tick
 refbStallingMass = 'M27EconomyStallingMass'
 refiLastEnergyStall = 'M27EconomyLastEnergyStall' --Game time in seconds of last power stall
+refbJustBuiltLotsOfPower = 'M27EconomyJustBuiltLotsPower' --true if we have just built a lot of power (so we are less likely to build more in the short period after)
 reftPausedUnits = 'M27EconomyPausedUnits'
 iSpecialHQCategory = 'M27EconomyFactoryHQ' --Used as a way of choosing to pause HQ
 
@@ -2480,7 +2481,7 @@ function RefreshEconomyData(aiBrain)
 
     local iCheatMod = 1
     if aiBrain.CheatEnabled then
-        iCheatMod = tonumber(ScenarioInfo.Options.CheatMult) or 2
+        iCheatMod = tonumber(ScenarioInfo.Options.CheatMult) or 2 --.CheatMult is the resource bonus; Build bonus is .BuildMult
     end
     aiBrain[refiGrossEnergyBaseIncome] = (iParagonCount * iParagonEnergy + iACUEnergy + iT3PowerCount * iEnergyT3Power + iT2PowerCount * iEnergyT2Power + iT1PowerCount * iEnergyT1Power + iHydroCount * iEnergyHydro + iRASSACUCount * iRASSACUEnergy + iSeraphimSACUCount * iSeraphimSACUEnergy) * iPerTickFactor * iCheatMod
 
@@ -2764,9 +2765,15 @@ function ManageMassStalls(aiBrain)
     local bChangeRequired = false
     local iUnitsAdjusted = 0
     local iMassStallPercentAdjust = 0
-    if aiBrain[M27EngineerOverseer.refbNeedResourcesForMissile] then iMassStallPercentAdjust = 0.02 end
+    if aiBrain[M27EngineerOverseer.refbNeedResourcesForMissile] then
+        if aiBrain:GetEconomyStored('MASS') <= aiBrain[refiGrossMassBaseIncome] * 5 or aiBrain[refiNetMassBaseIncome] < 0 then
+            iMassStallPercentAdjust = 0.04
+        else
+            iMassStallPercentAdjust = 0.02
+        end
+    end
     --Dont consider pausing or unpausing if are stalling energy or early game, as our energy stall manager is likely to be operating
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, GetGameTimeSeconds='..GetGameTimeSeconds()..'; aiBrain[refiGrossMassBaseIncome]='..aiBrain[refiGrossMassBaseIncome]..'; aiBrain[refbStallingEnergy]='..tostring(aiBrain[refbStallingEnergy])..'; time since last energy stall='..GetGameTimeSeconds() - (aiBrain[refiLastEnergyStall] or -100)..'; energy stored='..aiBrain:GetEconomyStoredRatio('ENERGY')) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, GetGameTimeSeconds='..GetGameTimeSeconds()..'; aiBrain[refiGrossMassBaseIncome]='..aiBrain[refiGrossMassBaseIncome]..'; aiBrain[refbStallingEnergy]='..tostring(aiBrain[refbStallingEnergy])..'; time since last energy stall='..GetGameTimeSeconds() - (aiBrain[refiLastEnergyStall] or -100)..'; energy stored='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; refbNeedResourcesForMissile='..tostring(aiBrain[M27EngineerOverseer.refbNeedResourcesForMissile] or false)) end
     if aiBrain[refbStallingMass] or (GetGameTimeSeconds() >= 120 and aiBrain[refiGrossMassBaseIncome] >= 3 and not(aiBrain[refbStallingEnergy]) and GetGameTimeSeconds() - (aiBrain[refiLastEnergyStall] or -100) >= 10 and aiBrain:GetEconomyStoredRatio('ENERGY') == 1) then
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': About to consider if we have a mass stall or not. aiBrain:GetEconomyStoredRatio(MASS)=' .. aiBrain:GetEconomyStoredRatio('MASS') .. '; aiBrain[refiNetMassBaseIncome]=' .. aiBrain[refiNetMassBaseIncome] .. '; aiBrain:GetEconomyTrend(MASS)=' .. aiBrain:GetEconomyTrend('MASS') .. '; aiBrain[refbStallingMass]=' .. tostring(aiBrain[refbStallingMass])..'; aiBrain:GetEconomyRequested(MASS)='..aiBrain:GetEconomyRequested('MASS'))
@@ -2804,7 +2811,8 @@ function ManageMassStalls(aiBrain)
 
             local iMassPerTickSavingNeeded
             if aiBrain[refbStallingMass] then
-                if aiBrain[M27EngineerOverseer.refbNeedResourcesForMissile] then iMassPerTickSavingNeeded = math.max(1, -aiBrain[refiNetMassBaseIncome])
+                if aiBrain[M27EngineerOverseer.refbNeedResourcesForMissile] and aiBrain:GetEconomyStored('MASS') <= math.max(500, aiBrain[refiGrossMassBaseIncome] * 4) then
+                    iMassPerTickSavingNeeded = math.max(1, -aiBrain[refiNetMassBaseIncome] * 0.6)
                 else
                     iMassPerTickSavingNeeded = math.max(1, -aiBrain[refiNetMassBaseIncome] * 0.8)
                 end
@@ -3166,9 +3174,21 @@ function ManageMassStalls(aiBrain)
                                 M27UnitInfo.PauseOrUnpauseMassUsage(aiBrain, oUnit, bPauseNotUnpause)
                                 --Cant move the below into unitinfo as get a crash if unitinfo tries to refernce the table of paused units
                                 if bPauseNotUnpause then
-                                    table.insert(aiBrain[reftPausedUnits], oUnit)
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Added unit to tracker table, size=' .. table.getn(aiBrain[reftPausedUnits]))
+                                    local bRecordUnit = true
+                                    if M27Utilities.IsTableEmpty(aiBrain[reftPausedUnits]) == false then
+                                        for iExistingUnit, oExistingUnit in aiBrain[reftPausedUnits] do
+                                            if oExistingUnit == oUnit then
+                                                bRecordUnit = false
+                                                break
+                                            end
+                                        end
+                                    end
+                                    if bRecordUnit then
+                                        table.insert(aiBrain[reftPausedUnits], oUnit)
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Added unit to tracker table, size=' .. table.getn(aiBrain[reftPausedUnits]))
+                                        end
+                                    elseif bDebugMessages == true then LOG(sFunctionRef..': Unit is already recorded in table of paused units')
                                     end
                                 else
                                     if bDebugMessages == true then
@@ -3665,9 +3685,21 @@ function ManageEnergyStalls(aiBrain)
                                 M27UnitInfo.PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
                                 --Cant move the below into unitinfo as get a crash if unitinfo tries to refernce the table of paused units
                                 if bPauseNotUnpause then
-                                    table.insert(aiBrain[reftPausedUnits], oUnit)
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Added unit to tracker table, size=' .. table.getn(aiBrain[reftPausedUnits]))
+                                    local bRecordUnit = true
+                                    if M27Utilities.IsTableEmpty(aiBrain[reftPausedUnits]) == false then
+                                        for iExistingUnit, oExistingUnit in aiBrain[reftPausedUnits] do
+                                            if oExistingUnit == oUnit then
+                                                bRecordUnit = false
+                                                break
+                                            end
+                                        end
+                                    end
+                                    if bRecordUnit then
+                                        table.insert(aiBrain[reftPausedUnits], oUnit)
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Added unit to tracker table, size=' .. table.getn(aiBrain[reftPausedUnits]))
+                                        end
+                                    elseif bDebugMessages == true then LOG(sFunctionRef..': Unit is already recorded in table of paused units')
                                     end
                                 else
                                     if bDebugMessages == true then
@@ -3682,7 +3714,6 @@ function ManageEnergyStalls(aiBrain)
                                         LOG(sFunctionRef .. ': Size of table after removal =' .. table.getn(aiBrain[reftPausedUnits]))
                                     end
                                 end
-
                             end
                         end
                         if not (bWasUnitPaused) and bPauseNotUnpause then
@@ -3876,5 +3907,32 @@ function UpgradeManager(aiBrain)
             LOG(sFunctionRef .. ': End of loop after waiting ticks')
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function UpdateIfJustBuiltLotsOfPower(oJustBuilt)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'UpdateIfJustBuiltLotsOfPower'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local iMassGen
+    local iEnergyGen
+    local aiBrain = oJustBuilt:GetAIBrain()
+    if EntityCategoryContains(M27UnitInfo.refCategoryParagon, oJustBuilt.UnitId) then
+        iMassGen = 10000
+        iEnergyGen = 1000000
+    else
+        local oBP = oJustBuilt:GetBlueprint()
+        iMassGen = math.max(oBP.Economy.ProductionPerSecondMass or 0) * 0.1
+        iEnergyGen = math.max(oBP.Economy.ProductionPerSecondEnergy or 0) * 0.1
+    end
+    --Set temporary flag that we have just built a lot of power (if we have)
+    if bDebugMessages == true then LOG(sFunctionRef..': Considering if should temporarily say we have enough power; iEnergyGen='..iEnergyGen..'; Gross energy='..(M28Team.tTeamData[aiBrain.M28Team][M28Team.subrefiTeamGrossEnergy] or 'nil')..'; Net energy='..(M28Team.tTeamData[aiBrain.M28Team][M28Team.subrefiTeamNetEnergy] or 'nil')..'; Flag for lots of power='..tostring(M28Team.tTeamData[aiBrain.M28Team][M28Team.refbJustBuiltLotsOfPower] or false)) end
+    if iEnergyGen >= math.max(20, (aiBrain[refiGrossEnergyBaseIncome] * 0.2), -(aiBrain[refiNetEnergyBaseIncome] or 0)) and not(aiBrain[refbJustBuiltLotsOfPower]) then
+        aiBrain[refbJustBuiltLotsOfPower] = true
+        M27Utilities.DelayChangeVariable(aiBrain, refbJustBuiltLotsOfPower, false, 10)
+        if bDebugMessages == true then LOG(sFunctionRef..': Just built a lot of power so will temporarily say we dont need more power') end
+    end
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

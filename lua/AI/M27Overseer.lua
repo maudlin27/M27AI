@@ -9062,26 +9062,42 @@ function ACUInitialisation(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function ResetCivilianAllianceForBrain(iOurIndex, iCivilianIndex, sRealState)
+    --Call via forkthread
+    WaitTicks(5)
+    SetAlliance(iOurIndex, iCivilianIndex, sRealState)
+end
+
 function RevealCiviliansToAI(aiBrain)
     --On some maps like burial mounds civilians are revealed to human players but not AI; meanwhile on other maps even if theyre not revealed to humans, the humans will likely know where the buildings are having played the map before
     --Thanks to Relent0r for providing code that achieved this
+    local bDebugMessages = false
+    if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RevealCiviliansToAI'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    local iOurIndex = aiBrain:GetArmyIndex()
-    local iBrainIndex
-    local sRealState
-    for i, v in ArmyBrains do
-        iBrainIndex = v:GetArmyIndex()
-        if ArmyIsCivilian(iBrainIndex) then
-            sRealState = IsAlly(iOurIndex, iBrainIndex) and 'Ally' or IsEnemy(iOurIndex, iBrainIndex) and 'Enemy' or 'Neutral'
-            SetAlliance(iOurIndex, iBrainIndex, 'Ally')
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-            WaitTicks(5)
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-            SetAlliance(iOurIndex, iBrainIndex, sRealState)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    WaitTicks(50) --Waiting only 5 ticks or less resulted in a strange bug where on one map when ahd 2 ACUs on the same team, the code would run for both of htem as expected, but the civilians would only be visible for one of the AI (as though making the civilian an ally had no effect for hte other); This went away when put a delay of 50 ticks
+    --if aiBrain:GetArmyIndex() == 3 then
+        if bDebugMessages == true then LOG(sFunctionRef..': Have finished waiting, will loop throguh all brians now to look for civilians, aiBrain='..aiBrain.Nickname..' with index ='..aiBrain:GetArmyIndex()..'; M27 team='..(aiBrain.M27Team or 'nil')) end
+
+        local iOurIndex = aiBrain:GetArmyIndex()
+        local iBrainIndex
+        local sRealState
+        for i, v in ArmyBrains do
+            iBrainIndex = v:GetArmyIndex()
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering brain '..(v.Nickname or 'nil')..' with index '..v:GetArmyIndex()..' for aiBrain '..aiBrain.Nickname..'; Is enemy='..tostring(IsEnemy(iOurIndex, iBrainIndex))..'; ArmyIsCivilian(iBrainIndex)='..tostring(ArmyIsCivilian(iBrainIndex))) end
+            if ArmyIsCivilian(iBrainIndex) then
+                sRealState = IsAlly(iOurIndex, iBrainIndex) and 'Ally' or IsEnemy(iOurIndex, iBrainIndex) and 'Enemy' or 'Neutral'
+                SetAlliance(iOurIndex, iBrainIndex, 'Ally')
+                if bDebugMessages == true then LOG(sFunctionRef..': Temporarily set the brain as an ally, sRealState='..sRealState) end
+                ForkThread(ResetCivilianAllianceForBrain, iOurIndex, iBrainIndex, sRealState)
+                --[[M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                WaitTicks(5)
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                SetAlliance(iOurIndex, iBrainIndex, sRealState)--]]
+            end
         end
-    end
+    --end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -9815,7 +9831,10 @@ end
 
 function TestCustom(aiBrain)
     local sFunctionRef = 'TestCustom'
+    --Scenario info.Options
+    LOG('Scenario info options reprs:'..reprs(ScenarioInfo.Options))
 
+    --[[
     --Call T3 arti logic when first spawn via cheat
     local tAlliedT3Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Ally')
     LOG('GameTime='..GetGameTimeSeconds())
@@ -9831,7 +9850,7 @@ function TestCustom(aiBrain)
     local tEnemyT3Engineers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryEngineer * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Enemy')
     if M27Utilities.IsTableEmpty(tEnemyT3Engineers) == false then
         LOG('Enemy T3 engi count='..table.getn(tEnemyT3Engineers))
-    end
+    end--]]
 
 
     --Calc range of SACUs - test
@@ -10362,7 +10381,7 @@ function OverseerManager(aiBrain)
     end
 
     --ForkThread(ConstantBomberLocation, aiBrain)
-    --TestCustom(aiBrain)
+    TestCustom(aiBrain)
 
 
 
