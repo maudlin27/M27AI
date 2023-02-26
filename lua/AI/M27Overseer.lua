@@ -10381,7 +10381,7 @@ function OverseerManager(aiBrain)
     end
 
     --ForkThread(ConstantBomberLocation, aiBrain)
-    TestCustom(aiBrain)
+    --TestCustom(aiBrain)
 
 
 
