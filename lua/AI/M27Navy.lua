@@ -1315,7 +1315,7 @@ function MoveUnitTowardsTarget(oUnit, tTarget, bAttackMove, sOrderDesc)
         end
     end
     local bRefreshOrder = ShouldWeRefreshUnitOrder(oUnit, iOrderType, (tAltTarget or tTarget), nil)
-    --LOG('Move Unit Towards Target: oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; bRefreshOrder='..tostring(bRefreshOrder)..'; iOrderType='..iOrderType..'; bAttackMove='..tostring(bAttackMove)..'; Unit last order type='..(oUnit[M27PlatoonUtilities.refiLastOrderType] or 'nil')..'; Distance to last target='..M27Utilities.GetDistanceBetweenPositions((oUnit[M27UnitInfo.reftLastOrderTarget] or {0,0,0}), tTarget))
+    --LOG('Move Unit Towards Target: oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; bRefreshOrder='..tostring(bRefreshOrder)..'; sOrderDesc='..(sOrderDesc or 'nil')..'; iOrderType='..iOrderType..'; bAttackMove='..tostring(bAttackMove)..'; Unit last order type='..(oUnit[M27PlatoonUtilities.refiLastOrderType] or 'nil')..'; Distance to last target='..M27Utilities.GetDistanceBetweenPositions((oUnit[M27UnitInfo.reftLastOrderTarget] or {0,0,0}), tTarget)..'; tAltTarget='..repru(tAltTarget)..'; tTarget='..repru(tTarget))
     if bRefreshOrder then
         M27Utilities.IssueTrackedClearCommands({oUnit})
         oUnit[M27UnitInfo.refoLastOrderUnitTarget] = nil
@@ -1471,7 +1471,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ManageTeamNavy'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if GetGameTimeSeconds() >= 600 and M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryMissileShip, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])) == false then bDebugMessages = true M27Config.M27ShowUnitNames = true end
+    --if GetGameTimeSeconds() >= 900 and M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategorySubmarine * categories.TECH2, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond])) == false then bDebugMessages = true M27Config.M27ShowUnitNames = true end
     --if GetGameTimeSeconds() >= 480 then bDebugMessages = true end
     --if GetGameTimeSeconds() >= 840 and (aiBrain:GetArmyIndex() == 2 or aiBrain:GetArmyIndex() == 4) then bDebugMessages = true end
 
@@ -1978,6 +1978,24 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                         if math.max(M27UnitInfo.GetNavalDirectAndSubRange(oUnit), oUnit[M27UnitInfo.refiIndirectRange]) > 0 then
                             iClosestEnemyCombatDistance = iCurDistToOurBase
                             oClosestEnemyCombatUnit = oUnit
+                        end
+                    end
+                end
+                --Update the last known position of the closest unit if we dont have visibility of it currently but have intel coverage of where it last was
+                if M27UnitInfo.IsUnitValid(oClosestEnemyCombatUnit) and not(M27Utilities.CanSeeUnit(aiBrain, oClosestEnemyCombatUnit, true)) then
+                    if M27Logic.GetIntelCoverageOfPosition(aiBrain, oClosestEnemyCombatUnit[M27UnitInfo.reftLastKnownPosition], 1, false) then
+                        oClosestEnemyCombatUnit[M27UnitInfo.reftLastKnownPosition] = {oClosestEnemyCombatUnit:GetPosition()[1], oClosestEnemyCombatUnit:GetPosition()[2], oClosestEnemyCombatUnit:GetPosition()[3]}
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have intel coverage of last known position so know unit not htere, have updated last known position') end
+                    else
+                        --Is our closest friendly unit near here?
+                        if M27UnitInfo.IsUnitValid(oClosestFriendlyUnitToEnemyBase) then
+                            local iDistToClosestEnemyUnit = M27Utilities.GetDistanceBetweenPositions(oClosestFriendlyUnitToEnemyBase:GetPosition(), oClosestEnemyCombatUnit[M27UnitInfo.reftLastKnownPosition])
+                            local oClosestUnitBP = oClosestFriendlyUnitToEnemyBase:GetBlueprint()
+                            local iClosestUnitIntel = math.max(oClosestUnitBP.Intel.SonarRadius or 0, oClosestUnitBP.Intel.VisionRadius or 0, oClosestUnitBP.Intel.WaterVisionRadius or 0, oClosestUnitBP.Intel.RadarRadius or 0)
+                            if bDebugMessages == true then LOG(sFunctionRef..': iClosestUnitIntel='..iClosestUnitIntel..'; iDistToClosestEnemyUnit='..iDistToClosestEnemyUnit..'; Will consider updating last known position') end
+                            if iDistToClosestEnemyUnit <= iClosestUnitIntel then
+                                oClosestEnemyCombatUnit[M27UnitInfo.reftLastKnownPosition] = {oClosestEnemyCombatUnit:GetPosition()[1], oClosestEnemyCombatUnit:GetPosition()[2], oClosestEnemyCombatUnit:GetPosition()[3]}
+                            end
                         end
                     end
                 end
@@ -3003,6 +3021,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                                         MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, not(oUnit[M27UnitInfo.refbLastShotBlocked]), 'ASKitingRetreat')
                                     else
                                         MoveUnitTowardsTarget(oUnit, tBaseRallyPoint, false, 'MSKitingRetreat')
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Will try and move to tBaseRallyPoint='..repru(tBaseRallyPoint)..' as a kiting retreat') end
                                     end
                                 elseif iCurDistToClosestEnemy + iMinDistanceWithinAttackRangeWanted < oUnit[M27UnitInfo.refiAntiNavyRange] then
                                     --Attack-move to target
@@ -3010,6 +3029,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                                 else
                                     --Move towards target (non-attack move)
                                     MoveUnitTowardsTarget(oUnit, tClosestEnemyTargetToUse, false, 'MSGetInRange')
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will try and move to tClosestEnemyTargetToUse='..repru(tClosestEnemyTargetToUse)..'; Our position='..repru(oUnit:GetPosition())..'; oUnit[M27UnitInfo.refbSpecialMicroActive]='..tostring(oUnit[M27UnitInfo.refbSpecialMicroActive])..'; oUnit[M27UnitInfo.reftLastOrderTarget]='..repru(oUnit[M27UnitInfo.reftLastOrderTarget])) end
                                 end
                             end
                         end

@@ -3714,7 +3714,6 @@ function ManageEnergyStalls(aiBrain)
                                         LOG(sFunctionRef .. ': Size of table after removal =' .. table.getn(aiBrain[reftPausedUnits]))
                                     end
                                 end
-
                             end
                         end
                         if not (bWasUnitPaused) and bPauseNotUnpause then

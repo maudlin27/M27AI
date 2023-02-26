@@ -3068,7 +3068,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     end
                                 end
                             elseif iCurrentConditionToTry == 9 then --Stealth boat (cybran specific)
-                                if iFactoryTechLevel >= 2 and EntityCategoryContains(categories.CYBRAN, oFactory.UnitId) and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] >= 13 then
+                                if iFactoryTechLevel >= 2 and EntityCategoryContains(categories.CYBRAN, oFactory.UnitId) and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] >= 13 and not(aiBrain[M27AirOverseer.refbEnemyHasOmniVision]) then
                                     local tT2PlusNavy = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalSurface - categories.TECH1 - M27UnitInfo.refCategoryStealthBoat, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
                                     if M27Utilities.IsTableEmpty(tT2PlusNavy) == false then
                                         local iT2PlusNavy = table.getn(tT2PlusNavy)

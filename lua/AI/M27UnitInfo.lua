@@ -1432,6 +1432,6 @@ function ToggleUnitDiveOrSurfaceStatus(oUnit)
     --Assumes have already checked that the unit is or isnt underwater
     M27Utilities.IssueTrackedClearCommands({ oUnit})
     IssueDive({oUnit})
-    oUnit[refbSpecialMicroActive] = true
-    M27Utilities.DelayChangeVariable(oUnit, refbSpecialMicroActive, false, 1)
+    local M27UnitMicro = import('/mods/M27AI/lua/AI/M27UnitMicro.lua')
+    M27UnitMicro.TrackTemporaryUnitMicro(oUnit, 1)
 end

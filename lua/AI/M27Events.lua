@@ -929,7 +929,7 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                 instigator[M27UnitInfo.refiGameTimeDamageLastDealt] = math.floor(GetGameTimeSeconds())
                 M27Utilities.DelayChangeVariable(instigator, M27UnitInfo.refbRecentlyDealtDamage, false, 5, M27UnitInfo.refiGameTimeDamageLastDealt, instigator[M27UnitInfo.refiGameTimeDamageLastDealt] + 1, nil, nil)
                 --If just damaged T2+ mex or high value building with surface naval unit then have it attack that unit specifically until it is dead
-                if EntityCategoryContains(M27UnitInfo.refCategoryNavalSurface, instigator.UnitId) and EntityCategoryContains(M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex + categories.VOLATILE * categories.STRUCTURE - M27UnitInfo.refCategoryT1Power + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + categories.EXPERIMENTAL * categories.STRUCTURE, self.UnitId) then
+                if EntityCategoryContains(M27UnitInfo.refCategoryNavalSurface, instigator.UnitId) and EntityCategoryContains(M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex + categories.VOLATILE * categories.STRUCTURE - M27UnitInfo.refCategoryT1Power + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML * categories.STRUCTURE + categories.EXPERIMENTAL * categories.STRUCTURE, self.UnitId) then
                     ForkThread(M27UnitMicro.FocusDownTarget, instigator, self)
                 elseif EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, instigator.UnitId) then
                     if M27UnitInfo.IsUnitValid(self) then self[M27Logic.refiT3ArtiShotCount] = 0 end --reset count of missed arti shots
@@ -1005,6 +1005,9 @@ function OnWeaponFired(oWeapon)
                 --Dodge logic for certain other attacks (conditions for this are in considerdodgingshot)
                 if bDebugMessages == true then LOG(sFunctionRef..': Will consider whether we want to dodge the shot') end
                 ForkThread(M27UnitMicro.ConsiderDodgingShot, oUnit, oWeapon)
+
+                --Update last known position if have one
+                if oUnit[M27UnitInfo.reftLastKnownPosition] then oUnit[M27UnitInfo.reftLastKnownPosition] = {oUnit:GetPosition()[1], oUnit:GetPosition()[2], oUnit:GetPosition()[3]} end
             end
 
             --Overcharge
@@ -1014,12 +1017,14 @@ function OnWeaponFired(oWeapon)
                 oUnit[M27UnitInfo.refiTimeOfLastOverchargeShot] = GetGameTimeSeconds()
             end
 
-            --SML fired - have all enemy M27 brains build SMD if they havent already (better late than never...)
+            --SML fired - have all enemy M27 brains build SMD if they havent already (better late than never...); also have ACUs run to SMD if have any loaded
             if EntityCategoryContains(M27UnitInfo.refCategorySML, oUnit.UnitId) then
                 local iEnemyIndex = oUnit:GetAIBrain():GetArmyIndex()
                 for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
                     if IsEnemy(oBrain:GetArmyIndex(), iEnemyIndex) then
                         oBrain[M27Overseer.refbEnemyFiredNuke] = true
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to setup forked thread to run from nuke for the ACU of brain '..oBrain.Nickname) end
+                        ForkThread(M27UnitMicro.RunFromNuke, M27Utilities.GetACU(oBrain), oUnit)
                     end
                 end
             end
@@ -1175,7 +1180,7 @@ function TrackProjectile(oProjectile)
     end
 end
 --[[function OnProjectileFired(oWeapon, oMuzzle, oProjectile)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OnProjectileFired'
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
@@ -1680,11 +1685,10 @@ function OnConstructed(oEngineer, oJustBuilt)
                         end
                     end
                     if M27Utilities.IsTableEmpty(oEngineer[M27Navy.reftInitialFactoryRallyPointOverride]) == false then
-                        oJustBuilt[M27UnitInfo.refbSpecialMicroActive] = true
+                        M27UnitMicro.TrackTemporaryUnitMicro(oJustBuilt, 10)
                         M27Utilities.IssueTrackedClearCommands({oJustBuilt})
                         IssueMove({oJustBuilt}, oEngineer[M27Navy.reftInitialFactoryRallyPointOverride])
                         if bDebugMessages == true then LOG(sFunctionRef..': Sent special micro order to the unit '..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)..' to try and move to open water') end
-                        M27Utilities.DelayChangeVariable(oJustBuilt, M27UnitInfo.refbSpecialMicroActive, false, 10)
                     end
                 end
 
