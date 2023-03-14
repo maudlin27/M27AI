@@ -129,8 +129,8 @@ reftEnemyAirNearby = 'M27EnemyAirNearby' --NOTE: Not updated as part of normal d
 reftPlatoonDFTargettingCategories = 'M27PlatoonTargettingReference' --variable name in unit info that contains the DF targetting for the platoon to use
 
 --escort related
-refoSupportHelperUnitTarget = 'M27ScoutHelperUnitTarget'
-refoSupportHelperPlatoonTarget = 'M27ScoutHelperPlatoonTarget'
+refoSupportHelperUnitTarget = 'M27ScoutHelperUnitTarget' --e.g. used by MAA
+refoSupportHelperPlatoonTarget = 'M27ScoutHelperPlatoonTarget' --e.g. used by MAA
 refiSupportHelperFollowDistance = 'M27ScoutHelperFollowDistance'
 refoPlatoonOrUnitToEscort = 'M27PlatoonEscortPlatoon'
 refoEscortingPlatoon = 'M27PlatoonEscortingPlatoon' --platoon that is escorting oPlatoon
@@ -2470,14 +2470,14 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
     local bProceed = true
     --if M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and EntityCategoryContains(M27UnitInfo.refCategoryIndirectT2Plus - categories.EXPERIMENTAL - M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) and GetGameTimeSeconds() >= 1380 and oPlatoon[refiEnemyStructuresInRange] > 0 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD * categories.TECH3, oPlatoon[reftEnemyStructuresInRange])) == false then bDebugMessages = true end
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 7 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 960 and aiBrain:GetArmyIndex() == 6 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
     --if sPlatoonName == 'M27Defender' and oPlatoon[refiPlatoonCount] == 7 and GetGameTimeSeconds() >= 570 then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and GetGameTimeSeconds() >= 300 and EntityCategoryContains(M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) and oPlatoon[refiPlatoonCount] == 9 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true end
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
     --if (oPlatoon:GetPlan() == 'M27GroundExperimental' or oPlatoon[refoFrontUnit].UnitId == 'xsl0401') then bDebugMessages = true end
-    --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 937 and aiBrain:GetArmyIndex() == 4 and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+    --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 240 and aiBrain:GetArmyIndex() == 4 and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
@@ -3647,23 +3647,45 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                 end
                             end
                         end
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have enemies in intel range; bCloseThreat='..tostring(bCloseThreat)..'; if true then will temporarily retreat') end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have enemies in intel range; bCloseThreat='..tostring(bCloseThreat)..'; if true then will temporarily retreat unless are a MAA that wants to protect its platoon and the platoon is nearby') end
                         if bCloseThreat == true then
                             --Have enemies in intel range - run away (but not too far)
-                            if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonName='..sPlatoonName..oPlatoon[refiPlatoonCount]..':  setting platoon action to run away, unless MAA that needs to protect experimental/ACU from air threat') end
+                            if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonName='..sPlatoonName..oPlatoon[refiPlatoonCount]..':  setting platoon action to run away, unless MAA that needs to protect experimental/ACU from air threat; platoon air attack range='..(oPlatoon[M27PlatoonTemplates.refiAirAttackRange] or 'nil')..'; Have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl] or false)..'; Is platoon or unit to escort nil='..tostring(oPlatoon[refoPlatoonOrUnitToEscort] == nil)) end
                             oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
-                            if sPlatoonName == 'M27MAAAssister' and oPlatoon[M27PlatoonTemplates.refiAirAttackRange] and oPlatoon[refoPlatoonOrUnitToEscort] and not(aiBrain[M27AirOverseer.refbHaveAirControl]) then
-                                --Is the platoon/unit we are escorting within 90 of us, and does it have a significant enemy air to ground threat near it, and do we lack air control?
-                                local tEscortingPlatoonOrUnitPosition
-                                if oPlatoon[refoPlatoonOrUnitToEscort].UnitId then tEscortingPlatoonOrUnitPosition = oPlatoon[refoPlatoonOrUnitToEscort]:GetPosition()
-                                elseif oPlatoon[refoPlatoonOrUnitToEscort].PlatoonHandle then tEscortingPlatoonOrUnitPosition = GetPlatoonFrontPosition(oPlatoon)
-                                end
-                                if tEscortingPlatoonOrUnitPosition and M27Utilities.GetDistanceBetweenPositions(tEscortingPlatoonOrUnitPosition, GetPlatoonFrontPosition(oPlatoon)) <= 90 and (not(M27MapInfo.IsUnderwater(tEscortingPlatoonOrUnitPosition, false)) or M27UnitInfo.GetUnitPathingType(oPlatoon[refoPathingUnit]) == M27UnitInfo.refPathingTypeAmphibious) then
-                                    local tEnemyAirToGroundThreats = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout - M27UnitInfo.refCategoryAirAA, tEscortingPlatoonOrUnitPosition, math.max(30, oPlatoon[M27PlatoonTemplates.refiAirAttackRange]), 'Enemy')
-                                    if M27Utilities.IsTableEmpty(tEnemyAirToGroundThreats) == false and M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirToGroundThreats, false, false, false, true, true, nil, nil, nil, nil, false) >= 350 then
+                            if sPlatoonName == 'M27MAAAssister' and oPlatoon[M27PlatoonTemplates.refiAirAttackRange] and (oPlatoon[refoSupportHelperUnitTarget] or oPlatoon[refoSupportHelperPlatoonTarget]) and not(aiBrain[M27AirOverseer.refbHaveAirControl]) then
+                                --Is the platoon/unit we are escorting within 90 of us, and does it have an enemy air to ground threat near it, or we lack air control?
+                                local tEscortingPlatoonOrUnitPosition = GetPlatoonFrontPosition(oPlatoon[refoSupportHelperUnitTarget] or oPlatoon[refoSupportHelperPlatoonTarget])
+
+                                if bDebugMessages == true then LOG(sFunctionRef..': Distance to assisting unit position from platoon from position='..M27Utilities.GetDistanceBetweenPositions(tEscortingPlatoonOrUnitPosition, GetPlatoonFrontPosition(oPlatoon))..'; Is escorting positoin underwater='..tostring(M27MapInfo.IsUnderwater(tEscortingPlatoonOrUnitPosition, false))) end
+                                local iDistFromAssistanceTarget = M27Utilities.GetDistanceBetweenPositions(tEscortingPlatoonOrUnitPosition, GetPlatoonFrontPosition(oPlatoon))
+                                if tEscortingPlatoonOrUnitPosition and iDistFromAssistanceTarget <= 100 and (not(M27MapInfo.IsUnderwater(tEscortingPlatoonOrUnitPosition, false)) or M27UnitInfo.GetUnitPathingType(oPlatoon[refoPathingUnit]) == M27UnitInfo.refPathingTypeAmphibious) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Are we far behidn on air and enemy has an air to ground threat? aiBrain[M27AirOverseer.refbFarBehindOnAir]='..tostring(aiBrain[M27AirOverseer.refbFarBehindOnAir] or false)..'; aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]='..(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 'nil')) end
+
+                                    local bIgnoreRetreat = false
+
+                                    if aiBrain[M27AirOverseer.refbFarBehindOnAir] and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 200 then
+                                        --local tEnemyAirToGroundThreats = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout - M27UnitInfo.refCategoryAirAA, tEscortingPlatoonOrUnitPosition, math.max(30, oPlatoon[M27PlatoonTemplates.refiAirAttackRange]), 'Enemy')
+                                        --if M27Utilities.IsTableEmpty(tEnemyAirToGroundThreats) == false and M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirToGroundThreats, false, false, false, true, true, nil, nil, nil, nil, false) >= 350 then
                                         --Want to help out even though we might die, so dont run away from the unit we're escorting
-                                        oPlatoon[refiCurrentAction] = nil
-                                        bDontConsiderFurtherOrders = true
+                                        bIgnoreRetreat = true
+
+                                    elseif aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 50 or aiBrain[M27AirOverseer.refbFarBehindOnAir] or aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 500 then
+                                        local tEnemyAirUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, tEscortingPlatoonOrUnitPosition, math.max(60, oPlatoon[M27PlatoonTemplates.refiAirAttackRange]), 'Enemy')
+                                        if M27Utilities.IsTableEmpty(tEnemyAirUnits) == false then -- and M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirToGroundThreats, false, false, false, true, true, nil, nil, nil, nil, false) >= 50 then
+                                            --Want to help out even though we might die, so dont run away from the unit we're escorting
+                                            bIgnoreRetreat = true
+                                        end
+                                    end
+                                    if bIgnoreRetreat then
+                                        if iDistFromAssistanceTarget > 4 then
+                                            --If there are dangerous ground units, then we only want to ignore the retreat if we are behind the unit we are assisting - approximate by checking if we are closer to our base
+                                            local iDistToBase = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                            local iAssistanceTargetDistToBase = M27Utilities.GetDistanceBetweenPositions(tEscortingPlatoonOrUnitPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                            if iDistToBase < iAssistanceTargetDistToBase then
+                                                oPlatoon[refiCurrentAction] = nil
+                                                bDontConsiderFurtherOrders = true
+                                            end
+                                        end
                                     end
                                 end
                             end
@@ -7615,7 +7637,7 @@ function DeterminePlatoonAction(oPlatoon)
 
         local sPlatoonName = oPlatoon:GetPlan()
         --if M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and EntityCategoryContains(M27UnitInfo.refCategoryIndirectT2Plus - categories.EXPERIMENTAL - M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) and GetGameTimeSeconds() >= 1380 and oPlatoon[refiEnemyStructuresInRange] > 0 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD * categories.TECH3, oPlatoon[reftEnemyStructuresInRange])) == false then bDebugMessages = true end
-        --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 8 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
+        --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 960 and aiBrain:GetArmyIndex() == 6 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
         --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 3 then bDebugMessages = true end
         --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
         --if sPlatoonName == 'M27Skirmisher' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and GetGameTimeSeconds() >= 300 and EntityCategoryContains(M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) and oPlatoon[refiPlatoonCount] == 9 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true end
@@ -10944,7 +10966,7 @@ function RefreshSupportPlatoonMovementPath(oPlatoon)
                     else
                         --Update distance to follow if are meant to be leading the unit that are escorting, based on our platoon size and target platoon size
 
-                        if oPlatoon[M27PlatoonTemplates.refiAirAttackRange] and aiBrain[M27AirOverseer.refbMercySightedRecently] and oPlatoon[refoPlatoonOrUnitToEscort][refbACUInPlatoon] then
+                        if oPlatoon[M27PlatoonTemplates.refiAirAttackRange] and aiBrain[M27AirOverseer.refbMercySightedRecently] and (oPlatoon[refoPlatoonOrUnitToEscort][refbACUInPlatoon] or (oPlatoon[refoSupportHelperUnitTarget] and EntityCategoryContains(categories.COMMAND, oPlatoon[refoSupportHelperUnitTarget])) or oPlatoon[refoSupportHelperPlatoonTarget][refbACUInPlatoon]) then
                             if bDebugMessages == true then LOG(sFunctionRef..': AA platoon and mercy detected so wnat to lead the units we are covering if its an ACU platoon') end
                             oPlatoon[refiSupportHelperFollowDistance] = -5
                         else

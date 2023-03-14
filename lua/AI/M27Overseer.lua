@@ -4825,7 +4825,7 @@ function ACUManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ACUManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-
+    --if GetGameTimeSeconds() >= 960 and (aiBrain:GetArmyIndex() == 4 or aiBrain:GetArmyIndex() == 6) then bDebugMessages = true M27Config.M27ShowUnitNames = true end
 
     if not (aiBrain.M27IsDefeated) and M27Logic.iTimeOfLastBrainAllDefeated < 10 then
         local oACU = M27Utilities.GetACU(aiBrain)
@@ -5575,7 +5575,7 @@ function ACUManager(aiBrain)
                         end
                     end
                 end
-                --Override - dont include ACU in attack if we are massively ahead on eco
+                --Override - dont include ACU in attack if we are massively ahead on eco or is significant air threat
                 if bIncludeACUInAttack then
                     if (iLastDistanceToACU > iACURange or M27UnitInfo.GetUnitHealthPercent(oACU) <= 0.75) and iOurACUDistToOurBase > aiBrain[refiDistanceToNearestEnemyBase] * 0.6 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 16 and not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
                         bIncludeACUInAttack = false
@@ -5597,6 +5597,47 @@ function ACUManager(aiBrain)
                             end
                         end
                     end
+                    if bIncludeACUInAttack then
+                        --Does the enemy have significant air threat nearby?
+                        if bDebugMessages == true then LOG(sFunctionRef..': Brain='..aiBrain.Nickname..'; Checking enemy air threat to see if we want to leave ACU behind. refbFarBehindOnAir='..tostring(aiBrain[M27AirOverseer.refbFarBehindOnAir])..'; refiEnemyAirToGroundThreat='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]..'; ACU MAA='..(oACU[refoUnitsMAAHelper][M27PlatoonUtilities.refiPlatoonMassValue] or 'nil')..'; airaa needed='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; iLastDistanceToACU='..iLastDistanceToACU..'; Enemy ACU to consider attacking health='..oEnemyACUToConsiderAttacking:GetHealth()..'; Enemy highest tech='..aiBrain[refiEnemyHighestTechLevel]) end
+                        if aiBrain[M27AirOverseer.refbFarBehindOnAir] or (not(aiBrain[M27AirOverseer.refbHaveAirControl]) and aiBrain[M27AirOverseer.refiAirAANeeded] > 2) then
+                            --If we die we are unlikely to kill the enemy ACU:
+                            if bDebugMessages == true then LOG(sFunctionRef..': iLastDistanceToACU='..iLastDistanceToACU..'; iACURange='..iACURange..'; oEnemyACUToConsiderAttacking:GetHealth()='..oEnemyACUToConsiderAttacking:GetHealth()) end
+                            if iLastDistanceToACU > iACURange or oEnemyACUToConsiderAttacking:GetHealth() >= 2000 then
+                                --We lack enough AirAA, does the enough have a large enough air to ground threat and T2+ tech (wont check for air fac in case we havent scouted it)?
+                                if bDebugMessages == true then LOG(sFunctionRef..': Enemy air to ground threat='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]..'; aiBrain[refiEnemyHighestTechLevel]='..aiBrain[refiEnemyHighestTechLevel]..'; Does enemy have >=800 threat='..tostring(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 800)..'; Does enemy have >=1500 threat='..tostring(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1500)..'; Does enemy have >=tech2='..tostring(aiBrain[refiEnemyHighestTechLevel] >= 2)..'; Does enemy meet the below condition='..tostring(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 800 and (aiBrain[refiEnemyHighestTechLevel] >= 2 or aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1500))) end
+                                if aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 800 and (aiBrain[refiEnemyHighestTechLevel] >= 2 or aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1500) then
+                                    --Do we likely lack sufficient MAA?
+                                    local tNearbyMAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, oACU:GetPosition(), 50, 'Ally')
+                                    local iNearbyMAAThreat = 0
+                                    if M27Utilities.IsTableEmpty(tNearbyMAA) == false then iNearbyMAAThreat = (M27Logic.GetAirThreatLevel(aiBrain, tNearbyMAA, false, false, true, false, false) or 0) end
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef..': About to see if we have sufficient MAA; mass value of MAA assigned to ACU='..(oACU[refoUnitsMAAHelper][M27PlatoonUtilities.refiPlatoonMassValue] or 0))
+                                        LOG(sFunctionRef..': is tNearbyMAA empty='..tostring(M27Utilities.IsTableEmpty(tNearbyMAA)))
+                                        LOG(sFunctionRef..': Threat of tNearbyMAA='..iNearbyMAAThreat)
+                                    end
+
+                                    if iNearbyMAAThreat == 0 or (oACU[refoUnitsMAAHelper][M27PlatoonUtilities.refiPlatoonMassValue] or 0) <= math.max(250, aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] / 8) or iNearbyMAAThreat <= math.max(150, (oACU[refoUnitsMAAHelper][M27PlatoonUtilities.refiPlatoonMassValue] or 0) * 0.5, aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] / 8) then
+                                        --Is our ACU relatively far from our base?
+                                        if bDebugMessages == true then LOG(sFunctionRef..': ACU dist from base='..iOurACUDistToOurBase..'; 75% of dist to enemy base='..iOurACUDistToEnemyBase * 0.75) end
+                                        if iOurACUDistToOurBase > math.max(125, iOurACUDistToEnemyBase * 0.75) then
+                                            --Do we lack radar coverage and enemy has significant air to ground threat, or alternatively we have radar coverage but enemy has air to ground nearby?
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Intel coverage of position='..M27Logic.GetIntelCoverageOfPosition(aiBrain, oACU:GetPosition(), nil, true)) end
+                                            local tNearbyEnemyAirToGround = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout - M27UnitInfo.refCategoryAirAA, oACU:GetPosition(), 100, 'Enemy')
+                                            local iNearbyAirToGroundThreat = 0
+                                            if M27Utilities.IsTableEmpty(tNearbyEnemyAirToGround) == false then iNearbyAirToGroundThreat = (M27Logic.GetAirThreatLevel(aiBrain, tNearbyEnemyAirToGround, false, false, false, true, true) or 0) end
+                                            if iNearbyAirToGroundThreat >= 400 or (aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1500 and not(M27Logic.GetIntelCoverageOfPosition(aiBrain, oACU:GetPosition(), 100, true))) or
+                                                    iNearbyAirToGroundThreat >= 250 then
+                                                bIncludeACUInAttack = false
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Enemy air is too dangerous, wont continue attack with ACU') end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+
 
                 end
 
