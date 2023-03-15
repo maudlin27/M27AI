@@ -1145,7 +1145,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         bConsiderUnderConstruction = false
                                         iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallInitialRaiderOrSkirmisher] + aiBrain[M27Overseer.refiScoutShortfallACU]
                                     end
-                                elseif iCurrentConditionToTry == 10 then --High priority T2 MAA for ACU if it doesnt have any and we dont have any to give it, and/or experimental needing MAA when enemy has large air threat
+                                elseif iCurrentConditionToTry == 10 then --High priority T2 MAA for ACU if it doesnt have any and we dont have any to give it, and/or experimental needing MAA when enemy has large air threat, and/or imminent base attack from air
                                     if iFactoryTechLevel >= 2 then
                                         local oACU = M27Utilities.GetACU(aiBrain)
                                         if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 100 and not(M27UnitInfo.IsUnitUnderwater(oACU)) then
@@ -1156,12 +1156,17 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         end
                                     end
-                                    if not(iCategoryToBuild) and not(aiBrain[M27AirOverseer.refbHaveAirControl]) and (aiBrain[M27AirOverseer.refbFarBehindOnAir] or aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 20000) and aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] > 0 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) > 0 then
-                                        iCategoryToBuild = refCategoryMAA - categories.TECH1
+                                    if bDebugMessages == true then LOG(sFunctionRef..': High priority MAA builder, is iCategoryToBuild nil='..tostring(iCategoryToBuild == nil)..'; Have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl])..'; Far behind on air='..tostring(aiBrain[M27AirOverseer.refbFarBehindOnAir])..'; Highest enemy air threat='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]..'; Is emergency MAA needed='..tostring(aiBrain[M27Overseer.refbEmergencyMAANeeded])..'; Nearest enemy air threat='..aiBrain[M27AirOverseer.refiNearestEnemyAirThreatActualDist]..'; MAA shortfall for large platoons='..aiBrain[M27Overseer.refiMAAShortfallLargePlatoons]..'; Cur land experimentals='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental)) end
+                                    if not(iCategoryToBuild) and not(aiBrain[M27AirOverseer.refbHaveAirControl]) and (aiBrain[M27AirOverseer.refbFarBehindOnAir] or aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 15000) and ((aiBrain[M27Overseer.refbEmergencyMAANeeded] and aiBrain[M27AirOverseer.refiNearestEnemyAirThreatActualDist] <= 110) or (aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] > 0 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) > 0)) then
+                                        iCategoryToBuild = refCategoryMAA
+                                        --Change to only build T2+ if no imminent threat and alreayd have lots of T1 MAA
+                                        if iFactoryTechLevel == 1 and aiBrain[M27AirOverseer.refiNearestEnemyAirThreatActualDist] >= 170 and aiBrain:GetCurrentUnits(refCategoryMAA) >= 10 and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] >= 2 then
+                                            iCategoryToBuild = refCategoryMAA - categories.TECH1
+                                        end
                                         if aiBrain:GetEconomyStoredRatio('MASS') <= 0.4 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * categories.TECH3) > 10 then
-                                            iTotalWanted = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory - categories.TECH1)
+                                            iTotalWanted = math.max(1, aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory - categories.TECH1))
                                         else
-                                            iTotalWanted = math.max(aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory - categories.TECH1) - 1)
+                                            iTotalWanted = math.max(1, aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory - categories.TECH1) - 1)
                                         end
                                     end
                                 elseif iCurrentConditionToTry == 11 then --Base level of engineers for base if early game, and/or engineers later game if getting close to overflowing, provided either no REALLY close enemy, or we have multiple air factories and this is a T2+ land (in which case engis could build PD while air fac builds bombers to defend)
@@ -1742,7 +1747,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     bReachedLastOption = true
                                     break
                                 end
-                            elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU then
+                                elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU then
                                 bGetFastest = true
                                 --If our ACU is near base then dont get fastest
                                 if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 75 then

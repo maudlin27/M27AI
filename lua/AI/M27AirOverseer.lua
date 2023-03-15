@@ -2458,7 +2458,7 @@ function AirThreatChecker(aiBrain)
     end
 
     --Reduce value of enemy air threat in team game since unlikely 1 team will have all the airaa
-    local iCurAirAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirUnits, true, true, false, false, false, nil, 0, 0, 0) * 1.1
+    local iCurAirAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirUnits, false, true, false, false, false, nil, 0, 0, 0) * 1.1
     if M27Team.iTotalTeamCount >= 3 then iCurAirAAThreat = iCurAirAAThreat / math.min(1.75, (M27Team.iTotalTeamCount - 1.5)) end
 
     --Also decay enemy air threat

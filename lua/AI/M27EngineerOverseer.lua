@@ -11124,6 +11124,17 @@ end--]]
                                     if not(bHaveLowMass) and not(bHaveLowPower) then iMaxEngisWanted = 4 end
                                 end
                             end
+
+                            --High priority precautionary sam if we have reached T3 and enemy has access to T3
+                            if not(iActionToAssign) and iHighestFactoryOrEngineerTechAvailable >= 3 and (aiBrain[M27Overseer.refiEnemyHighestTechLevel] >= 3 or aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1000) and (not(aiBrain[M27AirOverseer.refbHaveAirControl]) or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 10) then
+                                --Do we already have any SAM?
+                                if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryStructureAA * categories.TECH3) == 0 then
+                                    iActionToAssign = refActionBuildAA
+                                    iMinEngiTechLevelWanted = 3
+                                    iMaxEngisWanted = 1
+                                    if not(bHaveLowMass) and not(bHaveLowPower) then iMaxEngisWanted = 3 end
+                                end
+                            end
                         elseif iCurrentConditionToTry == 14 then
                             --More factories when we have stored mass and fewer than the target level
                             if not (bHaveVeryLowPower) and aiBrain:GetEconomyStored('MASS') >= 25 then

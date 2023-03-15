@@ -2470,7 +2470,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
     local bProceed = true
     --if M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and EntityCategoryContains(M27UnitInfo.refCategoryIndirectT2Plus - categories.EXPERIMENTAL - M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) and GetGameTimeSeconds() >= 1380 and oPlatoon[refiEnemyStructuresInRange] > 0 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD * categories.TECH3, oPlatoon[reftEnemyStructuresInRange])) == false then bDebugMessages = true end
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 960 and aiBrain:GetArmyIndex() == 6 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 5 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
     --if sPlatoonName == 'M27Defender' and oPlatoon[refiPlatoonCount] == 7 and GetGameTimeSeconds() >= 570 then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
@@ -3148,25 +3148,35 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                 end
 
                 --Also run if enemy has air units near our ACU and it doesnt have nearby MAA support and we need air units
-                if not(bACUNeedsToRun) and (aiBrain[M27AirOverseer.refiAirAANeeded] > 0 or aiBrain[M27AirOverseer.refbMercySightedRecently]) then
+                if not(bACUNeedsToRun) and ((aiBrain[M27AirOverseer.refiAirAANeeded] > 0 or aiBrain[M27AirOverseer.refbFarBehindOnAir]) or aiBrain[M27AirOverseer.refbMercySightedRecently]) then
 
                     local iEnemyAirSearchRange = 90
                     if aiBrain[M27AirOverseer.refbMercySightedRecently] then iEnemyAirSearchRange = 118 end
                     local tNearbyEnemyAir = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, GetPlatoonFrontPosition(oPlatoon), iEnemyAirSearchRange, 'Enemy')
+                    if bDebugMessages == true then LOG(sFunctionRef..': Checking for nearby enemy air threats to ACU, is tNearbyEnemyAir empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyAir))) end
                     if M27Utilities.IsTableEmpty(tNearbyEnemyAir) == false then
                         if aiBrain[M27AirOverseer.refbMercySightedRecently] and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryMercy, tNearbyEnemyAir)) == false then
                             bACUNeedsToRun = true
                             if bDebugMessages == true then LOG(sFunctionRef..': Enemy air contains mercies so will run regardless of if we have nearby MAA') end
                         else
-                            --Do we have nearby MAA?
-                            if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, GetPlatoonFrontPosition(oPlatoon), 90, 'Ally')) then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Nearby enemy air, and we dont have nearby MAA; Will run if a significant threat that we cant deal with with our air force, or if we are low on health. aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]) end if aiBrain[M27AirOverseer.refiAirAANeeded] > 3 and (M27UnitInfo.GetUnitHealthPercent(oPlatoon[refoFrontUnit]) <= 0.65 or M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryAirNonScout - M27UnitInfo.refCategoryAirAA, tNearbyEnemyAir)) == false) then
-                                --Run unless we are underewater and enemy doesnt have T2 air
-                                bACUNeedsToRun = true
-                                if M27UnitInfo.IsUnitUnderwater(oPlatoon[refoFrontUnit]) and (aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][2] + aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3]) == 0 and aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] <= 2000 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryTorpBomber, tNearbyEnemyAir)) then
-                                    bACUNeedsToRun = false
+                            --Are we underwater with no enemy torp bombers?
+                            if not(M27UnitInfo.IsUnitUnderwater(oPlatoon[refoFrontUnit]) and (aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][2] + aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3]) == 0 and aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] <= 2000 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryTorpBomber, tNearbyEnemyAir))) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': AirAA Needed='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; ACU health='..M27UnitInfo.GetUnitHealthPercent(oPlatoon[refoFrontUnit])..' is enemy air table excluding airaa empty='..tostring(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryAirNonScout - M27UnitInfo.refCategoryAirAA, tNearbyEnemyAir)))) end
+                                if (aiBrain[M27AirOverseer.refiAirAANeeded] > 2 or aiBrain[M27AirOverseer.refbFarBehindOnAir]) and (M27UnitInfo.GetUnitHealthPercent(oPlatoon[refoFrontUnit]) <= 0.65 or M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryAirNonScout - M27UnitInfo.refCategoryAirAA, tNearbyEnemyAir)) == false or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 0.4) then
+                                    --Do we have nearby ground AA?
+                                    local tNearbyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, GetPlatoonFrontPosition(oPlatoon), 50, 'Ally')
+                                    if M27Utilities.IsTableEmpty(tNearbyGroundAA) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Nearby enemy air, and we dont have nearby MAA; Will run if a significant threat that we cant deal with with our air force, or if we are low on health. aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]) end
+                                        bACUNeedsToRun = true
+                                    else
+                                        local iNearbyAirToGroundThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyEnemyAir, false, false, false, true, true)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': iNearbyAirToGroundThreat='..iNearbyAirToGroundThreat..'; Our ground AA threat='..M27Logic.GetAirThreatLevel(aiBrain, tNearbyGroundAA, false, false, true, false, false)) end
+                                        if iNearbyAirToGroundThreat > 800 or iNearbyAirToGroundThreat > 3 * M27Logic.GetAirThreatLevel(aiBrain, tNearbyGroundAA, false, false, true, false, false) then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Want ACU to run due to enemy air') end
+                                            bACUNeedsToRun = true
+                                        end
+                                    end
                                 end
-                            end
                             end
                         end
                     end
@@ -7637,7 +7647,7 @@ function DeterminePlatoonAction(oPlatoon)
 
         local sPlatoonName = oPlatoon:GetPlan()
         --if M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and EntityCategoryContains(M27UnitInfo.refCategoryIndirectT2Plus - categories.EXPERIMENTAL - M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) and GetGameTimeSeconds() >= 1380 and oPlatoon[refiEnemyStructuresInRange] > 0 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD * categories.TECH3, oPlatoon[reftEnemyStructuresInRange])) == false then bDebugMessages = true end
-        --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 960 and aiBrain:GetArmyIndex() == 6 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
+        --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 5 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
         --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 3 then bDebugMessages = true end
         --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
         --if sPlatoonName == 'M27Skirmisher' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and GetGameTimeSeconds() >= 300 and EntityCategoryContains(M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) and oPlatoon[refiPlatoonCount] == 9 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true end
@@ -9260,7 +9270,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                     end
                                     if bBigEnemyThreat == false then
                                         --Check if lots of enemy air
-                                        if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= (aiBrain[M27AirOverseer.refiOurMassInAirAA] + 2500) or (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] > 10000 and not(aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] < 15000 and aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] < aiBrain[M27AirOverseer.refiOurMassInAirAA] * 1.15)) then
+                                        if (not(aiBrain[M27AirOverseer.refbHaveAirControl]) and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1500) or aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= (aiBrain[M27AirOverseer.refiOurMassInAirAA] + 2500) or (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] > 10000 and not(aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] < 15000 and aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] < aiBrain[M27AirOverseer.refiOurMassInAirAA] * 1.15)) then
                                             --If cloaked or fully upgraded sera com then reduce thresholds
                                             bBigEnemyThreat = true
                                             if M27Utilities.GetACU(aiBrain):HasEnhancement('CloakingGenerator') or M27Utilities.GetACU(aiBrain):HasEnhancement('DamageStabilizationAdvanced') then
