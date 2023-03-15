@@ -12893,13 +12893,13 @@ end--]]
                             local tNearbyStructureAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructureAA, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 90, 'Ally')
                             local bBuildAA = false
                             if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Is table of nearby AA empty=' .. tostring(M27Utilities.IsTableEmpty(tNearbyStructureAA)))
+                                LOG(sFunctionRef .. ': High priority ground AA builder, Is table of nearby AA empty=' .. tostring(M27Utilities.IsTableEmpty(tNearbyStructureAA)))
                             end
                             if M27Utilities.IsTableEmpty(tNearbyStructureAA) then
                                 bBuildAA = true
                             else
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Checking if have high enoguh engi tech level for AA level wanted. iHighestFactoryOrEngineerTechAvailable=' .. iHighestFactoryOrEngineerTechAvailable .. '; tiAvailableEngineersByTech=' .. repru(tiAvailableEngineersByTech))
+                                    LOG(sFunctionRef .. ': Checking if have high enoguh engi tech level for AA level wanted. iHighestFactoryOrEngineerTechAvailable=' .. iHighestFactoryOrEngineerTechAvailable .. '; tiAvailableEngineersByTech=' .. repru(tiAvailableEngineersByTech)..'; aiBrain[M27AirOverseer.refbHaveAirControl]='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl]))
                                 end
                                 --Do we have AirAA for our current tech level and have an engineer of this level available?
 
@@ -12923,6 +12923,17 @@ end--]]
                                         --Further increase factor if we already have 3 of the current air structure at our current tech level, if dealing with T2 or lower
                                         if iHighestFactoryOrEngineerTechAvailable <= 2 and table.getn(tNearbyStructureAA) >= 3 then
                                             iStructureFactor = iStructureFactor + 0.5
+                                        end
+                                    end
+                                    --If enemy has signifcant air to ground threat nearby then build more AA structure than normal
+                                    if aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 700 then
+                                        local tNearbyEnemyAirToGround = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout - M27UnitInfo.refCategoryAirAA, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 90, 'Enemy')
+                                        if M27Utilities.IsTableEmpty(tNearbyEnemyAirToGround) == false then
+                                            iStructureFactor = iStructureFactor * 0.8
+                                            if bDebugMessages == true then LOG(sFunctionRef..': enemy has air to ground threat nearby of '..M27Logic.GetAirThreatLevel(aiBrain, tNearbyEnemyAirToGround, false, false, false, true, false)) end
+                                            if M27Logic.GetAirThreatLevel(aiBrain, tNearbyEnemyAirToGround, false, false, false, true, false) >= 300 then
+                                                iStructureFactor = iStructureFactor * 0.8
+                                            end
                                         end
                                     end
                                     if bDebugMessages == true then
