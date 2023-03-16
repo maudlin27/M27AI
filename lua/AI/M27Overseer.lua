@@ -8283,7 +8283,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
             -------->>>>>>>>>>>>Set ACU health to run on<<<<<<<<<<<----------------
             --NOTE: Platoon utilities nearby enemies logic will adjust this slightly, in particular see the variable bCapHealthToRunOn, which reduces health to run on from 100% to 98% in most cases
-
+            if GetGameTimeSeconds() >= 1080 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
 
             aiBrain[refiACUHealthToRunOn] = math.max(5250, oACU:GetMaxHealth() * 0.45)
             --Play safe with ACU if we have almost half or more of mexes
@@ -8341,7 +8341,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             end
 
             --Also set health to run as a high value if we have high mass and energy income and enemy is at tech 3
-            if aiBrain[refiEnemyHighestTechLevel] >= 3 and (aiBrain[refiHighestEnemyGroundUnitHealth] >= 5000 or aiBrain[refiTotalEnemyShortRangeThreat] >= 10000) and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 50 then
+            if (aiBrain[M27AirOverseer.refbFarBehindOnAir] or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 30 or (aiBrain[refiEnemyHighestTechLevel] >= 3 and (aiBrain[refiHighestEnemyGroundUnitHealth] >= 5000 or aiBrain[refiTotalEnemyShortRangeThreat] >= 10000))) and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 50 then
                 if bDebugMessages == true then LOG(sFunctionRef..': Enemy has access to tech 3, and we have at least 100 mass per second income') end
                 if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 13 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 100 then
                     if not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
@@ -8443,7 +8443,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                     if M27Utilities.IsTableEmpty(tNearbyMAA) == false then
                         iNearbyMAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyMAA, false, false, true, false, false, nil, nil, nil, nil, nil)
                     end
-                    if iNearbyMAAThreat <= 400 then
+                    if iNearbyMAAThreat <= 400 or (iNearbyMAAThreat <= 750 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1500 and aiBrain[M27AirOverseer.refbFarBehindOnAir]) then
                         aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
                         if bDebugMessages == true then LOG(sFunctionRef..': ACU very vulnerable to Air snipe, will retreat even if on full health') end
                     elseif iNearbyMAAThreat <= 750 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 2500 then
