@@ -1871,6 +1871,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                             --=======AIR FACTORY------------------
                         elseif bIsAirFactory then
+                            if aiBrain:GetArmyIndex() == 4 and (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber) >= 60 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber * categories.TECH3) >= 3) then bDebugMessages = true end
                             --if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableAirAA]) == false and table.getsize(aiBrain[M27AirOverseer.reftAvailableAirAA]) >= 20 then bDebugMessages = true end
 
 
@@ -1995,7 +1996,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     if bDebugMessages == true then LOG(sFunctionRef..': iEmergencyRange='..iEmergencyRange..'; refiModDistFromStartNearestOutstandingThreat='..aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]..'; bHavePowerForAir='..tostring(bHavePowerForAir)..'; Energy stored='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; aiBrain[M27AirOverseer.refiBomberDefenceModDistance]='..aiBrain[M27AirOverseer.refiBomberDefenceModDistance]..'; aiBrain[refiOurMassInAirAA]='..aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]) end
                                     if aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] <= iEmergencyRange  and (bHavePowerForAir or aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.8) then
                                         --Limit emergency defence if we want to save mass for T3 arti
-                                        if iCurT1Bombers <= 30 or not(aiBrain[M27Overseer.refbDefendAgainstArti]) or not(M27Conditions.HaveLowMass(aiBrain)) then
+                                        if iCurT1Bombers <= 70 and iAvailableT3Bombers <= 5 and (iCurT1Bombers <= 30 or not(aiBrain[M27Overseer.refbDefendAgainstArti]) or not(M27Conditions.HaveLowMass(aiBrain))) and (iCurT1Bombers <= 40 or not(aiBrain[M27AirOverseer.refbFarBehindOnAir]) or M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLocationFromStartNearestThreat], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(iEmergencyRange, 150)) then
 
                                             --Does the enemy have air units within a similar distance? If so then build AA first if the AA is closer than the nearest tank
                                             if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; Nearby non-scout air units table empty?='..tostring(M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iEmergencyRange - 15, 'Enemy')))) end
@@ -2170,7 +2171,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         end
                                     end
                                 elseif iCurrentConditionToTry == 4 then --Torp bombers if enemy navy near base
-                                    if aiBrain[M27Overseer.refbT2NavyNearOurBase] and (aiBrain[M27AirOverseer.refiTorpBombersWanted] > 0 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTorpBomber) < 80) then
+                                    if aiBrain[M27Overseer.refbT2NavyNearOurBase] and (not(aiBrain[M27AirOverseer.refbFarBehindOnAir]) or aiBrain[M27AirOverseer.refiTorpBombersWanted] > 0) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTorpBomber) < 80 then
                                         iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
                                         bGetCheapest = true
                                         bIgnoreTechDifferences = true
@@ -2199,7 +2200,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         end
                                     end
                                 elseif iCurrentConditionToTry == 6 then --Enemy land experimental - build up bombers to deal with it
-                                    if (iCurT1Bombers <= 50 or not(aiBrain[M27Overseer.refbDefendAgainstArti]) or not(M27Conditions.HaveLowMass(aiBrain))) and M27Conditions.HaveApproachingLandExperimentalThreat(aiBrain) then
+                                    if iAvailableT3Bombers <= 7 and (iCurT1Bombers + iAvailableT3Bombers * 15) <= 125 and (iCurT1Bombers <= 50 or not(aiBrain[M27Overseer.refbDefendAgainstArti]) or not(M27Conditions.HaveLowMass(aiBrain))) and M27Conditions.HaveApproachingLandExperimentalThreat(aiBrain) then
                                         iTotalWanted = 5
                                         --Is the experimental underwater?
                                         if M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoNearestRangeAdjustedLandExperimental]) and aiBrain[M27Overseer.refiNearestRangeAdjustedLandExperimental] >= 100 then
@@ -2445,7 +2446,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     end
                                 elseif iCurrentConditionToTry == 16 then
                                     --Emergency bomber defence but with less of a unit limitation and with an increased range %
-                                    if iCurT1Bombers <= 30 or not(aiBrain[M27Overseer.refbDefendAgainstArti]) or not(M27Conditions.HaveLowMass(aiBrain)) then
+                                    if (iAvailableT3Bombers <= 7 and (iCurT1Bombers + iAvailableT3Bombers * 15) <= 130) and (iCurT1Bombers <= 30 or not(aiBrain[M27Overseer.refbDefendAgainstArti]) or not(M27Conditions.HaveLowMass(aiBrain))) then
                                         local iEmergencyRange
                                         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 2 then
                                             --Bomber defence range will be focused on defending firebase from experimentals and indirect threats so will rely on this
@@ -2883,7 +2884,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 bTemporaryPause = true
                                                 iCategoryToBuild = nil
                                             else
-                                                if bHavePowerForAir and not(M27Conditions.HaveLowMass(aiBrain)) and ((aiBrain:GetEconomyStoredRatio('MASS') > 0.4 and aiBrain[M27AirOverseer.refbBombersAreEffective][iFactoryTechLevel] == true and iAvailableT3Bombers <= 8) or aiBrain:GetEconomyStoredRatio('MASS') >= 0.7) and aiBrain:GetEconomyStored('MASS') > 750 then
+                                                if bHavePowerForAir and not(M27Conditions.HaveLowMass(aiBrain)) and ((aiBrain:GetEconomyStoredRatio('MASS') > 0.4 and aiBrain[M27AirOverseer.refbBombersAreEffective][iFactoryTechLevel] == true and iAvailableT3Bombers <= 7) or aiBrain:GetEconomyStoredRatio('MASS') >= 0.7) and aiBrain:GetEconomyStored('MASS') > 750 then
                                                     if bDebugMessages == true then
                                                         LOG(sFunctionRef .. ': Bombers are effective at our current tech level and we have high mass so will build more even if are ecoing')
                                                     end
