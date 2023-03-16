@@ -1086,8 +1086,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             iTotalWanted = 3
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 5 then --High priority skirmishers (UEF and Cybran only) - ahead of initial engineer
-                                    if iFactoryTechLevel == 2 and EntityCategoryContains(categories.UEF + categories.CYBRAN, oFactory.UnitId) then
+                                elseif iCurrentConditionToTry == 5 then --High priority skirmishers (UEF and Cybran only) - ahead of initial engineer, provided enemy not approaching with guncom
+                                    if iFactoryTechLevel == 2 and EntityCategoryContains(categories.UEF + categories.CYBRAN, oFactory.UnitId) and (not(aiBrain[M27Overseer.refbEnemyGuncomApproachingBase]) or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer - categories.TECH1) >= 2) then
                                         --Get a few hoplites/gattling bots as a top priority if enemy base is nearby
                                         if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 400 and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategorySkirmisher) < 2 then
                                             iCategoryToBuild = M27UnitInfo.refCategorySkirmisher

@@ -2030,7 +2030,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                 end
             end
             if not(bWantHQEvenWithLowMass) then
-                if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 1 and iLandFactoryCount + iAirFactoryCount > 0 and aiBrain[M27Overseer.refiNearestEnemyT2PlusStructure] <= 200 then
+                if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 1 and iLandFactoryCount + iAirFactoryCount > 0 and (aiBrain[M27Overseer.refiNearestEnemyT2PlusStructure] <= 200 or aiBrain[M27Overseer.refbEnemyGuncomApproachingBase]) then
                     bWantHQEvenWithLowMass = true
                 end
             end

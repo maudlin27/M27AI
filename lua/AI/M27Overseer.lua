@@ -242,6 +242,7 @@ refbStopACUKillStrategy = 'M27OverseerStopACUKillStrat'
 refoLastNearestACU = 'M27OverseerLastACUObject'
 reftLastNearestACU = 'M27OverseerLastACUPosition' --Position of the last ACU we saw
 refiLastNearestACUDistance = 'M27OverseerLastNearestACUDistance'
+refbEnemyGuncomApproachingBase = 'M27OverseerEnemyGuncomNear' --true if nearest enemy ACU to our base is near and is a guncom
 
 refiFurthestValuableBuildingModDist = 'M27OverseerFurthestValuableBuildingModDist' --against aiBrain, includes under construction (incl experimentals being built)
 refiFurthestValuableBuildingActualDist = 'M27OverseerFurthestValuableBuildingActualDist' --against aiBrain, includes under construction (incl experimentals being built)
@@ -5220,7 +5221,7 @@ function ACUManager(aiBrain)
                             aiBrain[reftLastNearestACU] = tNearestACU
                             iLastDistanceToACU = iDistanceToACU
                         else
-                            if iDistanceToACU < aiBrain[refiLastNearestACUDistance] then
+                            if iDistanceToACU < aiBrain[refiLastNearestACUDistance] or not(M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU])) or iDistanceToACU < M27Utilities.GetDistanceBetweenPositions(aiBrain[refoLastNearestACU]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
                                 aiBrain[refoLastNearestACU] = oNearestACU
                                 aiBrain[reftLastNearestACU] = tNearestACU
                                 iLastDistanceToACU = iDistanceToACU
@@ -6073,7 +6074,21 @@ function ACUManager(aiBrain)
                 end
             end
         end
-        --end
+        --Flag if enemy has a guncom approaching our base:
+        aiBrain[refbEnemyGuncomApproachingBase] = false
+        if bDebugMessages == true then
+            LOG(sFunctionRef..': About to check if have approaching guncom, M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU])='..tostring(M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]))..'; aiBrain[refoLastNearestACU]='..(aiBrain[refoLastNearestACU].UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(aiBrain[refoLastNearestACU]) or 'nil')..' aiBrain[refiLastNearestACUDistance]='..aiBrain[refiLastNearestACUDistance]..'; Actual dist='..M27Utilities.GetDistanceBetweenPositions(aiBrain[refoLastNearestACU]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Dist to enemy base from our base='..aiBrain[refiDistanceToNearestEnemyBase])
+            if M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) then LOG(sFunctionRef..': Nearest ACU is owned by '..aiBrain[refoLastNearestACU]:GetAIBrain().Nickname..' and is at position '..repru(aiBrain[refoLastNearestACU]:GetPosition())..'; our start pos='..repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
+        end
+        if M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) and aiBrain[refiLastNearestACUDistance] <= 250 and M27Utilities.GetDistanceBetweenPositions(aiBrain[refoLastNearestACU]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.max(140, math.min(250, aiBrain[refiDistanceToNearestEnemyBase] * 0.25), math.min(175, aiBrain[refiDistanceToNearestEnemyBase] * 0.4)) then
+            --Is this a guncom or at risk of being a guncom?
+            if bDebugMessages == true then LOG(sFunctionRef..': Does ACU '..aiBrain[refoLastNearestACU].UnitId..M27UnitInfo.GetUnitLifetimeCount(aiBrain[refoLastNearestACU])..' owned by '..aiBrain[refoLastNearestACU]:GetAIBrain().Nickname..' have a gun='..tostring(M27Conditions.DoesACUHaveGun(aiBrain[refoLastNearestACU]:GetAIBrain(), false, aiBrain[refoLastNearestACU]))..'; Enemy ACU unit state='..M27Logic.GetUnitState(aiBrain[refoLastNearestACU])) end
+            if M27Conditions.DoesACUHaveGun(aiBrain[refoLastNearestACU]:GetAIBrain(), false, aiBrain[refoLastNearestACU]) or ((aiBrain[refoLastNearestACU]:IsUnitState('Upgrading') or aiBrain[refoLastNearestACU]:IsUnitState('Immobile')) and not(oACU:IsUnitState('Upgrading')) and not(M27Conditions.DoesACUHaveGun(aiBrain, false, oACU))) then
+                aiBrain[refbEnemyGuncomApproachingBase] = true
+                if bDebugMessages == true then LOG(sFunctionRef..': Time='..GetGameTimeSeconds()..'; Brain='..aiBrain.Nickname..'; Enemy has guncom approaching our base') end
+            end
+        end
+
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
