@@ -13047,6 +13047,14 @@ end--]]
                                             end
                                         end
                                     end
+                                    if not(bWantEmergencyOmni) and not(bHaveLowPower) and M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]) == false then
+                                        local tAvailableT3Bombers = EntityCategoryFilterDown(categories.TECH3, aiBrain[M27AirOverseer.reftAvailableBombers])
+
+                                        if M27Utilities.IsTableEmpty(tAvailableT3Bombers) == false then
+                                            local iAvailableT3Bombers = table.getn(tAvailableT3Bombers)
+                                            if iAvailableT3Bombers >= 3 and (iAvailableT3Bombers >= 5 or aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] > 225) then bWantEmergencyOmni = true end --likely if we have t3 bombers that we are limited on targets by intel
+                                        end
+                                    end
                                 end
                             end
                             if bWantEmergencyOmni then

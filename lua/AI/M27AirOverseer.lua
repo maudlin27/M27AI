@@ -5105,7 +5105,7 @@ function AirBomberManager(aiBrain)
 
     --if aiBrain[refiPreviousAvailableBombers] >= 10 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and GetGameTimeSeconds() >= 780 then bDebugMessages = true end
 
-    --if GetGameTimeSeconds() >= 960 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 1560 then bDebugMessages = true end
 
     DetermineBomberDefenceRange(aiBrain) --Updates aiBrain[refiBomberDefenceModDistance]
     if bDebugMessages == true then
@@ -5254,6 +5254,7 @@ function AirBomberManager(aiBrain)
                         iHighestPriorityFound = math.min(iHighestPriorityFound, iCurPriority)
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Added unit to the shortlist as it isnt underwater')
+                            --if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then M27Utilities.ErrorHandler('Audit trail') end
                         end
                     else
                         if bDebugMessages == true then LOG(sFunctionRef..': Dealing with a teleporting unit so will avoid targeting') end
@@ -5369,6 +5370,17 @@ function AirBomberManager(aiBrain)
                 table.insert(tEnemyAAAndCruisers, oUnit)
             end
         end
+
+        local iIntelBasedLimit = math.max(aiBrain[refiBomberDefenceCriticalThreatDistance] + 50, aiBrain[refiBomberDefenceModDistance] * 0.75, 150, M27Logic.GetIntelCoverageOfPosition(aiBrain, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], nil, true))
+        if aiBrain[refbHaveAirControl] then iIntelBasedLimit = iIntelBasedLimit * 1.5 end
+        iIntelBasedLimit = math.min(iIntelBasedLimit, aiBrain[refiMaxScoutRadius])
+        local iT3DefensiveLimit
+        if aiBrain[refbHaveAirControl] then iT3DefensiveLimit = iMaxPossibleRange
+        elseif aiBrain[refbFarBehindOnAir] then iT3DefensiveLimit = math.min(iMaxPossibleRange, math.max(iIntelBasedLimit, 200))
+        else iT3DefensiveLimit = math.min(iMaxPossibleRange, math.max(iIntelBasedLimit, 300))
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': iIntelBasedLimit='..iIntelBasedLimit..'; Intel coverage of start position='..M27Logic.GetIntelCoverageOfPosition(aiBrain, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], nil, true)..'; iT3DefensiveLimit='..iT3DefensiveLimit) end
+
 
 
 
@@ -5988,7 +6000,7 @@ function AirBomberManager(aiBrain)
                         else
                             --Check for nearby enemy T2+T3 units, except SAMs
                             iCurPriority = 1
-                            tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA - categories.TECH1 - M27UnitInfo.refCategoryEngineer - M27UnitInfo.refCategoryStructureAA * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxPossibleRange, 'Enemy')
+                            tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA - categories.TECH1 - M27UnitInfo.refCategoryEngineer - M27UnitInfo.refCategoryStructureAA * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iT3DefensiveLimit, 'Enemy')
                             for iUnit, oUnit in tPotentialTargets do
                                 if not (oUnit:IsUnitState('Attached')) then
                                     iCurModDistance = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false) + math.min(100, (oUnit[refiFailedHitCount] or 0) * 15)
@@ -6005,7 +6017,7 @@ function AirBomberManager(aiBrain)
 
                             --Normal combat units
                             iCurPriority = 2
-                            tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand - categories.TECH1 - M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategorySalem, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxPossibleRange, 'Enemy')
+                            tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand - categories.TECH1 - M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategorySalem, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iT3DefensiveLimit, 'Enemy')
                             for iUnit, oUnit in tPotentialTargets do
                                 if not (oUnit:IsUnitState('Attached')) then
                                     iCurModDistance = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false) + math.min(100, (oUnit[refiFailedHitCount] or 0) * 15)
@@ -6025,14 +6037,14 @@ function AirBomberManager(aiBrain)
                             if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) then
                                 iCurModDistance = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition(), false) + math.min(100, (aiBrain[M27Overseer.refoLastNearestACU][refiFailedHitCount] or 0) * 15)
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': CurPriority=' .. iCurPriority .. '; Considering whether to add enemy ACU to bomber target. Mod distance for enemy ACU=' .. iCurModDistance .. '; aiBrain[refiBomberDefenceModDistance]=' .. aiBrain[refiBomberDefenceModDistance])
+                                    LOG(sFunctionRef .. ': CurPriority=' .. iCurPriority .. '; Considering whether to add enemy ACU to bomber target. Mod distance for enemy ACU=' .. iCurModDistance .. '; aiBrain[refiBomberDefenceModDistance]=' .. aiBrain[refiBomberDefenceModDistance]..'; aiBrain[M27Overseer.refiLastNearestACUDistance]='..aiBrain[M27Overseer.refiLastNearestACUDistance]..'; aiBrain[refiBomberDefenceCriticalThreatDistance]='..aiBrain[refiBomberDefenceCriticalThreatDistance]..'; Intel coverage of target ACU position='..M27Logic.GetIntelCoverageOfPosition(aiBrain, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition())..'; last nearest ACU owner='..(aiBrain[M27Overseer.refoLastNearestACU]:GetAIBrain().Nickname or 'nil')..'; do we haev at least 19 intel coverage='..tostring(M27Logic.GetIntelCoverageOfPosition(aiBrain, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition(), 19, false)))
                                 end
                                 if iCurModDistance <= aiBrain[refiBomberDefenceModDistance] then
-                                    if iCurModDistance <= aiBrain[refiBomberDefenceCriticalThreatDistance] or (aiBrain[M27Overseer.refiLastNearestACUDistance] <= 150 and (not(bCheckForDangerousAA) or iCurModDistance <= aiBrain[refiBomberDefenceCriticalThreatDistance] or not (IsTargetCoveredByAA(aiBrain[M27Overseer.refoLastNearestACU], M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyAAToAvoid], 4, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], false)))) then
+                                    if iCurModDistance <= aiBrain[refiBomberDefenceCriticalThreatDistance] or ((aiBrain[M27Overseer.refiLastNearestACUDistance] <= 150 and (not(bCheckForDangerousAA) or not (IsTargetCoveredByAA(aiBrain[M27Overseer.refoLastNearestACU], M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyAAToAvoid], 4, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], false)))) and M27Logic.GetIntelCoverageOfPosition(aiBrain, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition(), 19)) then
                                         AddUnitToShortlist(aiBrain[M27Overseer.refoLastNearestACU], iTechLevel, iCurModDistance)
                                     else
-                                        --Only add ACU if it has no shield under it and no T3+ AA
-                                        if not (M27Logic.IsTargetUnderShield(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], 0, false, false, true)) then
+                                        --Only add ACU if it has no shield under it and no T3+ AA, and we have intel coverage (use 19 since air segment size is 20, so if we have visual it will return true)
+                                        if not (M27Logic.IsTargetUnderShield(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], 0, false, false, true)) and M27Logic.GetIntelCoverageOfPosition(aiBrain, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition(), 19) then
                                             if not (IsTargetCoveredByAA(aiBrain[M27Overseer.refoLastNearestACU], tEnemyAAAndCruisers, 3, tStartPoint)) then
                                                 AddUnitToShortlist(aiBrain[M27Overseer.refoLastNearestACU], iTechLevel, iCurModDistance)
                                             end
@@ -6075,7 +6087,7 @@ function AirBomberManager(aiBrain)
                         --If enemy cruiser within emergency defence range, and aren't avoiding cruisers, then also consider this (but not carriers)
                         if not (bAvoidCruisers) and iNearestCruiserModDistance <= aiBrain[refiBomberDefenceModDistance] + 30 then
                             iCurPriority = iHighestPriorityFound
-                            tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryCruiser, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiBomberDefenceModDistance] * 2, 'Enemy')
+                            tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryCruiser, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], math.min(iT3DefensiveLimit, aiBrain[refiBomberDefenceModDistance] * 2), 'Enemy')
                             if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
                                 for iUnit, oUnit in tPotentialTargets do
                                     if M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition()) <= aiBrain[refiBomberDefenceModDistance] + 30 then
@@ -6088,14 +6100,14 @@ function AirBomberManager(aiBrain)
                             end
                         end
 
-                        --If no targets, then search for lower priority targets
+                        --If no targets, then search for lower priority targets subject to intel limit
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': If no target count then will search for lower priority targets. iTargetCount=' .. iTargetCount)
                         end
                         if iTargetCount == 0 then
                             --Look for enemies that should be able to 1-shot if theyre unshielded that are high enoguh value to be worth risking the strat on
                             iCurPriority = 4
-                            local tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryStructureAA * categories.TECH2 + M27UnitInfo.refCategoryTML + M27UnitInfo.refCategoryT3Radar + M27UnitInfo.refCategoryPD * categories.TECH2, tStartPoint, aiBrain[refiMaxScoutRadius], 'Enemy')
+                            local tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryStructureAA * categories.TECH2 + M27UnitInfo.refCategoryTML + M27UnitInfo.refCategoryT3Radar + M27UnitInfo.refCategoryPD * categories.TECH2, tStartPoint, iIntelBasedLimit, 'Enemy')
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': is tEnemiesEmpty=' .. tostring(M27Utilities.IsTableEmpty(tEnemies)))
                             end
@@ -6126,7 +6138,7 @@ function AirBomberManager(aiBrain)
                                     LOG(sFunctionRef .. ': Couldnt find any emergengy defence or t2 vulnerable mexes so have looked for enemy ACU and land experimentals on our side of the map.  iTargetCount=' .. iTargetCount)
                                 end
                                 --Also consider T3 MAA that is unshielded within 65% of our base
-                                tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA * categories.TECH3, tStartPoint, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.65, 'Enemy')
+                                tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA * categories.TECH3, tStartPoint, math.min(iIntelBasedLimit, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.65), 'Enemy')
                                 --local tEnemyNonMAASAM --calculate outside of the istableempty check for tenemies since also refer to it for t2maa
                                 --if M27Utilities.IsTableEmpty(tEnemyAA) == false then
                                 --tEnemyNonMAASAM = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3 * categories.STRUCTURE + M27UnitInfo.refCategoryCruiserCarrier, tStartPoint, aiBrain[refiMaxScoutRadius], 'Enemy')
@@ -6144,7 +6156,7 @@ function AirBomberManager(aiBrain)
                                     end
                                 end
                                 --Consider T2 MAA and fixed T1 AA within bomber defence range+40 given how bad t1 bombers are against them
-                                tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA * categories.TECH2 + M27UnitInfo.refCategoryStructureAA * categories.TECH1, tStartPoint, aiBrain[refiBomberDefenceModDistance] * 2, 'Enemy')
+                                tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA * categories.TECH2 + M27UnitInfo.refCategoryStructureAA * categories.TECH1, tStartPoint, math.min(iIntelBasedLimit, aiBrain[refiBomberDefenceModDistance] * 2), 'Enemy')
                                 if M27Utilities.IsTableEmpty(tEnemies) == false then
                                     for iUnit, oUnit in tEnemies do
                                         if (oUnit[refiStrikeDamageAssigned] or 0) == 0 then
@@ -6164,7 +6176,7 @@ function AirBomberManager(aiBrain)
                             if iTargetCount == 0 then
                                 --land experimental or enemy ACU that is within 60% of our base, and within 500?
                                 iCurPriority = 6
-                                tEnemies = aiBrain:GetUnitsAroundPoint(categories.COMMAND + M27UnitInfo.refCategoryLandExperimental, tStartPoint, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase], 'Enemy')
+                                tEnemies = aiBrain:GetUnitsAroundPoint(categories.COMMAND + M27UnitInfo.refCategoryLandExperimental, tStartPoint, math.min(iIntelBasedLimit, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]), 'Enemy')
                                 if M27Utilities.IsTableEmpty(tEnemies) == false then
                                     for iUnit, oUnit in tEnemies do
                                         if bDebugMessages == true then
@@ -6202,7 +6214,7 @@ function AirBomberManager(aiBrain)
                             if iTargetCount == 0 then
                                 iCurPriority = 7
                                 --Consider T3 mexes since hover-bombing means we can kill in 1 go sometimes
-                                tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT3Mex, tStartPoint, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase], 'Enemy')
+                                tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT3Mex, tStartPoint, math.min(iIntelBasedLimit, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]), 'Enemy')
                                 if M27Utilities.IsTableEmpty(tEnemies) == false then
                                     for iUnit, oUnit in tEnemies do
                                         if bDebugMessages == true then
@@ -6223,7 +6235,7 @@ function AirBomberManager(aiBrain)
                                 if iTargetCount == 0 then
                                     iCurPriority = 8
                                     --Consider enemy T3 land within 50% of our base
-                                    tEnemies = aiBrain:GetUnitsAroundPoint(categories.SUBCOMMANDER + M27UnitInfo.refCategoryLandCombat * categories.TECH3 + M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryMAA * categories.TECH3, tStartPoint, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5, 'Enemy')
+                                    tEnemies = aiBrain:GetUnitsAroundPoint(categories.SUBCOMMANDER + M27UnitInfo.refCategoryLandCombat * categories.TECH3 + M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryMAA * categories.TECH3, tStartPoint, math.min(iIntelBasedLimit, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5), 'Enemy')
                                     if M27Utilities.IsTableEmpty(tEnemies) == false then
                                         for iUnit, oUnit in tEnemies do
                                             if (oUnit[refiStrikeDamageAssigned] or 0) == 0 then
@@ -6900,7 +6912,7 @@ function AirBomberManager(aiBrain)
                             tStratsNearRallyPoint[iStratsNearRallyPoint] = oUnit
                         end
                     end
-                    if iStratsNearRallyPoint >= 3 then
+                    if iStratsNearRallyPoint >= 3 and not(aiBrain[refbFarBehindOnAir]) and (aiBrain[refbHaveAirControl] or iStratsNearRallyPoint >= 5) and not(M27Conditions.HaveApproachingLandExperimentalThreat(aiBrain)) then
 
                         --local tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT3Mex, tStartPoint, math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 2, aiBrain[refiMaxScoutRadius]), 'Enemy')
                         local tTargetsByMaxHealth = {} --[1] = 10k, [2] = 20k, [3] = 30k, [4] = 40k, [5] = 50k+
@@ -6942,7 +6954,7 @@ function AirBomberManager(aiBrain)
                             iCategoriesToLookFor = M27UnitInfo.refCategoryStructure * categories.TECH3 - M27UnitInfo.refCategoryStructureAA * categories.TECH3 + M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryStructureAA * categories.TECH2 + M27UnitInfo.refCategoryTML + M27UnitInfo.refCategoryT3Radar + M27UnitInfo.refCategoryPD * categories.TECH2
                         end
 
-                        local tEnemies = aiBrain:GetUnitsAroundPoint(categories.COMMAND + M27UnitInfo.refCategoryStructure * categories.TECH3 - M27UnitInfo.refCategoryStructureAA * categories.TECH3 + M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryStructureAA * categories.TECH2 + M27UnitInfo.refCategoryTML + M27UnitInfo.refCategoryT3Radar + M27UnitInfo.refCategoryPD * categories.TECH2, tStartPoint, math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 2, aiBrain[refiMaxScoutRadius]), 'Enemy')
+                        local tEnemies = aiBrain:GetUnitsAroundPoint(categories.COMMAND + M27UnitInfo.refCategoryStructure * categories.TECH3 - M27UnitInfo.refCategoryStructureAA * categories.TECH3 + M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryStructureAA * categories.TECH2 + M27UnitInfo.refCategoryTML + M27UnitInfo.refCategoryT3Radar + M27UnitInfo.refCategoryPD * categories.TECH2, tStartPoint, math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 2, iIntelBasedLimit + 20), 'Enemy')
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': tStartPoint=' .. repru((tStartPoint or { 'nil' })) .. '; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]=' .. (aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] or 'nil') .. '; aiBrain[refiMaxScoutRadius]=' .. (aiBrain[refiMaxScoutRadius] or 'nil') .. '; tEnemies is high values tructures (e.g. t2 defence and t3 structures, excl t3 aa) and enemy ACU.  Is the table empty=' .. tostring(M27Utilities.IsTableEmpty(tEnemies)))
                         end
@@ -6993,7 +7005,7 @@ function AirBomberManager(aiBrain)
                         if iStratsNearRallyPoint >= 9 and (iPossibleTargets == 0 or (M27Utilities.IsTableEmpty(tTargetsByMaxHealth[1]) and M27Utilities.IsTableEmpty(tTargetsByMaxHealth[2]))) then
                             --Consider targeting unshielded isolated SAMs and cruisers if we have lots of available strats
                             local iEnemyAANearTarget
-                            tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructureAA * categories.TECH3 + M27UnitInfo.refCategoryCruiser + M27UnitInfo.refCategoryMAA * categories.TECH3, tStartPoint, math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 2, aiBrain[refiMaxScoutRadius]), 'Enemy')
+                            tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructureAA * categories.TECH3 + M27UnitInfo.refCategoryCruiser + M27UnitInfo.refCategoryMAA * categories.TECH3, tStartPoint, math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 2, iIntelBasedLimit + 20), 'Enemy')
                             if M27Utilities.IsTableEmpty(tEnemies) == false then
                                 for iUnit, oUnit in tEnemies do
                                     if (oUnit[refiStrikeDamageAssigned] or 0) <= 1000 then
@@ -7014,7 +7026,7 @@ function AirBomberManager(aiBrain)
 
                             if iPossibleTargets == 0 then
                                 --Consider enemy T3 land within 80% of our base
-                                tEnemies = aiBrain:GetUnitsAroundPoint(categories.SUBCOMMANDER + M27UnitInfo.refCategoryLandCombat * categories.TECH3 + M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryMAA * categories.TECH3, tStartPoint, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.8, 'Enemy')
+                                tEnemies = aiBrain:GetUnitsAroundPoint(categories.SUBCOMMANDER + M27UnitInfo.refCategoryLandCombat * categories.TECH3 + M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryMAA * categories.TECH3, tStartPoint, math.min(iIntelBasedLimit, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.8), 'Enemy')
                                 if M27Utilities.IsTableEmpty(tEnemies) == false then
                                     for iUnit, oUnit in tEnemies do
                                         if (oUnit[refiStrikeDamageAssigned] or 0) == 0 then
@@ -7032,7 +7044,7 @@ function AirBomberManager(aiBrain)
                                     end
                                 end
                                 --And at a similar priority, enemy MAA up to 100% of distance to base, provided it is unshielded
-                                tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA * categories.TECH3, tStartPoint, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase], 'Enemy')
+                                tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA * categories.TECH3, tStartPoint, math.min(iIntelBasedLimit + 20, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]), 'Enemy')
                                 if M27Utilities.IsTableEmpty(tEnemies) == false then
                                     --[[local tEnemyNonMAASAM
                                     if M27Utilities.IsTableEmpty(tEnemyAAAndCruisers) == false then
@@ -7057,7 +7069,7 @@ function AirBomberManager(aiBrain)
 
                                 if iPossibleTargets == 0 then
                                     --Consider enemy T2 land within 80% of our base
-                                    tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat * categories.TECH2 + M27UnitInfo.refCategoryMAA * categories.TECH2, tStartPoint, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.8, 'Enemy')
+                                    tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat * categories.TECH2 + M27UnitInfo.refCategoryMAA * categories.TECH2, tStartPoint, math.min(iIntelBasedLimit + 20, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.8), 'Enemy')
                                     if M27Utilities.IsTableEmpty(tEnemies) == false then
                                         for iUnit, oUnit in tEnemies do
                                             if (oUnit[refiStrikeDamageAssigned] or 0) == 0 then
@@ -7076,7 +7088,7 @@ function AirBomberManager(aiBrain)
                                     end
 
                                     --Also add T1 ground AA and t1 mexes within 85% of dist to their base
-                                    tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT1Mex + refCategoryAirAA * categories.STRUCTURE, tStartPoint, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.85, 'Enemy')
+                                    tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT1Mex + refCategoryAirAA * categories.STRUCTURE, tStartPoint, math.min(iIntelBasedLimit, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.85), 'Enemy')
                                     if M27Utilities.IsTableEmpty(tEnemies) == false then
                                         for iUnit, oUnit in tEnemies do
                                             if (oUnit[refiStrikeDamageAssigned] or 0) == 0 then
