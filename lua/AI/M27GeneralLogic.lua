@@ -5621,7 +5621,7 @@ function GetT3ArtiTarget(oT3Arti, bDontDelayShot)
                             iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
                             if iCurDistance >= iMinRange and iCurDistance <= iMaxRange then
                                 --Are they threatening valuable friendly structures (or close to threatening)?
-                                if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure * categories.TECH3 + M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryFixedShield + M27UnitInfo.RefCategoryT2Mex, oUnit:GetPosition(), 180, 'Ally')) == false then
+                                if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure * categories.TECH3 + M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryT2Mex, oUnit:GetPosition(), 180, 'Ally')) == false then
                                     iTargetShortlist = iTargetShortlist + 1
                                     tTargetShortlist[iTargetShortlist] = oUnit
                                     if bDebugMessages == true then LOG(sFunctionRef..': Will add arti '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to table of targets') end
@@ -5643,7 +5643,7 @@ function GetT3ArtiTarget(oT3Arti, bDontDelayShot)
                         iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
                         if iCurDistance >= iMinRange and iCurDistance <= iMaxRange then
                             --Are they threatening valuable friendly structures (or close to threatening)?
-                            if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure * categories.TECH3 + M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryFixedShield + M27UnitInfo.RefCategoryT2Mex, oUnit:GetPosition(), M27EngineerOverseer.iTMLMissileRange + 10, 'Ally')) == false then
+                            if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure * categories.TECH3 + M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryT2Mex, oUnit:GetPosition(), M27EngineerOverseer.iTMLMissileRange + 10, 'Ally')) == false then
                                 iTargetShortlist = iTargetShortlist + 1
                                 tTargetShortlist[iTargetShortlist] = oUnit
                                 if bDebugMessages == true then LOG(sFunctionRef..': Will add TML '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to table of targets') end
