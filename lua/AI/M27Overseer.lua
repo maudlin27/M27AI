@@ -8283,7 +8283,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
             -------->>>>>>>>>>>>Set ACU health to run on<<<<<<<<<<<----------------
             --NOTE: Platoon utilities nearby enemies logic will adjust this slightly, in particular see the variable bCapHealthToRunOn, which reduces health to run on from 100% to 98% in most cases
-            if GetGameTimeSeconds() >= 1080 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
+            --if GetGameTimeSeconds() >= 1080 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
 
             aiBrain[refiACUHealthToRunOn] = math.max(5250, oACU:GetMaxHealth() * 0.45)
             --Play safe with ACU if we have almost half or more of mexes

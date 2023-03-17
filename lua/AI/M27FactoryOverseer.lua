@@ -780,7 +780,6 @@ function DetermineWhatToBuild(aiBrain, oFactory)
             end
 
 
-            if bIsLandFactory and aiBrain:GetArmyIndex() == 5 and aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] > 0 then bDebugMessages = true end
             if bDebugMessages == true then LOG(sFunctionRef..': factory considering what to build at time '..GetGameTimeSeconds()..', bIsLandFactory='..tostring(bIsLandFactory)..'; iStrategy='..iStrategy..'; bIsQuantumGateway='..tostring(bIsQuantumGateway)) end
             if iFactoryTechLevel >= 3 or not(aiBrain[M27Overseer.refbCloseToUnitCap]) then
                 if bPlateauFactory then
@@ -1871,7 +1870,6 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                             --=======AIR FACTORY------------------
                         elseif bIsAirFactory then
-                            if aiBrain:GetArmyIndex() == 4 and (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber) >= 60 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber * categories.TECH3) >= 3) then bDebugMessages = true end
                             --if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableAirAA]) == false and table.getsize(aiBrain[M27AirOverseer.reftAvailableAirAA]) >= 20 then bDebugMessages = true end
 
 
