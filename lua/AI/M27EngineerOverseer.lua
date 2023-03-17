@@ -5399,6 +5399,12 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
             local iMonkeyLC = M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryMonkeylord)
             if iMonkeyLC >= 2 or (iMonkeyLC == 1 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryMonkeylord) == 0) then iCategoryRef = refiExperimentalMegalith end
         end
+
+        --Novax override for UEF in place of gameender and T3 arti if we have no T3 arti or novax on our team
+        if (iCategoryRef == refiExperimentalT3Arti or iCategoryRef == refiExperimentalArti) and iFactionIndex == M27UnitInfo.refFactionUEF then
+            local iCurNovax = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryNovaxCentre)
+            if iCurNovax == 0 then iCategoryRef = refiExperimentalNovax end
+        end
     end
 
     --Are there unit restrictions? If so then make sure we can build the category

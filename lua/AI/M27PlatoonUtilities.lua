@@ -1380,12 +1380,12 @@ function HasPlatoonReachedDestination(oPlatoon)
 
     local sPlatoonName = oPlatoon:GetPlan()
     --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 then bDebugMessages = true end
-    --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+    if EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oPlatoon[refoFrontUnit].UnitId) then bDebugMessages = true end
     --if oPlatoon[refbOverseerAction] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauLandCombat' then bDebugMessages = true end
 
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for platoon '..sPlatoonName..oPlatoon[refiPlatoonCount]..'; Current path number='..(oPlatoon[refiCurrentPathTarget] or 'nil')) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for platoon '..sPlatoonName..oPlatoon[refiPlatoonCount]..'; Current path number='..(oPlatoon[refiCurrentPathTarget] or 'nil')..'; oPlatoon[refiOverrideDistanceToReachDestination]='..(oPlatoon[refiOverrideDistanceToReachDestination] or 'nil')) end
     local iCurrentUnits = oPlatoon[refiCurrentUnits]
     if iCurrentUnits == nil then
         oPlatoon[refiCurrentUnits] = table.getn(oPlatoon:GetPlatoonUnits())
@@ -1395,6 +1395,10 @@ function HasPlatoonReachedDestination(oPlatoon)
         local iBase = 7
         if oPlatoon[refiBuilders] > 0 then iBase = 3 end --redundancy - have put this in the platoon initial setup as well
         iReachedTargetDist = iBase + iCurrentUnits * 0.25
+        if oPlatoon[refoFrontUnit].GetBlueprint then
+            local oFrontBP = oPlatoon[refoFrontUnit]:GetBlueprint()
+            iReachedTargetDist = iReachedTargetDist + math.max((oFrontBP.SizeX or 0), (oFrontBP.SizeZ or 0))
+        end
         if iReachedTargetDist > 25 then iReachedTargetDist = 25 end
         if sPlatoonName == 'M27GroundExperimental' then
             local aiBrain = oPlatoon:GetBrain()
@@ -7653,7 +7657,7 @@ function DeterminePlatoonAction(oPlatoon)
         --if sPlatoonName == 'M27Skirmisher' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and GetGameTimeSeconds() >= 300 and EntityCategoryContains(M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) and oPlatoon[refiPlatoonCount] == 9 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true end
         --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
         --if GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
-        --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refiPlatoonMaxRange] >= 60 and GetGameTimeSeconds() >= 2100 then bDebugMessages = true end
+        if EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oPlatoon[refoFrontUnit].UnitId) then bDebugMessages = true end
         --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 937 and aiBrain:GetArmyIndex() == 4 and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
         --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
         --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
@@ -8856,7 +8860,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
 
             --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
             --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
-            --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonMaxRange] >= 60 then bDebugMessages = true end
+            if EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oPlatoon[refoFrontUnit].UnitId) then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
@@ -8877,7 +8881,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
             oPlatoon[refiCurrentPathTarget] = 1 --Redundancy, think put this elsewhere as well
             --If have ACU in the platoon then remove it unless its the ACU platoon
             if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..'-'..oPlatoon[refiPlatoonUniqueCount]..': A'..refActionNewMovementPath) end
-            if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': GettingNewMovementPath') end
+            if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..oPlatoon[refiPlatoonCount]..': Start of code, GettingNewMovementPath at game time '..GetGameTimeSeconds()) end
             local tCurPosition = GetPlatoonFrontPosition(oPlatoon)
             local bDontGetNewPath = false
 
@@ -9019,6 +9023,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                         end
                                     end
                                 end
+                                if bDebugMessages == true then LOG(sFunctionRef..': bDefend='..tostring(bDefend)..'; is MAA helper nil='..tostring(oPlatoon[M27Overseer.refoUnitsMAAHelper] == nil)) end
 
                             end
                             if not(bDefend) then
@@ -9044,10 +9049,9 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                     if bDebugMessages == true then LOG(sFunctionRef..': Will move to nearest threat as it is near our base') end
                                 else
                                     oPlatoon[reftMovementPath] = {[1] = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon))}
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Will move to nearest rally point') end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will move to nearest rally point, dist from our front position='..M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftMovementPath][1], GetPlatoonFrontPosition(oPlatoon))) end
                                 end
                             else
-
                                 if oPlatoon[refbHavePreviouslyRun] then --Patorl 2 mexes and rally point
                                     oPlatoon[reftMovementPath] = M27MapInfo.GetMexPatrolLocations(aiBrain, 2, true)
                                     if bDebugMessages == true then LOG(sFunctionRef..': Have previously run so will get mex patrol locations') end
@@ -11241,7 +11245,7 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27Skirmisher' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and GetGameTimeSeconds() >= 300 and EntityCategoryContains(M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) and oPlatoon[refiPlatoonCount] == 9 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 780  then bDebugMessages = true end
-            --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refiPlatoonMaxRange] >= 60 and GetGameTimeSeconds() >= 2100 then bDebugMessages = true end
+            if EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oPlatoon[refoFrontUnit].UnitId) then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
@@ -13118,7 +13122,9 @@ function ProcessPlatoonAction(oPlatoon)
                                 if M27Utilities.GetDistanceBetweenPositions(tBuildingPosition, oBuilder:GetPosition()) > iBuildDistance then
                                     --Move to location
                                     if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonName..': Are too far away, will move closer before assisting') end
-                                    if oPlatoon[refiOverrideDistanceToReachDestination] == nil then oPlatoon[refiOverrideDistanceToReachDestination] = 3 end --(redundancy as set when platoon first created if there are builders in it)
+                                    if oPlatoon[refiOverrideDistanceToReachDestination] == nil and oPlatoon[refoFrontUnit].GetBlueprint and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oPlatoon[refoFrontUnit].UnitId) then
+                                        oPlatoon[refiOverrideDistanceToReachDestination] = math.max((oPlatoon[refoFrontUnit]:GetBlueprint().SizeX or 0), (oPlatoon[refoFrontUnit]:GetBlueprint().SizeZ or 0)) + 3 --(redundancy as set when platoon first created if there are builders in it)
+                                    end
                                     MoveNearConstruction(aiBrain, oBuilder, tBuildingPosition, oPlatoon[refoConstructionToAssist].UnitId, -oPlatoon[refiOverrideDistanceToReachDestination] - 1, false)
                                 end
                                 if EntityCategoryContains(M27UnitInfo.refCategoryStructure + categories.EXPERIMENTAL, oPlatoon[refoConstructionToAssist].UnitId) and oPlatoon[refoConstructionToAssist]:GetFractionComplete() < 1 then
@@ -13900,9 +13906,16 @@ function PlatoonInitialSetup(oPlatoon)
                         end
                         --Pathing range override for ACU and builders
                         if oPlatoon[refbACUInPlatoon] == true then
-                            oPlatoon[refiOverrideDistanceToReachDestination] = 3 --ACU treated as reaching destination when it gets this close to it
+                            if oPlatoon[refoFrontUnit].GetBlueprint then
+                                oPlatoon[refiOverrideDistanceToReachDestination] = math.max((oPlatoon[refoFrontUnit]:GetBlueprint().SizeX or 0), (oPlatoon[refoFrontUnit]:GetBlueprint().SizeZ or 0)) + 2 --ACU treated as reaching destination when it gets this close to it
+                            else --(redundancy)
+                                oPlatoon[refiOverrideDistanceToReachDestination] = 3
+                            end
                         elseif M27Utilities.IsTableEmpty(tBuilders) == false then
-                            oPlatoon[refiOverrideDistanceToReachDestination] = 3
+                            --Might trigger as builder if are SACU or fatboy, so only update this if are engineer
+                            if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oPlatoon[refoFrontUnit].UnitId) then
+                                oPlatoon[refiOverrideDistanceToReachDestination] = math.max((oPlatoon[refoFrontUnit]:GetBlueprint().SizeX or 0), (oPlatoon[refoFrontUnit]:GetBlueprint().SizeZ or 0)) + 3
+                            end
                         end
                         oPlatoon[refbConsiderMexes] = bCanBuildMex
                         if bCanBuildMex == true then

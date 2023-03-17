@@ -780,8 +780,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
             end
 
 
-
-            if bDebugMessages == true then LOG(sFunctionRef..': factory considering what to build, bIsLandFactory='..tostring(bIsLandFactory)..'; iStrategy='..iStrategy..'; bIsQuantumGateway='..tostring(bIsQuantumGateway)) end
+            if bIsLandFactory and aiBrain:GetArmyIndex() == 5 and aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] > 0 then bDebugMessages = true end
+            if bDebugMessages == true then LOG(sFunctionRef..': factory considering what to build at time '..GetGameTimeSeconds()..', bIsLandFactory='..tostring(bIsLandFactory)..'; iStrategy='..iStrategy..'; bIsQuantumGateway='..tostring(bIsQuantumGateway)) end
             if iFactoryTechLevel >= 3 or not(aiBrain[M27Overseer.refbCloseToUnitCap]) then
                 if bPlateauFactory then
                     --Calculate number of certain units so arent recalculating each time
@@ -1747,7 +1747,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     bReachedLastOption = true
                                     break
                                 end
-                                elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU then
+                            elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU then
                                 bGetFastest = true
                                 --If our ACU is near base then dont get fastest
                                 if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 75 then
