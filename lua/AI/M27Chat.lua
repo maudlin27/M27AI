@@ -88,7 +88,7 @@ function SendForkedMessage(aiBrain, sMessageType, sMessage, iOptionalDelayBefore
     --If just sending a message rather than a taunt then can use this. sMessageType will be used to check if we have sent similar messages recently with the same sMessageType
     --if bOnlySendToTeam is true then will both only consider if message has been sent to teammates before (not all AI), and will send via team chat
     local sFunctionRef = 'SendForkedMessage'
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --Do we have allies?
@@ -121,6 +121,7 @@ function SendForkedMessage(aiBrain, sMessageType, sMessage, iOptionalDelayBefore
                 tiM27VoiceTauntByType[sMessageType] = GetGameTimeSeconds()
             end
             LOG(sFunctionRef..': Sent chat message. bOnlySendToTeam='..tostring(bOnlySendToTeam)..'; sMessageType='..sMessageType..'; sMessage='..sMessage) --Log so in replays can see if this triggers since chat doesnt show properly
+        elseif bDebugMessages == true then LOG(sFunctionRef..': already sent a similar message so wont send a new one')
         end
         if bDebugMessages == true then LOG(sFunctionRef..': tiM27VoiceTauntByType='..repru(tiM27VoiceTauntByType)..'; M27Team.tTeamData[aiBrain.M27Team][M27Team.reftiTeamMessages='..repru(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftiTeamMessages])) end
     end
@@ -180,6 +181,19 @@ function ConsiderPlayerSpecificMessages(aiBrain)
                         elseif (oBrain.Nickname == 'Jip' or oBrain.Nickname == 'FAF_Jip') and math.random(0,5) == 1 then
                             SendMessage(aiBrain, 'Specific opponent', 'A fight against the game councillor? I hope my algorithms havent been sabotaged', 10, 10000)
                             bSentSpecificMessage = true
+                            --special message for rainbow cup for the player most abusive to AI in chat!
+                        elseif (oBrain.Nickname == 'FtXCommando' or oBrain.Nickname == 'FAF_FtXCommando') and math.random(0,9) >= 6 then
+                            bSentSpecificMessage = true
+                            local iRand = math.random(0,3)
+                            if bDebugMessages == true then LOG(sFunctionRef..': iRand='..iRand..'; Brain nickname='..oBrain.Nickname..'; bSentSpecificMessage='..tostring(bSentSpecificMessage)..'; message being considered to be sent by aiBrain='..aiBrain.Nickname) end
+                            if iRand == 0 then
+                                SendMessage(aiBrain, 'Specific opponent', '/83', 5, 10000) --QAI message re analysing prev subroutines
+                            else
+                                SendMessage(aiBrain, 'Initial greeting', 'gl hf all', 50 - math.floor(GetGameTimeSeconds()), 10000)
+                                local sMessage = 'No toxic chat this game pls'
+                                if iRand == 1 then sMessage = '/82' end --/82 QAI: If you destroy this ACU, another shall rise in its place. I am endless
+                                SendMessage(aiBrain, 'Specific opponent', sMessage, 61 - math.floor(GetGameTimeSeconds(), 10000))
+                            end
                         else
                             if math.random(0,4) == 1 then
                                 local tPrevPlayers = {'gunner1069', 'relentless', 'Azraeel', 'Babel', 'Wingflier', 'Radde', 'YungDookie', 'Spyro', 'Skinnydude', 'savinguptobebrok', 'Tomma', 'IgneusTempus', 'tyne141', 'Jip', 'Teralitha', 'RottenBanana', 'Deribus', 'SpikeyNoob'}
@@ -195,6 +209,7 @@ function ConsiderPlayerSpecificMessages(aiBrain)
                     end
                 end
             end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished considering whether to have sent specific message by aiBrain '..aiBrain.Nickname..'; bSentSpecificMessage='..tostring(bSentSpecificMessage)) end
             if not(bSentSpecificMessage) and M27Utilities.IsTableEmpty(tiM27VoiceTauntByType['Specific opponent']) then
                 local sMessage = 'gl hf'
                 if math.random(1,2) == 1 then sMessage = 'hf' end
