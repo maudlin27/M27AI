@@ -218,7 +218,6 @@ end
 function UpdatePlatoonName(oPlatoon, sNewName)
     local sFunctionRef = 'UpdatePlatoonName'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --M27Utilities.ErrorHandler('TEMP AUDIT TRAIL')
     if oPlatoon.GetPlan then
         local sPlan = oPlatoon:GetPlan()
         if sPlan == M27PlatoonTemplates.refoAllEngineers then

@@ -170,8 +170,6 @@ function ClearTransportTrackers(aiBrain, oTransport)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
 
-    --if bDebugMessages == true then M27Utilities.ErrorHandler('Audit trail for transport') end
-
 
     if aiBrain[reftTransportsAssignedByPlateauGroup][oTransport[refiAssignedPlateau]] then
         if bDebugMessages == true then LOG(sFunctionRef..': ai='..aiBrain.Nickname..'; About to clear any tracking for the transport '..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)) end
@@ -195,7 +193,6 @@ function SendTransportToPlateau(aiBrain, oTransport)
     --Check if target still safe and if not switches to an alternative target if there's a better one
     if bDebugMessages == true then
         LOG(sFunctionRef..': Start of code at time='..GetGameTimeSeconds()..', will update plateaus that we want to expand to. oTransport='..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)..'; oTransport[refiAssignedPlateau]='..(oTransport[refiAssignedPlateau] or 'nil')..'; Units loaded onto oTransport='..(oTransport[refiUnitsLoaded] or 'nil'))
-        M27Utilities.ErrorHandler('Audit trail')
     end
     M27MapInfo.UpdatePlateausToExpandTo(aiBrain, true, false, oTransport)
 

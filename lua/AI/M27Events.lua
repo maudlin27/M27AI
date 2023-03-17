@@ -1983,3 +1983,17 @@ function OnDetectedBy(oUnitDetected, iBrainIndex)
         end
     end
 end
+
+
+--[[Note: As at 2023-03017 there's a bug with the FAF capture callback which Jip confirmed - will be fixed in the next faf development patch/version - revisit at this point
+function OnCaptured(oSlave, oCaptor)
+    LOG('OnCaptured start, oSlave='..oSlave.UnitId..M27UnitInfo.GetUnitLifetimeCount(oSlave)..'; Is slave valid='..tostring(M27UnitInfo.IsUnitValid(oSlave))..'; slave owner='..oSlave:GetAIBrain().Nickname)
+    --WaitSeconds(1)
+    --LOG('OnCaptured after wait, oSlave='..oSlave.UnitId..M27UnitInfo.GetUnitLifetimeCount(oSlave)..'; Is slave valid='..tostring(M27UnitInfo.IsUnitValid(oSlave))..'; slave owner='..oSlave:GetAIBrain().Nickname)
+end
+
+function OnCapturedAlt(oOldUnit, oNewUnit)
+    WaitSeconds(1)
+    LOG('OnCapturedAlt: oNewUnit='..(oNewUnit.UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oNewUnit) or 'nil'))
+    LOG('OnCapturedAlt: Owner='..oNewUnit:GetAIBrain().Nickname)
+end--]]
