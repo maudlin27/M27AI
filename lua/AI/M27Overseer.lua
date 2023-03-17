@@ -9127,7 +9127,7 @@ function ResetCivilianAllianceForBrain(iOurIndex, iCivilianIndex, sRealState, oC
     --Call via forkthread
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, Time='..GetGameTimeSeconds()..'; iOurIndex='..iOurIndex..'; iCivilianIndex='..iCivilianIndex..'; Is ally='..tostring(IsAlly(iOurIndex, iCivilianIndex))..'; IsEnemy='..tostring(IsEnemy(iOurIndex, iCivilianIndex))) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    WaitTicks(10)
+    WaitTicks(11)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Finished waiting for some ticks, iOurIndex='..iOurIndex..'; iCivilianIndex='..iCivilianIndex..'; Is ally='..tostring(IsAlly(iOurIndex, iCivilianIndex))..'; IsEnemy='..tostring(IsEnemy(iOurIndex, iCivilianIndex))) end
     SetAlliance(iOurIndex, iCivilianIndex, sRealState)
@@ -9147,6 +9147,7 @@ function RevealCiviliansToAI(aiBrain)
     --if aiBrain:GetArmyIndex() == 3 then
     if bDebugMessages == true then LOG(sFunctionRef..': Have finished waiting, will loop throguh all brians now to look for civilians, aiBrain='..aiBrain.Nickname..' with index ='..aiBrain:GetArmyIndex()..'; M27 team='..(aiBrain.M27Team or 'nil')) end
     local tiCivilianBrains = {}
+    local toCivilianBrains = {}
     local iOurIndex = aiBrain:GetArmyIndex()
     local iBrainIndex
     local sRealState
@@ -9166,11 +9167,13 @@ function RevealCiviliansToAI(aiBrain)
                 oBrain[refiTemporarilySetAsAllyForTeam] = aiBrain.M27Team
                 sRealState = IsAlly(iOurIndex, iBrainIndex) and 'Ally' or IsEnemy(iOurIndex, iBrainIndex) and 'Enemy' or 'Neutral'
                 SetAlliance(iOurIndex, iBrainIndex, 'Ally')
-                if bDebugMessages == true then LOG(sFunctionRef..': Temporarily set the brain as an ally of team '..aiBrain.M27Team..', sRealState='..sRealState) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Time='..GetGameTimeSeconds()..'; Temporarily set the brain as an ally of team '..aiBrain.M27Team..', sRealState='..sRealState) end
                 table.insert(tiCivilianBrains, iBrainIndex)
+                table.insert(toCivilianBrains, oBrain)
                 ForkThread(ResetCivilianAllianceForBrain, iOurIndex, iBrainIndex, sRealState, oBrain)
             elseif oBrain[refiTemporarilySetAsAllyForTeam] == aiBrain.M27Team then
                 table.insert(tiCivilianBrains, iBrainIndex)
+                table.insert(toCivilianBrains, oBrain)
             end
             --[[M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             WaitTicks(5)
@@ -9181,7 +9184,7 @@ function RevealCiviliansToAI(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(8) --When did with just 4 tick delay had issues where getunitsaroundpoint didnt work properly; increasing to 8 tick solved this
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    M27EconomyOverseer.GetCivilianCaptureTargets(aiBrain, tiCivilianBrains) --dont do via fork thread or wait - must be run after have made all civilians allies, but before we have reset
+    M27EconomyOverseer.GetCivilianCaptureTargets(aiBrain, tiCivilianBrains, toCivilianBrains) --dont do via fork thread or wait - must be run after have made all civilians allies, but before we have reset
     --end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

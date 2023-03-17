@@ -124,19 +124,36 @@ function GetMexCountOnOurSideOfMap(aiBrain)
     return iCount
 end
 
-function GetCivilianCaptureTargets(aiBrain, tiCivilianBrainIndex)
+function GetCivilianCaptureTargets(aiBrain, tiCivilianBrainIndex, toCivilianBrains)
     --Assumes is run at start of game and civilians have temporarily been set to be our ally, with tiCivilianBrainIndex being a table of civilian brains temporarily set as our allies
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetCivilianCaptureTargets'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     if M27Utilities.IsTableEmpty(tiCivilianBrainIndex) == false then
 
         aiBrain[reftoCiviliansToCapture] = {}
         local iSearchRange = math.min(300, math.max(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4, 175, math.min(225, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5)))
-        local tUnitsOfInterest = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat * categories.RECLAIMABLE, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iSearchRange, 'Ally')
+        local iCategoriesOfInterest = M27UnitInfo.refCategoryLandCombat * categories.RECLAIMABLE - categories.TECH1
+        local tUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategoriesOfInterest, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iSearchRange, 'Ally')
         local sPathing = M27UnitInfo.refPathingTypeAmphibious
         local iPlateauWanted = M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
         if bDebugMessages == true then LOG(sFunctionRef..': Running for aiBrain='..aiBrain.Nickname..' at gametime='..GetGameTimeSeconds()..'; Is table of tUnitsOfInterest empty='..tostring(M27Utilities.IsTableEmpty(tUnitsOfInterest))..'; iPlateauWanted='..iPlateauWanted..'; tiCivilianBrainIndex='..reprs(tiCivilianBrainIndex)..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]..'; iSearchRange='..iSearchRange) end
+        if M27Utilities.IsTableEmpty(tUnitsOfInterest) then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            WaitTicks(10)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+            for iBrain, oBrain in toCivilianBrains do
+                local tCivilianUnits = oBrain:GetListOfUnits(iCategoriesOfInterest, false, true)
+                if M27Utilities.IsTableEmpty(tCivilianUnits) == false then
+                    for iUnit, oUnit in tCivilianUnits do
+                        table.insert(tUnitsOfInterest, oUnit)
+                    end
+                end
+            end
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': Is tUnitsOfInterest empty after checking getlist of units='..tostring(M27Utilities.IsTableEmpty(tUnitsOfInterest))) end
+        --toCivilianBrains
         if M27Utilities.IsTableEmpty(tUnitsOfInterest) == false then
             local iCurPlateau, bIsCivilianUnit, iCurUnitIndex
             for iUnit, oUnit in tUnitsOfInterest do

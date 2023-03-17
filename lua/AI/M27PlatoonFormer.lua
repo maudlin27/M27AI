@@ -233,7 +233,6 @@ function CombatPlatoonFormer(aiBrain)
     local tIndirectUnits = {}
     local iIndirectUnits = 0
     local tAmphibiousUnits = {}
-    if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat * categories.TECH3, aiBrain[reftoCombatUnitsWaitingForAssignment])) == false then bDebugMessages = true end
 
     if bDebugMessages == true then LOG(sFunctionRef..': About to check for indirect units at time='..GetGameTimeSeconds()..', aiBrain[M27Overseer.refbNeedIndirect]='..tostring(aiBrain[M27Overseer.refbNeedIndirect])..'; nearest threat='..(aiBrain[M27Overseer.refoNearestThreat].UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(aiBrain[M27Overseer.refoNearestThreat]) or 'nil')) end
     if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == false then
@@ -1711,7 +1710,6 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
     --DONT USE PROFILER HERE as need solution to the waitticks
     if bDebugMessages == true then LOG(sFunctionRef..': Start') end
 
-    if tNewUnits[1].UnitId == 'uel0303' and M27UnitInfo.GetUnitLifetimeCount(tNewUnits[1]) == 1 then bDebugMessages = true end
     if iDelayInTicks then
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(iDelayInTicks)
@@ -1729,7 +1727,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
         if bNotJustBuiltByFactory then
             --Make sure any shields are enabled
             for iUnit, oUnit in tNewUnits do
-                if oUnit.MyShield and oUnit.EnableShield and not(oUnit['M27ShRedy']) then --This is for e.g. if we have just captured a unit or been gifted a unit with a shield disabled
+                if oUnit.MyShield and oUnit.EnableShield and not(oUnit['M27ShRedy']) and M27UnitInfo.IsUnitValid(oUnit) then --This is for e.g. if we have just captured a unit or been gifted a unit with a shield disabled
                     M27UnitInfo.EnableUnitShield(oUnit)
                     oUnit['M27ShRedy'] = true
                 end

@@ -3675,30 +3675,29 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                     if bDebugMessages == true then LOG(sFunctionRef..': Are we far behidn on air and enemy has an air to ground threat? aiBrain[M27AirOverseer.refbFarBehindOnAir]='..tostring(aiBrain[M27AirOverseer.refbFarBehindOnAir] or false)..'; aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]='..(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 'nil')) end
 
                                     local bIgnoreRetreat = false
+                                    local iDistToBase = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                    local iAssistanceTargetDistToBase = M27Utilities.GetDistanceBetweenPositions(tEscortingPlatoonOrUnitPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
 
-                                    if aiBrain[M27AirOverseer.refbFarBehindOnAir] and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 200 then
-                                        --local tEnemyAirToGroundThreats = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout - M27UnitInfo.refCategoryAirAA, tEscortingPlatoonOrUnitPosition, math.max(30, oPlatoon[M27PlatoonTemplates.refiAirAttackRange]), 'Enemy')
-                                        --if M27Utilities.IsTableEmpty(tEnemyAirToGroundThreats) == false and M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirToGroundThreats, false, false, false, true, true, nil, nil, nil, nil, false) >= 350 then
-                                        --Want to help out even though we might die, so dont run away from the unit we're escorting
-                                        bIgnoreRetreat = true
+                                    if iDistFromAssistanceTarget <= 7 or iDistToBase < iAssistanceTargetDistToBase then
 
-                                    elseif aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 50 or aiBrain[M27AirOverseer.refbFarBehindOnAir] or aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 500 then
-                                        local tEnemyAirUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, tEscortingPlatoonOrUnitPosition, math.max(60, oPlatoon[M27PlatoonTemplates.refiAirAttackRange]), 'Enemy')
-                                        if M27Utilities.IsTableEmpty(tEnemyAirUnits) == false then -- and M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirToGroundThreats, false, false, false, true, true, nil, nil, nil, nil, false) >= 50 then
+                                        if aiBrain[M27AirOverseer.refbFarBehindOnAir] and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 200 then
+                                            --local tEnemyAirToGroundThreats = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout - M27UnitInfo.refCategoryAirAA, tEscortingPlatoonOrUnitPosition, math.max(30, oPlatoon[M27PlatoonTemplates.refiAirAttackRange]), 'Enemy')
+                                            --if M27Utilities.IsTableEmpty(tEnemyAirToGroundThreats) == false and M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirToGroundThreats, false, false, false, true, true, nil, nil, nil, nil, false) >= 350 then
                                             --Want to help out even though we might die, so dont run away from the unit we're escorting
                                             bIgnoreRetreat = true
+
+                                        elseif aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 50 or aiBrain[M27AirOverseer.refbFarBehindOnAir] or aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 500 then
+                                            local tEnemyAirUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, tEscortingPlatoonOrUnitPosition, math.max(60, oPlatoon[M27PlatoonTemplates.refiAirAttackRange]), 'Enemy')
+                                            if M27Utilities.IsTableEmpty(tEnemyAirUnits) == false then -- and M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirToGroundThreats, false, false, false, true, true, nil, nil, nil, nil, false) >= 50 then
+                                                --Want to help out even though we might die, so dont run away from the unit we're escorting
+                                                bIgnoreRetreat = true
+                                            end
                                         end
                                     end
                                     if bIgnoreRetreat then
-                                        if iDistFromAssistanceTarget > 4 then
-                                            --If there are dangerous ground units, then we only want to ignore the retreat if we are behind the unit we are assisting - approximate by checking if we are closer to our base
-                                            local iDistToBase = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                            local iAssistanceTargetDistToBase = M27Utilities.GetDistanceBetweenPositions(tEscortingPlatoonOrUnitPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                            if iDistToBase < iAssistanceTargetDistToBase then
-                                                oPlatoon[refiCurrentAction] = nil
-                                                bDontConsiderFurtherOrders = true
-                                            end
-                                        end
+                                        --If there are dangerous ground units, then we only want to ignore the retreat if we are behind the unit we are assisting - approximate by checking if we are closer to our base
+                                        oPlatoon[refiCurrentAction] = nil
+                                        bDontConsiderFurtherOrders = true
                                     end
                                 end
                             end
@@ -13124,7 +13123,7 @@ function ProcessPlatoonAction(oPlatoon)
                                     if oPlatoon[refiOverrideDistanceToReachDestination] == nil and oPlatoon[refoFrontUnit].GetBlueprint and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oPlatoon[refoFrontUnit].UnitId) then
                                         oPlatoon[refiOverrideDistanceToReachDestination] = math.max((oPlatoon[refoFrontUnit]:GetBlueprint().SizeX or 0), (oPlatoon[refoFrontUnit]:GetBlueprint().SizeZ or 0)) + 3 --(redundancy as set when platoon first created if there are builders in it)
                                     end
-                                    MoveNearConstruction(aiBrain, oBuilder, tBuildingPosition, oPlatoon[refoConstructionToAssist].UnitId, -oPlatoon[refiOverrideDistanceToReachDestination] - 1, false)
+                                    MoveNearConstruction(aiBrain, oBuilder, tBuildingPosition, oPlatoon[refoConstructionToAssist].UnitId, -(oPlatoon[refiOverrideDistanceToReachDestination] or 3) - 1, false)
                                 end
                                 if EntityCategoryContains(M27UnitInfo.refCategoryStructure + categories.EXPERIMENTAL, oPlatoon[refoConstructionToAssist].UnitId) and oPlatoon[refoConstructionToAssist]:GetFractionComplete() < 1 then
                                     IssueRepair({oBuilder}, oPlatoon[refoConstructionToAssist])

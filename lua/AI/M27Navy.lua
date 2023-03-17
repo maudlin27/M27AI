@@ -3902,7 +3902,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                     if bAllOutSubAttack and EntityCategoryContains(categories.SUBMERSIBLE + categories.AMPHIBIOUS - categories.HOVER, oClosestFriendlyUnitToEnemyBase.UnitId) then
                         local tSurfaceUnits
                         if M27Utilities.IsTableEmpty(tFriendlyNavalExcludingIntercept) == false then
-                            tSurfaceUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAllAmphibiousAndNavy - categories.SUBMIERSIBLE, tFriendlyNavalExcludingIntercept)
+                            tSurfaceUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAllAmphibiousAndNavy - categories.SUBMERSIBLE, tFriendlyNavalExcludingIntercept)
                             if M27Utilities.IsTableEmpty(tSurfaceUnits) == false then
                                 oRemainingUnitPriority = M27Utilities.GetNearestUnit(tSurfaceUnits, tEnemyBase)
                             else

@@ -1724,7 +1724,7 @@ function GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentAction
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetNearestEngineerWithLowerPriority'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if iCurrentActionPriority == 38 then bDebugMessages = true end
+    --if iCurrentActionPriority == 38 then bDebugMessages = true end
 
     local oNearestEngineer
     --local iActionExistingCount = 0
@@ -2400,7 +2400,6 @@ function IssueSpareEngineerAction(aiBrain, oEngineer, bNavalSpareAction)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IssueSpareEngineerAction'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
     --if oEngineer.UnitId == 'xsl0105' and M27UnitInfo.GetUnitLifetimeCount(oEngineer) == 4 and aiBrain:GetArmyIndex() == 3 and GetGameTimeSeconds() >= 1326 and GetGameTimeSeconds() <= 1327 then bDebugMessages = true end
 
 
