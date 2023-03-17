@@ -52,7 +52,7 @@ refActionBuildThirdPower = 20
 refActionBuildExperimental = 21
 refActionReclaimUnit = 22
 refActionBuildT3MexOverT2 = 23
-refActionUpgradeHQ = 24 --Assists an HQ with its upgrade
+refActionAssistHQUpgrade = 24 --Assists an HQ with its upgrade
 refActionReclaimTrees = 25
 refActionBuildT1Sonar = 26
 refActionBuildT2Sonar = 27
@@ -85,7 +85,8 @@ refActionBuildT3MexOnly = 53
 refActionAssistMexUpgrade = 54
 refActionSAMCreep = 55 --Intended to gradually expand SAM coverage for mexes
 refActionBuildMassFab = 56
-tiEngiActionsThatDontBuild = {refActionReclaimArea, refActionSpare, refActionNavalSpareAction, refActionHasNearbyEnemies, refActionReclaimUnit, refActionReclaimTrees, refActionUpgradeBuilding, refActionAssistSMD, refActionAssistTML, refActionAssistMexUpgrade, refActionAssistAirFactory, refActionAssistNavalFactory, refActionUpgradeHQ, refActionAssistNuke, refActionLoadOnTransport, refActionAssistShield}
+refActionCaptureCivilian = 57
+tiEngiActionsThatDontBuild = {refActionReclaimArea, refActionSpare, refActionNavalSpareAction, refActionHasNearbyEnemies, refActionReclaimUnit, refActionReclaimTrees, refActionUpgradeBuilding, refActionAssistSMD, refActionAssistTML, refActionAssistMexUpgrade, refActionAssistAirFactory, refActionAssistNavalFactory, refActionAssistHQUpgrade, refActionAssistNuke, refActionLoadOnTransport, refActionAssistShield, refActionCaptureCivilian}
 --NOTE: IF ADDING MORE ACTIONS, UPDATE THE ACTIONS IN THE POWER STALL MANAGER
 --ALSO update the actions noted in RefreshT3ArtiAdjacencyLocations as being ones that can ignore when deciding whether to clear existing engineer commands
 
@@ -1359,7 +1360,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                             bKeepBuilding = true
                         end
                     end
-                elseif oEngineer:IsUnitState('Reclaiming') then
+                elseif oEngineer:IsUnitState('Reclaiming') or oEngineer:IsUnitState('Capturing') then
                     bKeepBuilding = true
                 end
 
@@ -1435,17 +1436,24 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                                 bDontClearCommands = true
                             end
                         end
-                        if not(bDontClearCommands) and oEngineer:IsUnitState('Reclaiming') then
-                            if oEngineer.GetFocusUnit then
+                        if not(bDontClearCommands) then
+                            if oEngineer:IsUnitState('Reclaiming') then
+                                if oEngineer.GetFocusUnit then
+                                    local oCurTarget = oEngineer:GetFocusUnit()
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' has a cur target, is this valid='..tostring(M27UnitInfo.IsUnitValid(oCurTarget)))
+                                        if M27UnitInfo.IsUnitValid(oCurTarget) then LOG(sFunctionRef..': Cur target valid='..oCurTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCurTarget)..'; oReclaimTarget='..oReclaimTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oReclaimTarget)) end
+                                    end
+                                    if M27UnitInfo.IsUnitValid(oCurTarget) and oCurTarget == oReclaimTarget then
+                                        --Already reclaiming the target and it must be within build range since we already checked the distasnce just above, so dont clear orders
+                                        bDontClearCommands = true
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Are already targeting the unit in question') end
+                                    end
+                                end
+                            elseif oEngineer:IsUnitState('Capturing') and oEngineer.GetFocusUnit then
                                 local oCurTarget = oEngineer:GetFocusUnit()
-                                if bDebugMessages == true then LOG(sFunctionRef..': Engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' has a cur target, is this valid='..tostring(M27UnitInfo.IsUnitValid(oCurTarget)))
-                                    if M27UnitInfo.IsUnitValid(oCurTarget) then LOG(sFunctionRef..': Cur target valid='..oCurTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCurTarget)..'; oReclaimTarget='..oReclaimTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oReclaimTarget)) end
-                                end
-                                if M27UnitInfo.IsUnitValid(oCurTarget) and oCurTarget == oReclaimTarget then
-                                    --Already reclaiming the target and it must be within build range since we already checked the distasnce just above, so dont clear orders
-                                    bDontClearCommands = true
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Are already targeting the unit in question') end
-                                end
+                                local iWorkProgress = 0
+                                if oEngineer.GetWorkProgress then iWorkProgress = (oEngineer:GetWorkProgress() or 0) end
+                                if iWorkProgress >= 0.4 then bDontClearCommands = true end
                             end
                         end
                     end
@@ -1677,7 +1685,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
 
     --Enemy walls in range logic
     if bDebugMessages == true then LOG(sFunctionRef..': Just before checking for nearby walls. bAreNearbyEnemies='..tostring(bAreNearbyEnemies)..'; Enemy walls total count='..(M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyWalls] or 0)) end
-    if not(bAreNearbyEnemies) and (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyWalls] or 0) >= 9 and not(oEngineer:IsUnitState('Reclaiming')) then
+    if not(bAreNearbyEnemies) and (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyWalls] or 0) >= 9 and not(oEngineer:IsUnitState('Reclaiming')) and not(oEngineer:IsUnitState('Capturing')) then
         --Only consider if engineer is relatively far from base
         if M27Utilities.GetDistanceBetweenPositions(tEngPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 80 then
             local iBuildRange = oEngineer:GetBlueprint().Economy.MaxBuildDistance
@@ -1714,9 +1722,9 @@ function GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentAction
     --bGetInitialEngineer - if true then will just look for the first idle engineer, ignoring everything else
     --iMinTechLevelWanted - will ignore engis lower than this tech level
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-
     local sFunctionRef = 'GetNearestEngineerWithLowerPriority'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if iCurrentActionPriority == 38 then bDebugMessages = true end
 
     local oNearestEngineer
     --local iActionExistingCount = 0
@@ -1790,7 +1798,7 @@ end--]]
             if bDebugMessages == true then LOG(sFunctionRef..': Want engineers with min tech level='..iMinTechLevelWanted) end
         end
         if M27Utilities.IsTableEmpty(tEngineers) == false then
-            if bDebugMessages == true then LOG(sFunctionRef..': tEngineers size='..table.getn(tEngineers)) end
+            if bDebugMessages == true then LOG(sFunctionRef..': tEngineers size='..table.getn(tEngineers)..'; iMaxRangeForNearestEngi='..(iMaxRangeForNearestEngi or 'nil')) end
             for iEngineer, oEngineer in tEngineers do
                 if bDebugMessages == true then LOG(sFunctionRef..': Considering engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; UC='..GetEngineerUniqueCount(oEngineer)..'; Unit state='..M27Logic.GetUnitState(oEngineer)) end
                 if bGetInitialEngineer == true then
@@ -1859,7 +1867,6 @@ function DelayedSpareEngineerClearAction(aiBrain, oEngineer, iDelaySeconds)
     local sFunctionRef = 'DelayedSpareEngineerClearAction'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    local sFunctionRef = 'DelayedSpareEngineerClearAction'
     local iOrigAction = oEngineer[refiEngineerCurrentAction]
     if not(oEngineer[refbActiveDelayedTargetRechecker]) then
         oEngineer[refbActiveDelayedTargetRechecker] = true
@@ -2393,7 +2400,6 @@ function IssueSpareEngineerAction(aiBrain, oEngineer, bNavalSpareAction)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IssueSpareEngineerAction'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if GetEngineerUniqueCount(oEngineer) == 43 and GetGameTimeSeconds() >= 1320 and aiBrain:GetArmyIndex() == 6 then bDebugMessages = true end
     --if oEngineer.UnitId == 'xsl0105' and M27UnitInfo.GetUnitLifetimeCount(oEngineer) == 4 and aiBrain:GetArmyIndex() == 3 and GetGameTimeSeconds() >= 1326 and GetGameTimeSeconds() <= 1327 then bDebugMessages = true end
 
 
@@ -3430,7 +3436,13 @@ function GetEmergencyPDStartLocation(aiBrain)
         if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= 30 then
             tActionLocation = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
         else
-            local iDistTowardsEnemy = math.min(aiBrain[M27Overseer.refiModDistFromStartNearestThreat] - 30, aiBrain[M27Overseer.refiModDistFromStartNearestThreat] * 0.4, 50)
+            local iDistTowardsEnemy = math.min(aiBrain[M27Overseer.refiModDistFromStartNearestThreat] - 35, aiBrain[M27Overseer.refiModDistFromStartNearestThreat] * 0.4, 50)
+            if aiBrain[M27Overseer.refbEnemyGuncomApproachingBase] then
+                if aiBrain[M27Overseer.refiLastNearestACUDistance] <= 100 then iDistTowardsEnemy = math.min(iDistTowardsEnemy, 4)
+                else
+                    iDistTowardsEnemy = math.min(iDistTowardsEnemy, 15)
+                end
+            end
             tActionLocation = M27Utilities.MoveInDirection(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.reftLocationFromStartNearestThreat]), iDistTowardsEnemy, true)
 
             --Are we blocked by a cliff on this route?
@@ -4279,7 +4291,7 @@ function TrackWhenEngineerInBuildRange(oEngineer, tMoveNearTargetLocation, sBuil
             if bDebugMessages == true then LOG(sFunctionRef..': Start of loop. Is engineer valid='..tostring(M27UnitInfo.IsUnitValid(oEngineer)))
                 if M27UnitInfo.IsUnitValid(oEngineer) then LOG(sFunctionRef..': oEngineer[refiEngineerCurrentAction]='..(oEngineer[refiEngineerCurrentAction] or 'nil')..'; oEngineer[refiEngineerOrderCount]='..(oEngineer[refiEngineerOrderCount] or 'nil')..'; Engi unit state='..M27Logic.GetUnitState(oEngineer)) end
             end
-            if not(M27UnitInfo.IsUnitValid(oEngineer)) or not(oEngineer[refiEngineerCurrentAction]) or oEngineer[refiEngineerOrderCount] > iOrderRef or oEngineer:IsUnitState('Reclaiming') or oEngineer:IsUnitState('Building') or oEngineer:IsUnitState('Repairing') then
+            if not(M27UnitInfo.IsUnitValid(oEngineer)) or not(oEngineer[refiEngineerCurrentAction]) or oEngineer[refiEngineerOrderCount] > iOrderRef or oEngineer:IsUnitState('Reclaiming') or oEngineer:IsUnitState('Building') or oEngineer:IsUnitState('Repairing') or oEngineer:IsUnitState('Capturing') then
                 bKeepChecking = false
                 if bDebugMessages == true then LOG(sFunctionRef..': Engineer either no longer valid or current action is nil or order count dif to '..iOrderRef..' or engineer already actively reclaiming/building') end
                 break
@@ -5393,6 +5405,12 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
             local iMonkeyLC = M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryMonkeylord)
             if iMonkeyLC >= 2 or (iMonkeyLC == 1 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryMonkeylord) == 0) then iCategoryRef = refiExperimentalMegalith end
         end
+
+        --Novax override for UEF in place of gameender and T3 arti if we have no T3 arti or novax on our team
+        if (iCategoryRef == refiExperimentalT3Arti or iCategoryRef == refiExperimentalArti) and iFactionIndex == M27UnitInfo.refFactionUEF then
+            local iCurNovax = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryNovaxCentre)
+            if iCurNovax == 0 then iCategoryRef = refiExperimentalNovax end
+        end
     end
 
     --Are there unit restrictions? If so then make sure we can build the category
@@ -5544,11 +5562,13 @@ function GetCategoryToBuildFromAction(iActionToAssign, iMinTechLevel, aiBrain)
         iCategoryToBuild = M27UnitInfo.refCategoryT3Mex
     elseif iActionToAssign == refActionBuildMassFab then
         iCategoryToBuild = M27UnitInfo.refCategoryMassFab * categories.TECH2
+    elseif iActionToAssign == refActionCaptureCivilian then
+        iCategoryToBuild = nil
     else
         M27Utilities.ErrorHandler('Need to add code for action='..(iActionToAssign or 'nil'))
     end
-        if iMinTechLevel > 1 then
-        if iMinTechLevel == 3 then iCategoryToBuild = iCategoryToBuild * categories.TECH3 + iCategoryToBuild*categories.EXPERIMENTAL
+    if iMinTechLevel > 1 then
+    if iMinTechLevel == 3 then iCategoryToBuild = iCategoryToBuild * categories.TECH3 + iCategoryToBuild*categories.EXPERIMENTAL
     else iCategoryToBuild = iCategoryToBuild - categories.TECH1
         end
         end
@@ -5591,7 +5611,6 @@ function ReissueEngineerOldOrders(aiBrain, oEngineer, bClearActionsFirst)
     local sFunctionRef = 'ReissueEngineerOldOrders'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if GetEngineerUniqueCount(oEngineer) == 61 and GetGameTimeSeconds() >= 780 then bDebugMessages = true else bDebugMessages = false end
-
     if bClearActionsFirst then
         --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
 
@@ -5618,7 +5637,12 @@ function ReissueEngineerOldOrders(aiBrain, oEngineer, bClearActionsFirst)
                 if M27UnitInfo.IsUnitValid(tSubtable[refoObjectTarget]) then
                     --Was it to reclaim rather than assist?
                     if tSubtable[refiActionRef] == refActionReclaimUnit then
-                        IssueReclaim(tSubtable[refoObjectTarget])
+                        IssueReclaim({oEngineer}, tSubtable[refoObjectTarget])
+                    elseif tSubtable[refiActionRef] == refActionCaptureCivilian and not(EntityCategoryContains(categories.COMMAND + categories.SUBCOMMANDER + M27UnitInfo.refCategoryEngineer, tSubtable[refoObjectTarget])) and M27Logic.IsCivilianBrain(tSubtable[refoObjectTarget]:GetAIBrain()) then
+                        IssueCapture({oEngineer}, tSubtable[refoObjectTarget])
+                        --Dont increase capture attempt count
+                        --tSubtable[refoObjectTarget][M27UnitInfo.refiCaptureAttempts] = (tSubtable[refoObjectTarget][M27UnitInfo.refiCaptureAttempts] or 0) + 1
+                        if bDebugMessages == true then LOG(sFunctionRef..': Just issued a capture order for engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to capture '..tSubtable[refoObjectTarget].UnitId..M27UnitInfo.GetUnitLifetimeCount(tSubtable[refoObjectTarget])) end
                     else
                         --Engineer? then still assist
                         if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, tSubtable[refoObjectTarget].UnitId) then
@@ -6622,7 +6646,6 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
 
     local sFunctionRef = 'AssignActionToEngineer'
     M27Utilities.FunctionProfiler(sFunctionRef..iActionToAssign, M27Utilities.refProfilerStart)
-    --if (iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildThirdPower) then bDebugMessages = true end
     --if GetEngineerUniqueCount(oEngineer) == 12 then bDebugMessages = true end
     --if GetEngineerUniqueCount(oEngineer) == 61 and GetGameTimeSeconds() >= 660 then bDebugMessages = true end
     --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
@@ -6699,6 +6722,13 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                         if not(iActionToAssign == refActionReclaimArea) and not(iActionToAssign == refActionPlateauReclaim) and not(iActionToAssign == refActionReclaimTrees) and not((iActionToAssign == refActionBuildShield or iActionToAssign == refActionBuildSecondShield) and not(EntityCategoryContains(categories.MOBILE + M27UnitInfo.refCategoryFixedShield - M27UnitInfo.refCategoryExperimentalStructure, oActionTargetObject.UnitId))) then
                             if iActionToAssign == refActionReclaimUnit then
                                 IssueReclaim({oEngineer}, oActionTargetObject)
+                                --UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers, oUnitToBeDestroyed, iPrimaryEngineerCategoryBuilt)
+                                UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, nil, true, iConditionNumber, oActionTargetObject)
+                                bAreAssisting = true
+                            elseif iActionToAssign == refActionCaptureCivilian and not(EntityCategoryContains(categories.COMMAND + categories.SUBCOMMANDER + M27UnitInfo.refCategoryEngineer, oActionTargetObject)) and M27Logic.IsCivilianBrain(oActionTargetObject:GetAIBrain()) then
+                                IssueCapture({oEngineer}, oActionTargetObject)
+                                oActionTargetObject[M27UnitInfo.refiCaptureAttempts] = (oActionTargetObject[M27UnitInfo.refiCaptureAttempts] or 0) + 1
+                                if bDebugMessages == true then LOG(sFunctionRef..': Just issued a capture order for engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to capture '..oActionTargetObject.UnitId..M27UnitInfo.GetUnitLifetimeCount(oActionTargetObject)) end
                                 --UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers, oUnitToBeDestroyed, iPrimaryEngineerCategoryBuilt)
                                 UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, nil, true, iConditionNumber, oActionTargetObject)
                                 bAreAssisting = true
@@ -7416,8 +7446,8 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                         end
                                     end
                                 else
-                                    if iActionToAssign == refActionReclaimUnit then
-                                        M27Utilities.ErrorHandler('No reclaim unit logic activated so may be missing a valid target, will issue a spare action', true)
+                                    if iActionToAssign == refActionReclaimUnit or iActionToAssign == refActionCaptureCivilian then
+                                        M27Utilities.ErrorHandler('No reclaim unit logic activated so may be missing a valid target, will issue a spare action, iActionToAssign='..iActionToAssign, true)
                                     end
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': Nothing to build or reclaim, will issue spare action instead')
@@ -7433,7 +7463,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                     end
                 end
                 --Not a spare action - if upgrading a building then need to check if should reset after a short time period
-                if iActionToAssign == refActionUpgradeBuilding or iActionToAssign == refActionUpgradeHQ then
+                if iActionToAssign == refActionUpgradeBuilding or iActionToAssign == refActionAssistHQUpgrade then
                     ForkThread(UpgradeBuildingActionCompleteChecker, aiBrain, oEngineer, oActionTargetObject)
                 end
             end
@@ -7724,7 +7754,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     local sFunctionRef = 'GetActionTargetAndObject'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if GetGameTimeSeconds() >= 1560 and iActionRefToAssign == refActionBuildSecondShield then bDebugMessages = true end
+    --if iActionRefToAssign == refActionCaptureCivilian then bDebugMessages = true end
 
 
     local tLocationsToGoThrough = tExistingLocationsToPickFrom
@@ -7749,7 +7779,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, time='..GetGameTimeSeconds()..'. iActionRefToAssign='..iActionRefToAssign) end
 
     --Are we assisting a building?
-    if iActionRefToAssign == refActionUpgradeBuilding or iActionRefToAssign == refActionAssistSMD or iActionRefToAssign == refActionAssistTML or iActionRefToAssign == refActionAssistNuke or iActionRefToAssign == refActionAssistAirFactory or iActionRefToAssign == refActionAssistNavalFactory or iActionRefToAssign == refActionUpgradeHQ or iActionRefToAssign == refActionAssistShield or iActionRefToAssign == refActionAssistMexUpgrade then
+    if iActionRefToAssign == refActionUpgradeBuilding or iActionRefToAssign == refActionAssistSMD or iActionRefToAssign == refActionAssistTML or iActionRefToAssign == refActionAssistNuke or iActionRefToAssign == refActionAssistAirFactory or iActionRefToAssign == refActionAssistNavalFactory or iActionRefToAssign == refActionAssistHQUpgrade or iActionRefToAssign == refActionAssistShield or iActionRefToAssign == refActionAssistMexUpgrade then
         if oPresetActionTargetObject then
             oActionObject = oPresetActionTargetObject
             tActionLocation = oPresetActionTargetObject:GetPosition()
@@ -7780,7 +7810,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                 sUnitStateWanted = 'Building'
                 sAltUnitStateWanted = 'Upgrading'
                 iEnemySearchRange = 20
-            elseif iActionRefToAssign == refActionUpgradeHQ then
+            elseif iActionRefToAssign == refActionAssistHQUpgrade then
                 tAllBuildings = aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]
                 bIgnoreUnitState = true
                 iEnemySearchRange = 0
@@ -7907,6 +7937,14 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                     tActionLocation = oActionObject:GetPosition()
                 else oActionObject = nil
                 end
+            elseif iActionRefToAssign == refActionCaptureCivilian then--and M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][iActionRefToAssign]) then
+                --Dont want to assist existing engineers, as they dont actually assist with the capture; however capturing the same unit means they efefctively assist, i.e. 4 engineers each capturing the same unit will capture it 4x as fast as 1
+                oActionObject = M27Utilities.GetNearestUnit(aiBrain[M27EconomyOverseer.reftoCiviliansToCapture], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain, false, false)
+                if oActionObject.GetPosition then
+                    tActionLocation = oActionObject:GetPosition()
+                else oActionObject = nil
+                end
+
             elseif iActionRefToAssign == refActionReclaimTrees then
                 tActionLocation = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
             elseif iActionRefToAssign == refActionBuildT1Sonar or iActionRefToAssign == refActionBuildT2Sonar then
@@ -9589,7 +9627,7 @@ function ReleaseLowerPriorityEngineerIfHaveEmergency(aiBrain)
                 if M27Utilities.IsTableEmpty(tEngineers) == false then
                     for iEngineer, oEngineer in tEngineers do
                         if bDebugMessages == true then LOG(sFunctionRef..': Considering engineer '..GetEngineerUniqueCount(oEngineer)..'; Fraction complete='..oEngineer:GetFractionComplete()..'; Is primary builder='..tostring(oEngineer[refbPrimaryBuilder])..'; Engineer condition number='..(oEngineer[refiEngineerConditionNumber] or 'nil')..'; Engi dist to start='..M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; bWantT3Mex='..tostring(bWantT3Mex)..'; Engi cur action='..(oEngineer[refiEngineerCurrentAction] or 'nil')) end
-                        if oEngineer:GetFractionComplete() >= 1 and not(oEngineer[refbPrimaryBuilder]) and (oEngineer[refiEngineerConditionNumber] or 100) > iHighestConditionActive and M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 60 and (bWantT3Mex == false or not((oEngineer[refiEngineerCurrentAction] == refActionBuildT3MexOverT2 or oEngineer[refiEngineerCurrentAction] == refActionReclaimUnit or oEngineer[refiEngineerCurrentAction] == refActionReclaimArea or oEngineer[refiEngineerCurrentAction] == refActionBuildMex))) then
+                        if oEngineer:GetFractionComplete() >= 1 and not(oEngineer[refbPrimaryBuilder]) and (oEngineer[refiEngineerConditionNumber] or 100) > iHighestConditionActive and M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 60 and (bWantT3Mex == false or not((oEngineer[refiEngineerCurrentAction] == refActionBuildT3MexOverT2 or oEngineer[refiEngineerCurrentAction] == refActionReclaimUnit or oEngineer[refiEngineerCurrentAction] == refActionCaptureCivilian or oEngineer[refiEngineerCurrentAction] == refActionReclaimArea or oEngineer[refiEngineerCurrentAction] == refActionBuildMex))) then
                             iHighestConditionActive = (oEngineer[refiEngineerConditionNumber] or 100)
                             oHighestConditionEngineer = oEngineer
                             if bDebugMessages == true then LOG(sFunctionRef..': Setting oHighestConditionEngineer to engineer UC='..GetEngineerUniqueCount(oEngineer)..'; iHighestConditionActive='..iHighestConditionActive..'; Is engi valid='..tostring(M27UnitInfo.IsUnitValid(oEngineer))) end
@@ -9968,7 +10006,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             if not(tEngineersToReassign) and iCurGameTime - (oEngineer[refiTimeOfLastAssignment] or -100) <= 4 then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Less than 4s since last assignment so will treat engineer as busy, unless it has a big idle count and isnt busy moving, repairing, building or reclaiming') end
                                 bEngineerIsBusy = true
-                                if oEngineer[M27Logic.refiIdleCount] >= 20 and not(oEngineer:IsUnitState('Moving')) and not(oEngineer:IsUnitState('Reclaiming')) and not(oEngineer:IsUnitState('Building')) and not(oEngineer:IsUnitState('Repairing')) then
+                                if oEngineer[M27Logic.refiIdleCount] >= 20 and not(oEngineer:IsUnitState('Moving')) and not(oEngineer:IsUnitState('Reclaiming')) and not(oEngineer:IsUnitState('Capturing')) and not(oEngineer:IsUnitState('Building')) and not(oEngineer:IsUnitState('Repairing')) then
                                     if oEngineer[M27Navy.refiAssignedPond] then M27Navy.ReassignNavalEngineer(oEngineer)
                                     else
                                         IssueSpareEngineerAction(aiBrain, oEngineer)
@@ -10943,7 +10981,37 @@ end--]]
                                     end
                                 end
                             end
-                        elseif iCurrentConditionToTry == 10 then
+                        elseif iCurrentConditionToTry == 10 then --High priority factory HQ assist if need HQ urgently
+                            if bDebugMessages == true then LOG(sFunctionRef..': Brain='..aiBrain.Nickname..'; Time '..GetGameTimeSeconds()..'; Do we have empty table of HQ upgrade='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]))..'; bHaveVeryLowPower='..tostring(bHaveVeryLowPower)) end
+                            if not(bHaveVeryLowPower) and M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]) == false then
+
+                                --Do we have an approaching Guncom and lack T2? [Rush strategy]
+                                if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]='..aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]..'; aiBrain[M27Overseer.refbEnemyGuncomApproachingBase]='..tostring(aiBrain[M27Overseer.refbEnemyGuncomApproachingBase])) end
+                                if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 1 and aiBrain[M27Overseer.refbEnemyGuncomApproachingBase] then
+                                    --Double check al lthe units are still valid (as may be a slight delay)
+                                    local bStillValid = false
+                                    for iHQ, oHQ in aiBrain[M27EconomyOverseer.reftActiveHQUpgrades] do
+                                        if M27UnitInfo.IsUnitValid(oHQ) then
+                                            bStillValid = true
+                                            break
+                                        end
+                                    end
+                                    if not (bStillValid) then
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Clearing all of the active HQ upgrades')
+                                        end
+                                        aiBrain[M27EconomyOverseer.reftActiveHQUpgrades] = {}
+                                    else
+                                        iActionToAssign = refActionAssistHQUpgrade
+                                        iMaxEngisWanted = 1
+                                        if not(bHaveLowMass) or aiBrain:GetEconomyStored('MASS') > 0 or aiBrain[refiNetMassBaseIncome] > -0.5 then
+                                            iMaxEngisWanted = 4
+                                        end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Want to assist HQ upgrade as a high priority, iMaxEngisWanted='..iMaxEngisWanted) end
+                                    end
+                                end
+                            end
+                        elseif iCurrentConditionToTry == 11 then
                             --Low power builder
                             if bNearbyHydro == nil then
                                 bNearbyHydro, tNearbyHydro = M27Conditions.HydroNearACUAndBase(aiBrain, true, true)
@@ -10990,7 +11058,7 @@ end--]]
                                     iMaxEngisWanted = iMaxEngisWanted + 1
                                 end
                             end
-                        elseif iCurrentConditionToTry == 11 then
+                        elseif iCurrentConditionToTry == 12 then
                             --High priority energy storage
                             --Want to build energy storage if dont have any, and either have no ACU, or ACU is in combat and have high energy
                             if iEnergyStoredRatio == nil then
@@ -11019,7 +11087,7 @@ end--]]
                                     end
                                 end
                             end
-                        elseif iCurrentConditionToTry == 12 then
+                        elseif iCurrentConditionToTry == 13 then
                             --at least 5 factories including 1 air factory for the map if not mass stalling
                             if iMassStored == nil then
                                 iMassStored = aiBrain:GetEconomyStored('MASS')
@@ -11063,7 +11131,7 @@ end--]]
                             end
 
 
-                        elseif iCurrentConditionToTry == 13 then
+                        elseif iCurrentConditionToTry == 14 then
                             --Emergency AA when non-air threat near our base and we have no or little AA
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Considering if we want to build static AA as an emergency; aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]=' .. aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] .. '; aiBrain[M27AirOverseer.refiOurMassInAirAA]=' .. aiBrain[M27AirOverseer.refiOurMassInAirAA] .. '; aiBrain[M27AirOverseer.refiOurMassInMAA]=' .. aiBrain[M27AirOverseer.refiOurMassInMAA] .. '; iHighestFactoryOrEngineerTechAvailable=' .. iHighestFactoryOrEngineerTechAvailable)
@@ -11124,7 +11192,17 @@ end--]]
                                     if not(bHaveLowMass) and not(bHaveLowPower) then iMaxEngisWanted = 4 end
                                 end
                             end
-                        elseif iCurrentConditionToTry == 14 then
+                            --High priority precautionary sam if we have reached T3 and enemy has access to T3
+                            if not(iActionToAssign) and iHighestFactoryOrEngineerTechAvailable >= 3 and (aiBrain[M27Overseer.refiEnemyHighestTechLevel] >= 3 or aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1000) and (not(aiBrain[M27AirOverseer.refbHaveAirControl]) or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 10) then
+                                --Do we already have any SAM?
+                                if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryStructureAA * categories.TECH3) == 0 then
+                                    iActionToAssign = refActionBuildAA
+                                    iMinEngiTechLevelWanted = 3
+                                    iMaxEngisWanted = 1
+                                    if not(bHaveLowMass) and not(bHaveLowPower) then iMaxEngisWanted = 3 end
+                                end
+                            end
+                        elseif iCurrentConditionToTry == 15 then
                             --More factories when we have stored mass and fewer than the target level
                             if not (bHaveVeryLowPower) and aiBrain:GetEconomyStored('MASS') >= 25 then
                                 if iLandFactories == nil then
@@ -11166,7 +11244,7 @@ end--]]
                                     end
                                 end
                             end
-                        elseif iCurrentConditionToTry == 15 then --More power if have lots of mass and not much power
+                        elseif iCurrentConditionToTry == 16 then --More power if have lots of mass and not much power
                             if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.4 then
                                 iActionToAssign = refActionBuildPower
                                 iMaxEngisWanted = 4
@@ -11174,14 +11252,14 @@ end--]]
                                 if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] < 10 and bNearbyHydro then iActionToAssign = refActionBuildHydro end
 
                             end
-                        elseif iCurrentConditionToTry == 16 then
+                        elseif iCurrentConditionToTry == 17 then
                             if bWantMorePower and aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.7 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.25 and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 2.6 then
                                 iActionToAssign = refActionBuildSecondPower
                                 iMaxEngisWanted = 2
                                 if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 4 then iMaxEngisWanted = iMaxEngisWanted + 1 end
                                 if aiBrain:GetEconomyStoredRatio('MASS') >= 0.35 then iMaxEngisWanted = iMaxEngisWanted + 1 end
                             end
-                        elseif iCurrentConditionToTry == 17 then
+                        elseif iCurrentConditionToTry == 18 then
                             --Engis for transport
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Is table of transports waiting for engineers empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27Transport.reftTransportsWaitingForEngi])))
@@ -11193,14 +11271,14 @@ end--]]
                                     LOG(sFunctionRef .. ': Want action to load on transport, with iMaxEngisWanted=' .. iMaxEngisWanted)
                                 end
                             end
-                        elseif iCurrentConditionToTry == 18 then
+                        elseif iCurrentConditionToTry == 19 then
                             --second power if we already have quite a bit and are low
                             if aiBrain:GetEconomyStored('MASS') >= 50 and (bHaveLowPower or bHaveVeryLowPower) and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 18 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 3 then
                                 iActionToAssign = refActionBuildSecondPower
                                 iMaxEngisWanted = 2
                                 if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 3.4 and aiBrain:GetEconomyStored('MASS') >= 75 then iMaxEngisWanted = 3 if bHaveLowMass then iMaxEngisWanted = 4 end end
                             end
-                        elseif iCurrentConditionToTry == 19 then
+                        elseif iCurrentConditionToTry == 20 then
                             --More land factories if have lots of mass stored, regardless of the overall cap
                             if aiBrain:GetEconomyStored('MASS') >= 400 and not (bHaveLowPower) then
                                 if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildLandFactory]) == true then
@@ -11211,7 +11289,7 @@ end--]]
 
                                 iMaxEngisWanted = 3
                             end
-                        elseif iCurrentConditionToTry == 20 then
+                        elseif iCurrentConditionToTry == 21 then
                             --Unclaimed mexes within defender coverage
                             bThresholdInitialEngineerCondition = true
                             if iAllUnclaimedMexesInPathingGroup == nil then
@@ -11247,7 +11325,7 @@ end--]]
                                     iSearchRangeForNearestEngi = 10000
                                 end
                             end
-                        elseif iCurrentConditionToTry == 21 then
+                        elseif iCurrentConditionToTry == 22 then
                             --Have an engineer assisting a mex ugprade if we have any close to base
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Higher priority mex assist, bHaveVeryLowPower=' .. tostring(bHaveVeryLowPower) .. '; Mass stored=' .. aiBrain:GetEconomyStored('MASS'))
@@ -11288,7 +11366,7 @@ end--]]
                                     end
                                 end
                             end
-                        elseif iCurrentConditionToTry == 22 then
+                        elseif iCurrentConditionToTry == 23 then
                             --Hydro within our defence coverage?'
                             if iUnclaimedHydroWithinDefenceCoverage == nil then
                                 if tAllUnclaimedHydroInPathingGroup == nil then
@@ -11330,7 +11408,7 @@ end--]]
                                 end
                                 tExistingLocationsToPickFrom = tUnclaimedHydroWithinDefenceCoverage
                             end
-                        elseif iCurrentConditionToTry == 23 then
+                        elseif iCurrentConditionToTry == 24 then
                             --Higher priority air staging for if we have lots of air units wanting refueling
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Air staging condition, iCurrentConditionToTry=' .. iCurrentConditionToTry .. ': bHaveLowPower=' .. tostring(bHaveLowPower) .. '; aiBrain[M27AirOverseer.refiAirStagingWanted]=' .. (aiBrain[M27AirOverseer.refiAirStagingWanted] or 'nil'))
@@ -11350,7 +11428,7 @@ end--]]
                                 end
                             end
 
-                        elseif iCurrentConditionToTry == 24 then
+                        elseif iCurrentConditionToTry == 25 then
                             --Get reclaim
                             bThresholdPreReclaimEngineerCondition = true
 
@@ -11377,13 +11455,13 @@ end--]]
                                 end
                             end
 
-                        elseif iCurrentConditionToTry == 25 then
+                        elseif iCurrentConditionToTry == 26 then
                             if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftUnitsToReclaim]) == false and (iMassStoredRatio < 0.2 or (iMassStoredRatio < 0.5 and aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] < 0)) then
                                 iActionToAssign = refActionReclaimUnit
                                 iMaxEngisWanted = math.min(4, table.getn(aiBrain[M27EconomyOverseer.reftUnitsToReclaim]))
                                 iSearchRangeForNearestEngi = 200
                             end
-                        elseif iCurrentConditionToTry == 26 then
+                        elseif iCurrentConditionToTry == 27 then
                             --Try to get nearest unclaimed mex (i.e. this will only run if are no mexes within defensive area or our side of map):
                             if iAllUnclaimedMexesInPathingGroup == nil then
                                 tAllUnclaimedMexesInPathingGroup = GetUnclaimedMexes(aiBrain, sPathing, iPathingGroup, false, false, false)
@@ -11403,7 +11481,7 @@ end--]]
                                 end
                                 tExistingLocationsToPickFrom = tAllUnclaimedMexesInPathingGroup
                             end
-                        elseif iCurrentConditionToTry == 27 then
+                        elseif iCurrentConditionToTry == 28 then
                             --Radar near base
                             if bHaveLowPower == false and not (aiBrain[M27AirOverseer.refbHaveOmniVision]) then
                                 if iCurRadarCount == nil then
@@ -11414,14 +11492,14 @@ end--]]
                                     iMaxEngisWanted = 1
                                 end
                             end
-                        elseif iCurrentConditionToTry == 28 then
+                        elseif iCurrentConditionToTry == 29 then
                             --reclaim on enemy side of map
                             if iMassStoredRatio <= 0.25 and aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][2] + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][3] > 0 then
                                 iActionToAssign = refActionReclaimArea
                                 iMaxEngisWanted = math.min(15, math.max(1, math.min(math.ceil(aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] * 0.5 + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][2] * 0.3 + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][3] * 0.1))))
                                 iSearchRangeForNearestEngi = 10000
                             end
-                        elseif iCurrentConditionToTry == 29 then
+                        elseif iCurrentConditionToTry == 30 then
                             --More reclaim (lower priority locations)
                             if iMassStoredRatio == nil then
                                 iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS')
@@ -11445,14 +11523,14 @@ end--]]
                                 end
                             end
                             --SPARE ACTIONS BELOW
-                        elseif iCurrentConditionToTry == 30 then
+                        elseif iCurrentConditionToTry == 31 then
                             if bHaveVeryLowPower == false and bHaveLowMass == false and bWantMorePower then
 
                                 iActionToAssign = refActionBuildSecondPower
                                 iSearchRangeForNearestEngi = 100
                                 iMaxEngisWanted = 4
                             end
-                        elseif iCurrentConditionToTry == 31 then
+                        elseif iCurrentConditionToTry == 32 then
                             --If about to overflow mass then build a second factory unless we arent using existing factories
                             if bHaveLowMass == false and bHaveLowPower == false and iMassStoredRatio >= 0.7 and aiBrain:GetEconomyStored('MASS') >= 2000 and aiBrain:GetEconomyStored('ENERGY') >= 0.99 and aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] == 0 then
                                 if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
@@ -11598,9 +11676,9 @@ end--]]
                         --Emergency PD and (if turtling) firebase fortification; also emergency T2 Arti
                         --Dont want to get this too early even if threats detected, so require at least 15 mass income per tick
                         if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Considering if we want emergency PD or Arti. Gross mass income=' .. aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] .. '; bHaveLowPower=' .. tostring(bHaveLowPower) .. '; Gross energy income=' .. aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] .. '; Is table of existing engineers assigned to build PD empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildEmergencyPD])) .. '; Land segment group of nearest enemy=' .. M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) .. '; Land segment group of base=' .. M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
+                            LOG(sFunctionRef .. ': Considering if we want emergency PD or Arti; tiAvailableEngineersByTech[2]='..tiAvailableEngineersByTech[2]..'. Gross mass income=' .. aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] .. '; bHaveLowPower=' .. tostring(bHaveLowPower) .. '; Gross energy income=' .. aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] .. '; Is table of existing engineers assigned to build PD empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildEmergencyPD])) .. '; Land segment group of nearest enemy=' .. M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) .. '; Land segment group of base=' .. M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
                         end
-                        if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 1.5 and (not (bHaveLowPower) or aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 65) then
+                        if aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 1.5 and ((not (bHaveLowPower) or (not(bHaveVeryLowPower) and (aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 40 or (aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 20 and aiBrain[M27Overseer.refbEnemyGuncomApproachingBase])))) or aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 65) then
                             --Are there nearby threats to our base that are land pathable, or have we already started constructing an emergency PD?
                             if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildEmergencyPD]) == false then
                                 --Already building so want to assign lots of engineers
@@ -11683,7 +11761,7 @@ end--]]
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Can we path to nearest land threat=' .. tostring(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])))
                                 end
-                                if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
+                                if aiBrain[M27Overseer.refbEnemyGuncomApproachingBase] or M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
                                     local iSearchRange
                                     local iThreatRatio
                                     local iMassKilledToCost = aiBrain[refiMassKilledByPD] / aiBrain[refiMassSpentOnPD]
@@ -11736,7 +11814,7 @@ end--]]
                                         LOG(sFunctionRef .. ': Can path by land to closest enemy. Mod distance from start of threat=' .. aiBrain[M27Overseer.refiModDistFromStartNearestThreat] .. '; SearchRange=' .. iSearchRange .. '; iThreatRatio=' .. iThreatRatio .. '; aiBrain[M27AirOverseer.refiBomberDefenceModDistance]=' .. aiBrain[M27AirOverseer.refiBomberDefenceModDistance] .. '; aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]=' .. aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance] .. '; iMinPDWanted=' .. iMinPDWanted .. '; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]=' .. aiBrain[M27Overseer.refiModDistFromStartNearestThreat])
                                     end
 
-                                    if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= iSearchRange then
+                                    if aiBrain[M27Overseer.refbEnemyGuncomApproachingBase] or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= iSearchRange then
                                         tExistingLocationsToPickFrom = {}
                                         tExistingLocationsToPickFrom[1] = GetEmergencyPDStartLocation(aiBrain)
                                         --Rect: Small X-Z; Large X-Z
@@ -11781,7 +11859,7 @@ end--]]
                                             if bDebugMessages == true then
                                                 LOG(sFunctionRef .. ': iThreatOfPD=' .. iThreatOfPD .. '; iEnemyThreat=' .. iEnemyThreat .. '; iHighestFactoryOrEngineerTechAvailable=' .. iHighestFactoryOrEngineerTechAvailable .. '; iThreatRatio=' .. iThreatRatio .. '; aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome])
                                             end
-                                            if iEnemyThreat > 15 and (iThreatOfPD + 188 < iEnemyThreat / iThreatRatio or (iThreatOfPD <= 400 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 7)) then
+                                            if (aiBrain[M27Overseer.refbEnemyGuncomApproachingBase] and iExistingPD < 3) or (iEnemyThreat > 15 and (iThreatOfPD + 188 < iEnemyThreat / iThreatRatio or (iThreatOfPD <= 400 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 7))) then
                                                 if iHighestFactoryOrEngineerTechAvailable >= 2 or M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.INDIRECTFIRE, tEnemyMobileGround)) then
                                                     iActionToAssign = refActionBuildEmergencyPD
                                                     iMaxEngisWanted = math.min(math.ceil(aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]), 6)
@@ -12241,7 +12319,38 @@ end--]]
                                 if aiBrain:GetEconomyStoredRatio('MASS') >= 0.6 then iMaxEngisWanted = 2 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 12 then
+                    elseif iCurrentConditionToTry == 13 then --High priority factory HQ assist if need HQ urgently
+                        if bDebugMessages == true then LOG(sFunctionRef..': Brain='..aiBrain.Nickname..'; Time '..GetGameTimeSeconds()..'; Do we have empty table of HQ upgrade='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]))..'; bHaveVeryLowPower='..tostring(bHaveVeryLowPower)) end
+                        if not(bHaveVeryLowPower) and M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]) == false then
+
+                            --Do we have an approaching Guncom and lack T2? [normal strategy]
+                            if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]='..aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]..'; aiBrain[M27Overseer.refbEnemyGuncomApproachingBase]='..tostring(aiBrain[M27Overseer.refbEnemyGuncomApproachingBase])) end
+                            if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 1 and aiBrain[M27Overseer.refbEnemyGuncomApproachingBase] then
+                                --Double check al lthe units are still valid (as may be a slight delay)
+                                local bStillValid = false
+                                for iHQ, oHQ in aiBrain[M27EconomyOverseer.reftActiveHQUpgrades] do
+                                    if M27UnitInfo.IsUnitValid(oHQ) then
+                                        bStillValid = true
+                                        break
+                                    end
+                                end
+                                if not (bStillValid) then
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. ': Clearing all of the active HQ upgrades')
+                                    end
+                                    aiBrain[M27EconomyOverseer.reftActiveHQUpgrades] = {}
+                                else
+                                    iActionToAssign = refActionAssistHQUpgrade
+                                    iMaxEngisWanted = 1
+                                    if not(bHaveLowMass) or aiBrain:GetEconomyStored('MASS') > 0 or aiBrain[refiNetMassBaseIncome] > -0.5 then
+                                        iMaxEngisWanted = 3
+                                        if not(bHaveLowMass) then iMaxEngisWanted = 5 end
+                                    end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Want to assist HQ upgrade as a high priority, iMaxEngisWanted='..iMaxEngisWanted) end
+                                end
+                            end
+                        end
+                    elseif iCurrentConditionToTry == 14 then
                         --If engi tech level >1 then want to build power if have none >= that tech level
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': About to check if we have any power of current tech level')
@@ -12312,7 +12421,7 @@ end--]]
                                 iMaxEngisWanted = math.min(8, math.max(iExistingEngineersAssigned + 1))
                             end
                         end
-                    elseif iCurrentConditionToTry == 13 then
+                    elseif iCurrentConditionToTry == 15 then
                         --Naval threat near our base - assist air factory
                         if aiBrain[M27Overseer.refbT2NavyNearOurBase] then
                             if iAirFactories == nil then
@@ -12343,7 +12452,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 14 then
+                    elseif iCurrentConditionToTry == 16 then
                         if not((aiBrain[M27Overseer.refbDefendAgainstArti] or aiBrain[M27Overseer.refbPrioritiseExperimental])) or not(bHaveLowMass) then
                             --Land factories (or early game potentially air) when are getting close to overflowing mass and dont have that many, or early game on a smallish map
                             if iLandFactories == nil then
@@ -12385,7 +12494,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 15 then
+                    elseif iCurrentConditionToTry == 17 then
                         --Non-early game want 1 engi getting unclaimed mexes as a higher priority
                         if iGameTime >= 360 then
                             --6 mins
@@ -12421,7 +12530,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 16 then
+                    elseif iCurrentConditionToTry == 18 then
                         --Low power action part 1; also T3 power adjacency logic (as want this built as high priority  ahead of normal power)
                         local tT3Arti = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti - categories.MOBILE, false, false)
                         if M27Utilities.IsTableEmpty(tT3Arti) == false then
@@ -12544,7 +12653,7 @@ end--]]
                         if iActionToAssign and iMaxEngisWanted >= 5 and (aiBrain[M27Overseer.refbDefendAgainstArti] or aiBrain[M27Overseer.refbPrioritiseExperimental]) and bHaveLowMass and not(bHaveVeryLowPower) then
                             iMaxEngisWanted = 4
                         end
-                    elseif iCurrentConditionToTry == 17 then
+                    elseif iCurrentConditionToTry == 19 then
                         --High priority energy storage
                         --Want to build energy storage if dont have any, and either have no ACU, or ACU is in combat and have high energy
                         if iEnergyStoredRatio == nil then
@@ -12577,7 +12686,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 18 then
+                    elseif iCurrentConditionToTry == 20 then
                         --Are we turtling? If so then consider fortifying the firebase as a high priority
                         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 4 and (not(aiBrain[M27Overseer.refbDefendAgainstArti] or aiBrain[M27Overseer.refbPrioritiseExperimental]) or not(bHaveLowMass)) then
                             RefreshListOfFirebases(aiBrain)
@@ -12608,7 +12717,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 19 then
+                    elseif iCurrentConditionToTry == 21 then
                         --Initial land factories (high priority with low resource conditions)
                         if iLandFactories == nil then
                             iLandFactories = aiBrain:GetCurrentUnits(refCategoryLandFactory)
@@ -12650,7 +12759,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 20 then
+                    elseif iCurrentConditionToTry == 22 then
                         --SMD
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Checking if need to build SMD; iHighestFactoryOrEngineerTechAvailable=' .. iHighestFactoryOrEngineerTechAvailable .. '; M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers])=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers])) .. '; will still build if no SMLs if we have good economy')
@@ -12872,7 +12981,7 @@ end--]]
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Finsihed considering if want to build or assist SMD. iActionToAssign=' .. (iActionToAssign or 'nil'))
                         end
-                    elseif iCurrentConditionToTry == 21 then
+                    elseif iCurrentConditionToTry == 23 then
                         --Emergency AA when non-air threat near our base and we have no or little AA
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Considering if we want to build static AA as an emergency; aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]=' .. aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] .. '; aiBrain[M27AirOverseer.refiOurMassInAirAA]=' .. aiBrain[M27AirOverseer.refiOurMassInAirAA] .. '; aiBrain[M27AirOverseer.refiOurMassInMAA]=' .. aiBrain[M27AirOverseer.refiOurMassInMAA] .. '; iHighestFactoryOrEngineerTechAvailable=' .. iHighestFactoryOrEngineerTechAvailable)
@@ -12882,13 +12991,13 @@ end--]]
                             local tNearbyStructureAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructureAA, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 90, 'Ally')
                             local bBuildAA = false
                             if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Is table of nearby AA empty=' .. tostring(M27Utilities.IsTableEmpty(tNearbyStructureAA)))
+                                LOG(sFunctionRef .. ': High priority ground AA builder, Is table of nearby AA empty=' .. tostring(M27Utilities.IsTableEmpty(tNearbyStructureAA)))
                             end
                             if M27Utilities.IsTableEmpty(tNearbyStructureAA) then
                                 bBuildAA = true
                             else
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Checking if have high enoguh engi tech level for AA level wanted. iHighestFactoryOrEngineerTechAvailable=' .. iHighestFactoryOrEngineerTechAvailable .. '; tiAvailableEngineersByTech=' .. repru(tiAvailableEngineersByTech))
+                                    LOG(sFunctionRef .. ': Checking if have high enoguh engi tech level for AA level wanted. iHighestFactoryOrEngineerTechAvailable=' .. iHighestFactoryOrEngineerTechAvailable .. '; tiAvailableEngineersByTech=' .. repru(tiAvailableEngineersByTech)..'; aiBrain[M27AirOverseer.refbHaveAirControl]='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl]))
                                 end
                                 --Do we have AirAA for our current tech level and have an engineer of this level available?
 
@@ -12914,6 +13023,17 @@ end--]]
                                             iStructureFactor = iStructureFactor + 0.5
                                         end
                                     end
+                                    --If enemy has signifcant air to ground threat nearby then build more AA structure than normal
+                                    if aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 700 then
+                                        local tNearbyEnemyAirToGround = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout - M27UnitInfo.refCategoryAirAA, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 90, 'Enemy')
+                                        if M27Utilities.IsTableEmpty(tNearbyEnemyAirToGround) == false then
+                                            iStructureFactor = iStructureFactor * 0.8
+                                            if bDebugMessages == true then LOG(sFunctionRef..': enemy has air to ground threat nearby of '..M27Logic.GetAirThreatLevel(aiBrain, tNearbyEnemyAirToGround, false, false, false, true, false)) end
+                                            if M27Logic.GetAirThreatLevel(aiBrain, tNearbyEnemyAirToGround, false, false, false, true, false) >= 300 then
+                                                iStructureFactor = iStructureFactor * 0.8
+                                            end
+                                        end
+                                    end
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': iStructureAAThreat=' .. iStructureAAThreat .. '; aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]=' .. aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] .. '; aiBrain[M27AirOverseer.refiEnemyAirAAThreat]=' .. aiBrain[M27AirOverseer.refiEnemyAirAAThreat] .. '; iStructureFactor=' .. iStructureFactor)
                                     end
@@ -12929,7 +13049,7 @@ end--]]
                                 iMaxEngisWanted = 4
                             end
                         end
-                    elseif iCurrentConditionToTry == 22 then
+                    elseif iCurrentConditionToTry == 24 then
                         --Omni to protect from cloaked ACU/SACU, or if have ok resources and either enemy has large air threat or we are Sera/Aeon with skirmishers needing intel
                         if iHighestFactoryOrEngineerTechAvailable >= 3 and (aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] >= 350 or aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 1000) and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 5 and not (aiBrain[M27AirOverseer.refbHaveOmniVision]) then
                             --Want if enemy has cloaked ACU
@@ -12959,6 +13079,14 @@ end--]]
                                             end
                                         end
                                     end
+                                    if not(bWantEmergencyOmni) and not(bHaveLowPower) and M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]) == false then
+                                        local tAvailableT3Bombers = EntityCategoryFilterDown(categories.TECH3, aiBrain[M27AirOverseer.reftAvailableBombers])
+
+                                        if M27Utilities.IsTableEmpty(tAvailableT3Bombers) == false then
+                                            local iAvailableT3Bombers = table.getn(tAvailableT3Bombers)
+                                            if iAvailableT3Bombers >= 3 and (iAvailableT3Bombers >= 5 or aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] > 225) then bWantEmergencyOmni = true end --likely if we have t3 bombers that we are limited on targets by intel
+                                        end
+                                    end
                                 end
                             end
                             if bWantEmergencyOmni then
@@ -12974,7 +13102,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 23 then
+                    elseif iCurrentConditionToTry == 25 then
                         --Assist air to help defend against enemy experimental attack
                         --Careful if changing range condition to also change the ReleaseLowerPriorityEngineerIfHaveEmergency function's threshold
                         if bDebugMessages == true then
@@ -12991,7 +13119,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 24 then --High priority factory builder for if we are at risk of overflowing mass soon
+                    elseif iCurrentConditionToTry == 26 then --High priority factory builder for if we are at risk of overflowing mass soon
                         if iHighestFactoryOrEngineerTechAvailable >= 2 and not(bHaveLowMass) and not(bHaveVeryLowPower) then
                             if iAirFactories == nil then
                                 iAirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory)
@@ -13046,7 +13174,7 @@ end--]]
                             end
                         end
 
-                    elseif iCurrentConditionToTry == 25 then
+                    elseif iCurrentConditionToTry == 27 then
                         --Backup power - build 2nd power if have very low power and first pgen isnt constructing
                         if bHaveVeryLowPower and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 500 and not (bHaveLowMass) then
                             --Have at least 2 T3 PGens equivalent so build more power if our primary engineer for building power isnt constructing (e.g. if are trying to build power around t3 arti this can happen)
@@ -13067,7 +13195,7 @@ end--]]
                                 iMaxEngisWanted = 5
                             end
                         end
-                    elseif iCurrentConditionToTry == 26 then
+                    elseif iCurrentConditionToTry == 28 then
                         --Assist air fac if ACU needs protecting, or has taken recent torpedo damage and is underwater, or we have enemies near our base
                         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU or (aiBrain[M27AirOverseer.refiAirAANeeded] < 1 and (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= math.min(150, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4) and (not(aiBrain[M27Overseer.refbDefendAgainstArti]) or not(bHaveLowMass) or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= 110))) then
                             if iAirFactories == nil then
@@ -13091,7 +13219,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 27 then
+                    elseif iCurrentConditionToTry == 29 then
                         --Shield if needed for SML/SMD/T3 Arti as high priority
                         if bDebugMessages == true then LOG(sFunctionRef..': Deciding if want to consider building fixed shield; bHaveVeryLowPower='..tostring(bHaveVeryLowPower)..'; aiBrain[M27Overseer.refbDefendAgainstArti]='..tostring(aiBrain[M27Overseer.refbDefendAgainstArti] or false)..'; bHaveLowPower='..tostring(bHaveLowPower)..'; Mass stored='..aiBrain:GetEconomyStored('MASS')) end
                         if not (bHaveVeryLowPower) and (aiBrain[M27Overseer.refbDefendAgainstArti] or (not (bHaveLowPower) and aiBrain:GetEconomyStored('MASS') > 0)) then
@@ -13130,7 +13258,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 28 then
+                    elseif iCurrentConditionToTry == 30 then
                         --Assist shields to defend against arti
                         if not (bHaveLowPower) and aiBrain[M27Overseer.refbDefendAgainstArti] then
                             RecordPriorityShields(aiBrain)
@@ -13172,7 +13300,7 @@ end--]]
 
                             end
                         end
-                    elseif iCurrentConditionToTry == 29 then
+                    elseif iCurrentConditionToTry == 31 then
                         --Shield for T2 arti if are turtling or have multiple T2 arti
                         if (not(aiBrain[M27Overseer.refbDefendAgainstArti]) or not(bHaveLowMass)) and not (bHaveLowPower) and ((aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 6 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT2Arti) >= 2) then
                             RefreshUnitsWantingFixedShields(aiBrain)
@@ -13188,7 +13316,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 30 then
+                    elseif iCurrentConditionToTry == 32 then
                         --Initial engi for experimental (to reduce risk we spend a while looking for somewhere to build)
                         if iMassStoredRatio == nil then
                             iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS')
@@ -13208,7 +13336,7 @@ end--]]
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Finished deciding if we want to build an experimental. iActionToAssign=' .. (iActionToAssign or 'nil') .. '; aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] .. '; Is table of engis already assigned to build experimental empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildExperimental])) .. '; iMassStoredRatio=' .. iMassStoredRatio .. '; iMaxEngisWanted=' .. (iMaxEngisWanted or 'nil'))
                         end
-                    elseif iCurrentConditionToTry == 31 then
+                    elseif iCurrentConditionToTry == 33 then
                         --Land factories when are almost overflowing mass, or will about to have a massive income boost from mexes that we are upgrading
                         if (not(aiBrain[M27Overseer.refbDefendAgainstArti]  or aiBrain[M27Overseer.refbPrioritiseExperimental]) or not(bHaveLowMass)) and iEngineersWantedPreReset >= 5 and not (bHaveVeryLowPower) and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 20 and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] >= 3 and ((aiBrain[M27EconomyOverseer.refiMexesUpgrading] >= 6 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.1) or (not (bHaveLowMass) and aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > 0 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.5)) then
                             local iExistingT3LandFactories = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * categories.TECH3)
@@ -13218,7 +13346,7 @@ end--]]
                                 iMaxEngisWanted = 2
                             end
                         end
-                    elseif iCurrentConditionToTry == 32 then
+                    elseif iCurrentConditionToTry == 34 then
                         --Engis for transport
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Is table of transports waiting for engineers empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27Transport.reftTransportsWaitingForEngi])))
@@ -13230,7 +13358,7 @@ end--]]
                                 LOG(sFunctionRef .. ': Want action to load on transport, with iMaxEngisWanted=' .. iMaxEngisWanted)
                             end
                         end
-                    elseif iCurrentConditionToTry == 33 then
+                    elseif iCurrentConditionToTry == 35 then
                         --Naval factory
                         --Does enemy have a naval threat on a pond of danger to us?
 
@@ -13385,7 +13513,7 @@ end--]]
                             end
                         end
 
-                    elseif iCurrentConditionToTry == 34 then
+                    elseif iCurrentConditionToTry == 36 then
                         --Nuke assist
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Checking if have a nuke that want to assist; aiBrain[M27EconomyOverseer.refbStallingEnergy]=' .. tostring(aiBrain[M27EconomyOverseer.refbStallingEnergy]) .. '; Number of SMLs=' .. aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySML) .. '; iHighestFactoryOrEngineerTechAvailable=' .. iHighestFactoryOrEngineerTechAvailable .. '; aiBrain[M27EconomyOverseer.refbReclaimNukes]=' .. tostring((aiBrain[M27EconomyOverseer.refbReclaimNukes] or false)))
@@ -13422,7 +13550,7 @@ end--]]
                         end
 
 
-                    elseif iCurrentConditionToTry == 35 then
+                    elseif iCurrentConditionToTry == 37 then
                         --Very high priority air staging for if we have none and have gunships
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Air staging condition, iCurrentConditionToTry=' .. iCurrentConditionToTry .. ': bHaveLowPower=' .. tostring(bHaveLowPower) .. '; aiBrain[M27AirOverseer.refiAirStagingWanted]=' .. (aiBrain[M27AirOverseer.refiAirStagingWanted] or 'nil') .. '; Current air staging=' .. aiBrain:GetCurrentUnits(refCategoryAirStaging))
@@ -13447,7 +13575,43 @@ end--]]
 
                         --..................................................--
                         --END OF INITIAL ENGINEER BUILD ORDER
-                    elseif iCurrentConditionToTry == 36 then
+                    elseif iCurrentConditionToTry == 38 then
+                        if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; Time='..GetGameTimeSeconds()..'; Available engineers by tec='..repru(tiAvailableEngineersByTech)..'; available T1 engis='..tiAvailableEngineersByTech[1]..'; Is table of capturable civilians empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftoCiviliansToCapture]))..'; bHaveVeryLowPower='..tostring(bHaveVeryLowPower)..'; Gross energy base income='..aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]..'; aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]='..aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]) end
+                        if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] <= 1 and GetGameTimeSeconds() <= 600 and M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftoCiviliansToCapture]) == false and not(bHaveVeryLowPower) and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 15 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Is table of existing assignments to capture civilian empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionCaptureCivilian]))) end
+                            if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionCaptureCivilian]) == false then
+                                iActionToAssign = refActionCaptureCivilian
+                            else
+                                --Refresh list of units in case any have had failed capture attempts
+                                local tUnitsToRemove = {}
+                                for iUnit, oUnit in aiBrain[M27EconomyOverseer.reftoCiviliansToCapture] do
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Refreshing table, oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oUnit[M27UnitInfo.refiCaptureAttempts]='..(oUnit[M27UnitInfo.refiCaptureAttempts] or 'nil')..'; Is unit valid='..tostring(M27UnitInfo.IsUnitValid(oUnit))) end
+                                    if (oUnit[M27UnitInfo.refiCaptureAttempts] or 0) > 4 or not(M27UnitInfo.IsUnitValid(oUnit)) then
+                                        table.insert(tUnitsToRemove, oUnit)
+                                    end
+                                end
+                                if M27Utilities.IsTableEmpty(tUnitsToRemove) == false then
+                                    for iUnitToRemove, oUnitToRemove in tUnitsToRemove do
+                                        for iUnit, oUnit in aiBrain[M27EconomyOverseer.reftoCiviliansToCapture] do
+                                            if oUnit == oUnitToRemove then
+                                                table.remove(aiBrain[M27EconomyOverseer.reftoCiviliansToCapture], iUnit)
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Finished refreshing civilians to capture, is table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftoCiviliansToCapture]))) end
+                                if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftoCiviliansToCapture]) == false then
+                                    iActionToAssign = refActionCaptureCivilian
+                                end
+
+                            end
+                            if iActionToAssign then
+                                iMaxEngisWanted = math.min(4, math.max(1, (aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] - 15) / 3))
+                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Finished considering if want to capture civilians, iActionToAssign='..(iActionToAssign or 'nil')..'; iMaxEngisWanted='..(iMaxEngisWanted or 'nil')) end
+                        end
+                    elseif iCurrentConditionToTry == 39 then
                         --Unclaimed mexes within defender coverage
 
                         bThresholdInitialEngineerCondition = true
@@ -13508,7 +13672,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 37 then
+                    elseif iCurrentConditionToTry == 40 then
                         --T1/T2 radar if enemy may have significant air threat or high tech units, and radar if we have skirmishers needing better intel
                         if bHaveLowPower == false and not (aiBrain[M27AirOverseer.refbHaveOmniVision]) then
                             if iCurRadarCount == nil then
@@ -13549,7 +13713,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 38 then
+                    elseif iCurrentConditionToTry == 41 then
                         --Extra TMD by existing TMD if enemy has significant missile threat
                         --Does the enemy have a significant missile threat?
                         if (not(aiBrain[M27Overseer.refbDefendAgainstArti]) or not(bHaveLowMass)) and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
@@ -13638,7 +13802,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 39 then
+                    elseif iCurrentConditionToTry == 42 then
                         --If are rebuilding a mex or have a T3 mex under construction then treat as a high priority if getting low on mass (since want to complete it to get more mass)
                         if not (bHaveVeryLowPower) then
                             if bDebugMessages == true then
@@ -13679,7 +13843,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 40 then
+                    elseif iCurrentConditionToTry == 43 then
                         --Have an engineer assisting a mex ugprade if we have any close to base (note - copy this with v.few changes later on as lower priority for more engis to assist)
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Higher priority mex assist, bHaveVeryLowPower=' .. tostring(bHaveVeryLowPower) .. '; Mass stored=' .. aiBrain:GetEconomyStored('MASS'))
@@ -13722,7 +13886,7 @@ end--]]
                         end
 
 
-                    elseif iCurrentConditionToTry == 41 then
+                    elseif iCurrentConditionToTry == 44 then
                         --More engineers for navy if are behind
                         local iPondWanted = M27Navy.GetPondToFocusOn(aiBrain)
                         if iPondWanted and (not(aiBrain[M27Overseer.refbDefendAgainstArti]) or not(bHaveLowMass)) and M27Team.tTeamData[aiBrain.M27Team][M27Team.refbHaveNavalShortfall][iPondWanted] then
@@ -13800,7 +13964,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 42 then --Second air fac builder if are very behind on air
+                    elseif iCurrentConditionToTry == 45 then --Second air fac builder if are very behind on air
                         if bDebugMessages == true then LOG(sFunctionRef..': Second air fac builder if far behind on air; bHaveVeryLowPower='..tostring(bHaveVeryLowPower)..'; refbFarBehindOnAir='..tostring(aiBrain[M27AirOverseer.refbFarBehindOnAir])..'; Energy%='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; Gross mass='..aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]..'; Stored mass='..aiBrain:GetEconomyStored('MASS')..'; bHaveLowMass='..tostring(bHaveLowMass)) end
                         if (not(aiBrain[M27Overseer.refbDefendAgainstArti] or aiBrain[M27Overseer.refbPrioritiseExperimental]) or not(bHaveLowMass)) and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 and not(bHaveVeryLowPower) and aiBrain[M27AirOverseer.refbFarBehindOnAir] and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.95 and (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 15 or aiBrain:GetEconomyStored('MASS') >= 1500 or not(bHaveLowMass)) then
                             local iT3AirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory * categories.TECH3)
@@ -13832,7 +13996,7 @@ end--]]
                             end
                         end
 
-                    elseif iCurrentConditionToTry == 43 then
+                    elseif iCurrentConditionToTry == 46 then
                         --High priority experimental builders, for if enemy has land experimental or t3 arti, or (UEF specific) sniper bots
                         if aiBrain[M27Overseer.refbDefendAgainstArti] and iHighestFactoryOrEngineerTechAvailable >= 3 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 4 and not (bHaveVeryLowPower) then
                             if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildExperimental]) or (aiBrain[refiLastExperimentalReference] == refiExperimentalArti or aiBrain[refiLastExperimentalReference] == refiExperimentalT3Arti) then
@@ -13868,7 +14032,7 @@ end--]]
                             iMinEngiTechLevelWanted = 3
                         end
 
-                    elseif iCurrentConditionToTry == 44 then
+                    elseif iCurrentConditionToTry == 47 then
                         --Hive near firebase T3 shield that has reclaim nearby
                         if (not(aiBrain[M27Overseer.refbDefendAgainstArti]) or not(bHaveLowMass)) and M27Utilities.IsTableEmpty(aiBrain[reftShieldsWantingHives]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.CYBRAN - categories.TECH1, tIdleEngineers)) == false then
                             RefreshShieldsWantingHives(aiBrain)
@@ -13907,7 +14071,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 45 then
+                    elseif iCurrentConditionToTry == 48 then
                         --Quantum gateway single engineer builder if lots of mass
                         if (not(aiBrain[M27Overseer.refbDefendAgainstArti] or aiBrain[M27Overseer.refbPrioritiseExperimental]) or not(bHaveLowMass)) and aiBrain:GetEconomyStoredRatio('ENERGY') == 1 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 25 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryExperimentalLevel) >= 2 then
                             local iCurrentQuantumGateways = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryQuantumGateway)
@@ -13920,7 +14084,7 @@ end--]]
                             end
                         end
 
-                    elseif iCurrentConditionToTry == 46 then
+                    elseif iCurrentConditionToTry == 49 then
                         --Hydro within our defence coverage?'
                         if (not(aiBrain[M27Overseer.refbDefendAgainstArti] or aiBrain[M27Overseer.refbPrioritiseExperimental]) or not(bHaveLowMass)) and aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] <= 100 then
                             if iUnclaimedHydroWithinDefenceCoverage == nil then
@@ -13964,7 +14128,7 @@ end--]]
                                 tExistingLocationsToPickFrom = tUnclaimedHydroWithinDefenceCoverage
                             end
                         end
-                    elseif iCurrentConditionToTry == 47 then
+                    elseif iCurrentConditionToTry == 50 then
                         --Static AA due to losing air control even if no nearby air threats
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Considering if we want to build static AA; aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]=' .. aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] .. '; aiBrain[M27AirOverseer.refiOurMassInAirAA]=' .. aiBrain[M27AirOverseer.refiOurMassInAirAA] .. '; aiBrain[M27AirOverseer.refiOurMassInMAA]=' .. aiBrain[M27AirOverseer.refiOurMassInMAA] .. '; iHighestFactoryOrEngineerTechAvailable=' .. iHighestFactoryOrEngineerTechAvailable)
@@ -13997,7 +14161,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 48 then
+                    elseif iCurrentConditionToTry == 51 then
                         --Lower power action part 2 - want enough power to support guncom
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': 2nd low power action; bHaveLowPower=' .. tostring(bHaveLowPower) .. '; bWantMorePower=' .. tostring(bWantMorePower) .. '; bHaveLowMass=' .. tostring(bHaveLowMass))
@@ -14035,7 +14199,7 @@ end--]]
                                 LOG(sFunctionRef .. ': 2nd low power action: Want to build power; iAllEngineers=' .. iAllEngineers .. '; iMaxEngisWanted=' .. iMaxEngisWanted)
                             end
                         end
-                    elseif iCurrentConditionToTry == 49 then
+                    elseif iCurrentConditionToTry == 52 then
                         --Mass storage around T2/T3 mexes
                         if bHaveLowPower == false and M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftMassStorageLocations]) == false and iNetCurEnergyIncome > 8 then
                             --Unit cap if getting near limit
@@ -14080,7 +14244,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 50 then --mass fabs
+                    elseif iCurrentConditionToTry == 53 then --mass fabs
                         if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 500 and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] >= 50 and not(bHaveVeryLowPower) and aiBrain:GetEconomyStoredRatio('MASS') <= 0.3 and M27Utilities.IsTableEmpty(aiBrain[reftMassStorageWantingMassFab]) == false and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > (iMassFabMaxDistFromBase + 60) then
                             --Are all our nearby mexes T3?
                             local tMexesNearStart = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMex, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMassFabMaxDistFromBase, 'Ally')
@@ -14102,7 +14266,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 51 then
+                    elseif iCurrentConditionToTry == 54 then
                         --TML if think enough targets
                         --if iHighestFactoryOrEngineerTechAvailable >= 2 and tiAvailableEngineersByTech[2] > 0 then bDebugMessages = true end
                         if bDebugMessages == true then
@@ -14177,7 +14341,7 @@ end--]]
                             end
 
                         end
-                    elseif iCurrentConditionToTry == 52 then
+                    elseif iCurrentConditionToTry == 55 then
                         --Higher priority air staging for if we have lots of air units wanting refueling
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Air staging condition, iCurrentConditionToTry=' .. iCurrentConditionToTry .. ': bHaveLowPower=' .. tostring(bHaveLowPower) .. '; aiBrain[M27AirOverseer.refiAirStagingWanted]=' .. (aiBrain[M27AirOverseer.refiAirStagingWanted] or 'nil'))
@@ -14196,7 +14360,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 53 then
+                    elseif iCurrentConditionToTry == 56 then
                         --Fortify firebase
                         --if tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
                         if bDebugMessages == true then
@@ -14309,7 +14473,7 @@ end--]]
                                 iMaxEngisWanted = 2
                             end
                         end
-                    elseif iCurrentConditionToTry == 54 then
+                    elseif iCurrentConditionToTry == 57 then
                         --Assist mex upgrade if are upgrading a mex near our base
                         if not (bHaveVeryLowPower) then
                             --Do we have a mex near base that is being upgraded?
@@ -14355,7 +14519,7 @@ end--]]
                             end
                         end
 
-                    elseif iCurrentConditionToTry == 55 then
+                    elseif iCurrentConditionToTry == 58 then
                         --T3 mexes in place of existing T2 mexes if not assisting a mex upgrade near our base (or have very good mass income)
                         if iHighestFactoryOrEngineerTechAvailable >= 3 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 5 and (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 12 or aiBrain:GetEconomyStored('MASS') >= 3000 or M27Utilities.IsTableEmpty(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionAssistMexUpgrade]))) then
                             if bDebugMessages == true then
@@ -14432,7 +14596,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 56 then
+                    elseif iCurrentConditionToTry == 59 then
                         --Make sure we have at least 2 T3 land factories if we have significant mass and want more engineers
                         if (not(aiBrain[M27Overseer.refbDefendAgainstArti] or aiBrain[M27Overseer.refbPrioritiseExperimental]) or not(bHaveLowMass)) and iEngineersWantedPreReset >= 5 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 15 and aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > 0 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.25 and not (bHaveVeryLowPower) and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 3 then
                             local iExistingT3LandFactories = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * categories.TECH3)
@@ -14442,7 +14606,7 @@ end--]]
                                 iMaxEngisWanted = 5
                             end
                         end
-                    elseif iCurrentConditionToTry == 57 then --SAM creep
+                    elseif iCurrentConditionToTry == 60 then --SAM creep
                         if iHighestTechLevelEngi >= 3 and aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 9 and (aiBrain[M27AirOverseer.refbFarBehindOnAir] or aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 30 or (aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] >= 20 and not(aiBrain[M27AirOverseer.refbHaveAirControl]))) then
                             RefreshAreasToCoverWithAA(aiBrain)
                             if M27Utilities.IsTableEmpty(aiBrain[reftoMexesWantingAACoverage]) == false and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryStructureAA * categories.TECH3) <= 40 then
@@ -14457,7 +14621,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 58 then
+                    elseif iCurrentConditionToTry == 61 then
                         --Queue up an experimental if we have significant mass as it may take time to find the right position
                         if iMassStored == nil then
                             iMassStored = aiBrain:GetEconomyStored('MASS')
@@ -14477,7 +14641,7 @@ end--]]
                                 iMinEngiTechLevelWanted = 3
                             end
                         end
-                    elseif iCurrentConditionToTry == 59 then
+                    elseif iCurrentConditionToTry == 62 then
                         --Build factories (or upgrade HQ) if getting too much mass
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': iCurrentConditionToTry=' .. iCurrentConditionToTry .. '; bHaveVeryLowPower=' .. tostring(bHaveVeryLowPower) .. '; Have air control=' .. tostring(aiBrain[M27AirOverseer.refbHaveAirControl]) .. '; aiBrain[M27AirOverseer.refiAirAANeeded]=' .. (aiBrain[M27AirOverseer.refiAirAANeeded] or 'nil') .. '; AirAAWanted=' .. (aiBrain[M27AirOverseer.refiAirAAWanted] or 'nil') .. '; Air factory cap=' .. (aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] or 'nil') .. '; Have low mass=' .. tostring(bHaveLowMass))
@@ -14515,7 +14679,7 @@ end--]]
                                         end
                                         aiBrain[M27EconomyOverseer.reftActiveHQUpgrades] = {}
                                     else
-                                        iActionToAssign = refActionUpgradeHQ
+                                        iActionToAssign = refActionAssistHQUpgrade
                                     end
                                 end
                                 if not (iActionToAssign) then
@@ -14601,7 +14765,7 @@ end--]]
                             end
 
                         end
-                    elseif iCurrentConditionToTry == 60 then
+                    elseif iCurrentConditionToTry == 63 then
                         --Air staging if we need one for low fuel air units
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': iCurrentConditionToTry=' .. iCurrentConditionToTry .. ': bHaveLowPower=' .. tostring(bHaveLowPower) .. '; aiBrain[M27AirOverseer.refiAirStagingWanted]=' .. (aiBrain[M27AirOverseer.refiAirStagingWanted] or 'nil'))
@@ -14625,7 +14789,7 @@ end--]]
                             end
                         end
                         --end
-                    elseif iCurrentConditionToTry == 61 then
+                    elseif iCurrentConditionToTry == 64 then
                         --Energy storage once have certain level of power
                         if (not(aiBrain[M27Overseer.refbDefendAgainstArti] or aiBrain[M27Overseer.refbPrioritiseExperimental]) or not(bHaveLowMass)) and bHaveLowPower == false then
                             if iGrossCurEnergyIncome >= 28 and (aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] or iGrossCurEnergyIncome >= 100) then
@@ -14668,7 +14832,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 62 then
+                    elseif iCurrentConditionToTry == 65 then
                         --Get reclaim
                         bThresholdPreReclaimEngineerCondition = true
 
@@ -14695,13 +14859,13 @@ end--]]
                             end
                         end
 
-                    elseif iCurrentConditionToTry == 63 then --Reclaim obsolete units
+                    elseif iCurrentConditionToTry == 66 then --Reclaim obsolete units
                         if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftUnitsToReclaim]) == false and (iMassStoredRatio < 0.2 or (iMassStoredRatio < 0.5 and aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] < 0)) then
                             iActionToAssign = refActionReclaimUnit
                             iMaxEngisWanted = math.min(4, table.getn(aiBrain[M27EconomyOverseer.reftUnitsToReclaim]))
                             iSearchRangeForNearestEngi = 200
                         end
-                    elseif iCurrentConditionToTry == 64 then
+                    elseif iCurrentConditionToTry == 67 then
                         --Try to get nearest unclaimed mex (i.e. this will only run if are no mexes within defensive area or our side of map):
                         if iAllUnclaimedMexesInPathingGroup == nil then
                             tAllUnclaimedMexesInPathingGroup = GetUnclaimedMexes(aiBrain, sPathing, iPathingGroup, false, false, false)
@@ -14721,7 +14885,7 @@ end--]]
                             end
                             tExistingLocationsToPickFrom = tAllUnclaimedMexesInPathingGroup
                         end
-                    elseif iCurrentConditionToTry == 65 then
+                    elseif iCurrentConditionToTry == 68 then
                         --2nd T1 power construction with low priority engineers
                         if bHaveVeryLowPower == false and bHaveLowMass == false then
                             --If almost power stalling then want to focus on the first T1 power rather than trying multiple at once
@@ -14754,7 +14918,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 66 then
+                    elseif iCurrentConditionToTry == 69 then
                         --Radar near base
                         if bHaveLowPower == false and not (aiBrain[M27AirOverseer.refbHaveOmniVision]) then
                             if iCurRadarCount == nil then
@@ -14835,7 +14999,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 67 then
+                    elseif iCurrentConditionToTry == 70 then
                         --Shields
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Lower priority shield builder. bHaveLowPower=' .. tostring(bHaveLowPower) .. '; bHaveLowMass=' .. tostring(bHaveLowMass) .. '; aiBrain[M27Overseer.refbDefendAgainstArti]=' .. tostring(aiBrain[M27Overseer.refbDefendAgainstArti]) .. '; aiBrain[refbHaveUnitsWantingHeavyShield]=' .. tostring(aiBrain[refbHaveUnitsWantingHeavyShield]) .. '; iHighestFactoryOrEngineerTechAvailable=' .. iHighestFactoryOrEngineerTechAvailable .. '; Table of units wanting fixed shield is empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftUnitsWantingFixedShield])))
@@ -14857,14 +15021,14 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 68 then
+                    elseif iCurrentConditionToTry == 71 then
                         --reclaim on enemy side of map
                         if iMassStoredRatio <= 0.25 and aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][2] + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][3] > 0 then
                             iActionToAssign = refActionReclaimArea
                             iMaxEngisWanted = math.min(15, math.max(1, math.min(math.ceil(aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] * 0.5 + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][2] * 0.3 + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][3] * 0.1))))
                             iSearchRangeForNearestEngi = 10000
                         end
-                    elseif iCurrentConditionToTry == 69 then
+                    elseif iCurrentConditionToTry == 72 then
                         --Assist air
                         if (not(aiBrain[M27Overseer.refbDefendAgainstArti] or aiBrain[M27Overseer.refbPrioritiseExperimental]) or not(bHaveLowMass)) and bHaveLowPower == false and aiBrain:GetEconomyStoredRatio('Energy') >= 0.99 and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] >= 15 then
                             if iAirFactories == nil then
@@ -14930,7 +15094,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 70 then
+                    elseif iCurrentConditionToTry == 73 then
                         --More reclaim (lower priority locations)
                         if iMassStoredRatio == nil then
                             iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS')
@@ -14953,7 +15117,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 71 then
+                    elseif iCurrentConditionToTry == 74 then
                         --Quantum gateway
                         --if tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
                         if bDebugMessages == true then
@@ -14974,7 +15138,7 @@ end--]]
                             end
                         end
 
-                    elseif iCurrentConditionToTry == 72 then
+                    elseif iCurrentConditionToTry == 75 then
                         --Quantum optics
                         --if tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
                         if bDebugMessages == true then
@@ -14991,7 +15155,7 @@ end--]]
                                 iMinEngiTechLevelWanted = 3
                             end
                         end
-                    elseif iCurrentConditionToTry == 73 then
+                    elseif iCurrentConditionToTry == 76 then
                         --Hives
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Considering if we want to build a hive. Energy stored ratio=' .. aiBrain:GetEconomyStoredRatio('ENERGY') .. '; Net base income=' .. aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] .. '; gross mass income=' .. aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] .. '; Economy stored ratio mass=' .. aiBrain:GetEconomyStoredRatio('MASS') .. '; have low mass=' .. tostring(M27Conditions.HaveLowMass(aiBrain)) .. '; is table of idle engineers empty=' .. tostring(M27Utilities.IsTableEmpty(tIdleEngineers)) .. '; aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome])
@@ -15010,7 +15174,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 74 then
+                    elseif iCurrentConditionToTry == 77 then
                         --Experimental if have loads of mass or satisfy other tests; one of these will be if we ahve already started on an experimental
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Will consider building experimental if lots of mass or other tests. iHighestFactoryOrEngineerTechAvailable=' .. iHighestFactoryOrEngineerTechAvailable .. ';  Mass stored=' .. aiBrain:GetEconomyStored('MASS') .. '; aiBrain[M27Overseer.refiAIBrainCurrentStrategy]=' .. aiBrain[M27Overseer.refiAIBrainCurrentStrategy] .. '; Mass%=' .. aiBrain:GetEconomyStoredRatio('MASS') .. '; aiBrain[M27EconomyOverseer.refiNetMassBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] .. '; bHaveLowPower=' .. tostring(bHaveLowPower) .. '; aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome]=' .. aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] .. '; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]=' .. aiBrain[M27Overseer.refiModDistFromStartNearestThreat] .. '; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.35=' .. aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35 .. '; T3 lifetime buildcount=' .. M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryLandCombat * categories.TECH3) .. '; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.3=' .. aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.3 .. '; Do we already have an active action to build an experimental=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildExperimental])) .. '; Is it safe to build an experimental=' .. tostring(SafeToBuildExperimental(aiBrain)))
@@ -15072,7 +15236,7 @@ end--]]
                         end
 
                         --SPARE ACTIONS BELOW
-                    elseif iCurrentConditionToTry == 75 then
+                    elseif iCurrentConditionToTry == 78 then
                         if bHaveVeryLowPower == false and bHaveLowMass == false then
                             if bWantMorePower then
                                 if iHighestFactoryOrEngineerTechAvailable == 1 then
@@ -15128,7 +15292,7 @@ end--]]
                             end
                         end
 
-                    elseif iCurrentConditionToTry == 76 then
+                    elseif iCurrentConditionToTry == 79 then
                         if bHaveLowMass == false and bHaveLowPower == false then
                             if iMassStoredRatio == nil then
                                 iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS')
@@ -15143,13 +15307,13 @@ end--]]
                                 iMaxEngisWanted = 10
                             end
                         end
-                    elseif iCurrentConditionToTry == 77 then
+                    elseif iCurrentConditionToTry == 80 then
                         if bHaveLowMass == false and iHighestFactoryOrEngineerTechAvailable == 1 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
                             iActionToAssign = refActionBuildThirdPower
                             iMaxEngisWanted = 4
                             iSearchRangeForNearestEngi = 150
                         end
-                    elseif iCurrentConditionToTry == 78 then
+                    elseif iCurrentConditionToTry == 81 then
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': About to decide if want to build an experimental (or in some cases a factory) if have lots of mass. bHaveLowMass=' .. tostring(bHaveLowMass) .. '; bHaveLowPower=' .. tostring(bHaveLowPower) .. '; iMassStoredRatio=' .. iMassStoredRatio .. '; iMassStored=' .. iMassStored)
                         end
@@ -15191,7 +15355,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 79 then
+                    elseif iCurrentConditionToTry == 82 then
                         --If about to overflow mass then build a second factory unless we arent using existing factories
                         if bHaveLowMass == false and bHaveLowPower == false and iMassStoredRatio >= 0.7 and aiBrain:GetEconomyStored('MASS') >= 2000 and aiBrain:GetEconomyStored('ENERGY') >= 0.99 and aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] == 0 then
                             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
@@ -15215,7 +15379,7 @@ end--]]
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 80 then
+                    elseif iCurrentConditionToTry == 83 then
                         --Have a SAM by any fixed shield we own
                         if (not(aiBrain[M27Overseer.refbDefendAgainstArti]) or not(bHaveLowMass)) and aiBrain[M27AirOverseer.refbHaveAirControl] == false and aiBrain:GetEconomyStored('MASS') > 0 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 1 and iHighestFactoryOrEngineerTechAvailable >= 3 and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAirAA * categories.TECH3) >= 5 then
                             local tFixedShields = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryFixedShield, false, true)
@@ -15249,7 +15413,7 @@ end--]]
                     else
                         bAreOnSpareActions = true
                         iSearchRangeForNearestEngi = 200
-                        if iCurrentConditionToTry == 81 then
+                        if iCurrentConditionToTry == 84 then
                             --Start building a second experimental if we look like we might overflow mass, or have a very high mass income
                             if bHaveLowMass == false and bHaveLowPower == false and M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildExperimental]) == false then
                                 local bAlreadyBuildingFirstExperimental = false
@@ -15484,6 +15648,8 @@ end--]]
                                     --GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentActionPriority, tCurrentActionTarget, iActionRefToGetExistingCount, tsUnitStatesToIgnore, iMaxRangeForPrevEngi)
                                     if iActionToAssign == refActionBuildTMD or iActionToAssign == refActionBuildSecondTMD then
                                         iSearchRangeForNearestEngi = math.max(iSearchRangeForNearestEngi, M27Utilities.GetDistanceBetweenPositions(tActionTargetLocation, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) + 10)
+                                    elseif iActionToAssign == refActionCaptureCivilian and tActionTargetLocation then
+                                        iSearchRangeForNearestEngi = math.max(iSearchRangeForNearestEngi, M27Utilities.GetDistanceBetweenPositions(tActionTargetLocation, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) + 10)
                                     end
                                     if oEngineerToAssign == nil and bHaveEngisOfCurrentOrHigherTech then
                                         oEngineerToAssign = GetNearestEngineerWithLowerPriority(aiBrain, tIdleEngineers, iCurrentConditionToTry, (tActionTargetLocation or oActionTargetObject:GetPosition()), iActionToAssign, tsUnitStatesToIgnoreCurrent, iSearchRangeForPrevEngi, iSearchRangeForNearestEngi, bOnlyReassignIdle, bGetInitialEngineer, iMinEngiTechLevelWanted)
@@ -15714,7 +15880,6 @@ function DelayedEngiReassignment(aiBrain, bOnlyReassignIdle, tEngineersToReassig
     if M27Logic.iTimeOfLastBrainAllDefeated < 10 then
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': Reassigning ' .. table.getn(tEngineersToReassign) .. 'engineers')
-            --M27Utilities.ErrorHandler('Full audit trail of reassignengineer call', true)
         end
         for iEngi, oEngi in tRevisedEngisToReassign do
             oEngi[refbAlreadyReassigning] = false

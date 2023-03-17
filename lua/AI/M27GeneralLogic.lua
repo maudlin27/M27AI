@@ -2456,7 +2456,7 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsUnitIdle'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-
+    --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'url01053' then bDebugMessages = true end
 
     local bIsIdle
     local iIdleCountThreshold = 1 --Number of times the unit must have been idle to trigger (its increased by 1 this cycle, so 1 effectively means no previous times)
@@ -2538,6 +2538,9 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
             bIsIdle = false
         elseif oUnit:IsUnitState('Reclaiming') then
             if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Reclaiming') end
+            bIsIdle = false
+        elseif oUnit:IsUnitState('Capturing') then
+            if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Capturing') end
             bIsIdle = false
         else
             iIdleCountThreshold = 2 --i.e. need to have been idle at least this-1 times before
@@ -4041,85 +4044,87 @@ function IsShotBlocked(oFiringUnit, oTargetUnit)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsShotBlocked'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-
-
-    local oBPFiringUnit = oFiringUnit:GetBlueprint()
-    local bShotIsBlocked = false
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
-    local tShotStartPosition = GetDirectFireWeaponPosition(oFiringUnit)
-    if tShotStartPosition then
-        if bDebugMessages == true then LOG(sFunctionRef..': tShotStartPosition='..repru(tShotStartPosition)) end
-        if tShotStartPosition[2] <= 0 then bShotIsBlocked = true
-        else
-            local tShotEndPosition = {}
-            local oBPTargetUnit = oTargetUnit:GetBlueprint()
-            local iLowestHeight = 1000
-            local iHighestHeight = -1000
-            local sLowestBone, sHighestBone
-            local tTargetUnitDefaultPosition = oTargetUnit:GetPosition()
-            --Work out where the shot is targetting - not all units will have a bone specified in the AI section, in which case just get the unit position
-            if oBPTargetUnit.AI and oBPTargetUnit.AI.TargetBones then
-                if bDebugMessages == true then LOG(sFunctionRef..': Have targetbones in the targetunit blueprint; repr='..repru(oBPTargetUnit.AI.TargetBones)) end
-                --Is the target higher or lower than the shooter? If higher, want the lowest target bone; if lower, want the highest target bone
-                for iBone, sBone in oBPTargetUnit.AI.TargetBones do
-                    if oTargetUnit:IsValidBone(sBone) == true then
-                        tShotEndPosition = oTargetUnit:GetPosition(sBone)
-                        if bDebugMessages == true then LOG(sFunctionRef..' Getting position for sBone='..sBone..'; position='..repru(tShotEndPosition)) end
-                        if tShotEndPosition[2] < iLowestHeight then
-                            iLowestHeight = tShotEndPosition[2]
-                            sLowestBone = sBone
-                        end
-                        if tShotEndPosition[2] > iHighestHeight then
-                            iHighestHeight = tShotEndPosition[2]
-                            sHighestBone = sBone
+    local bShotIsBlocked = false
+    if not(oTargetUnit.GetBlueprint) then bShotIsBlocked = false else
+
+        local oBPFiringUnit = oFiringUnit:GetBlueprint()
+
+        local tShotStartPosition = GetDirectFireWeaponPosition(oFiringUnit)
+        if tShotStartPosition then
+            if bDebugMessages == true then LOG(sFunctionRef..': tShotStartPosition='..repru(tShotStartPosition)) end
+            if tShotStartPosition[2] <= 0 then bShotIsBlocked = true
+            else
+                local tShotEndPosition = {}
+                local oBPTargetUnit = oTargetUnit:GetBlueprint()
+                local iLowestHeight = 1000
+                local iHighestHeight = -1000
+                local sLowestBone, sHighestBone
+                local tTargetUnitDefaultPosition = oTargetUnit:GetPosition()
+                --Work out where the shot is targetting - not all units will have a bone specified in the AI section, in which case just get the unit position
+                if oBPTargetUnit.AI and oBPTargetUnit.AI.TargetBones then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have targetbones in the targetunit blueprint; repr='..repru(oBPTargetUnit.AI.TargetBones)) end
+                    --Is the target higher or lower than the shooter? If higher, want the lowest target bone; if lower, want the highest target bone
+                    for iBone, sBone in oBPTargetUnit.AI.TargetBones do
+                        if oTargetUnit:IsValidBone(sBone) == true then
+                            tShotEndPosition = oTargetUnit:GetPosition(sBone)
+                            if bDebugMessages == true then LOG(sFunctionRef..' Getting position for sBone='..sBone..'; position='..repru(tShotEndPosition)) end
+                            if tShotEndPosition[2] < iLowestHeight then
+                                iLowestHeight = tShotEndPosition[2]
+                                sLowestBone = sBone
+                            end
+                            if tShotEndPosition[2] > iHighestHeight then
+                                iHighestHeight = tShotEndPosition[2]
+                                sHighestBone = sBone
+                            end
                         end
                     end
-                end
-                --Try alternative approach:
-                if sHighestBone == nil and oTargetUnit.GetBoneCount then
-                    local iBoneCount = oTargetUnit:GetBoneCount()
-                    local sBone
-                    if iBoneCount > 0 then
-                        for iCurBone = 0, iBoneCount - 1 do
-                            sBone = oTargetUnit:GetBoneName(iCurBone)
-                            if sBone then
-                                if oTargetUnit:IsValidBone(sBone) == true then
-                                    tShotEndPosition = oTargetUnit:GetPosition(sBone)
-                                    if bDebugMessages == true then LOG(sFunctionRef..' Getting position for sBone='..sBone..'; position='..repru(tShotEndPosition)) end
-                                    if tShotEndPosition[2] < iLowestHeight then
-                                        iLowestHeight = tShotEndPosition[2]
-                                        sLowestBone = sBone
-                                    end
-                                    if tShotEndPosition[2] > iHighestHeight then
-                                        iHighestHeight = tShotEndPosition[2]
-                                        sHighestBone = sBone
+                    --Try alternative approach:
+                    if sHighestBone == nil and oTargetUnit.GetBoneCount then
+                        local iBoneCount = oTargetUnit:GetBoneCount()
+                        local sBone
+                        if iBoneCount > 0 then
+                            for iCurBone = 0, iBoneCount - 1 do
+                                sBone = oTargetUnit:GetBoneName(iCurBone)
+                                if sBone then
+                                    if oTargetUnit:IsValidBone(sBone) == true then
+                                        tShotEndPosition = oTargetUnit:GetPosition(sBone)
+                                        if bDebugMessages == true then LOG(sFunctionRef..' Getting position for sBone='..sBone..'; position='..repru(tShotEndPosition)) end
+                                        if tShotEndPosition[2] < iLowestHeight then
+                                            iLowestHeight = tShotEndPosition[2]
+                                            sLowestBone = sBone
+                                        end
+                                        if tShotEndPosition[2] > iHighestHeight then
+                                            iHighestHeight = tShotEndPosition[2]
+                                            sHighestBone = sBone
+                                        end
                                     end
                                 end
                             end
                         end
                     end
                 end
-            end
-            if sHighestBone == nil then
-                tShotEndPosition = tTargetUnitDefaultPosition
-                if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find a bone to target for target unit, so using its position instaed='..repru(tShotEndPosition)) end
-            else
-                if tTargetUnitDefaultPosition[2] > tShotStartPosition[2] then
-                    tShotEndPosition = oTargetUnit:GetPosition(sLowestBone)
-                    --if tShotEndPosition[2] - GetSurfaceHeight(tShotEndPosition[1], tShotEndPosition[3]) > 0.1 then tShotEndPosition[2] = math.max(GetSurfaceHeight(tShotEndPosition[1], tShotEndPosition[3]) + 0.1, tShotEndPosition[2] - 0.2) end
+                if sHighestBone == nil then
+                    tShotEndPosition = tTargetUnitDefaultPosition
+                    if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find a bone to target for target unit, so using its position instaed='..repru(tShotEndPosition)) end
                 else
-                    tShotEndPosition = oTargetUnit:GetPosition(sHighestBone)
-                    --if tShotEndPosition[2] - GetSurfaceHeight(tShotEndPosition[1], tShotEndPosition[3]) > 0.1 then tShotEndPosition[2] = math.max(GetSurfaceHeight(tShotEndPosition[1], tShotEndPosition[3]) + 0.1, tShotEndPosition[2] - 0.2) end
+                    if tTargetUnitDefaultPosition[2] > tShotStartPosition[2] then
+                        tShotEndPosition = oTargetUnit:GetPosition(sLowestBone)
+                        --if tShotEndPosition[2] - GetSurfaceHeight(tShotEndPosition[1], tShotEndPosition[3]) > 0.1 then tShotEndPosition[2] = math.max(GetSurfaceHeight(tShotEndPosition[1], tShotEndPosition[3]) + 0.1, tShotEndPosition[2] - 0.2) end
+                    else
+                        tShotEndPosition = oTargetUnit:GetPosition(sHighestBone)
+                        --if tShotEndPosition[2] - GetSurfaceHeight(tShotEndPosition[1], tShotEndPosition[3]) > 0.1 then tShotEndPosition[2] = math.max(GetSurfaceHeight(tShotEndPosition[1], tShotEndPosition[3]) + 0.1, tShotEndPosition[2] - 0.2) end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': HighestBone='..sHighestBone..'; lowest bone='..sLowestBone..'; tShotEndPosition='..repru(tShotEndPosition)) end
                 end
-                if bDebugMessages == true then LOG(sFunctionRef..': HighestBone='..sHighestBone..'; lowest bone='..sLowestBone..'; tShotEndPosition='..repru(tShotEndPosition)) end
-            end
-            --Have the shot end and start positions; Now check that not firing at underwater target
-            if tShotEndPosition[2] < GetSurfaceHeight(tShotEndPosition[1], tShotEndPosition[3]) then
-                bShotIsBlocked = true
-            else
-                --Have the shot end and start positions; now want to move along a line between the two and work out if terrain will block the shot
-                if bDebugMessages == true then LOG(sFunctionRef..': About to see if line is blocked. tShotStartPosition='..repru(tShotStartPosition)..'; tShotEndPosition='..repru(tShotEndPosition)..'; Terrain height at start='..GetTerrainHeight(tShotStartPosition[1], tShotStartPosition[3])..'; Terrain height at end='..GetTerrainHeight(tShotEndPosition[1], tShotEndPosition[3])) end
-                bShotIsBlocked = IsLineBlocked(oFiringUnit:GetAIBrain(), tShotStartPosition, tShotEndPosition)
+                --Have the shot end and start positions; Now check that not firing at underwater target
+                if tShotEndPosition[2] < GetSurfaceHeight(tShotEndPosition[1], tShotEndPosition[3]) then
+                    bShotIsBlocked = true
+                else
+                    --Have the shot end and start positions; now want to move along a line between the two and work out if terrain will block the shot
+                    if bDebugMessages == true then LOG(sFunctionRef..': About to see if line is blocked. tShotStartPosition='..repru(tShotStartPosition)..'; tShotEndPosition='..repru(tShotEndPosition)..'; Terrain height at start='..GetTerrainHeight(tShotStartPosition[1], tShotStartPosition[3])..'; Terrain height at end='..GetTerrainHeight(tShotEndPosition[1], tShotEndPosition[3])) end
+                    bShotIsBlocked = IsLineBlocked(oFiringUnit:GetAIBrain(), tShotStartPosition, tShotEndPosition)
+                end
             end
         end
     end
@@ -4708,7 +4713,6 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitD
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetDamageFromBomb'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if not(iOptionalShieldReductionFactor) then bDebugMessages = true M27Utilities.ErrorHandler('Audit trail') end
 
     local bIgnoreT3ArtiShotReduction = not(bT3ArtiShotReduction or false)
 
@@ -5621,7 +5625,7 @@ function GetT3ArtiTarget(oT3Arti, bDontDelayShot)
                             iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
                             if iCurDistance >= iMinRange and iCurDistance <= iMaxRange then
                                 --Are they threatening valuable friendly structures (or close to threatening)?
-                                if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure * categories.TECH3 + M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryFixedShield + M27UnitInfo.RefCategoryT2Mex, oUnit:GetPosition(), 180, 'Ally')) == false then
+                                if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure * categories.TECH3 + M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryT2Mex, oUnit:GetPosition(), 180, 'Ally')) == false then
                                     iTargetShortlist = iTargetShortlist + 1
                                     tTargetShortlist[iTargetShortlist] = oUnit
                                     if bDebugMessages == true then LOG(sFunctionRef..': Will add arti '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to table of targets') end
@@ -5643,7 +5647,7 @@ function GetT3ArtiTarget(oT3Arti, bDontDelayShot)
                         iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
                         if iCurDistance >= iMinRange and iCurDistance <= iMaxRange then
                             --Are they threatening valuable friendly structures (or close to threatening)?
-                            if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure * categories.TECH3 + M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryFixedShield + M27UnitInfo.RefCategoryT2Mex, oUnit:GetPosition(), M27EngineerOverseer.iTMLMissileRange + 10, 'Ally')) == false then
+                            if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure * categories.TECH3 + M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryT2Mex, oUnit:GetPosition(), M27EngineerOverseer.iTMLMissileRange + 10, 'Ally')) == false then
                                 iTargetShortlist = iTargetShortlist + 1
                                 tTargetShortlist[iTargetShortlist] = oUnit
                                 if bDebugMessages == true then LOG(sFunctionRef..': Will add TML '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to table of targets') end

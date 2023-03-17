@@ -234,7 +234,7 @@ function CombatPlatoonFormer(aiBrain)
     local iIndirectUnits = 0
     local tAmphibiousUnits = {}
 
-    if bDebugMessages == true then LOG(sFunctionRef..': About to check for indirect units, aiBrain[M27Overseer.refbNeedIndirect]='..tostring(aiBrain[M27Overseer.refbNeedIndirect])..'; nearest threat='..(aiBrain[M27Overseer.refoNearestThreat].UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(aiBrain[M27Overseer.refoNearestThreat]) or 'nil')) end
+    if bDebugMessages == true then LOG(sFunctionRef..': About to check for indirect units at time='..GetGameTimeSeconds()..', aiBrain[M27Overseer.refbNeedIndirect]='..tostring(aiBrain[M27Overseer.refbNeedIndirect])..'; nearest threat='..(aiBrain[M27Overseer.refoNearestThreat].UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(aiBrain[M27Overseer.refoNearestThreat]) or 'nil')) end
     if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == false then
         --Special unit type exclusions/where we only want certain units to be part of a platoon, not all combat units
         if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 2 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * categories.TECH2 + M27UnitInfo.refCategoryEngineer * categories.TECH3) >= 3  then
@@ -390,6 +390,12 @@ function CombatPlatoonFormer(aiBrain)
         end
         if bDebugMessages == true then LOG(sFunctionRef..': iDefenceCoverage='..iDefenceCoverage..'; iStrategy='..iStrategy) end
         local iCount = 0
+
+        local bIgnoreMinimumSize = false
+        if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] < 3 then
+            --If we have tech3 units then ignore minimum size (e.g. we may have captured or been gifted tech 3 units)
+            if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.TECH3, tUnitsWaiting)) == false then bIgnoreMinimumSize = true end
+        end
         while sPlatoonToForm == nil do
             oPlatoonOrUnitToEscort = nil
             iCount = iCount + 1 if iCount > 100 then M27Utilities.ErrorHandler('Infinite loop') break end
@@ -533,7 +539,8 @@ function CombatPlatoonFormer(aiBrain)
         else
             --Do we have enough units for this platoon?
             local iMinSize = M27PlatoonTemplates.PlatoonTemplate[sPlatoonToForm][M27PlatoonTemplates.refiMinimumPlatoonSize]
-            if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry after increasing by 1='..iCurrentConditionToTry..'; sPlatoonWanted='..sPlatoonToForm..'; iMinSize='..iMinSize..'; iUnitsWaiting='..iUnitsWaiting) end
+            if bIgnoreMinimumSize then iMinSize = 1 end
+            if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry after increasing by 1='..iCurrentConditionToTry..'; sPlatoonWanted='..sPlatoonToForm..'; iMinSize='..iMinSize..'; iUnitsWaiting='..iUnitsWaiting..'; bIgnoreMinimumSize='..tostring(bIgnoreMinimumSize)..'; Min size if didnt ignore='..M27PlatoonTemplates.PlatoonTemplate[sPlatoonToForm][M27PlatoonTemplates.refiMinimumPlatoonSize]) end
             --Add combat patrol platoon to units that are waiting if we dont want to form a combat patrol platoon
             if not(sPlatoonToForm == 'M27CombatPatrolAI') then
                 if aiBrain[refoCombatPatrolPlatoon] and aiBrain:PlatoonExists(aiBrain[refoCombatPatrolPlatoon]) and aiBrain[refoCombatPatrolPlatoon][M27PlatoonUtilities.refiCurrentUnits] > 0 and (aiBrain[refoCombatPatrolPlatoon][M27PlatoonUtilities.refiEnemiesInRange] or 0) <= 0 then
@@ -1703,8 +1710,6 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
     --DONT USE PROFILER HERE as need solution to the waitticks
     if bDebugMessages == true then LOG(sFunctionRef..': Start') end
 
-
-
     if iDelayInTicks then
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(iDelayInTicks)
@@ -1719,6 +1724,15 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
     else
         iUnits = table.getn(tNewUnits)
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code, iUnits='..iUnits..'; bNotJustBuiltByFactory='..tostring(bNotJustBuiltByFactory or false)) end
+        if bNotJustBuiltByFactory then
+            --Make sure any shields are enabled
+            for iUnit, oUnit in tNewUnits do
+                if oUnit.MyShield and oUnit.EnableShield and not(oUnit['M27ShRedy']) and M27UnitInfo.IsUnitValid(oUnit) then --This is for e.g. if we have just captured a unit or been gifted a unit with a shield disabled
+                    M27UnitInfo.EnableUnitShield(oUnit)
+                    oUnit['M27ShRedy'] = true
+                end
+            end
+        end
     end
     if not(bNotJustBuiltByFactory) and iUnits > 1 then
         M27Utilities.ErrorHandler('More than 1 units has been passed to this function but should only do this if not built by a factory recently; will only consider the first unit')

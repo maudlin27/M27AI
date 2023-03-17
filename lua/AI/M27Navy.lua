@@ -784,7 +784,6 @@ function UpdateUnitPond(oUnit, iM27TeamUpdatingFor, bIsEnemy, iPondRefOverride)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateUnitPond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if bDebugMessages == true then M27Utilities.ErrorHandler('Audit trail', true) end
 
     --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'xes02051' and oUnit:GetAIBrain():GetArmyIndex() == 2 and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, bIsEnemy='..tostring((bIsEnemy or false))..'; Unit brain index='..oUnit:GetAIBrain():GetArmyIndex()..'; Unit assigned pond='..(oUnit[refiAssignedPond] or 'nil')..'; Contains fixed pond category='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryPondFixedCategory, oUnit.UnitId))) end
@@ -3903,7 +3902,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                     if bAllOutSubAttack and EntityCategoryContains(categories.SUBMERSIBLE + categories.AMPHIBIOUS - categories.HOVER, oClosestFriendlyUnitToEnemyBase.UnitId) then
                         local tSurfaceUnits
                         if M27Utilities.IsTableEmpty(tFriendlyNavalExcludingIntercept) == false then
-                            tSurfaceUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAllAmphibiousAndNavy - categories.SUBMIERSIBLE, tFriendlyNavalExcludingIntercept)
+                            tSurfaceUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAllAmphibiousAndNavy - categories.SUBMERSIBLE, tFriendlyNavalExcludingIntercept)
                             if M27Utilities.IsTableEmpty(tSurfaceUnits) == false then
                                 oRemainingUnitPriority = M27Utilities.GetNearestUnit(tSurfaceUnits, tEnemyBase)
                             else

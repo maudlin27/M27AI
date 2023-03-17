@@ -60,6 +60,7 @@ refbTreatAsVisible = 'M27UnitTreatAsVisible' --used for unseen T2PD that damages
 reftLastKnownPosition = 'M27UnitLastKnownPosition' --Used for naval units to try and avoid AI cheating while giving it a basic memory
 refbIsDangerousAA = 'M27UnitIsDangerousAA' --true if have added to table due to being dangeorus
 reftbInArmyIndexBigThreatTable = 'M27UnitInBigThreatTable' --[x] is army index; true if have added unit to table of big threats for that army index
+refiCaptureAttempts = 'M27UnitCaptureAttempts' --number of times an engineer has given a capture order against this unit
 
 --Order related - used for navy (platoon uses platoon tracking)
 reftLastOrderTarget = 'M27UnitLastOrderTarget' --location of last target (e.g. for issuemove)
