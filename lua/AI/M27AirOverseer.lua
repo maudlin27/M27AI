@@ -10165,7 +10165,14 @@ function GunshipManager(aiBrain)
             local tiValidPlacements = {}
             local iTotalUnits = table.getn(tUnits)
             for iUnit, oUnit in tUnits do
-                if oUnit[refiGunshipPlacement] then tiValidPlacements[oUnit[refiGunshipPlacement]] = true end
+                if oUnit[refiGunshipPlacement] then
+                    if tiValidPlacements[oUnit[refiGunshipPlacement]] then
+                        --Duplicate entry so need to clear this unit
+                        oUnit[refiGunshipPlacement] = 10000
+                    else
+                        tiValidPlacements[oUnit[refiGunshipPlacement]] = true
+                    end
+                end
             end
             local iFirstMissingPlacement
             for iCurPlacement = 1, iTotalUnits do
