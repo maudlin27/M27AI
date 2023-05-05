@@ -6815,7 +6815,7 @@ function CheckUnitCap(aiBrain)
         local tiCategoryToDestroy = {
             [0] = categories.TECH1 - categories.COMMAND,
             [1] = M27UnitInfo.refCategoryAllAir * categories.TECH1,
-            [2] = M27UnitInfo.refCategoryMobileLand * categories.TECH2 - categories.COMMAND - M27UnitInfo.refCategoryMAA + M27UnitInfo.refCategoryAirScout + M27UnitInfo.refCategoryAirAA + categories.NAVAL * categories.MOBILE * categories.TECH1,
+            [2] = M27UnitInfo.refCategoryMobileLand * categories.TECH2 - categories.COMMAND - M27UnitInfo.refCategoryMAA + M27UnitInfo.refCategoryAirScout + M27UnitInfo.refCategoryAirAA * categories.TECH1 + categories.NAVAL * categories.MOBILE * categories.TECH1,
             [3] = M27UnitInfo.refCategoryMobileLand * categories.TECH1 - categories.COMMAND,
             [4] = M27UnitInfo.refCategoryWall + M27UnitInfo.refCategoryEngineer - categories.TECH3,
         }
@@ -9138,7 +9138,7 @@ end
 
 function RevealCiviliansToAI(aiBrain)
     --On some maps like burial mounds civilians are revealed to human players but not AI; meanwhile on other maps even if theyre not revealed to humans, the humans will likely know where the buildings are having played the map before
-    --Thanks to Relent0r for providing code that achieved this
+    --Thanks to Relent0r for providing code that I used as a starting point to achieve this
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RevealCiviliansToAI'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
