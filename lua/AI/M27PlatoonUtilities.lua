@@ -6625,10 +6625,10 @@ function DecideWhetherToGetACUUpgrade(aiBrain, oPlatoon)
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': Have gun upgrade or cant path to enemy base, checking if we want to get the next upgrade') end
                 local bWantUpgrade, bSafeToUpgrade = M27Conditions.WantToGetAnotherACUUpgrade(aiBrain)
-                if bWantUpgrade then
+                if bWantUpgrade and bSafeToUpgrade then
                     if bDebugMessages == true then LOG(sFunctionRef..': Want to get the next upgrade') end
                     oPlatoon[refiCurrentAction] = refActionUpgrade
-                elseif bSafeToUpgrade == false then
+                elseif bWantUpgrade and not(bSafeToUpgrade) then
                     --Only reason we're not upgrading is because its not safe - return towards nearest rally point and say we're running away unless are in combat
                     oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
                     if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, GetPlatoonFrontPosition(oPlatoon), 22, 'Enemy')) then
@@ -7185,6 +7185,7 @@ function GetACUUpgradeWanted(aiBrain, oACU)
     if sUpgradeID == nil then
         oACU[M27UnitInfo.refbFullyUpgraded] = true
     end
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return sUpgradeID
 end

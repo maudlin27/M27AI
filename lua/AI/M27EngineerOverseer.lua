@@ -86,7 +86,6 @@ refActionAssistMexUpgrade = 54
 refActionSAMCreep = 55 --Intended to gradually expand SAM coverage for mexes
 refActionBuildMassFab = 56
 refActionCaptureCivilian = 57
-tiEngiActionsThatDontBuild = {refActionReclaimArea, refActionSpare, refActionNavalSpareAction, refActionHasNearbyEnemies, refActionReclaimUnit, refActionReclaimTrees, refActionUpgradeBuilding, refActionAssistSMD, refActionAssistTML, refActionAssistMexUpgrade, refActionAssistAirFactory, refActionAssistNavalFactory, refActionAssistHQUpgrade, refActionAssistNuke, refActionLoadOnTransport, refActionAssistShield, refActionCaptureCivilian}
 --NOTE: IF ADDING MORE ACTIONS, UPDATE THE ACTIONS IN THE POWER STALL MANAGER
 --ALSO update the actions noted in RefreshT3ArtiAdjacencyLocations as being ones that can ignore when deciding whether to clear existing engineer commands
 
@@ -99,6 +98,7 @@ refActionPlateauSpareAction = 1004
 refActionPlateauBuildTMD = 1005
 refActionPlateauAssistUpgrade = 1006
 
+tiEngiActionsThatDontBuild = {refActionReclaimArea, refActionSpare, refActionNavalSpareAction, refActionHasNearbyEnemies, refActionReclaimUnit, refActionReclaimTrees, refActionUpgradeBuilding, refActionAssistSMD, refActionAssistTML, refActionAssistMexUpgrade, refActionAssistAirFactory, refActionAssistNavalFactory, refActionAssistHQUpgrade, refActionAssistNuke, refActionLoadOnTransport, refActionAssistShield, refActionCaptureCivilian, refActionPlateauAssistUpgrade}
 
 --Build order related variables
 refiBOInitialEngineersWanted = 'M27BOInitialEngineersWanted'
@@ -5564,6 +5564,8 @@ function GetCategoryToBuildFromAction(iActionToAssign, iMinTechLevel, aiBrain)
         iCategoryToBuild = M27UnitInfo.refCategoryMassFab * categories.TECH2
     elseif iActionToAssign == refActionCaptureCivilian then
         iCategoryToBuild = nil
+    elseif iActionToAssign == refActionPlateauAssistUpgrade then
+        iCategoryToBuild = nil
     else
         M27Utilities.ErrorHandler('Need to add code for action='..(iActionToAssign or 'nil'))
     end
@@ -7008,6 +7010,8 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                 iMaxAreaToSearch = 65
                             elseif iActionToAssign == refActionAssistMexUpgrade then
                                 bConstructBuilding = false
+                            elseif iActionToAssign == refActionPlateauAssistUpgrade then
+                                bConstructBuilding = false
                             elseif iActionToAssign == refActionAssistSMD or iActionToAssign == refActionAssistNuke or iActionToAssign == refActionAssistTML then
                                 bConstructBuilding = false
                             elseif iActionToAssign == refActionAssistAirFactory then
@@ -7779,7 +7783,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, time='..GetGameTimeSeconds()..'. iActionRefToAssign='..iActionRefToAssign) end
 
     --Are we assisting a building?
-    if iActionRefToAssign == refActionUpgradeBuilding or iActionRefToAssign == refActionAssistSMD or iActionRefToAssign == refActionAssistTML or iActionRefToAssign == refActionAssistNuke or iActionRefToAssign == refActionAssistAirFactory or iActionRefToAssign == refActionAssistNavalFactory or iActionRefToAssign == refActionAssistHQUpgrade or iActionRefToAssign == refActionAssistShield or iActionRefToAssign == refActionAssistMexUpgrade then
+    if iActionRefToAssign == refActionUpgradeBuilding or iActionRefToAssign == refActionAssistSMD or iActionRefToAssign == refActionAssistTML or iActionRefToAssign == refActionAssistNuke or iActionRefToAssign == refActionAssistAirFactory or iActionRefToAssign == refActionAssistNavalFactory or iActionRefToAssign == refActionAssistHQUpgrade or iActionRefToAssign == refActionAssistShield or iActionRefToAssign == refActionAssistMexUpgrade or iActionRefToAssign == refActionPlateauAssistUpgrade then
         if oPresetActionTargetObject then
             oActionObject = oPresetActionTargetObject
             tActionLocation = oPresetActionTargetObject:GetPosition()
@@ -7852,6 +7856,10 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                         end
                     end
                 end
+            elseif iActionRefToAssign == refActionPlateauAssistUpgrade then
+                iCategoryToAssist = M27UnitInfo.refCategoryT1Mex + M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryLandFactory * categories.TECH1 + M27UnitInfo.refCategoryLandFactory * categories.TECH2
+                sUnitStateWanted = 'Building'
+                sAltUnitStateWanted = 'Upgrading'
             end
 
             if M27Utilities.IsTableEmpty(tAllBuildings) then
