@@ -685,7 +685,7 @@ end
 
 function OnBomberDeath(aiBrain, oDeadBomber)
     --Track how effective the bomber was
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OnBomberDeath'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then
@@ -759,7 +759,7 @@ end
 function CheckForBetterBomberTargets(oBomber, bOneOff)
     local sFunctionRef = 'CheckForBetterBomberTargets'
     --bOneOff - if true, then only run this once (e.g. in response to bomb being fired); otherwise will create a loop
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 3 then bDebugMessages = true end
 
     if bDebugMessages == true then
@@ -1432,7 +1432,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
     --bLookForHigherPriorityShortlist - set to true when a bomb is fired and this function is called as a result; if the target shortlist has a higher priority unit for targetting, then will switch to this
     --bReissueIfBlocked - will make use of the logic for maps like astro where cliffs can block bomber shots - should only use this on specific events like when the bomb has been recently fired
 
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateBomberTargets'
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -1795,7 +1795,6 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                         end
                                     end
                                     if iCategoriesToSearch and not (EntityCategoryContains(iCategoriesToSearch, oBomberCurTarget.UnitId)) then
-                                        bDebugMessages = true
                                         local tNearbyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategoriesToSearch, oBomber:GetPosition(), 125, 'Enemy')
                                         if M27Utilities.IsTableEmpty(tNearbyUnitsOfInterest) == false then
                                             if bDebugMessages == true then
@@ -1890,7 +1889,6 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                                 end
                                             end
                                         end
-                                        bDebugMessages = false
                                     elseif bDebugMessages == true then
                                         LOG(sFunctionRef .. ': Bomber cur target is already a shield or AA')
                                     end
@@ -5106,7 +5104,7 @@ end
 
 function AirBomberManager(aiBrain)
     --v30 - replaced old approach which would determine a shortlist for use by all bombers; new approach will break things up by bomber tech level
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirBomberManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
