@@ -685,7 +685,7 @@ end
 
 function OnBomberDeath(aiBrain, oDeadBomber)
     --Track how effective the bomber was
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OnBomberDeath'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then
@@ -703,7 +703,7 @@ function OnBomberDeath(aiBrain, oDeadBomber)
 
         UpdateBomberEffectiveness(aiBrain, oDeadBomber, false)
     end
-
+    if bDebugMessages == true then LOG(sFunctionRef..': Dead bomber '..oDeadBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oDeadBomber)..'; reftTargetList='..reprs(oDeadBomber[reftTargetList])) end
     --Update units it was targetting to show them as no longer having bomber strike damage assigned
     ClearTrackersOnUnitsTargets(oDeadBomber)
 
@@ -759,7 +759,7 @@ end
 function CheckForBetterBomberTargets(oBomber, bOneOff)
     local sFunctionRef = 'CheckForBetterBomberTargets'
     --bOneOff - if true, then only run this once (e.g. in response to bomb being fired); otherwise will create a loop
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 3 then bDebugMessages = true end
 
     if bDebugMessages == true then
@@ -1432,7 +1432,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
     --bLookForHigherPriorityShortlist - set to true when a bomb is fired and this function is called as a result; if the target shortlist has a higher priority unit for targetting, then will switch to this
     --bReissueIfBlocked - will make use of the logic for maps like astro where cliffs can block bomber shots - should only use this on specific events like when the bomb has been recently fired
 
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateBomberTargets'
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -1795,32 +1795,36 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                         end
                                     end
                                     if iCategoriesToSearch and not (EntityCategoryContains(iCategoriesToSearch, oBomberCurTarget.UnitId)) then
+                                        bDebugMessages = true
                                         local tNearbyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategoriesToSearch, oBomber:GetPosition(), 125, 'Enemy')
                                         if M27Utilities.IsTableEmpty(tNearbyUnitsOfInterest) == false then
                                             if bDebugMessages == true then
                                                 LOG(sFunctionRef .. ': Have nearby shields or AA to consider')
                                             end
                                             for iUnit, oUnit in tNearbyUnitsOfInterest do
-                                                --Fixed shield - only target if <75% done
-                                                if EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, oUnit.UnitId) and oUnit:GetFractionComplete() <= 0.8 and M27Logic.IsTargetUnderShield(aiBrain, oUnit, M27UnitInfo.GetUnitStrikeDamage(oUnit) * 0.5) == false then
-                                                    if bDebugMessages == true then
-                                                        LOG(sFunctionRef .. ': Shield being constructed, fraction complete=' .. oUnit:GetFractionComplete())
-                                                    end
-                                                    iNearbyPriorityShieldTargets = iNearbyPriorityShieldTargets + 1
-                                                    tNearbyPriorityShieldTargets[iNearbyPriorityShieldTargets] = oUnit
-                                                elseif EntityCategoryContains(M27UnitInfo.refCategoryGroundAA, oUnit.UnitId) then
-                                                    --Check no nearby shield
-                                                    if bDebugMessages == true then
-                                                        LOG(sFunctionRef .. ': Ground AA detected, checking if under shield')
-                                                    end
-                                                    if M27Logic.IsTargetUnderShield(aiBrain, oBomberCurTarget, M27UnitInfo.GetUnitStrikeDamage(oUnit) * 0.8) == false then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit health='..oUnit:GetHealth()..'; Unit strike damage assigned='..(oUnit[refiStrikeDamageAssigned] or 0)) end
+                                                if oUnit:GetHealth() * 1.5 + 150 > (oUnit[refiStrikeDamageAssigned] or 0) then
+                                                    --Fixed shield - only target if <75% done
+                                                    if EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, oUnit.UnitId) and oUnit:GetFractionComplete() <= 0.8 and M27Logic.IsTargetUnderShield(aiBrain, oUnit, M27UnitInfo.GetUnitStrikeDamage(oUnit) * 0.5) == false then
                                                         if bDebugMessages == true then
-                                                            LOG(sFunctionRef .. ': AA not under shield, adding as priority target')
+                                                            LOG(sFunctionRef .. ': Shield being constructed, fraction complete=' .. oUnit:GetFractionComplete())
                                                         end
-                                                        iNearbyPriorityAATargets = iNearbyPriorityAATargets + 1
-                                                        tNearbyPriorityAATargets[iNearbyPriorityAATargets] = oUnit
-                                                    elseif bDebugMessages == true then
-                                                        LOG(sFunctionRef .. ': AA under shield')
+                                                        iNearbyPriorityShieldTargets = iNearbyPriorityShieldTargets + 1
+                                                        tNearbyPriorityShieldTargets[iNearbyPriorityShieldTargets] = oUnit
+                                                    elseif EntityCategoryContains(M27UnitInfo.refCategoryGroundAA, oUnit.UnitId) then
+                                                        --Check no nearby shield
+                                                        if bDebugMessages == true then
+                                                            LOG(sFunctionRef .. ': Ground AA detected, checking if under shield')
+                                                        end
+                                                        if M27Logic.IsTargetUnderShield(aiBrain, oBomberCurTarget, M27UnitInfo.GetUnitStrikeDamage(oUnit) * 0.8) == false then
+                                                            if bDebugMessages == true then
+                                                                LOG(sFunctionRef .. ': AA not under shield, adding as priority target')
+                                                            end
+                                                            iNearbyPriorityAATargets = iNearbyPriorityAATargets + 1
+                                                            tNearbyPriorityAATargets[iNearbyPriorityAATargets] = oUnit
+                                                        elseif bDebugMessages == true then
+                                                            LOG(sFunctionRef .. ': AA under shield')
+                                                        end
                                                     end
                                                 end
                                             end
@@ -1881,10 +1885,12 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                                 if M27UnitInfo.GetUnitTechLevel(oBomber) >= 3 or M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oTargetToSwitchTo:GetPosition()) >= 100 then
                                                     TellBomberToAttackTarget(oBomber, oTargetToSwitchTo, false)
                                                 else
-                                                    IssueAttack({ oBomber }, oTargetToSwitchTo)
+                                                    TellBomberToAttackTarget(oBomber, oTargetToSwitchTo, false, false, true)
+                                                    --IssueAttack({ oBomber }, oTargetToSwitchTo)
                                                 end
                                             end
                                         end
+                                        bDebugMessages = false
                                     elseif bDebugMessages == true then
                                         LOG(sFunctionRef .. ': Bomber cur target is already a shield or AA')
                                     end
@@ -4590,9 +4596,10 @@ function GetBomberPreTargetViaPoint(oBomber, tGroundTarget, bTargetingMobileUnit
     return tViaPoint
 end
 
-function TellBomberToAttackTarget(oBomber, oTarget, bClearCommands, bAreHoverBombing)
+function TellBomberToAttackTarget(oBomber, oTarget, bClearCommands, bAreHoverBombing, bDontConsiderMoveOrder)
     --Works out the best location to attack, and then if the bomber should be sent a move command to ensure its bomb will hit the target
     --bAreHoverBombing - if true, then will pick a location within 2.5 degrees of the bomber facing direction if possible
+    --bDontConsiderMoveOrder - if true, wont consider a move command or best location, will just try and attack oBobmer
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'TellBomberToAttackTarget'
@@ -4617,9 +4624,9 @@ function TellBomberToAttackTarget(oBomber, oTarget, bClearCommands, bAreHoverBom
         oBomber[refiModDefenceRangeAtTimeTargetAssigned] = nil
     end
 
-    if iBomberAOE >= 2 and EntityCategoryContains(M27UnitInfo.refCategoryStructure, oTarget.UnitId) then
+    if iBomberAOE >= 2 and EntityCategoryContains(M27UnitInfo.refCategoryStructure, oTarget.UnitId) and not(bDontConsiderMoveOrder) then
         bTargetGround = true
-    elseif iBomberAOE >= 2 and M27UnitInfo.IsUnitUnderwater(oTarget) and EntityCategoryContains(M27UnitInfo.refCategoryBomber, oBomber.UnitId) then
+    elseif iBomberAOE >= 2 and M27UnitInfo.IsUnitUnderwater(oTarget) and EntityCategoryContains(M27UnitInfo.refCategoryBomber, oBomber.UnitId) and not(bDontConsiderMoveOrder) then
         bTargetGround = true
     end
     --Will reduce bomber aoe by 0.1 as had an issue where bombers were just missing a mex, not sure if this was the cause; however if come across same issue use logs to confirm what is causing in case it's somethign else
@@ -4665,7 +4672,7 @@ function TellBomberToAttackTarget(oBomber, oTarget, bClearCommands, bAreHoverBom
     if not (bTargetGround) and EntityCategoryContains(categories.MOBILE, oTarget.UnitId) then
         bTargetingMobileUnit = true
     end
-    if not (bAreHoverBombing) then
+    if not (bAreHoverBombing) and not(bDontConsiderMoveOrder) then
         tPreTargetViaPoint = GetBomberPreTargetViaPoint(oBomber, tGroundTarget, bTargetingMobileUnit)
     end
     --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
@@ -5099,7 +5106,7 @@ end
 
 function AirBomberManager(aiBrain)
     --v30 - replaced old approach which would determine a shortlist for use by all bombers; new approach will break things up by bomber tech level
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirBomberManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 

@@ -5752,35 +5752,7 @@ function ACUManager(aiBrain)
                         end
                         if bCancelUpgradeAndRun == false then
                             --if >=3 TML nearby, then cancel upgrade
-                            if M27Utilities.IsTableEmpty(aiBrain[reftEnemyTML]) == false then
-                                --Abort ACU upgrade if >=3 TML and its not safe to upgrade
-                                local iEnemyTML = 0
-                                for iUnit, oUnit in aiBrain[reftEnemyTML] do
-                                    if M27UnitInfo.IsUnitValid(oUnit) and EntityCategoryContains(M27UnitInfo.refCategoryTML, oUnit.UnitId) then
-                                        iEnemyTML = iEnemyTML + 1
-                                    end
-                                end
-                                if iEnemyTML >= 3 then
-                                    if M27Conditions.SafeToGetACUUpgrade(aiBrain) == false and oACU:GetWorkProgress() < 0.85 then
-                                        --Double-check all 3 TML are in-range, since safetoget upgrade only uses threshold of 2
-                                        iEnemyTML = 0
-                                        for iUnit, oUnit in aiBrain[reftEnemyTML] do
-                                            if EntityCategoryContains(M27UnitInfo.refCategoryTML, oUnit.UnitId) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tACUPos) <= 259 then
-                                                iEnemyTML = iEnemyTML + 1
-                                            end
-                                        end
-                                        if iEnemyTML >= 3 then
-                                            --Abort upgrade unless are near TMD or under shield with <=6 TML
-                                            if not (iEnemyTML < 6 and (M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, oACU:GetPosition(), 18, 'Ally')) == false or M27Logic.IsLocationUnderFriendlyFixedShield(aiBrain, oACU:GetPosition()))) then
-                                                if bDebugMessages == true then
-                                                    LOG(sFunctionRef .. ': Enemy has ' .. iEnemyTML .. ' TML so will cancel upgrade and run')
-                                                end
-                                                bCancelUpgradeAndRun = true
-                                            end
-                                        end
-                                    end
-                                end
-                            end
+                            bCancelUpgradeAndRun = M27Conditions.DoWeWantToAbortUpgradeForTML(aiBrain, oACU)
                         else
                             --Want to cancel but not because of TML, so need to protect ACU
                             if not (aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and not (aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill) then

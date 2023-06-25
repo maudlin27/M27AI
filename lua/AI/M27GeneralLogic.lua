@@ -1373,7 +1373,10 @@ function SetFactoryRallyPoint(oFactory)
     local iDistFromFactory = 5 --Factories are 8x8, midpoint is middle of it so 4 to end of factory
     local aiBrain = oFactory:GetAIBrain()
     if aiBrain == nil then M27Utilities.ErrorHandler('SetFactoryRallyPoint: aiBrain is Nil') end
-    local iEnemyX, iEnemyZ = aiBrain:GetCurrentEnemy():GetArmyStartPos()
+    local tNearestEnemyStart = M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)]
+
+    local iEnemyX = tNearestEnemyStart[1]
+    local iEnemyZ = tNearestEnemyStart[3]
     if bDebugMessages == true then LOG('SetFactoryRallyPoint: iEnemyX='..iEnemyX) end
     local tFactoryPos = oFactory:GetPosition()
     --Set the rally point near to the factory in the direction of the enemy, unless the nearest rally point is closer to the enemy
@@ -6100,8 +6103,10 @@ function DetermineTMDWantedForUnits(aiBrain, tUnits)
     local iCurPlateau, sUnitRef
     for iUnit, oUnit in tUnits do
         sUnitRef = oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)
-        for iPlateau, toUnits in aiBrain[M27EngineerOverseer.reftUnitsWantingTMDByPlateau] do
-            if toUnits[sUnitRef] then toUnits[sUnitRef] = nil end
+        if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftUnitsWantingTMDByPlateau]) == false then
+            for iPlateau, toUnits in aiBrain[M27EngineerOverseer.reftUnitsWantingTMDByPlateau] do
+                if toUnits[sUnitRef] then toUnits[sUnitRef] = nil end
+            end
         end
     end
 

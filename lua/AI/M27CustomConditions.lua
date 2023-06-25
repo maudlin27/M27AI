@@ -538,6 +538,43 @@ function HaveEnoughGrossIncomeToForceFirstUpgrade(aiBrain)
     end
 end
 
+function DoWeWantToAbortUpgradeForTML(aiBrain, oACU)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'DoWeWantToAbortUpgradeForTML'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local bCancelUpgradeAndRun = false
+    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false and (not(oACU:IsUnitState('Upgrading')) or oACU:GetWorkProgress() < 0.85) then
+        --Abort ACU upgrade if >=3 TML and its not safe to upgrade
+        local iEnemyTML = 0
+        for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyTML] do
+            if M27UnitInfo.IsUnitValid(oUnit) and EntityCategoryContains(M27UnitInfo.refCategoryTML, oUnit.UnitId) then
+                iEnemyTML = iEnemyTML + 1
+            end
+        end
+        if iEnemyTML >= 3 then
+            if SafeToGetACUUpgrade(aiBrain) == false then
+                --Double-check all 3 TML are in-range, since safetoget upgrade only uses threshold of 2
+                iEnemyTML = 0
+                for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyTML] do
+                    if EntityCategoryContains(M27UnitInfo.refCategoryTML, oUnit.UnitId) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oACU:GetPosition()) <= 259 then
+                        iEnemyTML = iEnemyTML + 1
+                    end
+                end
+                if iEnemyTML >= 3 then
+                    --Abort upgrade unless are near TMD or under shield with <=6 TML
+                    if not (iEnemyTML < 6 and (M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, oACU:GetPosition(), 18, 'Ally')) == false or M27Logic.IsLocationUnderFriendlyFixedShield(aiBrain, oACU:GetPosition()))) then
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Enemy has ' .. iEnemyTML .. ' TML so will cancel upgrade and run')
+                        end
+                        bCancelUpgradeAndRun = true
+                    end
+                end
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return bCancelUpgradeAndRun
+end
 
 function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -687,6 +724,11 @@ function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
         if bDebugMessages == true then LOG(sFunctionRef..': Cant find any valid ACU upgrades') end
         bWantToGetGun = false
     end
+
+    --Backup - make sure we wont cancel the upgrade straight away
+    if bWantToGetGun and (ACUShouldRunFromBigThreat(aiBrain) or DoWeWantToAbortUpgradeForTML(aiBrain, M27Utilities.GetACU(aiBrain))) then
+        bWantToGetGun = false
+    end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code, bWantToGetGun='..tostring(bWantToGetGun)) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bWantToGetGun
@@ -809,6 +851,7 @@ function WantToGetAnotherACUUpgrade(aiBrain)
                             if bDebugMessages == true then LOG(sFunctionRef..': If have low health or nearby threats wont upgrade; M27UnitInfo.GetUnitHealthPercent(oACU)='..M27UnitInfo.GetUnitHealthPercent(oACU)..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
                             if M27UnitInfo.GetUnitHealthPercent(oACU) < 0.8 or (aiBrain[M27Overseer.refiPercentageOutstandingThreat] > 0.5 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] > 0.3) then
                                 --Have enough energy, check if safe to get upgrade
+                                bWantToGetUpgrade = true
                                 local bAbort = false
                                 if bDebugMessages == true then LOG(sFunctionRef..': Have enough energy and mass, check its safe to get upgrade') end
                                 --Dont treat as being safe if trying to get a slow upgrade and arent on our side of map
@@ -831,7 +874,6 @@ function WantToGetAnotherACUUpgrade(aiBrain)
                                 end
                                 if bSafeToGetUpgrade then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Its safe to get upgrade') end
-                                    bWantUpgrade = true
                                 end
                             end
                         end
@@ -846,6 +888,7 @@ function WantToGetAnotherACUUpgrade(aiBrain)
     if bWantUpgrade and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
         if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] < 10 then bWantUpgrade = false end
     end
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bWantUpgrade, bSafeToGetUpgrade
 end
