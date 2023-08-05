@@ -10344,8 +10344,7 @@ function OverseerManager(aiBrain)
     --With thanks to Balthazar for suggesting the below for where e.g. FAF develop has a function that isnt yet in FAF main
     _G.repru = rawget(_G, 'repru') or repr
 
-
-
+    LOG('Start of overseer manager, personality='..(ScenarioInfo.ArmySetup[aiBrain.Name].AIPersonality or 'nil')..'; Cheat enabled='..tostring(aiBrain.CheatEnabled or false)..'; cheat pos='..(string.find(ScenarioInfo.ArmySetup[aiBrain.Name].AIPersonality, 'cheat') or 'nil')..'; reprs of aiBrain='..reprs(aiBrain))
 
 
     --[[ForkThread(RunLotsOfLoopsPreStart)

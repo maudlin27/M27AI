@@ -10,6 +10,7 @@ local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 local M27MiscProfiling = import('/mods/M27AI/lua/MiscProfiling.lua')
+local AIUtils = import("/lua/ai/aiutilities.lua")
 
 NewAIBrain = Class(StandardBrain) {
 
@@ -53,6 +54,17 @@ NewAIBrain = Class(StandardBrain) {
                 if bDebugMessages == true then LOG(sFunctionRef..': Size of tAllActiveM27Brains='..table.getsize(M27Overseer.tAllActiveM27Brains)) end
 
                 StandardBrain.OnCreateAI(self, planName)
+
+                --Redundancy - enable cheats if not already
+                if not(self.CheatEnabled) then
+                    local per = ScenarioInfo.ArmySetup[self.Name].AIPersonality
+                    local cheatPos = string.find(per, 'cheat')
+                    if cheatPos then
+                        AIUtils.SetupCheat(self, true)
+                        ScenarioInfo.ArmySetup[self.Name].AIPersonality = string.sub(per, 1, cheatPos - 1)
+                    end
+                end
+
                 ForkThread(M27Overseer.OverseerManager, self)
             else
                 StandardBrain.OnCreateAI(self, planName)
