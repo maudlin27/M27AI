@@ -19,9 +19,7 @@ AIBrain = Class(M27AIBrainClass) {
     OnCreateAI = function(self, planName)
         local sFunctionRef = 'OnCreateAI'
         local bDebugMessages = false
-        if M27Utilities.bGlobalDebugOverride == true then
-            bDebugMessages = true
-        end
+        if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
         if bDebugMessages == true then
             LOG(sFunctionRef .. ' M27AI: aibrain.lua: OnCreateAI function - before recorded if m27AI. reprs of AI=' .. reprs(self))
         end
