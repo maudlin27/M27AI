@@ -7117,11 +7117,11 @@ function GetACUUpgradeWanted(aiBrain, oACU)
                     if bEnemyIsAeon then
                         tUpgradesWanted = {'ResourceAllocation'}
                     else
-                        tUpgradesWanted = { 'StealthGenerator', 'CloakingGenerator', 'MicrowaveLaserGenerator' }
+                        tUpgradesWanted = { 'StealthGenerator', 'FAF_SelfRepairSystem', 'CloakingGenerator', 'MicrowaveLaserGenerator' }
                     end
                 end
             elseif iFactionRef == M27UnitInfo.refFactionAeon then
-                tUpgradesWanted = { 'Shield' }
+                tUpgradesWanted = { 'Shield', 'FAF_CrysalisBeamAdvanced' }
             elseif iFactionRef == M27UnitInfo.refFactionSeraphim then
                 --Want damagestabilization before blast attack, as blast attack removes advanced engineering; dont want advanced engineering if we already have blast attack
                 --[[if oACU:HasEnhancement('BlastAttack') then
@@ -7144,10 +7144,22 @@ function GetACUUpgradeWanted(aiBrain, oACU)
                 if not (oACU:HasEnhancement(sPossibleUpgrade)) then
                     bHaveLaterUpgrade = false
                     --Does ACU have another enhancement which lists this as a prerequisite?
-                    for iBPUpgrade, tBPUpgrade in oACU:GetBlueprint().Enhancements do
-                        if tBPUpgrade.Prerequisite == sPossibleUpgrade and oACU:HasEnhancement(iBPUpgrade) then
-                            bHaveLaterUpgrade = true
-                            break
+                    local oACUBP = oACU:GetBlueprint()
+                    for iBPUpgrade, tBPUpgrade in oACUBP.Enhancements do
+                        if tBPUpgrade.Prerequisite then
+                            if tBPUpgrade.Prerequisite == sPossibleUpgrade then
+                                sUpgradeWithThisAsPreRequisite = iBPUpgrade
+                                if oACU:HasEnhancement(iBPUpgrade) then
+                                    bHaveLaterUpgrade = true
+                                    break
+                                end
+                            elseif oACU:HasEnhancement(iBPUpgrade) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': ACU has enhancement with prerequisite, iBPUpgrade='..iBPUpgrade..'; Prerequisite='..tBPUpgrade.Prerequisite..'; oACUBP.Enhancements[tBPUpgrade.Prerequisite].Prerequisite='..(oACUBP.Enhancements[tBPUpgrade.Prerequisite].Prerequisite or 'nil')..'; sPossibleUpgrade='..sPossibleUpgrade) end
+                                if oACUBP.Enhancements[tBPUpgrade.Prerequisite].Prerequisite == sPossibleUpgrade then
+                                    bHaveLaterUpgrade = true
+                                    break
+                                end
+                            end
                         end
                     end
                     if bHaveLaterUpgrade == false then

@@ -905,7 +905,12 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                             end
 
                             --Big threat
-                            if EntityCategoryContains(M27Overseer.iAllBigThreatCategories, oUnitCausingDamage.UnitId) then ForkThread(M27Overseer.AddUnitToBigThreatTable, aiBrain, oUnitCausingDamage) end
+                            if EntityCategoryContains(M27Overseer.iAllBigThreatCategories, oUnitCausingDamage.UnitId) then
+                                --If unit isnt an ally (as allied units cna do friendly fire, e.g. allied T3 arti), then add to big threat table
+                                if not(IsAlly(aiBrain:GetArmyIndex(), oUnitCausingDamage:GetAIBrain():GetArmyIndex())) then
+                                    ForkThread(M27Overseer.AddUnitToBigThreatTable, aiBrain, oUnitCausingDamage)
+                                end
+                            end
                         end
                         --General logic for shields so are very responsive with micro
                         if self.MyShield and self.MyShield.GetHealth and self.MyShield:GetHealth() < 100 and EntityCategoryContains((M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryPersonalShield) * categories.MOBILE, self) then

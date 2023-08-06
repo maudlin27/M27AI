@@ -320,6 +320,7 @@ function SafeToGetACUUpgrade(aiBrain)
                             end
 
                             local iACUDistToBase = M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                            if bDebugMessages == true then LOG(sFunctionRef..': iACUDistToBase='..iACUDistToBase..'; M27Overseer.iDistanceFromBaseToBeSafe='..M27Overseer.iDistanceFromBaseToBeSafe) end
                             if iACUDistToBase <= M27Overseer.iDistanceFromBaseToBeSafe or (M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.75 and iACUDistToBase <= math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25))) then
                                 bACUNearBase = true
                             elseif M27Utilities.GetDistanceBetweenPositions(tACUPos, M27Logic.GetNearestRallyPoint(aiBrain, tACUPos, oACU)) <= math.min(10, M27Overseer.iDistanceFromBaseToBeSafe * 0.5) then
@@ -348,7 +349,7 @@ function SafeToGetACUUpgrade(aiBrain)
                             if bIsSafe == false then
                                 --Check if we have mobile shields nearby and are on our side of the map
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Not safe under normal checks, but if underwater and not vulnerable to navy then may still be save. bAreUnderwater=' .. tostring(bAreUnderwater) .. '; aiBrain[M27AirOverseer.refiTorpBombersWanted]=' .. (aiBrain[M27AirOverseer.refiTorpBombersWanted] or 0) .. '; Time since last took unseen damage=' .. (GetGameTimeSeconds() - oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage]) >= 30)
+                                    LOG(sFunctionRef .. ': Not safe under normal checks, but if underwater and not vulnerable to navy then may still be save. bAreUnderwater=' .. tostring(bAreUnderwater) .. '; aiBrain[M27AirOverseer.refiTorpBombersWanted]=' .. (aiBrain[M27AirOverseer.refiTorpBombersWanted] or 0) .. '; Time since last took unseen damage=' .. (GetGameTimeSeconds() - (oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] or 0)) >= 30)
                                 end
                                 if oACU.PlatoonHandle and HaveNearbyMobileShield(oACU.PlatoonHandle) and M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) and M27UnitInfo.GetUnitHealthPercent(oACU) <= M27Overseer.iACUEmergencyHealthPercentThreshold * 0.8 then
                                     bIsSafe = true
@@ -800,7 +801,18 @@ function WantToGetAnotherACUUpgrade(aiBrain)
     if GetGameTimeSeconds() > 60 then
         if aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 then
             local oACU = M27Utilities.GetACU(aiBrain)
-            if M27Utilities.IsACU(oACU) and not(ACUShouldRunFromBigThreat(aiBrain)) then
+            local bHaveBigThreatToRunFrom = ACUShouldRunFromBigThreat(aiBrain)
+            if bHaveBigThreatToRunFrom then
+                --How close is the nearest enemy unit?
+                if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 200 and (aiBrain[M27Overseer.refiNearestRangeAdjustedLandExperimental] or 300) >= 300 then
+                    --Are we either under a fixed shield or close to base?
+                    if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 15 or M27Logic.IsLocationUnderFriendlyFixedShield(aiBrain, oACU:GetPosition()) then
+                        bHaveBigThreatToRunFrom = false
+                    end
+                end
+
+            end
+            if M27Utilities.IsACU(oACU) and not(bHaveBigThreatToRunFrom) then
                 local sUpgradeRef = M27PlatoonUtilities.GetACUUpgradeWanted(aiBrain, oACU)
                 if sUpgradeRef then
                     --Is it a really expensive upgrade?
@@ -829,7 +841,7 @@ function WantToGetAnotherACUUpgrade(aiBrain)
 
 
                     if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome]='..aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome]..'; iEnergyWanted='..iEnergyWanted) end
-                    if aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] > iEnergyWanted then
+                    if aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] > iEnergyWanted or aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= math.max(5000, iEnergyWanted * 10) then --I.e. equivalent of 20 T3 pgens
                         --Do we have enough mass? Want this to represent <20% of our total mass income
                         local iUpgradeMassCost = oBP.Enhancements[sUpgradeRef].BuildCostMass
                         --Double the mass cost if its a really expensive upgrade
@@ -869,11 +881,12 @@ function WantToGetAnotherACUUpgrade(aiBrain)
                                 end
                                 if bAbort then bSafeToGetUpgrade = false
                                 else
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Want to get upgrade providing its safe; based on distances it looks ok') end
                                     bSafeToGetUpgrade = SafeToGetACUUpgrade(aiBrain)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Want to get upgrade providing its safe; based on distances it looks ok. SaveToGetACUUpgrade='..tostring(bSafeToGetUpgrade)) end
                                 end
                                 if bSafeToGetUpgrade then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Its safe to get upgrade') end
+                                    bWantUpgrade = true
                                 end
                             end
                         end
@@ -886,8 +899,12 @@ function WantToGetAnotherACUUpgrade(aiBrain)
         end
     end
     if bWantUpgrade and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
-        if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] < 10 then bWantUpgrade = false end
+        if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] < 10 then
+            if bDebugMessages == true then LOG(sFunctionRef..': Have less than 80% energy stored so dont want upgrade afterall') end
+            bWantUpgrade = false
+        end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code, bWantUpgrade='..tostring(bWantUpgrade)..'; bSafeToGetUpgrade='..tostring(bSafeToGetUpgrade)) end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bWantUpgrade, bSafeToGetUpgrade
