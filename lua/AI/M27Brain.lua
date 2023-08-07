@@ -14,8 +14,6 @@ local AIUtils = import("/lua/ai/aiutilities.lua")
 
 NewAIBrain = Class(StandardBrain) {
 
-    M28AI = true,
-
     OnDefeat = function(self)
         StandardBrain.OnDefeat(self)
         ForkThread(M27Events.OnPlayerDefeated, self)
