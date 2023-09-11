@@ -3987,7 +3987,6 @@ function UpdateIfJustBuiltLotsOfPower(oJustBuilt)
         iEnergyGen = math.max(oBP.Economy.ProductionPerSecondEnergy or 0) * 0.1
     end
     --Set temporary flag that we have just built a lot of power (if we have)
-    if bDebugMessages == true then LOG(sFunctionRef..': Considering if should temporarily say we have enough power; iEnergyGen='..iEnergyGen..'; Gross energy='..(M28Team.tTeamData[aiBrain.M28Team][M28Team.subrefiTeamGrossEnergy] or 'nil')..'; Net energy='..(M28Team.tTeamData[aiBrain.M28Team][M28Team.subrefiTeamNetEnergy] or 'nil')..'; Flag for lots of power='..tostring(M28Team.tTeamData[aiBrain.M28Team][M28Team.refbJustBuiltLotsOfPower] or false)) end
     if iEnergyGen >= math.max(20, (aiBrain[refiGrossEnergyBaseIncome] * 0.2), -(aiBrain[refiNetEnergyBaseIncome] or 0)) and not(aiBrain[refbJustBuiltLotsOfPower]) then
         aiBrain[refbJustBuiltLotsOfPower] = true
         M27Utilities.DelayChangeVariable(aiBrain, refbJustBuiltLotsOfPower, false, 10)
