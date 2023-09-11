@@ -10453,7 +10453,7 @@ end--]]
                             if iEnergyStorageMax == nil then
                                 iEnergyStorageMax = iEnergyStored / iEnergyStoredRatio
                             end
-                            if iEnergyStorageMax < 9000 or iEnergyStorageMax < math.min(67000, 4 * aiBrain[M27Overseer.refiHighestEnemyGroundUnitHealth] / 0.9) then
+                            if iEnergyStorageMax < 9000 or iEnergyStorageMax < math.min(95000, 6 * aiBrain[M27Overseer.refiHighestEnemyGroundUnitHealth] / 0.9) then
                                 iActionToAssign = refActionBuildEnergyStorage
                                 iMaxEngisWanted = 6
                             end
@@ -14821,7 +14821,7 @@ end--]]
                                         if aiBrain[M27EconomyOverseer.refiGrossEnergyBaseIncome] >= 75 and aiBrain[M27EconomyOverseer.refiNetEnergyBaseIncome] >= 15 then
                                             iMaxStorageWanted = math.max(iMaxStorageWanted, 4.44445 * aiBrain[M27Overseer.refiHighestEnemyGroundUnitHealth])
                                         end
-                                        iMaxStorageWanted = math.min(65000, iMaxStorageWanted) --need 60k energy to deal max of 15k, but only a % of current energy (90%?) is used; when sandboxing, dealt max 15k damage at 68.5k storage, and c.800 below max at 63.5k storage
+                                        iMaxStorageWanted = math.min(97000, iMaxStorageWanted) --need 60k energy to deal max of 15k, but only a % of current energy (90%?) is used; when sandboxing, dealt max 15k damage at 68.5k storage, and c.800 below max at 63.5k storage - adjusted for energy storage and overcharge being 7500 rather than 5000
                                     else
                                         --Dont have an ACU so only want energy to manage powerstalls
                                         iMaxStorageWanted = math.min(30000, math.max(5000, iGrossCurEnergyIncome * 40))

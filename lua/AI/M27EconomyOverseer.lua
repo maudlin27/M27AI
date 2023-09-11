@@ -3879,7 +3879,7 @@ end
 function GetEnergyStorageMaximum(aiBrain)
     if aiBrain:GetEconomyStoredRatio('ENERGY') > 0 then return aiBrain:GetEconomyStored('ENERGY') / aiBrain:GetEconomyStoredRatio('ENERGY')
     else
-        return aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEnergyStorage) * 5000 + aiBrain:GetCurrentUnits(categories.COMMAND) * 3900 + 100
+        return aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEnergyStorage) * 7500 + aiBrain:GetCurrentUnits(categories.COMMAND) * 3900 + 100
     end
 end
 
