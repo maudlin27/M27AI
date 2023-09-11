@@ -9189,6 +9189,8 @@ function OverseerInitialisation(aiBrain)
         M27Config.M27ShowUnitNames = true
     end
 
+
+
     aiBrain[refiSearchRangeForEnemyStructures] = 36 --T1 PD has range of 26, want more than this
     aiBrain[refbEnemyHasTech2PD] = false
     aiBrain[refbNeedScoutPlatoons] = false
@@ -9251,7 +9253,12 @@ function OverseerInitialisation(aiBrain)
 
     --ACU specific
     local oACU = M27Utilities.GetACU(aiBrain)
-    oACU[refbACUHelpWanted] = false
+    while not(oACU) do
+        WaitSeconds(1)
+        oACU = M27Utilities.GetACU(aiBrain)
+        if GetGameTimeSeconds() >= 30 then break end
+    end
+    if oACU then oACU[refbACUHelpWanted] = false end
     aiBrain[refbEnemyACUNearOurs] = false
 
 
@@ -9890,9 +9897,14 @@ function TestNewMovementCommands(aiBrain)
 end
 
 function TestCustom(aiBrain)
-    local sFunctionRef = 'TestCustom'
-    --Scenario info.Options
-    LOG('Scenario info options reprs:'..reprs(ScenarioInfo.Options))
+    WaitSeconds(5)
+    local NavUtils = import("/lua/sim/navutils.lua")
+    LOG('Test custoM: ScenarioInfo.size[1]='..(ScenarioInfo.size[1] or 'nil'))
+    NavUtils.Generate()
+    while GetGameTimeSeconds() <= 30 do
+        WaitSeconds(1)
+    end
+    M27MapInfo.DrawAllMapPathing(aiBrain)
 
     --[[
     --Call T3 arti logic when first spawn via cheat
@@ -10440,7 +10452,7 @@ function OverseerManager(aiBrain)
     end
 
     --ForkThread(ConstantBomberLocation, aiBrain)
-    --TestCustom(aiBrain)
+    --ForkThread(TestCustom, aiBrain)
 
 
 

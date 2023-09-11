@@ -366,7 +366,7 @@ function AllocateTeamEnergyResources(iTeam, iFirstM27Brain)
         if bDebugMessages == true then LOG(sFunctionRef..': Considering brain with name='..oBrain.Nickname..'; iEnergyStorageMax='..iEnergyStorageMax..'; Is M27='..tostring(oBrain.M27AI or false)..'; % stored energy='..oBrain:GetEconomyStoredRatio('ENERGY')..'; flagged as stalling energy='..tostring(oBrain[M27EconomyOverseer.refbStallingEnergy] or false)) end
 
         --Does ACU have enemies nearby and we are capable of overcharging?
-        if M27Utilities.GetACU(oBrain).PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] and iEnergyStorageMax >= 5000 then
+        if M27Utilities.GetACU(oBrain).PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] and iEnergyStorageMax >= 7500 then
             if oBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or oBrain[M27EconomyOverseer.refbStallingEnergy] then
                 if oBrain:GetEconomyStoredRatio('ENERGY') < 0.8 then
                     iPriority = 2
