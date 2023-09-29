@@ -380,6 +380,7 @@ function TransportManager(aiBrain)
 
                 bUnloadFirst = false
                 if not(oUnit[refbMoreUnitsWanted]) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Fraction complete='..oUnit:GetFractionComplete()..'; Unit state='..M27Logic.GetUnitState(oUnit)) end
                     if oUnit.GetCargo and M27Utilities.IsTableEmpty(oUnit:GetCargo()) == false then
                         bUnloadFirst = true
                     end

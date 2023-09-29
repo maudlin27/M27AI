@@ -2686,6 +2686,8 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
         local tTorpBombers = aiBrain:GetListOfUnits(refCategoryTorpBomber, false, true)
         local tTransports = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryTransport, false, true)
         local tGunships = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryGunship - categories.EXPERIMENTAL, false, true)
+
+
         --Every 10s update list of closest enemy AA in case we dont have the bomber logic triggering and we have airaa that needs checking aginst this; hgowever only decrease the range dont increase it
         if M27Utilities.IsTableEmpty(tAllAirAA) == false and math.floor(GetGameTimeSeconds() / 10) * 10 == math.floor(GetGameTimeSeconds()) then
             local iAACategoryToConsider
