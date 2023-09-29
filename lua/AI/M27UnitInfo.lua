@@ -203,12 +203,12 @@ refCategoryBomber = categories.AIR * categories.BOMBER - categories.ANTINAVY - c
 refCategoryFighterBomber = categories.AIR * categories.ANTIAIR * categories.BOMBER - categories.EXPERIMENTAL
 refCategoryGunship = categories.AIR * categories.GROUNDATTACK
 refCategoryNoFriendlyFireGunships = refCategoryGunship * categories.TECH3 + refCategoryGunship * categories.TECH1 + refCategoryGunship * categories.UEF * categories.TECH2 + refCategoryGunship * categories.SERAPHIM * categories.TECH2
-refCategoryTorpBomber = categories.AIR * categories.BOMBER * categories.ANTINAVY
+refCategoryTorpBomber = categories.AIR * categories.BOMBER * categories.ANTINAVY + (categories.AIR * categories.ANTINAVY - categories.EXPERIMENTAL)
 refCategoryAllAir = categories.MOBILE * categories.AIR - categories.UNTARGETABLE --Excludes novax
 refCategoryAllNonExpAir = categories.MOBILE * categories.AIR * categories.TECH1 + categories.MOBILE * categories.AIR * categories.TECH2 + categories.MOBILE * categories.AIR * categories.TECH3
 refCategoryAirNonScout = refCategoryAllAir - categories.SCOUT
 refCategoryMercy = categories.HIGHPRIAIR * categories.AEON * categories.BOMBER * categories.TECH2
-refCategoryTransport = categories.AIR * categories.TRANSPORTATION - categories.UEF * categories.GROUNDATTACK
+refCategoryTransport = categories.AIR * categories.TRANSPORTATION - categories.UEF * categories.GROUNDATTACK - refCategoryTorpBomber
 refCategoryRestorer = refCategoryGunship * categories.ANTIAIR
 refCategoryCzar = categories.AIR * categories.EXPERIMENTAL * categories.ANTIAIR * categories.AEON
 
