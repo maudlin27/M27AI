@@ -2299,7 +2299,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                 --Adjust threat for health
                 if iBaseThreat > 0 then
                     --Increase for cargo of transports
-                    if bIncludeAirToGround and EntityCategoryContains(refCategoryTransport, sCurUnitBP) and oUnit.GetCargo then --brewlan bug workaround as it gives torp bombers the transportation category
+                    if bIncludeAirToGround and EntityCategoryContains(M27UnitInfo.refCategoryTransport, sCurUnitBP) and oUnit.GetCargo then --brewlan bug workaround as it gives torp bombers the transportation category
                         if bDebugMessages == true then LOG(sFunctionRef..': Have an enemy transport, will get its cargo and see if it contains LABs') end
                         --Include threat of cargo if cargo are LABs
                         local tCargo = oUnit:GetCargo()
