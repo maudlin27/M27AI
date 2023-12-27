@@ -3114,7 +3114,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 end
                             elseif iCurrentConditionToTry == 12 then --Destroyer if have none
                                 if bDebugMessages == true then LOG(sFunctionRef..': Is table filtered to destroyers empty='..tostring(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryDestroyer, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])))) end
-                                if iFactoryTechLevel >= 2 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryDestroyer, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])) then
+                                if iFactoryTechLevel >= 2 and oFactory[M27Navy.refiAssignedPond] and M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryDestroyer, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])) then
                                     iCategoryToBuild = M27UnitInfo.refCategoryDestroyer
                                 end
                             elseif iCurrentConditionToTry == 13 then --Cruiser if have none (previous condition was if dont ahve air control)
@@ -4179,7 +4179,7 @@ function FactoryOverseer(aiBrain)
     local iCurCycleCount = 0
 
     aiBrain[refiFactoriesTemporarilyPaused] = 0
-    local tAllFactories = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAllFactories + M27UnitInfo.refCategoryQuantumGateway - categories.MOBILE, true, true)
+    local tAllFactories = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAllFactories + M27UnitInfo.refCategoryQuantumGateway - categories.MOBILE -categories.EXTERNALFACTORYUNIT, true, true)
 
     while aiBrain do
         if bDebugMessages == true then LOG(sFunctionRef..': Checking if any idle factories') end
