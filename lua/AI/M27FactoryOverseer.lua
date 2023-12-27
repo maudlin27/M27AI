@@ -4179,7 +4179,7 @@ function FactoryOverseer(aiBrain)
     local iCurCycleCount = 0
 
     aiBrain[refiFactoriesTemporarilyPaused] = 0
-    local tAllFactories = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAllFactories + M27UnitInfo.refCategoryQuantumGateway, true, true)
+    local tAllFactories = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAllFactories + M27UnitInfo.refCategoryQuantumGateway - categories.MOBILE, true, true)
 
     while aiBrain do
         if bDebugMessages == true then LOG(sFunctionRef..': Checking if any idle factories') end
