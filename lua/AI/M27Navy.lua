@@ -1051,7 +1051,7 @@ function GetPrimaryNavalFactory(aiBrain, iPond)
                 M27Team.tTeamData[aiBrain.M27Team][M27Team.reftBackupBaseLocationByPond][iPond] = oPrimaryFactory:GetPosition()
             end
         end
-
+        if not(M27Team.tTeamData[aiBrain.M27Team][M27Team.refoPrimaryNavalFactoryByPond]) then M27Team.tTeamData[aiBrain.M27Team][M27Team.refoPrimaryNavalFactoryByPond] = {} end
         M27Team.tTeamData[aiBrain.M27Team][M27Team.refoPrimaryNavalFactoryByPond][iPond] = oPrimaryFactory
         if oPrimaryFactory then M27Team.tTeamData[aiBrain.M27Team][M27Team.refiTimeOfLastPrimaryNavalUpdateByPond][iPond] = GetGameTimeSeconds()
         else

@@ -1439,6 +1439,7 @@ function GetUpgradeCombatWeighting(sEnhancementRef, iFaction)
             AdvancedEngineering = iMinor, --T2
             ChronoDampener = iDeadly, --ChronoDampener
             CrysalisBeam = iMajor, --Range
+            FAF_CrysalisBeamAdvanced = iMajor,
             EnhancedSensors = iNone, --Sensors
             HeatSink = iMajor, --ROF
             ResourceAllocation = iNone, --RAS
