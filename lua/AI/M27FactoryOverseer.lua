@@ -3144,14 +3144,20 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 local iMaxThreatRatioWanted = 2.5
                                 if M27Conditions.HaveLowMass(aiBrain) then iMaxThreatRatioWanted = 1.5 end
                                 --Decide which threat type has the greatest shortfall
-                                local tEnemySurfaceNavy = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalSurface, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                                local tEnemySurfaceNavy
+                                if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false then
+                                    tEnemySurfaceNavy = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalSurface, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                                end
                                 local iEnemySurfaceThreat = 0
                                 local iOurNavalThreat =   M27Logic.GetCombatThreatRating(aiBrain, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]], false, nil, nil, false, false, false, false, true, false, false)
                                 local iEnemySubmersibleThreat = 0
                                 local iOurAntiNavyThreat = 0
                                 local tOurAntiNavy
                                 if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false then tOurAntiNavy = EntityCategoryFilterDown(categories.ANTINAVY * categories.MOBILE, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) end
-                                local tEnemySubs = EntityCategoryFilterDown(M27UnitInfo.refCategorySubmarine, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                                local tEnemySubs
+                                if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false then
+                                    tEnemySubs = EntityCategoryFilterDown(M27UnitInfo.refCategorySubmarine, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                                end
 
                                 --local iSurfaceCategoryToBuild = M27UnitInfo.refCategoryFrigate + M27UnitInfo.refCategoryDestroyer + categories.TECH3 * categories.DIRECTFIRE * M27UnitInfo.refCategoryNavalSurface
 
