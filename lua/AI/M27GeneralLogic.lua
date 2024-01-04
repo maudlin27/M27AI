@@ -1439,6 +1439,7 @@ function GetUpgradeCombatWeighting(sEnhancementRef, iFaction)
             AdvancedEngineering = iMinor, --T2
             ChronoDampener = iDeadly, --ChronoDampener
             CrysalisBeam = iMajor, --Range
+            FAF_CrysalisBeamAdvanced = iMajor,
             EnhancedSensors = iNone, --Sensors
             HeatSink = iMajor, --ROF
             ResourceAllocation = iNone, --RAS
@@ -2299,7 +2300,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                 --Adjust threat for health
                 if iBaseThreat > 0 then
                     --Increase for cargo of transports
-                    if bIncludeAirToGround and EntityCategoryContains(categories.TRANSPORTATION, sCurUnitBP) and oUnit.GetCargo then
+                    if bIncludeAirToGround and EntityCategoryContains(M27UnitInfo.refCategoryTransport, sCurUnitBP) and oUnit.GetCargo then --brewlan bug workaround as it gives torp bombers the transportation category
                         if bDebugMessages == true then LOG(sFunctionRef..': Have an enemy transport, will get its cargo and see if it contains LABs') end
                         --Include threat of cargo if cargo are LABs
                         local tCargo = oUnit:GetCargo()

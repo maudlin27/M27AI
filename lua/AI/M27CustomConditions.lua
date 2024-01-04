@@ -14,6 +14,7 @@ local M27Navy = import('/mods/M27AI/lua/AI/M27Navy.lua')
 tGunUpgrades = { 'HeavyAntiMatterCannon',
                        'CrysalisBeam', --Range
                        'HeatSink', --Aeon
+                       'FAF_CrysalisBeamAdvanced', --Aeon extra range
                        'CoolingUpgrade',
                        'RateOfFire'
 }

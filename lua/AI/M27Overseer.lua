@@ -9511,6 +9511,7 @@ function GameSettingWarningsAndChecks(aiBrain)
             M27Conditions.tGunUpgrades = { 'HeavyAntiMatterCannon',
                                            'CrysalisBeam', --Range
                                            'HeatSink', --Aeon
+                                           'FAF_CrysalisBeamAdvanced', --Aeon extra range
                                            'CoolingUpgrade',
                                            'RateOfFire',
                 --Blackops:
