@@ -2093,3 +2093,12 @@ function IssueTrackedClearCommands(tUnits)
 
     IssueClearCommands(tUnits)
 end
+
+function SimpleProfiler(iInterval)
+    local iTimeOfLastCycle
+    while true do
+        iTimeOfLastCycle = GetSystemTimeSecondsOnlyForProfileUse()
+        WaitSeconds(10)
+        LOG('SimpleProfiler: Time='..math.floor(GetGameTimeSeconds()*10)..'; Time taken cumulative='..GetSystemTimeSecondsOnlyForProfileUse()..'; Time since last update='..(GetSystemTimeSecondsOnlyForProfileUse() -iTimeOfLastCycle))
+    end
+end

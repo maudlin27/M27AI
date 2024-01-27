@@ -16,6 +16,7 @@ function BeginSession()
     --Call anything e.g. profilers
     if M27Config.M27RunSoftlesProfiling then ForkThread(M27Utilities.StartSoftlesProfiling) end
     if M27Config.M27StatTracking then ForkThread(M27Stats.StatTrackingInitialisation) end
+    if M27Config.M27RunSimpleProfiling then ForkThread(M27Utilities.SimpleProfiler, 10) end
 end
 
 local M27OnCreateArmyBrain = OnCreateArmyBrain
