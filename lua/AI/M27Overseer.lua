@@ -6865,7 +6865,7 @@ function UpdateFurthestBuildingDistances(aiBrain)
 end
 
 function AddUnitToBigThreatTable(aiBrain, oUnit)
-    local bDebugMessages = false
+    local bDebugMessages = true
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --local bDebugMessages = M27Config.M27StrategicLog
     local sFunctionRef = 'AddUnitToBigThreatTable'
@@ -6902,20 +6902,20 @@ function AddUnitToBigThreatTable(aiBrain, oUnit)
                     if bConsiderChatWarning and M27Utilities.IsTableEmpty(aiBrain[sReferenceTable]) then
                         if sReferenceTable == reftEnemyArtiAndExpStructure then
                             if EntityCategoryContains(M27UnitInfo.refCategoryNovaxCentre, oUnit.UnitId) then
-                                M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy Novax detected', 0, 1000, true)
+                                M27Chat.SendMessage(aiBrain, oUnit.UnitId..aiBrain.M27Team, 'Enemy Novax detected', 10, 10000, true)
                             elseif EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oUnit.UnitId) then
-                                M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy T3 arti detected', 0, 1000, true)
+                                M27Chat.SendMessage(aiBrain, oUnit.UnitId..aiBrain.M27Team, 'Enemy T3 arti detected', 10, 10000, true)
                             elseif EntityCategoryContains(M27UnitInfo.refCategoryExperimentalStructure, oUnit.UnitId) then
-                                if oUnit:GetFractionComplete() <= 0.2 and oUnit:GetAIBrain():GetCurrentUnits(M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryRASSACU + M27UnitInfo.refCategoryParagon) <= 20 then
-                                    M27Chat.SendMessage(aiBrain, sReferenceTable, 'LOL theyre building a '..LOCF(oUnit:GetBlueprint().General.UnitName), 0, 1000, true)
+                                if oUnit:GetFractionComplete() <= 0.2 and oUnit:GetAIBrain():GetCurrentUnits(M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryRASSACU) <= 20 and oUnit:GetAIBrain():GetCurrentUnits(M27UnitInfo.refCategoryParagon) == 0 then
+                                    M27Chat.SendMessage(aiBrain, sReferenceTable..aiBrain.M27Team, 'LOL theyre building a '..LOCF(oUnit:GetBlueprint().General.UnitName), 10, 10000, true)
                                 else
-                                    M27Chat.SendMessage(aiBrain, sReferenceTable, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 0, 1000, true)
+                                    M27Chat.SendMessage(aiBrain, sReferenceTable..aiBrain.M27Team, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 10, 10000, true)
                                 end
                             end
                         elseif sReferenceTable == reftEnemyLandExperimentals then
-                            M27Chat.SendMessage(aiBrain, oUnit.UnitId, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 0, 1000, true)
+                            M27Chat.SendMessage(aiBrain, oUnit.UnitId..aiBrain.M27Team, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 10, 10000, true)
                         else
-                            M27Chat.SendMessage(aiBrain, sReferenceTable, 'Enemy '..sReferenceTable..' detected', 0, 1000, true)
+                            M27Chat.SendMessage(aiBrain, sReferenceTable..aiBrain.M27Team, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 10, 10000, true)
                         end
                     end
 

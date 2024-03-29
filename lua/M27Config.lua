@@ -19,6 +19,7 @@ M27ProfilingIgnoreFirst2Seconds = true --Means logic relating to pathing generat
 --M27ProfilingIgnoreFirstMin = true --Means logic relating to pathing generation gets ignored
 M27RunSoftlesProfiling = false --Runs Softles profiling which tracks every function call (not just in my code but in the game) which allows calculation of the average tick length that a function occurs in (i.e. doesnt track time spent by each function but instead can use the correlation between function calls and how long a tick is taking)
 M27RunGamePerformanceCheck = false --Runs regardless of whether M27 is active in the game, sends a log every second with how long it took to run that second and how many units are in the game.  Intended for August 2022 AI tourney performance profiling
+M27RunSimpleProfiling = false --if true then will output time taken every 10s
 
 
 --Randomness for alternative strategies
