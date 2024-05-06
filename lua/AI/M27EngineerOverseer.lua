@@ -11012,7 +11012,7 @@ end--]]
                                     else
                                         iActionToAssign = refActionAssistHQUpgrade
                                         iMaxEngisWanted = 1
-                                        if not(bHaveLowMass) or aiBrain:GetEconomyStored('MASS') > 0 or aiBrain[refiNetMassBaseIncome] > -0.5 then
+                                        if not(bHaveLowMass) or aiBrain:GetEconomyStored('MASS') > 0 or aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > -0.5 then
                                             iMaxEngisWanted = 4
                                         end
                                         if bDebugMessages == true then LOG(sFunctionRef..': Want to assist HQ upgrade as a high priority, iMaxEngisWanted='..iMaxEngisWanted) end
@@ -12350,7 +12350,7 @@ end--]]
                                 else
                                     iActionToAssign = refActionAssistHQUpgrade
                                     iMaxEngisWanted = 1
-                                    if not(bHaveLowMass) or aiBrain:GetEconomyStored('MASS') > 0 or aiBrain[refiNetMassBaseIncome] > -0.5 then
+                                    if not(bHaveLowMass) or aiBrain:GetEconomyStored('MASS') > 0 or aiBrain[M27EconomyOverseer.refiNetMassBaseIncome] > -0.5 then
                                         iMaxEngisWanted = 3
                                         if not(bHaveLowMass) then iMaxEngisWanted = 5 end
                                     end
