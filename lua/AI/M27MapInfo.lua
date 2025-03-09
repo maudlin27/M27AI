@@ -14,6 +14,16 @@ local M27PlatoonTemplates = import('/mods/M27AI/lua/AI/M27PlatoonTemplates.lua')
 local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
 local M27Navy = import('/mods/M27AI/lua/AI/M27Navy.lua')
+local NavUtils = import("/lua/sim/navutils.lua")
+
+local file_exists = function(name)
+    local file = DiskGetFileInfo(name)
+    if file == false or file == nil then
+        return false
+    else
+        return true
+    end
+end
 
 bUsingArmyIndexForStartPosition = false --by default will assume armies are ARMY_1 etc.; this will be changed to true if any exceptions are found
 MassPoints = {} -- Stores position of each mass point (as a position value, i.e. a table with 3 values, x, y, z
@@ -2874,7 +2884,14 @@ function RecordBaseLevelPathability()
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --Manually uncomment out logs that want - disabled for performance reasons for the most part
     local sFunctionRef = 'RecordBaseLevelPathability'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local bFAFActive = false
+    if file_exists('/lua/sim/navutils.lua') then
+        bFAFActive = true
+    end
 
+    if bFAFActive and not(NavUtils.IsGenerated()) then
+        NavUtils.Generate()
+    end
     --Setup some common logic used to see if it makes things faster
     local Max = math.max
     local Min = math.min
@@ -2982,6 +2999,7 @@ function RecordBaseLevelPathability()
 
     function IsAmphibiousPathableAlongLine(xStartInteger, xEndInteger, zStartInteger, zEndInteger)--, bForceDebug)
         --Thanks to Balthazar for figuring out a more accurate test for pathability (look in whole integer intervals of 1 and compare height dif to see if it's >0.75)  - have used this idea to update my previous code
+        if bFAFActive then return NavUtils.GetLabel(sPathingAmphibious, {xStartInteger, 0, xEndInteger}) == NavUtils.GetLabel(sPathingAmphibious, {zStartInteger, 0, zEndInteger}) end
 
         --This is mostly a copy of land pathing but with changes for water
         --local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -3138,7 +3156,7 @@ function RecordBaseLevelPathability()
         --local sFunctionRef = 'IsLandPathableAlongLine'
         --if xStartInteger >= 150 and xEndInteger <= 350 and zStartInteger >= 150 and zEndInteger <= 350 then bDebugMessages = true end
         --if bDebugMessages == true then LOG(sFunctionRef..': Start of code, X Start-End='..xStartInteger..'-'..xEndInteger..'; Z='..zStartInteger..'-'..zEndInteger..'; iMaxDifInHeight='..iMaxDifInHeight) end
-
+        if bFAFActive then return NavUtils.GetLabel(sPathingLand, {xStartInteger, 0, xEndInteger}) == NavUtils.GetLabel(sPathingLand, {zStartInteger, 0, zEndInteger}) end
         local sTerrainType
         local tiTerrainHeights = {}
         local iFloorStartX = math.floor(xStartInteger)
@@ -3239,7 +3257,7 @@ function RecordBaseLevelPathability()
         --local sFunctionRef = 'IsLandPathableAlongLine'
 
         --local iNavyMinWaterDepth = iMinWaterDepth
-
+        if bFAFActive then return NavUtils.GetLabel(sPathingNavy, {xStartInteger, 0, xEndInteger}) == NavUtils.GetLabel(sPathingNavy, {zStartInteger, 0, zEndInteger}) end
         local iIntervalX = xEndInteger - xStartInteger
         local iIntervalZ = zEndInteger - zStartInteger
         --local iHeightDif
@@ -3392,113 +3410,144 @@ function RecordBaseLevelPathability()
                             end
                         end
                         if bWaterOrLandCheck then
-                            --Not on water (if looking at land pathing)/not on land (if looking at navy pathing)
-                            iCurPathingGroup = iCurPathingGroup + 1
-                            --RecordSegmentGroup(iSegmentX, iSegmentZ, sPathing, iCurPathingGroup)
-                            iCurRecursivePosition = iCurRecursivePosition + 1
-
-                            while iCurRecursivePosition > 1 do
-                                bHaveSubsequentPath = false
-                                RecordPathingGroup(sPathing, iSegmentX, iSegmentZ, iCurPathingGroup)
-                                local tAllAdjacentSegments = {
-                                    {iSegmentX - 1, iSegmentZ -1},
-                                    {iSegmentX - 1, iSegmentZ},
-                                    {iSegmentX - 1, iSegmentZ +1},
-
-                                    {iSegmentX, iSegmentZ - 1},
-                                    {iSegmentX, iSegmentZ + 1},
-
-                                    {iSegmentX + 1, iSegmentZ - 1},
-                                    {iSegmentX + 1, iSegmentZ},
-                                    {iSegmentX + 1, iSegmentZ + 1},
-
-                                }
-
-
-                                --if bDebugMessages == true then LOG(sFunctionRef..': iSegmentX-Z='..iSegmentX..'-'..iSegmentZ..'; iCurRecursivePosition='..iCurRecursivePosition..': About to check if are at edge of map') end
-                                --Dont check if are at map edge (if we really wanted to optimise this then I expect predefined tables of all the options would work but for now I'll leave it at this
-                                if iSegmentX >= iMaxSegmentX or iSegmentZ >= iMaxSegmentZ or iSegmentX < 2 or iSegmentZ < 2 then
-                                    --if bDebugMessages == true then LOG(sFunctionRef..': Are at map edge so limit the adjacent segments to consider') end
-                                    tAllAdjacentSegments = {}
-                                    local bCanDecreaseX, bCanIncreaseX, bCanDecreaseZ, bCanIncreaseZ
-                                    if iSegmentX >= 2 then bCanDecreaseX = true end
-                                    if iSegmentZ >= 2 then bCanDecreaseZ = true end
-                                    if iSegmentX < iMaxSegmentX then bCanIncreaseX = true end
-                                    if iSegmentZ < iMaxSegmentZ then bCanIncreaseZ = true end
-                                    if bCanDecreaseX then
-                                        if bCanDecreaseZ then table.insert(tAllAdjacentSegments, {iSegmentX - 1, iSegmentZ -1}) end
-                                        if bCanIncreaseZ then table.insert(tAllAdjacentSegments, {iSegmentX - 1, iSegmentZ +1}) end
-                                        table.insert(tAllAdjacentSegments, {iSegmentX - 1, iSegmentZ})
+                            if bFAFActive then
+                                tCurPosition = GetPositionFromPathingSegments(iSegmentX, iSegmentZ)
+                                iCurPathingGroup = NavUtils.GetLabel(sPathing, tCurPosition)
+                                if not(iCurPathingGroup) then
+                                    if bCheckForWater == true then
+                                        iCurTerrainHeight = GetTerrainHeight(tCurPosition[1], tCurPosition[3])
+                                        iCurSurfaceHeight = GetSurfaceHeight(tCurPosition[1], tCurPosition[3])
+                                        if iCurTerrainHeight < iCurSurfaceHeight then
+                                            --Have water
+                                            if not(bCheckForLand) then bWaterOrLandCheck = false end
+                                        elseif bCheckForLand then bWaterOrLandCheck = false end
+                                        if bWaterOrLandCheck == false then
+                                            RecordPathingGroup(sPathing, iBaseSegmentX, iBaseSegmentZ, iLandPathingGroupForWater)
+                                        end
                                     end
-                                    if bCanIncreaseX then
-                                        if bCanDecreaseZ then table.insert(tAllAdjacentSegments, {iSegmentX + 1, iSegmentZ -1}) end
-                                        if bCanIncreaseZ then table.insert(tAllAdjacentSegments, {iSegmentX + 1, iSegmentZ +1}) end
-                                        table.insert(tAllAdjacentSegments, {iSegmentX + 1, iSegmentZ})
+                                    --Search in straight line in 8 directions until find somewhere pathable
+                                    for iPositionAdjustSize = 2, 10, 2 do
+                                        for iAdjustXMod = -1, 1, 1 do
+                                            for iAdjustZMod = -1, 1, 1 do
+                                                if not(iAdjustXMod == 0) or not(iAdjustZMod == 0) then
+                                                    iCurPathingGroup = NavUtils.GetLabel(sPathing, {tCurPosition[1] + iAdjustXMod * iPositionAdjustSize, 0, tCurPosition[3] + iAdjustZMod * iPositionAdjustSize})
+                                                    if iCurPathingGroup then break end
+                                                end
+                                            end
+                                        end
                                     end
-                                    if bCanDecreaseZ then table.insert(tAllAdjacentSegments, {iSegmentX, iSegmentZ -1}) end
-                                    if bCanIncreaseZ then table.insert(tAllAdjacentSegments, {iSegmentX, iSegmentZ +1}) end
                                 end
+                                if not(iCurPathingGroup) then iCurPathingGroup = -1 end
+                                RecordPathingGroup(sPathing, iBaseSegmentX, iBaseSegmentZ, iCurPathingGroup)
+                            else
+                                --Not on water (if looking at land pathing)/not on land (if looking at navy pathing)
+                                iCurPathingGroup = iCurPathingGroup + 1
+                                --RecordSegmentGroup(iSegmentX, iSegmentZ, sPathing, iCurPathingGroup)
+                                iCurRecursivePosition = iCurRecursivePosition + 1
+
+                                while iCurRecursivePosition > 1 do
+                                    bHaveSubsequentPath = false
+                                    RecordPathingGroup(sPathing, iSegmentX, iSegmentZ, iCurPathingGroup)
+                                    local tAllAdjacentSegments = {
+                                        {iSegmentX - 1, iSegmentZ -1},
+                                        {iSegmentX - 1, iSegmentZ},
+                                        {iSegmentX - 1, iSegmentZ +1},
+
+                                        {iSegmentX, iSegmentZ - 1},
+                                        {iSegmentX, iSegmentZ + 1},
+
+                                        {iSegmentX + 1, iSegmentZ - 1},
+                                        {iSegmentX + 1, iSegmentZ},
+                                        {iSegmentX + 1, iSegmentZ + 1},
+
+                                    }
 
 
-                                --if bDebugMessages == true then LOG(sFunctionRef..': iSegmentX-Z='..iSegmentX..'-'..iSegmentZ..'; iCurRecursivePosition='..iCurRecursivePosition..': Number of adjacent locations to consider='..table.getn(tAllAdjacentSegments)) end
-                                for iEntry, tAdjacentSegment in tAllAdjacentSegments do
-                                    --if bDebugMessages == true then LOG(sFunctionRef..': Considering adjacent segment; iEntry='..iEntry..'; tAdjacentSegment='..repru(tAdjacentSegment)) end
-                                    if tPathingSegmentGroupBySegment[sPathing][tAdjacentSegment[1]][tAdjacentSegment[2]] == nil then
-                                        tTargetPosition = GetPositionFromPathingSegments(tAdjacentSegment[1], tAdjacentSegment[2])
-                                        --if bDebugMessages == true then LOG(sFunctionRef..': iEntry='..iEntry..': Have no entry yet for XZ='..tAdjacentSegment[1]..'-'..tAdjacentSegment[2]..' so will see if we can path there; tTargetPosition='..repru(tTargetPosition)..'; tCurPosition='..repru(tCurPosition)..'; iSegmentXZ='..iSegmentX..'-'..iSegmentZ) end
-                                        if bLandPathing then
-                                            if IsLandPathableAlongLine(tCurPosition[1], tTargetPosition[1], tCurPosition[3], tTargetPosition[3]) then
-                                                bHaveSubsequentPath = true
-                                            end
-                                        elseif bAmphibPathing then
-                                            if IsAmphibiousPathableAlongLine(tCurPosition[1], tTargetPosition[1], tCurPosition[3], tTargetPosition[3]) then
-                                                --BELOW COMMENTED OUT SECTIONS ARE FOR DEBUG PURPOSES ONLY - allow highlighting of sections between land and sea that are pathable to each other, and enabling of logs
-                                                --[[local bCurPositionUnderwater = true
-                                                local bTargetPositionUnderwater = true
-                                                local bMoveFromLandToWater = false
-                                                local iTerrainHeightCur = GetTerrainHeight(tCurPosition[1], tCurPosition[3])
-                                                local iTerrainHeightTarget = GetTerrainHeight(tTargetPosition[1], tTargetPosition[3])
-                                                local iMapWaterHeightCur = GetSurfaceHeight(tCurPosition[1], tCurPosition[3])
-                                                local iMapWaterHeightTarget = GetSurfaceHeight(tTargetPosition[1], tTargetPosition[3])
-
-                                                if iTerrainHeightCur == iMapWaterHeightCur then bCurPositionUnderwater = false end
-                                                if iTerrainHeightTarget == iMapWaterHeightTarget then bTargetPositionUnderwater = false end
-                                                if bCurPositionUnderwater == true and bTargetPositionUnderwater == false then bMoveFromLandToWater = true
-                                                elseif bCurPositionUnderwater == false and bTargetPositionUnderwater == true then bMoveFromLandToWater = true end
-                                                if bMoveFromLandToWater == true then
-                                                    LOG(sFunctionRef..': Moving from land to water, tCurPosition='..repru(tCurPosition)..'; tTargetPosition='..repru(tTargetPosition)..'; iTerrainHeightCur='..iTerrainHeightCur..'; iMapWaterHeightCur='..iMapWaterHeightCur..'; iTerrainHeightTarget='..iTerrainHeightTarget..'; iMapWaterHeightTarget='..iMapWaterHeightTarget..'; will redo the logic with logs enabled')
-                                                    M27Utilities.DrawLocations({tCurPosition, tTargetPosition}, nil, 1, 500)
-                                                    IsAmphibiousPathableAlongLine(tCurPosition[1], tTargetPosition[1], tCurPosition[3], tTargetPosition[3], true)
-                                                end--]]
-
-                                                bHaveSubsequentPath = true
-                                            end
-                                        elseif bNavyPathfinding then
-                                            if IsNavyPathableAlongLine(tCurPosition[1], tTargetPosition[1], tCurPosition[3], tTargetPosition[3]) then
-                                                bHaveSubsequentPath = true
-                                                if iMapWaterHeight == 0 then iMapWaterHeight = GetSurfaceHeight(tCurPosition[1], tCurPosition[3]) end
-                                            end
+                                    --if bDebugMessages == true then LOG(sFunctionRef..': iSegmentX-Z='..iSegmentX..'-'..iSegmentZ..'; iCurRecursivePosition='..iCurRecursivePosition..': About to check if are at edge of map') end
+                                    --Dont check if are at map edge (if we really wanted to optimise this then I expect predefined tables of all the options would work but for now I'll leave it at this
+                                    if iSegmentX >= iMaxSegmentX or iSegmentZ >= iMaxSegmentZ or iSegmentX < 2 or iSegmentZ < 2 then
+                                        --if bDebugMessages == true then LOG(sFunctionRef..': Are at map edge so limit the adjacent segments to consider') end
+                                        tAllAdjacentSegments = {}
+                                        local bCanDecreaseX, bCanIncreaseX, bCanDecreaseZ, bCanIncreaseZ
+                                        if iSegmentX >= 2 then bCanDecreaseX = true end
+                                        if iSegmentZ >= 2 then bCanDecreaseZ = true end
+                                        if iSegmentX < iMaxSegmentX then bCanIncreaseX = true end
+                                        if iSegmentZ < iMaxSegmentZ then bCanIncreaseZ = true end
+                                        if bCanDecreaseX then
+                                            if bCanDecreaseZ then table.insert(tAllAdjacentSegments, {iSegmentX - 1, iSegmentZ -1}) end
+                                            if bCanIncreaseZ then table.insert(tAllAdjacentSegments, {iSegmentX - 1, iSegmentZ +1}) end
+                                            table.insert(tAllAdjacentSegments, {iSegmentX - 1, iSegmentZ})
                                         end
-                                        if bHaveSubsequentPath then
-                                            iSegmentX = tAdjacentSegment[1]
-                                            iSegmentZ = tAdjacentSegment[2]
-                                            break
+                                        if bCanIncreaseX then
+                                            if bCanDecreaseZ then table.insert(tAllAdjacentSegments, {iSegmentX + 1, iSegmentZ -1}) end
+                                            if bCanIncreaseZ then table.insert(tAllAdjacentSegments, {iSegmentX + 1, iSegmentZ +1}) end
+                                            table.insert(tAllAdjacentSegments, {iSegmentX + 1, iSegmentZ})
                                         end
+                                        if bCanDecreaseZ then table.insert(tAllAdjacentSegments, {iSegmentX, iSegmentZ -1}) end
+                                        if bCanIncreaseZ then table.insert(tAllAdjacentSegments, {iSegmentX, iSegmentZ +1}) end
+                                    end
+
+
+                                    --if bDebugMessages == true then LOG(sFunctionRef..': iSegmentX-Z='..iSegmentX..'-'..iSegmentZ..'; iCurRecursivePosition='..iCurRecursivePosition..': Number of adjacent locations to consider='..table.getn(tAllAdjacentSegments)) end
+                                    for iEntry, tAdjacentSegment in tAllAdjacentSegments do
+                                        --if bDebugMessages == true then LOG(sFunctionRef..': Considering adjacent segment; iEntry='..iEntry..'; tAdjacentSegment='..repru(tAdjacentSegment)) end
+                                        if tPathingSegmentGroupBySegment[sPathing][tAdjacentSegment[1]][tAdjacentSegment[2]] == nil then
+                                            tTargetPosition = GetPositionFromPathingSegments(tAdjacentSegment[1], tAdjacentSegment[2])
+                                            --if bDebugMessages == true then LOG(sFunctionRef..': iEntry='..iEntry..': Have no entry yet for XZ='..tAdjacentSegment[1]..'-'..tAdjacentSegment[2]..' so will see if we can path there; tTargetPosition='..repru(tTargetPosition)..'; tCurPosition='..repru(tCurPosition)..'; iSegmentXZ='..iSegmentX..'-'..iSegmentZ) end
+                                            if bLandPathing then
+                                                if IsLandPathableAlongLine(tCurPosition[1], tTargetPosition[1], tCurPosition[3], tTargetPosition[3]) then
+                                                    bHaveSubsequentPath = true
+                                                end
+                                            elseif bAmphibPathing then
+                                                if IsAmphibiousPathableAlongLine(tCurPosition[1], tTargetPosition[1], tCurPosition[3], tTargetPosition[3]) then
+                                                    --BELOW COMMENTED OUT SECTIONS ARE FOR DEBUG PURPOSES ONLY - allow highlighting of sections between land and sea that are pathable to each other, and enabling of logs
+                                                    --[[local bCurPositionUnderwater = true
+                                                    local bTargetPositionUnderwater = true
+                                                    local bMoveFromLandToWater = false
+                                                    local iTerrainHeightCur = GetTerrainHeight(tCurPosition[1], tCurPosition[3])
+                                                    local iTerrainHeightTarget = GetTerrainHeight(tTargetPosition[1], tTargetPosition[3])
+                                                    local iMapWaterHeightCur = GetSurfaceHeight(tCurPosition[1], tCurPosition[3])
+                                                    local iMapWaterHeightTarget = GetSurfaceHeight(tTargetPosition[1], tTargetPosition[3])
+
+                                                    if iTerrainHeightCur == iMapWaterHeightCur then bCurPositionUnderwater = false end
+                                                    if iTerrainHeightTarget == iMapWaterHeightTarget then bTargetPositionUnderwater = false end
+                                                    if bCurPositionUnderwater == true and bTargetPositionUnderwater == false then bMoveFromLandToWater = true
+                                                    elseif bCurPositionUnderwater == false and bTargetPositionUnderwater == true then bMoveFromLandToWater = true end
+                                                    if bMoveFromLandToWater == true then
+                                                        LOG(sFunctionRef..': Moving from land to water, tCurPosition='..repru(tCurPosition)..'; tTargetPosition='..repru(tTargetPosition)..'; iTerrainHeightCur='..iTerrainHeightCur..'; iMapWaterHeightCur='..iMapWaterHeightCur..'; iTerrainHeightTarget='..iTerrainHeightTarget..'; iMapWaterHeightTarget='..iMapWaterHeightTarget..'; will redo the logic with logs enabled')
+                                                        M27Utilities.DrawLocations({tCurPosition, tTargetPosition}, nil, 1, 500)
+                                                        IsAmphibiousPathableAlongLine(tCurPosition[1], tTargetPosition[1], tCurPosition[3], tTargetPosition[3], true)
+                                                    end--]]
+
+                                                    bHaveSubsequentPath = true
+                                                end
+                                            elseif bNavyPathfinding then
+                                                if IsNavyPathableAlongLine(tCurPosition[1], tTargetPosition[1], tCurPosition[3], tTargetPosition[3]) then
+                                                    bHaveSubsequentPath = true
+                                                    if iMapWaterHeight == 0 then iMapWaterHeight = GetSurfaceHeight(tCurPosition[1], tCurPosition[3]) end
+                                                end
+                                            end
+                                            if bHaveSubsequentPath then
+                                                iSegmentX = tAdjacentSegment[1]
+                                                iSegmentZ = tAdjacentSegment[2]
+                                                break
+                                            end
+                                        else
+                                            --if bDebugMessages == true then LOG(sFunctionRef..': Already have a pathing group which is '..tPathingSegmentGroupBySegment[sPathing][tAdjacentSegment[1]][tAdjacentSegment[2]]) end
+                                        end
+                                    end
+                                    if bHaveSubsequentPath == true then
+                                        tRecursivePosition[iCurRecursivePosition] = {iSegmentX, iSegmentZ}
+                                        iCurRecursivePosition = iCurRecursivePosition + 1
+                                        --if bDebugMessages == true then LOG(sFunctionRef..': Can path to the new segment so setting cur segment equal to the new segment') end
                                     else
-                                        --if bDebugMessages == true then LOG(sFunctionRef..': Already have a pathing group which is '..tPathingSegmentGroupBySegment[sPathing][tAdjacentSegment[1]][tAdjacentSegment[2]]) end
+                                        iCurRecursivePosition = iCurRecursivePosition - 1
+                                        iSegmentX = tRecursivePosition[iCurRecursivePosition][1]
+                                        iSegmentZ = tRecursivePosition[iCurRecursivePosition][2]
+                                        --if bDebugMessages == true then LOG(sFunctionRef..': Have nowhere that can path to that havent already considered, so moving recursive position back one, iCurRecursivePosition='..iCurRecursivePosition..'; New segment X-Z='..repru(tRecursivePosition[iCurRecursivePosition])) end
                                     end
+                                    if iCurRecursivePosition > 1 then tCurPosition = GetPositionFromPathingSegments(iSegmentX, iSegmentZ) end
                                 end
-                                if bHaveSubsequentPath == true then
-                                    tRecursivePosition[iCurRecursivePosition] = {iSegmentX, iSegmentZ}
-                                    iCurRecursivePosition = iCurRecursivePosition + 1
-                                    --if bDebugMessages == true then LOG(sFunctionRef..': Can path to the new segment so setting cur segment equal to the new segment') end
-                                else
-                                    iCurRecursivePosition = iCurRecursivePosition - 1
-                                    iSegmentX = tRecursivePosition[iCurRecursivePosition][1]
-                                    iSegmentZ = tRecursivePosition[iCurRecursivePosition][2]
-                                    --if bDebugMessages == true then LOG(sFunctionRef..': Have nowhere that can path to that havent already considered, so moving recursive position back one, iCurRecursivePosition='..iCurRecursivePosition..'; New segment X-Z='..repru(tRecursivePosition[iCurRecursivePosition])) end
-                                end
-                                if iCurRecursivePosition > 1 then tCurPosition = GetPositionFromPathingSegments(iSegmentX, iSegmentZ) end
                             end
                         end
                     end
