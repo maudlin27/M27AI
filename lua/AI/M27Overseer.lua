@@ -6865,7 +6865,7 @@ function UpdateFurthestBuildingDistances(aiBrain)
 end
 
 function AddUnitToBigThreatTable(aiBrain, oUnit)
-    local bDebugMessages = true
+    local bDebugMessages = false
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --local bDebugMessages = M27Config.M27StrategicLog
     local sFunctionRef = 'AddUnitToBigThreatTable'
