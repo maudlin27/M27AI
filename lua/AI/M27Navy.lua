@@ -172,7 +172,7 @@ function RecordPonds()
                     tPondDetails[iPathingGroup] = {}
                     --Are we actually underwater?
                     tbUnderwaterGroup[iPathingGroup] = M27MapInfo.IsUnderwater(M27MapInfo.GetPositionFromPathingSegments(iSegmentX, iSegmentZ)) --GetPosition returns the terrain height
-                    if bDebugMessages == true then LOG(sFunctionRef..': Considering pathing group '..iPathingGroup..'; is this underwater='..tostring(tbUnderwaterGroup[iPathingGroup])) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering pathing group '..iPathingGroup..' for iSegmentX='..iSegmentX..'; iSegmentZ='..iSegmentZ..'; is this underwater='..tostring(tbUnderwaterGroup[iPathingGroup])) end
                     if tbUnderwaterGroup[iPathingGroup] then
                         tPondDetails[iPathingGroup][subrefPondMinX] = 100000
                         tPondDetails[iPathingGroup][subrefPondMinZ] = 100000

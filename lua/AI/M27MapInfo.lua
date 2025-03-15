@@ -3392,6 +3392,7 @@ function RecordBaseLevelPathability()
                 else
                     iCurRecursivePosition = 1
                     --Check not already determined this
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering sPathing='..sPathing..'; iBaseSegmentX='..iBaseSegmentX..'; iBaseSegmentZ='..iBaseSegmentZ..'; tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX][iBaseSegmentZ]='..(tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX][iBaseSegmentZ] or 'nil')..'; bCheckForWater='..tostring(bCheckForWater or false)..'; bFAFActive='..tostring(bFAFActive)..'; bCheckForLand='..tostring(bCheckForLand)) end
                     if tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX][iBaseSegmentZ] == nil then
                         bWaterOrLandCheck = true
                         iSegmentX = iBaseSegmentX
@@ -3401,11 +3402,13 @@ function RecordBaseLevelPathability()
                         if bCheckForWater == true then
                             iCurTerrainHeight = GetTerrainHeight(tCurPosition[1], tCurPosition[3])
                             iCurSurfaceHeight = GetSurfaceHeight(tCurPosition[1], tCurPosition[3])
+                            if bDebugMessages == true then LOG(sFunctionRef..': Is terrain height below surface height='..tostring(iCurTerrainHeight<    iCurSurfaceHeight)..'; iCurTerrainHeight='..iCurTerrainHeight..'; iCurSurfaceHeight='..iCurSurfaceHeight) end
                             if iCurTerrainHeight < iCurSurfaceHeight then
                                 --Have water
                                 if not(bCheckForLand) then bWaterOrLandCheck = false end
                             elseif bCheckForLand then bWaterOrLandCheck = false end
                             if bWaterOrLandCheck == false then
+                                if bDebugMessages == true then LOG(sFunctionRef..': will record the pathing group using iLandPathingGroupForWater='..iLandPathingGroupForWater) end
                                 RecordPathingGroup(sPathing, iBaseSegmentX, iBaseSegmentZ, iLandPathingGroupForWater)
                             end
                         end
@@ -3413,6 +3416,13 @@ function RecordBaseLevelPathability()
                             if bFAFActive then
                                 tCurPosition = GetPositionFromPathingSegments(iSegmentX, iSegmentZ)
                                 iCurPathingGroup = NavUtils.GetLabel(sPathing, tCurPosition)
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef..': tCurPosition='..repru(tCurPosition)..'; iCurPathingGroup='..(iCurPathingGroup or 'nil')..'; Is terrain height lower than surface height='..tostring(GetTerrainHeight(tCurPosition[1], tCurPosition[3]) < GetSurfaceHeight(tCurPosition[1], tCurPosition[3]))..'; IsUnderWater function result='..tostring(IsUnderwater(tCurPosition))..'; iMapWaterHeight='..iMapWaterHeight..'; tCurPosition[2]='..tCurPosition[2])
+                                    if not(iCurPathingGroup) and GetTerrainHeight(tCurPosition[1], tCurPosition[3]) < GetSurfaceHeight(tCurPosition[1], tCurPosition[3]) then
+                                        LOG(sFunctionRef..': Time='..GetGameTimeSeconds()..'; NavUtils.IsGenerated()='..tostring(NavUtils.IsGenerated())..'; iCurPathingGroup after wait='..(iCurPathingGroup or 'nil')..'; Amphib pathing='..(NavUtils.GetLabel(M27UnitInfo.refPathingTypeAmphibious, tCurPosition) or 'nil')..'; Land pathing='..(NavUtils.GetLabel(M27UnitInfo.refPathingTypeLand, tCurPosition) or 'nil'))
+                                        --if not(iCurPathingGroup) then ForkThread(M27Utilities.DrawCircleAroundPoint, tCurPosition, 2, 200, 2) end
+                                    end
+                                end
                                 if not(iCurPathingGroup) then
                                     if bCheckForWater == true then
                                         iCurTerrainHeight = GetTerrainHeight(tCurPosition[1], tCurPosition[3])
@@ -3436,8 +3446,10 @@ function RecordBaseLevelPathability()
                                             end
                                         end
                                     end
+                                elseif iMapWaterHeight == 0 then iMapWaterHeight = GetSurfaceHeight(tCurPosition[1], tCurPosition[3])
                                 end
                                 if not(iCurPathingGroup) then iCurPathingGroup = -1 end
+                                if bDebugMessages == true and iCurPathingGroup >= 0 then LOG(sFunctionRef..': Have a valid pathing group for iBaseSegmentX='..iBaseSegmentX..'; iBaseSegmentZ='..iBaseSegmentZ) end
                                 RecordPathingGroup(sPathing, iBaseSegmentX, iBaseSegmentZ, iCurPathingGroup)
                             else
                                 --Not on water (if looking at land pathing)/not on land (if looking at navy pathing)
