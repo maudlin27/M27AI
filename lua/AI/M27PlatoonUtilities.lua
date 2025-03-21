@@ -2158,7 +2158,7 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
     local iHeightAtWhichConsideredUnderwater = M27MapInfo.IsUnderwater(GetPlatoonFrontPosition(oPlatoon), true)
     local iMaxDistanceForLandSearch = math.max(20, oPlatoon[refiPlatoonMaxRange] * 0.5)
 
-    if bDebugMessages == true then LOG(sFunctionRef..': Time='..GetGameTimeSeconds()..'; Checking if underwater; iHeightAtWhichConsideredUnderwater='..iHeightAtWhichConsideredUnderwater..'; Cur Position height='..GetPlatoonFrontPosition(oPlatoon)[2]..'; Surface height='..GetSurfaceHeight(GetPlatoonFrontPosition(oPlatoon)[1], GetPlatoonFrontPosition(oPlatoon)[3])..'; terrain height='..GetTerrainHeight(GetPlatoonFrontPosition(oPlatoon)[1], GetPlatoonFrontPosition(oPlatoon)[3])..'; Front unit position (if dif)='..repru(oPlatoon[refoFrontUnit]:GetPosition())..'; Front unit='..oPlatoon[refoFrontUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit])) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Time='..GetGameTimeSeconds()..'; Checking if underwater; iHeightAtWhichConsideredUnderwater='..iHeightAtWhichConsideredUnderwater..'; Cur Position height='..GetPlatoonFrontPosition(oPlatoon)[2]..'; Surface height='..GetSurfaceHeight(GetPlatoonFrontPosition(oPlatoon)[1], GetPlatoonFrontPosition(oPlatoon)[3])..'; terrain height='..GetTerrainHeight(GetPlatoonFrontPosition(oPlatoon)[1], GetPlatoonFrontPosition(oPlatoon)[3])..'; Front unit position (if dif)='..repru(oPlatoon[refoFrontUnit]:GetPosition())..'; Front unit='..oPlatoon[refoFrontUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit])..'; iMapWaterHeight='..M27MapInfo.iMapWaterHeight) end
 
 
     if GetPlatoonFrontPosition(oPlatoon)[2] < iHeightAtWhichConsideredUnderwater then
@@ -8043,7 +8043,7 @@ function DeterminePlatoonAction(oPlatoon)
                                                         if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Finished checking action for if stuck, CurAction='..(oPlatoon[refiCurrentAction] or 'nil')) end
                                                         if oPlatoon[refiCurrentAction] == nil then
                                                             --ACU specific: Get nearby reclaim if no enemies within ACU gun range (even if dont have gun); also consider getting t2 upgrade even if nearby enemies
-                                                            if bDebugMessages == true then LOG(sFunctionRef..': Cur action is nil, will check for recliam if are an ACU platoon; oPlatoon[refbACUInPlatoon]='..tostring(oPlatoon[refbACUInPlatoon])..'; oPlatoon[refbConsiderReclaim]='..tostring(oPlatoon[refbConsiderReclaim])) end
+                                                            if bDebugMessages == true then LOG(sFunctionRef..': Cur action is nil, will check for recliam if are an ACU platoon; oPlatoon[refbACUInPlatoon]='..tostring(oPlatoon[refbACUInPlatoon])..'; oPlatoon[refbConsiderReclaim]='..tostring(oPlatoon[refbConsiderReclaim])..'; oPlatoon[refbConsiderMexes]='..tostring(oPlatoon[refbConsiderMexes] or false)) end
                                                             if oPlatoon[refbACUInPlatoon] then
                                                                 if oPlatoon[refbConsiderReclaim] == true then
                                                                     DetermineActionForNearbyReclaim(oPlatoon)
@@ -8071,6 +8071,7 @@ function DeterminePlatoonAction(oPlatoon)
                                                                 elseif oPlatoon[refbACUInPlatoon] and not(oPlatoon[refiCurrentAction]) and oPlatoon[refiEnemiesInRange] == 0 then
                                                                     --Check for underwater action if no nearby enemies as may not have done before
                                                                     GetUnderwaterActionForLandUnit(oPlatoon)
+                                                                    if bDebugMessages == true then LOG(sFunctionRef..': Finished getting underwater action for land unit, is action nil='..tostring(oPlatoon[refiCurrentAction] == nil)) end
                                                                 end
                                                                 if oPlatoon[refiCurrentAction] == nil then
                                                                     --if not(sPlatoonName == M27Overseer.sIntelPlatoonRef) then --Dont want completion action for intel when it reaches the target path

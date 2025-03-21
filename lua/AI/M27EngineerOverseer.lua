@@ -10836,6 +10836,7 @@ end--]]
                                     LOG(sFunctionRef .. ': Condition ' .. iCurrentConditionToTry .. ': iAllUnclaimedMexesInPathingGroup=' .. iAllUnclaimedMexesInPathingGroup)
                                 end
                             end
+                            if bDebugMessages == true then LOG(sFunctionRef..': iAllUnclaimedMexesInPathingGroup='..iAllUnclaimedMexesInPathingGroup) end
                             if iAllUnclaimedMexesInPathingGroup > 0 then
                                 --Initial build order - if no hydro and we dont have muc hpower, then dont assign engis to mexe as want them for power instead
                                 --Have adjusted ACU build order to support initial engis getting mexes with no hydro as well

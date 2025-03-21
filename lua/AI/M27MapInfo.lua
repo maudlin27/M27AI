@@ -3446,8 +3446,8 @@ function RecordBaseLevelPathability()
                                             end
                                         end
                                     end
-                                elseif iMapWaterHeight == 0 then iMapWaterHeight = GetSurfaceHeight(tCurPosition[1], tCurPosition[3])
                                 end
+                                if bNavyPathfinding and iCurPathingGroup and iMapWaterHeight == 0 then iMapWaterHeight = GetSurfaceHeight(tCurPosition[1], tCurPosition[3]) end
                                 if not(iCurPathingGroup) then iCurPathingGroup = -1 end
                                 if bDebugMessages == true and iCurPathingGroup >= 0 then LOG(sFunctionRef..': Have a valid pathing group for iBaseSegmentX='..iBaseSegmentX..'; iBaseSegmentZ='..iBaseSegmentZ) end
                                 RecordPathingGroup(sPathing, iBaseSegmentX, iBaseSegmentZ, iCurPathingGroup)
