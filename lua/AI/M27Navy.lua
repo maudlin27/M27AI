@@ -4107,6 +4107,7 @@ function GetPondToFocusOn(aiBrain)
     if iPondWanted then
         iBestPondDefensiveValue = (aiBrain[reftiPondThreatToUs][iPondWanted] or 0)
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': Near start, iBestPondDefensiveValue='..(iBestPondDefensiveValue or 'nil')..'; iPondWanted='..(iPondWanted or 'nil')..'; Is tableo f enemy units by pond empyt='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]))) end
     if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]) == false then
         for iPondWithEnemies, tEnemyUnits in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond] do
             if bDebugMessages == true then
@@ -4124,6 +4125,7 @@ function GetPondToFocusOn(aiBrain)
             end
         end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code, iPondWanted='..(iPondWanted or 'nil')) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iPondWanted
 end
