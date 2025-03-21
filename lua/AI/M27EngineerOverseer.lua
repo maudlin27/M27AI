@@ -13467,19 +13467,23 @@ end--]]
                                                     end
                                                 end
                                                 if iCompletedNavalFactory > 0 then
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': We have a completed naval fac so wont try and build except if have enough eco and want multiple') end
                                                     bBuildNavalFactory = false
                                                     --Do we want more than 1 naval factory? (if have <6 factories, none are aeon, we have enough eco, and dont have T2+
                                                     if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] <= 2 and aiBrain[M27Overseer.refiOurHighestNavalFactoryTech] == 1 and iUpgradingNavalFactory == 0 and iCompletedNavalFactory < 6 and (iAeonFactories == 0 or iCompletedNavalFactory < 2) and iCompletedNavalFactory < aiBrain[M27EconomyOverseer.refiGrossMassBaseIncome] * 1.5 and iCompletedNavalFactory < aiBrain[M27Navy.reftiPondValueToUs][iPondWanted] * 0.5 then
                                                         --Have we tried and failed ot build additional naval factories?
                                                         if (aiBrain[refiTimeOfLastFailure][refActionBuildNavalFactory] or 0) <= 0 then
                                                             bBuildNavalFactory = true
+                                                            if bDebugMessages == true then LOG(sFunctionRef..': We havent failed to build a naval fac so will try and build one') end
                                                         end
 
                                                     end
                                                 end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': bBuildNavalFactory='..tostring(bBuildNavalFactory)) end
                                                 if bBuildNavalFactory then
                                                     iActionToAssign = refActionBuildNavalFactory
                                                     iMaxEngisWanted = math.max(1, math.min(5, iPondEngisWanted + iCurPondEngis))
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Want to build a naval factory, iMaxEngisWanted='..iMaxEngisWanted) end
                                                 elseif iCompletedNavalFactory > 0 then
 
                                                     iActionToAssign = refActionAssistNavalFactory
@@ -13512,6 +13516,7 @@ end--]]
                                                             --No naval factory near our primary naval base so switch to building a naval factory instead
                                                             iActionToAssign = refActionBuildNavalFactory
                                                             iMaxEngisWanted = 1
+                                                            if bDebugMessages == true then LOG(sFunctionRef..': Will try and build a naval factory as none to assist') end
                                                         end
                                                     end
                                                 end
@@ -13521,6 +13526,7 @@ end--]]
                                 end
                             end
                         end
+                        bDebugMessages = false
 
                     elseif iCurrentConditionToTry == 36 then
                         --Nuke assist
