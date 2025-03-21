@@ -13526,7 +13526,6 @@ end--]]
                                 end
                             end
                         end
-                        bDebugMessages = false
 
                     elseif iCurrentConditionToTry == 36 then
                         --Nuke assist
